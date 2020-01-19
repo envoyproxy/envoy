@@ -6,11 +6,11 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/data/core/v3alpha/health_check_event.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
@@ -256,7 +256,7 @@ public:
   Secret::MockSecretManager& secretManager() override { return secret_manager_; };
 
   MOCK_METHOD(ClusterManagerPtr, clusterManagerFromProto,
-              (const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap));
+              (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
 
   MOCK_METHOD(Http::ConnectionPool::InstancePtr, allocateConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
@@ -269,11 +269,11 @@ public:
                Network::TransportSocketOptionsSharedPtr));
 
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>), clusterFromProto,
-              (const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
+              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
   MOCK_METHOD(CdsApiPtr, createCds,
-              (const envoy::config::core::v3alpha::ConfigSource& cds_config, ClusterManager& cm));
+              (const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm));
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
@@ -306,7 +306,7 @@ public:
 
   // Upstream::ClusterManager
   MOCK_METHOD(bool, addOrUpdateCluster,
-              (const envoy::config::cluster::v3alpha::Cluster& cluster,
+              (const envoy::config::cluster::v3::Cluster& cluster,
                const std::string& version_info));
   MOCK_METHOD(void, setInitializedCb, (std::function<void()>));
   MOCK_METHOD(ClusterInfoMap, clusters, ());
@@ -322,7 +322,7 @@ public:
   MOCK_METHOD(Http::AsyncClient&, httpAsyncClientForCluster, (const std::string& cluster));
   MOCK_METHOD(bool, removeCluster, (const std::string& cluster));
   MOCK_METHOD(void, shutdown, ());
-  MOCK_METHOD(const envoy::config::core::v3alpha::BindConfig&, bindConfig, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::BindConfig&, bindConfig, (), (const));
   MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
   MOCK_METHOD(const std::string, versionInfo, (), (const));
@@ -335,7 +335,7 @@ public:
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Tcp::ConnectionPool::MockInstance> tcp_conn_pool_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
-  envoy::config::core::v3alpha::BindConfig bind_config_;
+  envoy::config::core::v3::BindConfig bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   absl::optional<std::string> local_cluster_name_;
@@ -363,19 +363,19 @@ public:
 class MockHealthCheckEventLogger : public HealthCheckEventLogger {
 public:
   MOCK_METHOD(void, logEjectUnhealthy,
-              (envoy::data::core::v3alpha::HealthCheckerType, const HostDescriptionConstSharedPtr&,
-               envoy::data::core::v3alpha::HealthCheckFailureType));
+              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
+               envoy::data::core::v3::HealthCheckFailureType));
   MOCK_METHOD(void, logAddHealthy,
-              (envoy::data::core::v3alpha::HealthCheckerType, const HostDescriptionConstSharedPtr&,
+              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
                bool));
   MOCK_METHOD(void, logUnhealthy,
-              (envoy::data::core::v3alpha::HealthCheckerType, const HostDescriptionConstSharedPtr&,
-               envoy::data::core::v3alpha::HealthCheckFailureType, bool));
+              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
+               envoy::data::core::v3::HealthCheckFailureType, bool));
   MOCK_METHOD(void, logDegraded,
-              (envoy::data::core::v3alpha::HealthCheckerType,
+              (envoy::data::core::v3::HealthCheckerType,
                const HostDescriptionConstSharedPtr&));
   MOCK_METHOD(void, logNoLongerDegraded,
-              (envoy::data::core::v3alpha::HealthCheckerType,
+              (envoy::data::core::v3::HealthCheckerType,
                const HostDescriptionConstSharedPtr&));
 };
 

@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
@@ -126,10 +126,10 @@ public:
   virtual AccessLog::AccessLogManager& accessLogManager() PURE;
 
   /**
-   * @return envoy::config::core::v3alpha::TrafficDirection the direction of the traffic relative to
+   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
    * the local proxy.
    */
-  virtual envoy::config::core::v3alpha::TrafficDirection direction() const PURE;
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -168,10 +168,10 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return const envoy::config::core::v3alpha::Metadata& the config metadata associated with this
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
    * listener.
    */
-  virtual const envoy::config::core::v3alpha::Metadata& listenerMetadata() const PURE;
+  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.

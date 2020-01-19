@@ -1,11 +1,11 @@
 #pragma once
 
 #include "envoy/config/config_provider_manager.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/config_provider_impl.h"
 #include "common/config/resources.h"
@@ -28,7 +28,7 @@ public:
   }
   ~MockSubscriptionCallbacks() override = default;
   static std::string
-  resourceName_(const envoy::config::endpoint::v3alpha::ClusterLoadAssignment& resource) {
+  resourceName_(const envoy::config::endpoint::v3::ClusterLoadAssignment& resource) {
     return resource.cluster_name();
   }
   template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
@@ -37,7 +37,7 @@ public:
               (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                const std::string& version_info));
   MOCK_METHOD(void, onConfigUpdate,
-              (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+              (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&
                    added_resources,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                const std::string& system_version_info));
@@ -58,7 +58,7 @@ public:
   ~MockSubscriptionFactory() override;
 
   MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
-              (const envoy::config::core::v3alpha::ConfigSource& config, absl::string_view type_url,
+              (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
@@ -116,7 +116,7 @@ public:
 };
 
 class MockGrpcStreamCallbacks
-    : public GrpcStreamCallbacks<envoy::service::discovery::v3alpha::DiscoveryResponse> {
+    : public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   MockGrpcStreamCallbacks();
   ~MockGrpcStreamCallbacks() override;
@@ -124,7 +124,7 @@ public:
   MOCK_METHOD(void, onStreamEstablished, ());
   MOCK_METHOD(void, onEstablishmentFailure, ());
   MOCK_METHOD(void, onDiscoveryResponse,
-              (std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> && message));
+              (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message));
   MOCK_METHOD(void, onWriteable, ());
 };
 

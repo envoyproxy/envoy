@@ -14,7 +14,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:codes_interface",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,8 +42,8 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -60,10 +60,10 @@ envoy_cc_library(
         "//source/common/http:async_client_lib",
         "//source/common/http:codes_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -77,7 +77,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )

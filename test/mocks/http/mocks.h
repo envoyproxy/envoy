@@ -139,7 +139,7 @@ public:
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(absl::optional<Router::ConfigConstSharedPtr>, routeConfig, ());
   MOCK_METHOD(void, clearRouteCache, ());
-  MOCK_METHOD(uint64_t, streamId, ());
+  MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
@@ -215,7 +215,7 @@ public:
   MOCK_METHOD(bool, canRequestRouteConfigUpdate, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(void, clearRouteCache, ());
-  MOCK_METHOD(uint64_t, streamId, ());
+  MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());

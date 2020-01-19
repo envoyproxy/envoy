@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/extensions/filters/http/fault/v3alpha/fault.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 
 #include "test/test_common/utility.h"
 
@@ -11,9 +11,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-inline envoy::extensions::filters::http::fault::v3alpha::HTTPFault
+inline envoy::extensions::filters::http::fault::v3::HTTPFault
 convertYamlStrToProtoConfig(const std::string& yaml) {
-  envoy::extensions::filters::http::fault::v3alpha::HTTPFault fault;
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   TestUtility::loadFromYaml(yaml, fault);
   return fault;
 }

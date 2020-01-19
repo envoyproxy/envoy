@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/http/buffer/v3alpha/buffer.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -116,18 +116,20 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
-  envoy::extensions::filters::http::buffer::v3alpha::BufferPerRoute buffer_per_route;
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute buffer_per_route;
   TestUtility::loadFromJson(json_config, buffer_per_route);
 
-  return [buffer_per_route](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                                HttpConnectionManager& cfg) {
-    auto* config = cfg.mutable_route_config()
-                       ->mutable_virtual_hosts()
-                       ->Mutable(0)
-                       ->mutable_typed_per_filter_config();
+  return
+      [buffer_per_route](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cfg) {
+        auto* config = cfg.mutable_route_config()
+                           ->mutable_virtual_hosts()
+                           ->Mutable(0)
+                           ->mutable_typed_per_filter_config();
 
-    (*config)["envoy.buffer"].PackFrom(buffer_per_route);
-  };
+        (*config)["envoy.buffer"].PackFrom(buffer_per_route);
+      };
 }
 
 TEST_P(BufferIntegrationTest, RouteDisabled) {

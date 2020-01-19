@@ -5,7 +5,7 @@
 #include <list>
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -86,15 +86,15 @@ public:
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
-  MOCK_METHOD(const std::shared_ptr<envoy::config::core::v3alpha::Metadata>, metadata, (), (const));
-  MOCK_METHOD(void, metadata, (const envoy::config::core::v3alpha::Metadata&));
+  MOCK_METHOD(const std::shared_ptr<envoy::config::core::v3::Metadata>, metadata, (), (const));
+  MOCK_METHOD(void, metadata, (const envoy::config::core::v3::Metadata&));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
   MOCK_METHOD(Network::TransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(HostStats&, stats, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3alpha::Locality&, locality, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   Stats::StatName localityZoneStatName() const override {
@@ -132,7 +132,9 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
-  CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override {
+  CreateConnectionData
+  createHealthCheckConnection(Event::Dispatcher& dispatcher,
+                              Network::TransportSocketOptionsSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
@@ -155,8 +157,8 @@ public:
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
-  MOCK_METHOD(const std::shared_ptr<envoy::config::core::v3alpha::Metadata>, metadata, (), (const));
-  MOCK_METHOD(void, metadata, (const envoy::config::core::v3alpha::Metadata&));
+  MOCK_METHOD(const std::shared_ptr<envoy::config::core::v3::Metadata>, metadata, (), (const));
+  MOCK_METHOD(void, metadata, (const envoy::config::core::v3::Metadata&));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
   MOCK_METHOD((std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>),
               counters, (), (const));
@@ -183,7 +185,7 @@ public:
   MOCK_METHOD(void, weight, (uint32_t new_weight));
   MOCK_METHOD(bool, used, (), (const));
   MOCK_METHOD(void, used, (bool new_used));
-  MOCK_METHOD(const envoy::config::core::v3alpha::Locality&, locality, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));

@@ -1,6 +1,6 @@
 #include "extensions/filters/http/csrf/csrf_filter.h"
 
-#include "envoy/extensions/filters/http/csrf/v3alpha/csrf.pb.h"
+#include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
@@ -61,14 +61,14 @@ static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
 }
 
 static CsrfPolicyPtr
-generatePolicy(const envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy& policy,
+generatePolicy(const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
                Runtime::Loader& runtime) {
   return std::make_unique<CsrfPolicy>(policy, runtime);
 }
 } // namespace
 
 CsrfFilterConfig::CsrfFilterConfig(
-    const envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy& policy,
+    const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, runtime)) {}
 

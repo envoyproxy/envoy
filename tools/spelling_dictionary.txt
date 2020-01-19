@@ -510,6 +510,7 @@ dir
 dirname
 djb
 downcasted
+downcasting
 downstreams
 dtor
 dubbo
@@ -575,6 +576,7 @@ gcov
 genrule
 getaddrinfo
 getaffinity
+gethostname
 getifaddrs
 getpeername
 getsockname
@@ -882,6 +884,8 @@ referer
 refetch
 regex
 regexes
+reified
+reify
 reimplements
 rele
 releasor
@@ -893,6 +897,7 @@ repicked
 repo
 requirepass
 reselecting
+reserialize
 reservable
 resize
 resized

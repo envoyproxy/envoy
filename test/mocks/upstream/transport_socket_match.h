@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/stats/isolated_store_impl.h"
@@ -18,7 +18,7 @@ public:
   MockTransportSocketMatcher(Network::TransportSocketFactoryPtr default_factory);
   ~MockTransportSocketMatcher() override;
   MOCK_METHOD(TransportSocketMatcher::MatchData, resolve,
-              (const envoy::config::core::v3alpha::Metadata&), (const));
+              (const envoy::config::core::v3::Metadata&), (const));
 
 private:
   Network::TransportSocketFactoryPtr socket_factory_;

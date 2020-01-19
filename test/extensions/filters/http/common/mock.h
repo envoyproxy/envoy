@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/http_uri.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
@@ -17,7 +17,7 @@ class MockJwksFetcher : public JwksFetcher {
 public:
   MOCK_METHOD(void, cancel, ());
   MOCK_METHOD(void, fetch,
-              (const envoy::config::core::v3alpha::HttpUri& uri, Tracing::Span& parent_span,
+              (const envoy::config::core::v3::HttpUri& uri, Tracing::Span& parent_span,
                JwksReceiver& receiver));
 };
 

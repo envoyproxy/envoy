@@ -52,7 +52,7 @@ class UpgradeVisitor(visitor.Visitor):
     return re.sub(ENVOY_COMMENT_WITH_TYPE_REGEX, UpgradeType, c)
 
   def _UpgradedPostMethod(self, m):
-    return re.sub(r'^/v2/', '/v3alpha/', m)
+    return re.sub(r'^/v2/', '/v3/', m)
 
   # Upgraded type using canonical type naming, e.g. foo.bar.
   def _UpgradedTypeCanonical(self, t):
@@ -210,7 +210,7 @@ class UpgradeVisitor(visitor.Visitor):
 
 
 def V3MigrationXform(envoy_internal_shadow, file_proto):
-  """Transform a FileDescriptorProto from v2[alpha\d] to v3alpha.
+  """Transform a FileDescriptorProto from v2[alpha\d] to v3.
 
   Args:
     envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.

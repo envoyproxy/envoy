@@ -75,6 +75,7 @@ public:
   MOCK_METHOD(int, getsockopt_,
               (int sockfd, int level, int optname, void* optval, socklen_t* optlen));
   MOCK_METHOD(SysCallIntResult, socket, (int domain, int type, int protocol));
+  MOCK_METHOD(SysCallIntResult, gethostname, (char* name, size_t length));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<int, int, int>;

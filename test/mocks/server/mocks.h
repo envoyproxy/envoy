@@ -6,11 +6,11 @@
 #include <string>
 
 #include "envoy/common/mutex_tracer.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
@@ -70,7 +70,7 @@ public:
   MOCK_METHOD(uint64_t, baseId, (), (const));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(const std::string&, configPath, (), (const));
-  MOCK_METHOD(const envoy::config::bootstrap::v3alpha::Bootstrap&, configProto, (), (const));
+  MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
   MOCK_METHOD(const std::string&, configYaml, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
@@ -99,7 +99,7 @@ public:
   MOCK_METHOD(Server::CommandLineOptionsPtr, toCommandLineOptions, (), (const));
 
   std::string config_path_;
-  envoy::config::bootstrap::v3alpha::Bootstrap config_proto_;
+  envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
@@ -244,23 +244,23 @@ public:
   ~MockListenerComponentFactory() override;
 
   DrainManagerPtr
-  createDrainManager(envoy::config::listener::v3alpha::Listener::DrainType drain_type) override {
+  createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override {
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
-  LdsApiPtr createLdsApi(const envoy::config::core::v3alpha::ConfigSource& lds_config) override {
+  LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {
     return LdsApiPtr{createLdsApi_(lds_config)};
   }
 
   MOCK_METHOD(LdsApi*, createLdsApi_,
-              (const envoy::config::core::v3alpha::ConfigSource& lds_config));
+              (const envoy::config::core::v3::ConfigSource& lds_config));
   MOCK_METHOD(std::vector<Network::FilterFactoryCb>, createNetworkFilterFactoryList,
-              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
+              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                Configuration::FilterChainFactoryContext& filter_chain_factory_context));
   MOCK_METHOD(std::vector<Network::ListenerFilterFactoryCb>, createListenerFilterFactoryList,
-              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&,
+              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(std::vector<Network::UdpListenerFilterFactoryCb>, createUdpListenerFilterFactoryList,
-              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&,
+              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&,
                Configuration::ListenerFactoryContext& context));
   MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
               (Network::Address::InstanceConstSharedPtr address,
@@ -268,7 +268,7 @@ public:
                const Network::Socket::OptionsSharedPtr& options,
                const ListenSocketCreationParams& params));
   MOCK_METHOD(DrainManager*, createDrainManager_,
-              (envoy::config::listener::v3alpha::Listener::DrainType drain_type));
+              (envoy::config::listener::v3::Listener::DrainType drain_type));
   MOCK_METHOD(uint64_t, nextListenerTag, ());
 
   std::shared_ptr<Network::MockListenSocket> socket_;
@@ -280,9 +280,9 @@ public:
   ~MockListenerManager() override;
 
   MOCK_METHOD(bool, addOrUpdateListener,
-              (const envoy::config::listener::v3alpha::Listener& config,
+              (const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, bool modifiable));
-  MOCK_METHOD(void, createLdsApi, (const envoy::config::core::v3alpha::ConfigSource& lds_config));
+  MOCK_METHOD(void, createLdsApi, (const envoy::config::core::v3::ConfigSource& lds_config));
   MOCK_METHOD(std::vector<std::reference_wrapper<Network::ListenerConfig>>, listeners, ());
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(bool, removeListener, (const std::string& listener_name));
@@ -291,6 +291,7 @@ public:
   MOCK_METHOD(void, stopWorkers, ());
   MOCK_METHOD(void, beginListenerUpdate, ());
   MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates &&));
+  MOCK_METHOD(ApiListenerOptRef, apiListener, ());
 };
 
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {
@@ -521,8 +522,8 @@ public:
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3alpha::Metadata&, listenerMetadata, (), (const));
-  MOCK_METHOD(envoy::config::core::v3alpha::TrafficDirection, direction, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
+  MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }

@@ -225,7 +225,7 @@ private:
       return;
     }
     // We need to map from envoy::type::matcher::StringMatcher::kRegex to
-    // envoy::type::matcher::v3alpha::StringMatcher::kHiddenEnvoyDeprecatedRegex.
+    // envoy::type::matcher::v3::StringMatcher::kHiddenEnvoyDeprecatedRegex.
     const auto constant_rename =
         ProtoCxxUtils::renameConstant(decl_name, latest_type_info->renames_);
     if (constant_rename) {

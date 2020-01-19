@@ -37,10 +37,15 @@ static_resources:
     type: strict_dns
     lb_policy: round_robin
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: kv-backend-service
-        port_value: 8081
+    load_assignment:
+      cluster_name: backend_grpc_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: kv-backend-service
+                port_value: 8081
 
 admin:
   access_log_path: "/tmp/admin_access.log"

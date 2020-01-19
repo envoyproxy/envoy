@@ -15,7 +15,7 @@ envoy_cc_library(
     deps = [
         ":private_key_callbacks_interface",
         "//include/envoy/event:dispatcher_interface",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -26,7 +26,7 @@ envoy_cc_library(
         ":private_key_interface",
         "//include/envoy/config:typed_config_interface",
         "//include/envoy/registry",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 

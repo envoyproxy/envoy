@@ -10,11 +10,11 @@
 
 #include "envoy/common/time.h"
 #include "envoy/config/config_provider.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -25,7 +25,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/stats/fake_symbol_table_impl.h"
@@ -83,13 +83,13 @@ class TestHedgePolicy : public HedgePolicy {
 public:
   // Router::HedgePolicy
   uint32_t initialRequests() const override { return initial_requests_; }
-  const envoy::type::v3alpha::FractionalPercent& additionalRequestChance() const override {
+  const envoy::type::v3::FractionalPercent& additionalRequestChance() const override {
     return additional_request_chance_;
   }
   bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
   uint32_t initial_requests_{};
-  envoy::type::v3alpha::FractionalPercent additional_request_chance_{};
+  envoy::type::v3::FractionalPercent additional_request_chance_{};
   bool hedge_on_per_try_timeout_{};
 };
 
@@ -188,18 +188,16 @@ public:
 class TestShadowPolicy : public ShadowPolicy {
 public:
   TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
-                   envoy::type::v3alpha::FractionalPercent default_value = {})
+                   envoy::type::v3::FractionalPercent default_value = {})
       : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value) {}
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
-  const envoy::type::v3alpha::FractionalPercent& defaultValue() const override {
-    return default_value_;
-  }
+  const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
 
   std::string cluster_;
   std::string runtime_key_;
-  envoy::type::v3alpha::FractionalPercent default_value_;
+  envoy::type::v3::FractionalPercent default_value_;
 };
 
 class MockShadowWriter : public ShadowWriter {
@@ -337,7 +335,7 @@ public:
   MOCK_METHOD((const std::multimap<std::string, std::string>&), opaqueConfig, (), (const));
   MOCK_METHOD(bool, includeVirtualHostRateLimits, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
-  MOCK_METHOD(const envoy::config::core::v3alpha::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
@@ -361,7 +359,7 @@ public:
   MockTlsContextMatchCriteria tls_context_matches_criteria_;
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
-  envoy::config::core::v3alpha::Metadata metadata_;
+  envoy::config::core::v3::Metadata metadata_;
   UpgradeMap upgrade_map_;
 };
 
@@ -383,9 +381,9 @@ public:
   ~MockRouteTracing() override;
 
   // Router::RouteTracing
-  MOCK_METHOD(const envoy::type::v3alpha::FractionalPercent&, getClientSampling, (), (const));
-  MOCK_METHOD(const envoy::type::v3alpha::FractionalPercent&, getRandomSampling, (), (const));
-  MOCK_METHOD(const envoy::type::v3alpha::FractionalPercent&, getOverallSampling, (), (const));
+  MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getClientSampling, (), (const));
+  MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getRandomSampling, (), (const));
+  MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getOverallSampling, (), (const));
   MOCK_METHOD(const Tracing::CustomTagMap&, getCustomTags, (), (const));
 };
 
@@ -434,7 +432,7 @@ public:
   MOCK_METHOD(absl::optional<ConfigInfo>, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
   MOCK_METHOD(void, onConfigUpdate, ());
-  MOCK_METHOD(void, validateConfig, (const envoy::config::route::v3alpha::RouteConfiguration&),
+  MOCK_METHOD(void, validateConfig, (const envoy::config::route::v3::RouteConfiguration&),
               (const));
   MOCK_METHOD(void, requestVirtualHostsUpdate,
               (const std::string&, Event::Dispatcher&,
@@ -450,11 +448,11 @@ public:
 
   MOCK_METHOD(
       RouteConfigProviderSharedPtr, createRdsRouteConfigProvider,
-      (const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
+      (const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
        Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
        Init::Manager& init_manager));
   MOCK_METHOD(RouteConfigProviderPtr, createStaticRouteConfigProvider,
-              (const envoy::config::route::v3alpha::RouteConfiguration& route_config,
+              (const envoy::config::route::v3::RouteConfiguration& route_config,
                Server::Configuration::FactoryContext& factory_context));
 };
 

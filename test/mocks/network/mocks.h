@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -54,7 +54,7 @@ public:
   ~MockAddressResolver() override;
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, resolve,
-              (const envoy::config::core::v3alpha::SocketAddress&));
+              (const envoy::config::core::v3::SocketAddress&));
   MOCK_METHOD(std::string, name, (), (const));
 };
 
@@ -233,10 +233,10 @@ public:
   ~MockSocketOption() override;
 
   MOCK_METHOD(bool, setOption,
-              (Socket&, envoy::config::core::v3alpha::SocketOption::SocketState state), (const));
+              (Socket&, envoy::config::core::v3::SocketOption::SocketState state), (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));
   MOCK_METHOD(absl::optional<Socket::Option::Details>, getOptionDetails,
-              (const Socket&, envoy::config::core::v3alpha::SocketOption::SocketState state),
+              (const Socket&, envoy::config::core::v3::SocketOption::SocketState state),
               (const));
 };
 
@@ -316,8 +316,8 @@ public:
   MOCK_METHOD(const Network::ActiveUdpListenerFactory*, udpListenerFactory, ());
   MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
 
-  envoy::config::core::v3alpha::TrafficDirection direction() const override {
-    return envoy::config::core::v3alpha::UNSPECIFIED;
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
   }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;

@@ -26,7 +26,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )
 
@@ -66,6 +66,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:config",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )

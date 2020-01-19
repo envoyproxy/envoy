@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
@@ -41,7 +41,7 @@ public:
     }
   }
 
-  MOCK_METHOD(bool, deprecatedFeatureEnabled, (const std::string& key), (const));
+  MOCK_METHOD(bool, deprecatedFeatureEnabled, (const std::string& key, bool default_enabled), (const));
   MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
   MOCK_METHOD(bool, featureEnabled, (const std::string& key, uint64_t default_value), (const));
   MOCK_METHOD(bool, featureEnabled,
@@ -52,10 +52,10 @@ public:
               (const));
   MOCK_METHOD(bool, featureEnabled,
               (const std::string& key,
-               const envoy::type::v3alpha::FractionalPercent& default_value),
+               const envoy::type::v3::FractionalPercent& default_value),
               (const));
   MOCK_METHOD(bool, featureEnabled,
-              (const std::string& key, const envoy::type::v3alpha::FractionalPercent& default_value,
+              (const std::string& key, const envoy::type::v3::FractionalPercent& default_value,
                uint64_t random_value),
               (const));
   MOCK_METHOD(const std::string&, get, (const std::string& key), (const));

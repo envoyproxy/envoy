@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/ssl/context.h"
@@ -117,7 +117,7 @@ public:
   ~MockPrivateKeyMethodManager() override;
 
   MOCK_METHOD(PrivateKeyMethodProviderSharedPtr, createPrivateKeyMethodProvider,
-              (const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
+              (const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
                Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
 };
 

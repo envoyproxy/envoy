@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/metadata/v2/metadata.pb.h"
 #include "envoy/type/tracing/v2/custom_tag.pb.h"
 
@@ -321,7 +321,7 @@ MetadataCustomTag::MetadataCustomTag(const std::string& tag,
       metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 
 void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
-  const envoy::config::core::v3alpha::Metadata* meta = metadata(ctx);
+  const envoy::config::core::v3::Metadata* meta = metadata(ctx);
   if (!meta) {
     if (!default_value_.empty()) {
       span.setTag(tag(), default_value_);
@@ -353,7 +353,7 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
   }
 }
 
-const envoy::config::core::v3alpha::Metadata*
+const envoy::config::core::v3::Metadata*
 MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   const StreamInfo::StreamInfo& info = ctx.stream_info;
   switch (kind_) {

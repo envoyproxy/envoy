@@ -6,7 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
@@ -656,7 +656,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
     if (!Network::Socket::applyOptions(options, *socket_,
-                                       envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)) {
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;
