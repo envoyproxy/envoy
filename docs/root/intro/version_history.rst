@@ -10,7 +10,7 @@ Version history
 * access log: added HOSTNAME.
 * api: remove all support for v1
 * api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
-* api: v3 xDS API added.
+* api: support for the v3 xDS API added. See :ref:`api_supported_versions`.
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * cluster: added :ref:`aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
