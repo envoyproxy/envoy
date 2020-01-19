@@ -59,6 +59,7 @@ envoy_cc_library(
     deps = [
         ":message_validator_lib",
         ":protobuf",
+        ":well_known_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -67,6 +68,13 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:api_type_oracle_lib",
         "//source/common/config:version_converter_lib",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
+        "@envoy_api//envoy/annotations:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "well_known_lib",
+    hdrs = ["well_known.h"],
 )

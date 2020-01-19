@@ -1,5 +1,5 @@
-#include "envoy/config/trace/v3alpha/trace.pb.h"
-#include "envoy/config/trace/v3alpha/trace.pb.validate.h"
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.validate.h"
 
 #include "extensions/tracers/dynamic_ot/config.h"
 
@@ -37,7 +37,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
         output_file: fake_file
   )EOF",
       TestEnvironment::runfilesPath("mocktracer/libmocktracer_plugin.so", "io_opentracing_cpp"));
-  envoy::config::trace::v3alpha::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   DynamicOpenTracingTracerFactory factory;

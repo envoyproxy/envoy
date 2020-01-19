@@ -1,10 +1,10 @@
 #include "common/common/matchers.h"
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/type/matcher/v3alpha/metadata.pb.h"
-#include "envoy/type/matcher/v3alpha/number.pb.h"
-#include "envoy/type/matcher/v3alpha/string.pb.h"
-#include "envoy/type/matcher/v3alpha/value.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/matcher/v3/metadata.pb.h"
+#include "envoy/type/matcher/v3/number.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/type/matcher/v3/value.pb.h"
 
 #include "common/common/regex.h"
 #include "common/config/metadata.h"
@@ -14,20 +14,19 @@
 namespace Envoy {
 namespace Matchers {
 
-ValueMatcherConstSharedPtr
-ValueMatcher::create(const envoy::type::matcher::v3alpha::ValueMatcher& v) {
+ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::v3::ValueMatcher& v) {
   switch (v.match_pattern_case()) {
-  case envoy::type::matcher::v3alpha::ValueMatcher::MatchPatternCase::kNullMatch:
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kNullMatch:
     return std::make_shared<const NullMatcher>();
-  case envoy::type::matcher::v3alpha::ValueMatcher::MatchPatternCase::kDoubleMatch:
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kDoubleMatch:
     return std::make_shared<const DoubleMatcher>(v.double_match());
-  case envoy::type::matcher::v3alpha::ValueMatcher::MatchPatternCase::kStringMatch:
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kStringMatch:
     return std::make_shared<const StringMatcherImpl>(v.string_match());
-  case envoy::type::matcher::v3alpha::ValueMatcher::MatchPatternCase::kBoolMatch:
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kBoolMatch:
     return std::make_shared<const BoolMatcher>(v.bool_match());
-  case envoy::type::matcher::v3alpha::ValueMatcher::MatchPatternCase::kPresentMatch:
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kPresentMatch:
     return std::make_shared<const PresentMatcher>(v.present_match());
-  case envoy::type::matcher::v3alpha::ValueMatcher::MatchPatternCase::kListMatch:
+  case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kListMatch:
     return std::make_shared<const ListMatcher>(v.list_match());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -53,23 +52,23 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
 
   const double v = value.number_value();
   switch (matcher_.match_pattern_case()) {
-  case envoy::type::matcher::v3alpha::DoubleMatcher::MatchPatternCase::kRange:
+  case envoy::type::matcher::v3::DoubleMatcher::MatchPatternCase::kRange:
     return matcher_.range().start() <= v && v < matcher_.range().end();
-  case envoy::type::matcher::v3alpha::DoubleMatcher::MatchPatternCase::kExact:
+  case envoy::type::matcher::v3::DoubleMatcher::MatchPatternCase::kExact:
     return matcher_.exact() == v;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   };
 }
 
-StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3alpha::StringMatcher& matcher)
+StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3::StringMatcher& matcher)
     : matcher_(matcher) {
   if (matcher.match_pattern_case() ==
-      envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
+      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
     regex_ =
         Regex::Utility::parseStdRegexAsCompiledMatcher(matcher_.hidden_envoy_deprecated_regex());
   } else if (matcher.match_pattern_case() ==
-             envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kSafeRegex) {
+             envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
     regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
   }
 }
@@ -84,14 +83,14 @@ bool StringMatcherImpl::match(const ProtobufWkt::Value& value) const {
 
 bool StringMatcherImpl::match(const absl::string_view value) const {
   switch (matcher_.match_pattern_case()) {
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kExact:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
     return matcher_.exact() == value;
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kPrefix:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
     return absl::StartsWith(value, matcher_.prefix());
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kSuffix:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
     return absl::EndsWith(value, matcher_.suffix());
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kSafeRegex:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return regex_->match(value);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -106,21 +105,21 @@ bool LowerCaseStringMatcher::match(const ProtobufWkt::Value& value) const {
   return matcher_.match(value);
 }
 
-envoy::type::matcher::v3alpha::StringMatcher
-LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::v3alpha::StringMatcher& matcher) {
-  envoy::type::matcher::v3alpha::StringMatcher lowercase;
+envoy::type::matcher::v3::StringMatcher
+LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::v3::StringMatcher& matcher) {
+  envoy::type::matcher::v3::StringMatcher lowercase;
   switch (matcher.match_pattern_case()) {
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
     lowercase.set_hidden_envoy_deprecated_regex(
         StringUtil::toLower(matcher.hidden_envoy_deprecated_regex()));
     break;
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kExact:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
     lowercase.set_exact(StringUtil::toLower(matcher.exact()));
     break;
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kPrefix:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
     lowercase.set_prefix(StringUtil::toLower(matcher.prefix()));
     break;
-  case envoy::type::matcher::v3alpha::StringMatcher::MatchPatternCase::kSuffix:
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
     lowercase.set_suffix(StringUtil::toLower(matcher.suffix()));
     break;
   default:
@@ -129,10 +128,9 @@ LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::v3alpha::StringM
   return lowercase;
 }
 
-ListMatcher::ListMatcher(const envoy::type::matcher::v3alpha::ListMatcher& matcher)
-    : matcher_(matcher) {
+ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher) : matcher_(matcher) {
   ASSERT(matcher_.match_pattern_case() ==
-         envoy::type::matcher::v3alpha::ListMatcher::MatchPatternCase::kOneOf);
+         envoy::type::matcher::v3::ListMatcher::MatchPatternCase::kOneOf);
 
   oneof_value_matcher_ = ValueMatcher::create(matcher_.one_of());
 }
@@ -152,7 +150,7 @@ bool ListMatcher::match(const ProtobufWkt::Value& value) const {
   return false;
 }
 
-MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3alpha::MetadataMatcher& matcher)
+MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher& matcher)
     : matcher_(matcher) {
   for (const auto& seg : matcher.path()) {
     path_.push_back(seg.key());
@@ -161,7 +159,7 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3alpha::MetadataMa
   value_matcher_ = ValueMatcher::create(v);
 }
 
-bool MetadataMatcher::match(const envoy::config::core::v3alpha::Metadata& metadata) const {
+bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) const {
   const auto& value = Envoy::Config::Metadata::metadataValue(metadata, matcher_.filter(), path_);
   return value_matcher_ && value_matcher_->match(value);
 }

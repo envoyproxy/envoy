@@ -1,7 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/config.h"
 
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/dubbo_proxy.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
@@ -19,7 +19,7 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy& proto_config,
+    const envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Config> filter_config(std::make_shared<ConfigImpl>(proto_config, context));
 
@@ -37,8 +37,7 @@ REGISTER_FACTORY(DubboProxyFilterConfigFactory,
 
 class ProtocolTypeMapper {
 public:
-  using ConfigProtocolType =
-      envoy::extensions::filters::network::dubbo_proxy::v3alpha::ProtocolType;
+  using ConfigProtocolType = envoy::extensions::filters::network::dubbo_proxy::v3::ProtocolType;
   using ProtocolTypeMap = absl::flat_hash_map<ConfigProtocolType, ProtocolType>;
 
   static ProtocolType lookupProtocolType(ConfigProtocolType config_type) {
@@ -58,7 +57,7 @@ private:
 class SerializationTypeMapper {
 public:
   using ConfigSerializationType =
-      envoy::extensions::filters::network::dubbo_proxy::v3alpha::SerializationType;
+      envoy::extensions::filters::network::dubbo_proxy::v3::SerializationType;
   using SerializationTypeMap = absl::flat_hash_map<ConfigSerializationType, SerializationType>;
 
   static SerializationType lookupSerializationType(ConfigSerializationType type) {
@@ -78,8 +77,7 @@ private:
 
 class RouteMatcherTypeMapper {
 public:
-  using ConfigProtocolType =
-      envoy::extensions::filters::network::dubbo_proxy::v3alpha::ProtocolType;
+  using ConfigProtocolType = envoy::extensions::filters::network::dubbo_proxy::v3::ProtocolType;
   using RouteMatcherTypeMap = absl::flat_hash_map<ConfigProtocolType, Router::RouteMatcherType>;
 
   static Router::RouteMatcherType lookupRouteMatcherType(ConfigProtocolType type) {
@@ -111,7 +109,7 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
   if (config.dubbo_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");
 
-    envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboFilter router_config;
+    envoy::extensions::filters::network::dubbo_proxy::v3::DubboFilter router_config;
     router_config.set_name(DubboFilters::DubboFilterNames::get().ROUTER);
     registerFilter(router_config);
   } else {

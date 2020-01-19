@@ -1,6 +1,6 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +15,7 @@ Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 } // namespace
 
 ConfigImpl::ConfigImpl(
-    const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings&
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
         config)
     : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
       enable_hashtagging_(config.enable_hashtagging()),
@@ -30,23 +30,21 @@ ConfigImpl::ConfigImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
       enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
-  case envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::
-      MASTER:
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Master;
     break;
-  case envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
       PREFER_MASTER:
     read_policy_ = ReadPolicy::PreferMaster;
     break;
-  case envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::
-      REPLICA:
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::REPLICA:
     read_policy_ = ReadPolicy::Replica;
     break;
-  case envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::
       PREFER_REPLICA:
     read_policy_ = ReadPolicy::PreferReplica;
     break;
-  case envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::ANY:
+  case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ANY:
     read_policy_ = ReadPolicy::Any;
     break;
   default:

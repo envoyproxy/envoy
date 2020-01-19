@@ -7,6 +7,7 @@ Version history
 * admin: added the ability to filter :ref:`/config_dump <operations_admin_interface_config_dump>`.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
 * access log: fixed UPSTREAM_LOCAL_ADDRESS :ref:`access log formatters <config_access_log_format>` to work for http requests
+* access log: added HOSTNAME.
 * api: remove all support for v1
 * api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
 * buffer: remove old implementation
@@ -44,8 +45,11 @@ Version history
 * router: added support for :ref:`max_internal_redirects <envoy_api_field_route.RouteAction.max_internal_redirects>` for configurable maximum internal redirect hops.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
 * router: added :ref:`auto_sni <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_sni>` to support setting SNI to transport socket for new upstream connections based on the downstream HTTP host/authority header.
+* router: added support for HOSTNAME :ref:`header formatter
+  <config_http_conn_man_headers_custom_request_headers>`.
 * server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * server: fixed a bug in config validation for configs with runtime layers.
+* server: added :ref:`workers_started <config_listener_manager_stats>` that indicates whether listeners have been fully initialized on workers.
 * tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`.
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`.
 * thrift_proxy: added support for cluster header based routing.
@@ -57,6 +61,7 @@ Version history
 * tracing: added initial support for AWS X-Ray (local sampling rules only) :ref:`X-Ray Tracing <envoy_api_msg_config.trace.v2alpha.XRayConfig>`.
 * tracing: added tags for gRPC request path, authority, content-type and timeout.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
+* fault: fixed an issue where the http fault filter would repeatedly check the percentage of abort/delay when the `x-envoy-downstream-service-cluster` header was included in the request to ensure that the actual percentage of abort/delay matches the configuration of the filter.
 
 1.12.2 (December 10, 2019)
 ==========================

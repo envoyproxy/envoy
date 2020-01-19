@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
@@ -110,26 +110,22 @@ INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
-  return [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                HttpConnectionManager& hcm) {
-    hcm.add_upgrade_configs()->set_upgrade_type("websocket");
-  };
+  return [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); };
 }
 
 void WebsocketIntegrationTest::initialize() {
   if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
     config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
           cluster->mutable_http2_protocol_options()->set_allow_connect(true);
         });
   }
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
     config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                HttpConnectionManager& hcm) -> void {
-          hcm.mutable_http2_protocol_options()->set_allow_connect(true);
-        });
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   }
   HttpProtocolIntegrationTest::initialize();
 }
@@ -263,8 +259,8 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0)->mutable_route();
@@ -286,8 +282,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
       });
@@ -314,8 +310,8 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 
 TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         foo_upgrade->mutable_enabled()->set_value(false);
@@ -351,8 +347,8 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 
   // Add a second upgrade type which goes directly to the router filter.
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         auto* filter_list_back = foo_upgrade->add_filters();

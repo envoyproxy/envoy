@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/http/header_to_metadata/v3alpha/header_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
@@ -39,7 +39,7 @@ request_rules:
 )EOF";
 
   void initializeFilter(const std::string& yaml) {
-    envoy::extensions::filters::http::header_to_metadata::v3alpha::Config config;
+    envoy::extensions::filters::http::header_to_metadata::v3::Config config;
     TestUtility::loadFromYaml(yaml, config);
     config_.reset(new Config(config));
     filter_.reset(new HeaderToMetadataFilter(config_));

@@ -3,8 +3,8 @@
 #include <map>
 #include <string>
 
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/thrift_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
@@ -23,7 +23,7 @@ namespace ThriftProxy {
 class ProtocolOptionsConfigImpl : public ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
-      const envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProtocolOptions&
+      const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions&
           proto_config);
 
   // ProtocolOptionsConfig
@@ -40,18 +40,18 @@ private:
  */
 class ThriftProxyFilterConfigFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProxy,
-          envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProtocolOptions> {
+          envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy,
+          envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions> {
 public:
   ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().ThriftProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProxy& proto_config,
+      const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
-      const envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProtocolOptions&
+      const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions&
           proto_config) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
@@ -62,7 +62,7 @@ class ConfigImpl : public Config,
                    public ThriftFilters::FilterChainFactory,
                    Logger::Loggable<Logger::Id::config> {
 public:
-  ConfigImpl(const envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProxy& config,
+  ConfigImpl(const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config,
              Server::Configuration::FactoryContext& context);
 
   // ThriftFilters::FilterChainFactory
@@ -83,7 +83,7 @@ public:
 
 private:
   void processFilter(
-      const envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftFilter& proto_config);
+      const envoy::extensions::filters::network::thrift_proxy::v3::ThriftFilter& proto_config);
 
   Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;

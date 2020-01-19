@@ -26,8 +26,8 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
-        "@envoy_api//envoy/extensions/filters/network/ext_authz/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,7 +42,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/ext_authz",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/ext_authz/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/ext_authz/v3:pkg_cc_proto",
     ],
 )
