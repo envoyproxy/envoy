@@ -4,7 +4,7 @@
 #include <tuple>
 #include <vector>
 
-#include "envoy/extensions/filters/http/header_to_metadata/v3alpha/header_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
@@ -16,10 +16,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-using Rule = envoy::extensions::filters::http::header_to_metadata::v3alpha::Config::Rule;
-using ValueType = envoy::extensions::filters::http::header_to_metadata::v3alpha::Config::ValueType;
-using ValueEncode =
-    envoy::extensions::filters::http::header_to_metadata::v3alpha::Config::ValueEncode;
+using Rule = envoy::extensions::filters::http::header_to_metadata::v3::Config::Rule;
+using ValueType = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueType;
+using ValueEncode = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueEncode;
 using HeaderToMetadataRules = std::vector<std::pair<Http::LowerCaseString, Rule>>;
 
 // TODO(yangminzhu): Make MAX_HEADER_VALUE_LEN configurable.
@@ -31,7 +30,7 @@ const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
  */
 class Config : public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(const envoy::extensions::filters::http::header_to_metadata::v3alpha::Config config);
+  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config);
 
   HeaderToMetadataRules requestRules() const { return request_rules_; }
   HeaderToMetadataRules responseRules() const { return response_rules_; }

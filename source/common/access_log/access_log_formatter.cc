@@ -1,12 +1,15 @@
 #include "common/access_log/access_log_formatter.h"
 
+#include <limits.h>
+
 #include <cstdint>
 #include <regex>
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -64,6 +67,25 @@ AccessLogFormatUtils::protocolToString(const absl::optional<Http::Protocol>& pro
     return Http::Utility::getProtocolString(protocol.value());
   }
   return UnspecifiedValueString;
+}
+
+const std::string AccessLogFormatUtils::getHostname() {
+#ifdef HOST_NAME_MAX
+  const size_t len = HOST_NAME_MAX;
+#else
+  // This is notably the case in OSX.
+  const size_t len = 255;
+#endif
+  char name[len];
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
+
+  std::string hostname = "-";
+  if (result.rc_ == 0) {
+    hostname.assign(name);
+  }
+
+  return hostname;
 }
 
 FormatterImpl::FormatterImpl(const std::string& format) {
@@ -696,6 +718,10 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           }
           return result;
         });
+  } else if (field_name == "HOSTNAME") {
+    std::string hostname = AccessLogFormatUtils::getHostname();
+    field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
+        [hostname](const StreamInfo::StreamInfo&) { return hostname; });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
@@ -826,7 +852,7 @@ MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
     : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
 
 std::string
-MetadataFormatter::formatMetadata(const envoy::config::core::v3alpha::Metadata& metadata) const {
+MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metadata) const {
   ProtobufWkt::Value value = formatMetadataValue(metadata);
   if (value.kind_case() == ProtobufWkt::Value::kNullValue) {
     return UnspecifiedValueString;
@@ -837,8 +863,8 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3alpha::Metadata& 
   return json;
 }
 
-ProtobufWkt::Value MetadataFormatter::formatMetadataValue(
-    const envoy::config::core::v3alpha::Metadata& metadata) const {
+ProtobufWkt::Value
+MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const {
   if (path_.empty()) {
     const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
     if (filter_it == metadata.filter_metadata().end()) {

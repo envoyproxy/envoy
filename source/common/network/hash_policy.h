@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/network/hash_policy.h"
-#include "envoy/type/v3alpha/hash_policy.pb.h"
+#include "envoy/type/v3/hash_policy.pb.h"
 
 #include "common/common/hash.h"
 
@@ -12,8 +12,7 @@ namespace Network {
  */
 class HashPolicyImpl : public Network::HashPolicy {
 public:
-  explicit HashPolicyImpl(
-      const absl::Span<const envoy::type::v3alpha::HashPolicy* const>& hash_policy);
+  explicit HashPolicyImpl(const absl::Span<const envoy::type::v3::HashPolicy* const>& hash_policy);
 
   // Network::HashPolicy
   absl::optional<uint64_t>

@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "test/integration/integration.h"
 
@@ -57,11 +57,16 @@ public:
       setDeterministic();
       setUpstreamCount(upstream_count);
       config_helper_.addConfigModifier(
-          [upstream_count](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+          [upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
             for (uint32_t i = 1; i < upstream_count; i++) {
-              auto* new_host =
-                  bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
-              new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
+              bootstrap.mutable_static_resources()
+                  ->mutable_clusters(0)
+                  ->mutable_load_assignment()
+                  ->mutable_endpoints(0)
+                  ->add_lb_endpoints()
+                  ->mutable_endpoint()
+                  ->MergeFrom(ConfigHelper::buildEndpoint(
+                      Network::Test::getLoopbackAddressString(GetParam())));
             }
           });
     }

@@ -256,7 +256,7 @@ public:
   void setOnServerReadyCb(std::function<void(IntegrationTestServer&)> on_server_ready) {
     on_server_ready_cb_ = std::move(on_server_ready);
   }
-  void onRuntimeCreated() override;
+  void onRuntimeCreated() override {}
 
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,

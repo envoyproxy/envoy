@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.grpc_http1_reverse
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3alpha";
+    "envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3";
 
 // [#protodoc-title: gRPC HTTP/1.1 Reverse Bridge]
 // gRPC HTTP/1.1 Reverse Bridge :ref:`configuration overview

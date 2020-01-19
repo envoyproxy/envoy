@@ -1,7 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/socket_option_factory.h"
 
@@ -123,7 +123,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
     connection_socket->addOptions(options);
   }
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
-                                     envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)) {
+                                     envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
     return connection_socket;
@@ -135,7 +135,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
     local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
   }
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
-                                     envoy::config::core::v3alpha::SocketOption::STATE_BOUND)) {
+                                     envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
     connection_socket->close();
   }

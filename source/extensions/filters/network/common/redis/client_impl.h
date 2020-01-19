@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -38,7 +38,7 @@ using RedirectionResponse = ConstSingleton<RedirectionValues>;
 class ConfigImpl : public Config {
 public:
   ConfigImpl(
-      const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings&
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
           config);
 
   bool disableOutlierEvents() const override { return false; }

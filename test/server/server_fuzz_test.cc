@@ -1,7 +1,7 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -23,7 +23,7 @@ namespace Server {
 namespace {
 
 void makePortHermetic(Fuzz::PerTestEnvironment& test_env,
-                      envoy::config::core::v3alpha::Address& address) {
+                      envoy::config::core::v3::Address& address) {
   if (address.has_socket_address()) {
     address.mutable_socket_address()->set_port_value(0);
   } else if (address.has_pipe()) {
@@ -31,10 +31,10 @@ void makePortHermetic(Fuzz::PerTestEnvironment& test_env,
   }
 }
 
-envoy::config::bootstrap::v3alpha::Bootstrap
+envoy::config::bootstrap::v3::Bootstrap
 makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
-                          const envoy::config::bootstrap::v3alpha::Bootstrap& input) {
-  envoy::config::bootstrap::v3alpha::Bootstrap output(input);
+                          const envoy::config::bootstrap::v3::Bootstrap& input) {
+  envoy::config::bootstrap::v3::Bootstrap output(input);
   // This is not a complete list of places where we need to zero out ports or sanitize paths, so we
   // should adapt it as we go and encounter places that we need to stabilize server test flakes.
   // config_validation_fuzz_test doesn't need to do this sanitization, so should pickup the coverage
@@ -58,20 +58,26 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
       // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
       health_check.mutable_http_health_check()->clear_codec_client_type();
     }
-    for (auto& host : *cluster.mutable_hosts()) {
+    // We may have both deprecated hosts() or load_assignment().
+    for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
       makePortHermetic(test_env, host);
+    }
+    for (int j = 0; j < cluster.load_assignment().endpoints_size(); ++j) {
+      auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);
+      for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
+        auto* lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+        if (lb_endpoint->endpoint().address().has_socket_address()) {
+          makePortHermetic(test_env, *lb_endpoint->mutable_endpoint()->mutable_address());
+        }
+      }
     }
   }
   return output;
 }
 
-class AllFeaturesHooks : public DefaultListenerHooks {
-  void onRuntimeCreated() override { Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed(); }
-};
-
-DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3alpha::Bootstrap& input) {
+DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
-  AllFeaturesHooks hooks;
+  DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
   Stats::TestIsolatedStoreImpl stats_store;
   Thread::MutexBasicLockable fakelock;

@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
 
 #include "common/common/c_smart_ptr.h"
@@ -539,7 +540,7 @@ TEST_F(LookupWithStatNameTest, NotFound) {
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  envoy::config::metrics::v3alpha::StatsConfig stats_config_;
+  envoy::config::metrics::v3::StatsConfig stats_config_;
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
@@ -848,7 +849,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   EXPECT_EQ("h1", store_->histograms()[0]->name());
 
   // Will effectively block all stats, and remove all the non-matching stats.
-  envoy::config::metrics::v3alpha::StatsConfig stats_config;
+  envoy::config::metrics::v3::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
@@ -903,7 +904,7 @@ protected:
     store_->addSink(sink_);
 
     // Use a tag producer that will produce tags.
-    envoy::config::metrics::v3alpha::StatsConfig stats_config;
+    envoy::config::metrics::v3::StatsConfig stats_config;
     store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
   }
 

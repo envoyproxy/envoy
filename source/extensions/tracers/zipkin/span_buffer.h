@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -29,7 +29,7 @@ public:
    * @param shared_span_context To determine whether client and server spans will share the same
    * span context.
    */
-  SpanBuffer(const envoy::config::trace::v3alpha::ZipkinConfig::CollectorEndpointVersion& version,
+  SpanBuffer(const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
              bool shared_span_context);
 
   /**
@@ -41,7 +41,7 @@ public:
    * span context.
    * @param size The desired buffer size.
    */
-  SpanBuffer(const envoy::config::trace::v3alpha::ZipkinConfig::CollectorEndpointVersion& version,
+  SpanBuffer(const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
              bool shared_span_context, uint64_t size);
 
   /**
@@ -82,9 +82,9 @@ public:
   std::string serialize() const { return serializer_->serialize(span_buffer_); }
 
 private:
-  SerializerPtr makeSerializer(
-      const envoy::config::trace::v3alpha::ZipkinConfig::CollectorEndpointVersion& version,
-      bool shared_span_context);
+  SerializerPtr
+  makeSerializer(const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
+                 bool shared_span_context);
 
   // We use a pre-allocated vector to improve performance
   std::vector<Span> span_buffer_;
