@@ -16,6 +16,7 @@ option (udpa.annotations.file_migrate).move_to_package =
 // [#protodoc-title: ZooKeeper proxy]
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
 // [#extension: envoy.filters.network.zookeeper_proxy]
+
 message ZooKeeperProxy {
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_zookeeper_proxy_stats>`.

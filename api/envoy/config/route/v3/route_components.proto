@@ -81,7 +81,7 @@ message VirtualHost {
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.
-  TlsRequirementType require_tls = 4;
+  TlsRequirementType require_tls = 4 [(validate.rules).enum = {defined_only: true}];
 
   // A list of virtual clusters defined for this virtual host. Virtual clusters
   // are used for additional statistics gathering.

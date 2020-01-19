@@ -63,9 +63,8 @@ void LdsApiImpl::onConfigUpdate(
   for (const auto& resource : added_resources) {
     envoy::config::listener::v3::Listener listener;
     try {
-      listener =
-          MessageUtil::anyConvert<envoy::config::listener::v3::Listener>(resource.resource());
-      MessageUtil::validate(listener, validation_visitor_);
+      listener = MessageUtil::anyConvertAndValidate<envoy::config::listener::v3::Listener>(
+          resource.resource(), validation_visitor_);
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
         throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
@@ -108,6 +107,7 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
   for (const auto& listener_blob : resources) {
     // Add this resource to our delta added/updated pile...
     envoy::service::discovery::v3::Resource* to_add = to_add_repeated.Add();
+    // No validation needed here the overloaded call to onConfigUpdate validates.
     const std::string listener_name =
         MessageUtil::anyConvert<envoy::config::listener::v3::Listener>(listener_blob).name();
     to_add->set_name(listener_name);
