@@ -18,8 +18,8 @@ Resource Types
 --------------
 
 Every configuration resource in the xDS API has a type associated with it. Resource types follow a
-`versioning scheme <https://github.com/envoyproxy/envoy/blob/master/api/API_VERSIONING.md>`_.
-Resource types are versioned independent of the transports described below.
+:repo:`versioning scheme <api/API_VERSIONING.md>`. Resource types are versioned independent of the
+transports described below.
 
 The following v2 xDS resource types are supported:
 

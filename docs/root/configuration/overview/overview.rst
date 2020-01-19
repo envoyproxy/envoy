@@ -26,10 +26,9 @@ further details on aspects of xDS message exchange between Envoy and the managem
 Versioning
 ----------
 
-The Envoy xDS APIs follow a well defined `versioning scheme
-<https://github.com/envoyproxy/envoy/blob/master/api/API_VERSIONING.md>`_. Envoy supports
-:ref:`multiple major versions <api_supported_versions>` at any point in time. The examples below
-are taken from the v2 xDS API.
+The Envoy xDS APIs follow a well defined :repo:`versioning scheme <api/API_VERSIONING.md>`. Envoy
+supports :ref:`multiple major versions <api_supported_versions>` at any point in time. The examples
+below are taken from the v2 xDS API.
 
 Envoy has API versions for both the xDS transport, i.e. the wire protocol for moving resources
 between a management server and Envoy, and for resources. These are known as the transport and
@@ -41,7 +40,7 @@ resource types. For example, :ref:`v3 Clusters <envoy_v3_api_msg_config.cluster.
 used alongside :ref:`v2 Listeners <envoy_api_msg_Listener>`.
 
 Both the transport and resource API versions follow the API versioning support and deprecation
-`policy <https://github.com/envoyproxy/envoy/blob/master/api/API_VERSIONING.md>`_.
+:repo:`policy <api/API_VERSIONING.md>`.
 
 .. _config_overview_bootstrap:
 

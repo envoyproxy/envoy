@@ -3,8 +3,7 @@
 Suported API versions
 =====================
 
-Envoy's APIs follow a `versioning scheme
-<https://github.com/envoyproxy/envoy/blob/master/api/API_VERSIONING.md>`_ in which Envoy supports
+Envoy's APIs follow a :repo:`versioning scheme <api/API_VERSIONING.md>` in which Envoy supports
 multiple major API versions at any point in time. The following versions are currently supported:
 
 * v2 xDS API (*deprecated*, end-of-life EOY 2020). This API will not accept new features after the
