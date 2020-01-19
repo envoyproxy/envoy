@@ -1110,7 +1110,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
 }
 
 // Validated exception thrown when anyConvertAndValidate observes a PGV failures.
-TEST_F(ProtobufUtilityTest, anyConvertAndValidateFailedValidation) {
+TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
   envoy::config::cluster::v3::Filter filter;
   ProtobufWkt::Any source_any;
   source_any.PackFrom(filter);
