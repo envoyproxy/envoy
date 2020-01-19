@@ -112,9 +112,10 @@ public:
 
   MOCK_METHOD(void, onConfigUpdate,
               (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&, const std::string&));
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added,
-      const Protobuf::RepeatedPtrField<std::string>& removed, const std::string& version) override {
+  void
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added,
+                 const Protobuf::RepeatedPtrField<std::string>& removed,
+                 const std::string& version) override {
     SdsApi::onConfigUpdate(added, removed, version);
   }
   void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
@@ -246,9 +247,8 @@ class MockCvcValidationCallback : public CvcValidationCallback {
 public:
   MockCvcValidationCallback() = default;
   ~MockCvcValidationCallback() override = default;
-  MOCK_METHOD(
-      void, validateCvc,
-      (const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&));
+  MOCK_METHOD(void, validateCvc,
+              (const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&));
 };
 
 // Validate that CertificateValidationContextSdsApi updates secrets successfully if

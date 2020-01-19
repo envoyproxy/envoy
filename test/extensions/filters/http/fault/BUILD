@@ -62,8 +62,5 @@ envoy_extension_cc_test(
 envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
-    deps = [
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",
-    ],
+    deps = ["//test/test_common:utility_lib"],
 )
