@@ -30,9 +30,9 @@ namespace {
 
 class FakeTransportSocketFactory : public Network::TransportSocketFactory {
 public:
-  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD1(createTransportSocket,
-                     Network::TransportSocketPtr(Network::TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
+              (Network::TransportSocketOptionsSharedPtr), (const));
   FakeTransportSocketFactory(std::string id) : id_(std::move(id)) {}
   std::string id() const { return id_; }
 
@@ -45,9 +45,9 @@ class FooTransportSocketFactory
       public Server::Configuration::UpstreamTransportSocketConfigFactory,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD1(createTransportSocket,
-                     Network::TransportSocketPtr(Network::TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
+              (Network::TransportSocketOptionsSharedPtr), (const));
 
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,
@@ -134,14 +134,14 @@ transport_socket:
   envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
-  envoy.transport_socket_match: { sidecar: "true" } 
+  envoy.transport_socket_match: { sidecar: "true" }
 )EOF",
                             metadata);
 
   validate(metadata, "sidecar");
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
-  envoy.transport_socket_match: { protocol: "http" } 
+  envoy.transport_socket_match: { protocol: "http" }
 )EOF",
                             metadata);
   validate(metadata, "http");

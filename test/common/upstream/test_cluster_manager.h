@@ -109,18 +109,16 @@ public:
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
-  MOCK_METHOD1(clusterManagerFromProto_,
-               ClusterManager*(const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
-  MOCK_METHOD3(allocateConnPool_,
-               Http::ConnectionPool::Instance*(HostConstSharedPtr host,
-                                               Network::ConnectionSocket::OptionsSharedPtr,
-                                               Network::TransportSocketOptionsSharedPtr));
-  MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
-  MOCK_METHOD4(clusterFromProto_,
-               std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>(
-                   const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
-  MOCK_METHOD0(createCds_, CdsApi*());
+  MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
+              (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
+  MOCK_METHOD(Http::ConnectionPool::Instance*, allocateConnPool_,
+              (HostConstSharedPtr host, Network::ConnectionSocket::OptionsSharedPtr,
+               Network::TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
+  MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
+              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+               Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
+  MOCK_METHOD(CdsApi*, createCds_, ());
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -143,13 +141,13 @@ public:
 // Helper to intercept calls to postThreadLocalClusterUpdate.
 class MockLocalClusterUpdate {
 public:
-  MOCK_METHOD3(post, void(uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed));
+  MOCK_METHOD(void, post,
+              (uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed));
 };
 
 class MockLocalHostsRemoved {
 public:
-  MOCK_METHOD1(post, void(const HostVector&));
+  MOCK_METHOD(void, post, (const HostVector&));
 };
 
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
