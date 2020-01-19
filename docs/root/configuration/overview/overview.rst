@@ -42,6 +42,13 @@ used alongside :ref:`v2 Listeners <envoy_api_msg_Listener>`.
 Both the transport and resource API versions follow the API versioning support and deprecation
 :repo:`policy <api/API_VERSIONING.md>`.
 
+.. note::
+
+    Envoy will internally operate at the latest xDS resource version and all supported versioned
+    resources will be transparently upgrading to this latest version on configuration ingestion. For
+    example, v2 and v3 resources, delivered over either a v2 or v3 transport, or any mix thereof,
+    will be internally converted into v3 resources.
+
 .. _config_overview_bootstrap:
 
 Bootstrap configuration
