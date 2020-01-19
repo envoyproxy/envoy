@@ -113,6 +113,11 @@ public:
     Histogram& histogram = histograms_.get(name, unit);
     return histogram;
   }
+  Histogram& histogramFromStatName(StatName name, const std::vector<Tag>&,
+                                   Histogram::Unit unit) override {
+    Histogram& histogram = histograms_.get(name, unit);
+    return histogram;
+  }
   OptionalCounter findCounter(StatName name) const override { return counters_.find(name); }
   OptionalGauge findGauge(StatName name) const override { return gauges_.find(name); }
   OptionalHistogram findHistogram(StatName name) const override { return histograms_.find(name); }

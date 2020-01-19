@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/symbol_table.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
 
@@ -85,6 +86,15 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) PURE;
+
+  /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags The tags to associate with this histogram.
+   * @param unit The unit of measurement.
+   * @return a histogram within the scope's namespace with a particular value type.
+   */
+  virtual Histogram& histogramFromStatName(StatName name, const std::vector<Tag>& tags,
+                                           Histogram::Unit unit) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.

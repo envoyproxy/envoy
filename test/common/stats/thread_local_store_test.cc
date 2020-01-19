@@ -4,11 +4,13 @@
 #include <unordered_map>
 
 #include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/stats/histogram.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -325,6 +327,12 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   auto found_histogram2 = store_->findHistogram(h2_name.statName());
   ASSERT_TRUE(found_histogram2.has_value());
   EXPECT_EQ(&h2, &found_histogram2->get());
+
+  StatNameManagedStorage storage("h3", *symbol_table_);
+  Histogram& h3 = scope1->histogramFromStatName(StatName(storage.statName()), {Tag{"a", "b"}},
+                                                Stats::Histogram::Unit::Unspecified);
+  const std::vector<Tag> expectedTags = {Tag{"a", "b"}};
+  EXPECT_EQ(expectedTags, h3.tags());
 
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);

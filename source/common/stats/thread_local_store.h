@@ -175,6 +175,10 @@ public:
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     return default_scope_->histogramFromStatName(name, unit);
   }
+  Histogram& histogramFromStatName(StatName name, const std::vector<Tag>& tags,
+                                   Histogram::Unit unit) override {
+    return default_scope_->histogramFromStatName(name, tags, unit);
+  }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     return default_scope_->histogram(name, unit);
   }
@@ -281,7 +285,11 @@ private:
     Counter& counterFromStatName(StatName name) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
+    Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+      return histogramFromStatName(name, {}, unit);
+    }
+    Histogram& histogramFromStatName(StatName name, const std::vector<Tag>& tags,
+                                     Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);

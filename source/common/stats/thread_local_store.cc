@@ -456,6 +456,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
+                                                                  const std::vector<Tag>& tags,
                                                                   Histogram::Unit unit) {
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
@@ -498,8 +499,12 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   } else {
     TagExtraction extraction(parent_, final_stat_name);
 
+    // Combine the provided tags with the extracted tags.
+    std::vector<Tag> allTags = tags;
+    allTags.insert(allTags.end(), extraction.tags().begin(), extraction.tags().end());
+
     RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
-        final_stat_name, unit, parent_, *this, extraction.tagExtractedName(), extraction.tags()));
+        final_stat_name, unit, parent_, *this, extraction.tagExtractedName(), tags));
     central_ref = &central_cache_->histograms_[stat->statName()];
     *central_ref = stat;
   }

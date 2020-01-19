@@ -44,6 +44,13 @@ Histogram& ScopePrefixer::histogramFromStatName(StatName name, Histogram::Unit u
   return scope_.histogramFromStatName(StatName(stat_name_storage.get()), unit);
 }
 
+Histogram& ScopePrefixer::histogramFromStatName(StatName name, const std::vector<Tag>& tags,
+                                                Histogram::Unit unit) {
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_.symbolTable().join({prefix_.statName(), name});
+  return scope_.histogramFromStatName(StatName(stat_name_storage.get()), tags, unit);
+}
+
 OptionalCounter ScopePrefixer::findCounter(StatName name) const { return scope_.findCounter(name); }
 
 OptionalGauge ScopePrefixer::findGauge(StatName name) const { return scope_.findGauge(name); }
