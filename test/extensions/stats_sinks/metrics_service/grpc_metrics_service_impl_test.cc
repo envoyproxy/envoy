@@ -87,7 +87,7 @@ TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
 class MockGrpcMetricsStreamer : public GrpcMetricsStreamer {
 public:
   // GrpcMetricsStreamer
-  MOCK_METHOD1(send, void(envoy::service::metrics::v3::StreamMetricsMessage& message));
+  MOCK_METHOD(void, send, (envoy::service::metrics::v3::StreamMetricsMessage & message));
 };
 
 class TestGrpcMetricsStreamer : public GrpcMetricsStreamer {

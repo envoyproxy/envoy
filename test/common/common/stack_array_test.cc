@@ -12,7 +12,7 @@ public:
 
   int val_ = 0;
   TestEntry* self_;
-  MOCK_METHOD1(destructor_, void(int));
+  MOCK_METHOD(void, destructor_, (int));
 };
 
 TEST(StackArray, ConstructorsAndDestructorsCalled) {
