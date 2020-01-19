@@ -26,7 +26,7 @@ class TestUdpProxyFilter : public UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
 
-  MOCK_METHOD1(createIoHandle, Network::IoHandlePtr(const Upstream::HostConstSharedPtr& host));
+  MOCK_METHOD(Network::IoHandlePtr, createIoHandle, (const Upstream::HostConstSharedPtr& host));
 };
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {

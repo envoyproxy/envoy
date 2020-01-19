@@ -39,12 +39,12 @@ namespace MongoProxy {
 
 class MockDecoder : public Decoder {
 public:
-  MOCK_METHOD1(onData, void(Buffer::Instance& data));
+  MOCK_METHOD(void, onData, (Buffer::Instance & data));
 };
 
 class TestStatStore : public Stats::IsolatedStoreImpl {
 public:
-  MOCK_METHOD2(deliverHistogramToSinks, void(const Stats::Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, deliverHistogramToSinks, (const Stats::Histogram& histogram, uint64_t value));
 };
 
 class TestProxyFilter : public ProxyFilter {

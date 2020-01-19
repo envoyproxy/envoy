@@ -29,7 +29,7 @@ namespace {
 
 class MockWriter : public Writer {
 public:
-  MOCK_METHOD1(write, void(const std::string& message));
+  MOCK_METHOD(void, write, (const std::string& message));
 };
 
 class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
