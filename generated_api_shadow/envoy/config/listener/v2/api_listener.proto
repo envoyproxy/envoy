@@ -11,6 +11,8 @@ option java_outer_classname = "ApiListenerProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3";
 
+// [#protodoc-title: API listener]
+
 // Describes a type of API listener, which is used in non-proxy clients. The type of API
 // exposed to the non-proxy application depends on the type of API listener.
 message ApiListener {

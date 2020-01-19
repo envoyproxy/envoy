@@ -4,6 +4,8 @@ package envoy.annotations;
 
 import "google/protobuf/descriptor.proto";
 
+// [#protodoc-title: Resource]
+
 // Magic number in this file derived from top 28bit of SHA256 digest of "envoy.annotation.resource".
 extend google.protobuf.ServiceOptions {
   ResourceAnnotation resource = 265073217;
