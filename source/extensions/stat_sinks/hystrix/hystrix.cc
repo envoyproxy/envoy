@@ -11,6 +11,7 @@
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -294,7 +295,11 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.setReferenceAccessControlAllowOrigin(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  response_headers.setNoChunks(0);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_chunks_pseudo_header")) {
+    response_headers.setNoChunksPseudoHeader(0);
+  } else {
+    response_headers.setNoChunks(0);
+  }
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();

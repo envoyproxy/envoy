@@ -134,6 +134,7 @@ public:
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
   const LowerCaseString NoChunks{"no-chunks"};
+  const LowerCaseString NoChunksPseudoHeader{":no-chunks"}; // Illegal and deprecated.
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};

@@ -271,6 +271,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/01/09  9227     43637       44000   router: per-cluster histograms w/ timeout budget
   // 2020/01/12  9633     43797       44104   config: support recovery of original message when
   //                                          upgrading.
+  // 2020/01/18  9737     44918       45000   http: change ":no-chunks" pseudo-header to "no-chunks"
+  //                                          header.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -284,8 +286,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 43797); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 44104);
+  EXPECT_MEMORY_EQ(m_per_cluster, 44918);
+  EXPECT_MEMORY_LE(m_per_cluster, 45000);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
