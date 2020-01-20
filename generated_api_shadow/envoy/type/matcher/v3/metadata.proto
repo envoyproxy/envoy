@@ -15,8 +15,8 @@ option java_multiple_files = true;
 // [#protodoc-title: MetadataMatcher]
 
 // MetadataMatcher provides a general interface to check if a given value is matched in
-// :ref:`Metadata <envoy_api_msg_config.core.v3.Metadata>`. It uses `filter` and `path` to retrieve
-// the value from the Metadata and then check if it's matched to the specified value.
+// :ref:`Metadata <envoy_api_msg_config.core.v3.Metadata>`. It uses `filter` and `path` to retrieve the value
+// from the Metadata and then check if it's matched to the specified value.
 //
 // For example, for the following Metadata:
 //

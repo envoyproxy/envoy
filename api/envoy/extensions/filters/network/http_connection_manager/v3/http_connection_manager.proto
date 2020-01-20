@@ -7,7 +7,7 @@ import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/route/v3/route.proto";
 import "envoy/config/route/v3/scoped_route.proto";
-import "envoy/type/tracing/v2/custom_tag.proto";
+import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -143,7 +143,7 @@ message HttpConnectionManager {
     google.protobuf.UInt32Value max_path_tag_length = 7;
 
     // A list of custom tags with unique tag name to create tags for the active span.
-    repeated type.tracing.v2.CustomTag custom_tags = 8;
+    repeated type.tracing.v3.CustomTag custom_tags = 8;
   }
 
   message InternalAddressConfig {
@@ -506,16 +506,14 @@ message ScopedRoutes {
       "envoy.config.filter.network.http_connection_manager.v2.ScopedRoutes";
 
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
-  // keys are matched against a set of
-  // :ref:`Key<envoy_api_msg_config.route.v3.ScopedRouteConfiguration.Key>` objects assembled from
-  // :ref:`ScopedRouteConfiguration<envoy_api_msg_config.route.v3.ScopedRouteConfiguration>`
+  // keys are matched against a set of :ref:`Key<envoy_api_msg_config.route.v3.ScopedRouteConfiguration.Key>`
+  // objects assembled from :ref:`ScopedRouteConfiguration<envoy_api_msg_config.route.v3.ScopedRouteConfiguration>`
   // messages distributed via SRDS (the Scoped Route Discovery Service) or assigned statically via
   // :ref:`scoped_route_configurations_list<envoy_api_field_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.scoped_route_configurations_list>`.
   //
   // Upon receiving a request's headers, the Router will build a key using the algorithm specified
   // by this message. This key will be used to look up the routing table (i.e., the
-  // :ref:`RouteConfiguration<envoy_api_msg_config.route.v3.RouteConfiguration>`) to use for the
-  // request.
+  // :ref:`RouteConfiguration<envoy_api_msg_config.route.v3.RouteConfiguration>`) to use for the request.
   message ScopeKeyBuilder {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.ScopedRoutes.ScopeKeyBuilder";

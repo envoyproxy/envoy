@@ -14,6 +14,8 @@ option java_outer_classname = "MetricsServiceProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 
+// [#protodoc-title: Metrics service]
+
 // Service for streaming metrics to server that consumes the metrics data. It uses Prometheus metric
 // data model as a standard to represent metrics information.
 service MetricsService {

@@ -10,6 +10,7 @@ Version history
 * access log: added HOSTNAME.
 * api: remove all support for v1
 * api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
+* api: support for the v3 xDS API added. See :ref:`api_supported_versions`.
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * cluster: added :ref:`aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
@@ -330,7 +331,7 @@ Version history
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
 * config: logging warnings when deprecated fields are in use.
 * config: removed deprecated --v2-config-only from command line config.
-* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_bootstrap>`.
 * config: removed the deprecated_v1 config option from :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * config: finish cluster warming only when a named response i.e. ClusterLoadAssignment associated to the cluster being warmed comes in the EDS response. This is a behavioural change from the current implementation where warming of cluster completes on missing load assignments also.
@@ -883,7 +884,7 @@ Version history
 * admin: added basic :ref:`Prometheus output <operations_admin_interface_stats>` for stats admin
   endpoint. Histograms are not currently output.
 * admin: added ``version_info`` to the :ref:`/clusters admin endpoint<operations_admin_interface_clusters>`.
-* config: the :ref:`v2 API <config_overview_v2>` is now considered production ready.
+* config: the :ref:`v2 API <config_overview>` is now considered production ready.
 * config: added --v2-config-only CLI flag.
 * cors: added :ref:`CORS filter <config_http_filters_cors>`.
 * health check: added :ref:`x-envoy-immediate-health-check-fail

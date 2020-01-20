@@ -1,9 +1,9 @@
-.. _config_overview_v2:
+.. _config_overview:
 
 Overview
 ========
 
-The Envoy v2 APIs are defined as `proto3
+The Envoy xDS APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
 <https://developers.google.com/protocol-buffers/>`_ in the :repo:`api tree <api/>`. They
 support:
@@ -21,14 +21,40 @@ support:
   when needed. The v2 APIs still maintain a baseline eventual consistency model.
 
 See the :ref:`xDS protocol description <xds_protocol>` for
-further details on aspects of v2 message exchange between Envoy and the management server.
+further details on aspects of xDS message exchange between Envoy and the management server.
 
-.. _config_overview_v2_bootstrap:
+Versioning
+----------
+
+The Envoy xDS APIs follow a well defined :repo:`versioning scheme <api/API_VERSIONING.md>`. Envoy
+supports :ref:`multiple major versions <api_supported_versions>` at any point in time. The examples
+below are taken from the v2 xDS API.
+
+Envoy has API versions for both the xDS transport, i.e. the wire protocol for moving resources
+between a management server and Envoy, and for resources. These are known as the transport and
+resource API version respectively.
+
+The transport and resource version may be mixed. For example, v3 resources may be transferred over
+the v2 transport protocol. In addition, an Envoy may consume mixed resource versions for distinct
+resource types. For example, :ref:`v3 Clusters <envoy_v3_api_msg_config.cluster.v3.Cluster>` may be
+used alongside :ref:`v2 Listeners <envoy_api_msg_Listener>`.
+
+Both the transport and resource API versions follow the API versioning support and deprecation
+:repo:`policy <api/API_VERSIONING.md>`.
+
+.. note::
+
+    Envoy will internally operate at the latest xDS resource version and all supported versioned
+    resources will be transparently upgrading to this latest version on configuration ingestion. For
+    example, v2 and v3 resources, delivered over either a v2 or v3 transport, or any mix thereof,
+    will be internally converted into v3 resources.
+
+.. _config_overview_bootstrap:
 
 Bootstrap configuration
 -----------------------
 
-To use the v2 API, it's necessary to supply a bootstrap configuration file. This
+To use the xDS API, it's necessary to supply a bootstrap configuration file. This
 provides static server configuration and configures Envoy to access :ref:`dynamic
 configuration if needed <arch_overview_dynamic_config>`. This is supplied on the command-line via
 the :option:`-c` flag, i.e.:
@@ -37,7 +63,7 @@ the :option:`-c` flag, i.e.:
 
   ./envoy -c <path to config>.{json,yaml,pb,pb_text}
 
-where the extension reflects the underlying v2 config representation.
+where the extension reflects the underlying config representation.
 
 The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
 configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
@@ -332,16 +358,18 @@ The management server could respond to EDS requests with:
               address: 127.0.0.2
               port_value: 1234
 
-.. _config_overview_v2_management_server:
+.. _config_overview_management_server:
 
 xDS API endpoints
 -----------------
 
-A v2 xDS management server will implement the below endpoints as required for
+An xDS management server will implement the below endpoints as required for
 gRPC and/or REST serving. In both streaming gRPC and
 REST-JSON cases, a :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` is sent and a
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` received following the
 :ref:`xDS protocol <xds_protocol>`.
+
+Below we describe endpoints for the v2 and v3 transport API versions.
 
 .. _v2_grpc_streaming_endpoints:
 
@@ -349,6 +377,7 @@ gRPC streaming endpoints
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. http:post:: /envoy.api.v2.ClusterDiscoveryService/StreamClusters
+.. http:post:: /envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters
 
 See :repo:`cds.proto <api/envoy/api/v2/cds.proto>` for the service definition. This is used by Envoy
 as a client when
@@ -358,6 +387,7 @@ as a client when
     cds_config:
       api_config_source:
         api_type: GRPC
+        transport_api_version: <V2|V3>
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -367,6 +397,7 @@ is set in the :ref:`dynamic_resources
 <envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
 
 .. http:post:: /envoy.api.v2.EndpointDiscoveryService/StreamEndpoints
+.. http:post:: /envoy.service.endpoint.v3.EndpointDiscoveryService/StreamEndpoints
 
 See :repo:`eds.proto
 <api/envoy/api/v2/eds.proto>`
@@ -377,6 +408,7 @@ for the service definition. This is used by Envoy as a client when
     eds_config:
       api_config_source:
         api_type: GRPC
+        transport_api_version: <V2|V3>
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -386,6 +418,7 @@ is set in the :ref:`eds_cluster_config
 <envoy_api_msg_Cluster>` config.
 
 .. http:post:: /envoy.api.v2.ListenerDiscoveryService/StreamListeners
+.. http:post:: /envoy.service.listener.v3.ListenerDiscoveryService/StreamListeners
 
 See :repo:`lds.proto
 <api/envoy/api/v2/lds.proto>`
@@ -396,6 +429,7 @@ for the service definition. This is used by Envoy as a client when
     lds_config:
       api_config_source:
         api_type: GRPC
+        transport_api_version: <V2|V3>
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -405,6 +439,7 @@ is set in the :ref:`dynamic_resources
 <envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
 
 .. http:post:: /envoy.api.v2.RouteDiscoveryService/StreamRoutes
+.. http:post:: /envoy.service.route.v3.RouteDiscoveryService/StreamRoutes
 
 See :repo:`rds.proto
 <api/envoy/api/v2/rds.proto>`
@@ -416,6 +451,7 @@ for the service definition. This is used by Envoy as a client when
     config_source:
       api_config_source:
         api_type: GRPC
+        transport_api_version: <V2|V3>
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -426,6 +462,7 @@ of the :ref:`HttpConnectionManager
 <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
 
 .. http:post:: /envoy.api.v2.ScopedRoutesDiscoveryService/StreamScopedRoutes
+.. http:post:: /envoy.service.route.v3.ScopedRoutesDiscoveryService/StreamScopedRoutes
 
 See :repo:`srds.proto
 <api/envoy/api/v2/srds.proto>`
@@ -438,6 +475,7 @@ for the service definition. This is used by Envoy as a client when
       config_source:
         api_config_source:
           api_type: GRPC
+          transport_api_version: <V2|V3>
           grpc_services:
             envoy_grpc:
               cluster_name: some_xds_cluster
@@ -448,6 +486,7 @@ field of the :ref:`HttpConnectionManager
 <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>` config.
 
 .. http:post:: /envoy.service.discovery.v2.SecretDiscoveryService/StreamSecrets
+.. http:post:: /envoy.service.secret.v3.SecretDiscoveryService/StreamSecrets
 
 See :repo:`sds.proto
 <api/envoy/service/discovery/v2/srds.proto>`
@@ -459,6 +498,7 @@ for the service definition. This is used by Envoy as a client when
     config_source:
       api_config_source:
         api_type: GRPC
+        transport_api_version: <V2|V3>
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -467,6 +507,7 @@ is set inside a :ref:`SdsSecretConfig <envoy_api_msg_auth.SdsSecretConfig>` mess
 is used in various places such as the :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>`.
 
 .. http:post:: /envoy.service.discovery.v2.RuntimeDiscoveryService/StreamRuntime
+.. http:post:: /envoy.service.runtime.v3.RuntimeDiscoveryService/StreamRuntime
 
 See :repo:`rtds.proto
 <api/envoy/service/discovery/v2/rtds.proto>`
@@ -478,6 +519,7 @@ for the service definition. This is used by Envoy as a client when
     config_source:
       api_config_source:
         api_type: GRPC
+        transport_api_version: <V2|V3>
         grpc_services:
           envoy_grpc:
             cluster_name: some_xds_cluster
@@ -489,6 +531,7 @@ REST endpoints
 ^^^^^^^^^^^^^^
 
 .. http:post:: /v2/discovery:clusters
+.. http:post:: /v3/discovery:clusters
 
 See :repo:`cds.proto
 <api/envoy/api/v2/cds.proto>`
@@ -499,6 +542,7 @@ for the service definition. This is used by Envoy as a client when
     cds_config:
       api_config_source:
         api_type: REST
+        transport_api_version: <V2|V3>
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`dynamic_resources
@@ -506,6 +550,7 @@ is set in the :ref:`dynamic_resources
 <envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
 
 .. http:post:: /v2/discovery:endpoints
+.. http:post:: /v3/discovery:endpoints
 
 See :repo:`eds.proto
 <api/envoy/api/v2/eds.proto>`
@@ -516,6 +561,7 @@ for the service definition. This is used by Envoy as a client when
     eds_config:
       api_config_source:
         api_type: REST
+        transport_api_version: <V2|V3>
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`eds_cluster_config
@@ -523,6 +569,7 @@ is set in the :ref:`eds_cluster_config
 <envoy_api_msg_Cluster>` config.
 
 .. http:post:: /v2/discovery:listeners
+.. http:post:: /v3/discovery:listeners
 
 See :repo:`lds.proto
 <api/envoy/api/v2/lds.proto>`
@@ -533,6 +580,7 @@ for the service definition. This is used by Envoy as a client when
     lds_config:
       api_config_source:
         api_type: REST
+        transport_api_version: <V2|V3>
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`dynamic_resources
@@ -540,6 +588,7 @@ is set in the :ref:`dynamic_resources
 <envoy_api_msg_config.bootstrap.v2.Bootstrap>` config.
 
 .. http:post:: /v2/discovery:routes
+.. http:post:: /v3/discovery:routes
 
 See :repo:`rds.proto
 <api/envoy/api/v2/rds.proto>`
@@ -551,6 +600,7 @@ for the service definition. This is used by Envoy as a client when
     config_source:
       api_config_source:
         api_type: REST
+        transport_api_version: <V2|V3>
         cluster_names: [some_xds_cluster]
 
 is set in the :ref:`rds
@@ -563,10 +613,10 @@ is set in the :ref:`rds
     along with a HTTP status of 200. Additionally, if the configuration that would be supplied has not changed (as indicated by the version
     supplied by the Envoy client) then the management server can respond with an empty body and a HTTP status of 304.
 
-.. _config_overview_v2_ads:
+.. _config_overview_ads:
 
 Aggregated Discovery Service
-----------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 While Envoy fundamentally employs an eventual consistency model, ADS provides an
 opportunity to sequence API update pushes and ensure affinity of a single
@@ -595,6 +645,7 @@ in :ref:`xDS <xds_protocol_ads>`
 document. The gRPC endpoint is:
 
 .. http:post:: /envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources
+.. http:post:: /envoy.service.discovery.v3.AggregatedDiscoveryService/StreamAggregatedResources
 
 See :repo:`discovery.proto
 <api/envoy/api/v2/discovery.proto>`
@@ -604,6 +655,7 @@ for the service definition. This is used by Envoy as a client when
 
     ads_config:
       api_type: GRPC
+      transport_api_version: <V2|V3>
       grpc_services:
         envoy_grpc:
           cluster_name: some_ads_cluster
@@ -631,10 +683,10 @@ to
 with the effect that the LDS stream will be directed to *some_ads_cluster* over
 the shared ADS channel.
 
-.. _config_overview_v2_delta:
+.. _config_overview_delta:
 
 Delta endpoints
----------------
+^^^^^^^^^^^^^^^
 
 The REST, filesystem, and original gRPC xDS implementations all deliver "state of the world" updates:
 every CDS update must contain every cluster, with the absence of a cluster from an update implying
@@ -657,7 +709,7 @@ That works for both xDS and ADS; for ADS, it's the api_type field of
 :ref:`DynamicResources.ads_config <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>`,
 as described in the previous section.
 
-.. _config_overview_v2_mgmt_con_issues:
+.. _config_overview_mgmt_con_issues:
 
 Management Server Unreachability
 --------------------------------

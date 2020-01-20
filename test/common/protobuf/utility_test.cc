@@ -6,6 +6,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/filter.pb.h"
+#include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
@@ -1105,6 +1107,16 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   EXPECT_THROW_WITH_REGEX(
       TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+// Validated exception thrown when anyConvertAndValidate observes a PGV failures.
+TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
+  envoy::config::cluster::v3::Filter filter;
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(filter);
+  EXPECT_THROW(MessageUtil::anyConvertAndValidate<envoy::config::cluster::v3::Filter>(
+                   source_any, ProtobufMessage::getStrictValidationVisitor()),
+               ProtoValidationException);
 }
 
 // MessageUtility::unpackTo() with the wrong type throws.
