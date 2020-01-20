@@ -233,6 +233,7 @@ private:
   CodecClientCallbacks* codec_client_callbacks_{};
   bool connected_{};
   bool remote_closed_{};
+  bool last_request_reset_{};
 };
 
 using CodecClientPtr = std::unique_ptr<CodecClient>;

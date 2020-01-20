@@ -16,6 +16,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -93,6 +94,9 @@ void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
+  // ResetNoFlush is only allowed for ClientConnections
+  ASSERT(type != ConnectionCloseType::ResetNoFlush);
+
   if (!ioHandle().isOpen()) {
     return;
   }
@@ -666,10 +670,15 @@ ClientConnectionImpl::ClientConnectionImpl(
     }
     const Network::Address::Instance* source_to_use = source_address.get();
     if (socket_->localAddress()) {
+      // Local address set by a socket option overrides 'source_address'
       source_to_use = socket_->localAddress().get();
     }
 
     if (source_to_use != nullptr) {
+      // remember if the source port was bound to a specific (non-zero) value
+      if (source_to_use->ip() && source_to_use->ip()->port() != 0) {
+        source_port_set_ = true;
+      }
       const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
       if (result.rc_ < 0) {
         // TODO(lizan): consider add this error into transportFailureReason.
@@ -685,6 +694,24 @@ ClientConnectionImpl::ClientConnectionImpl(
       }
     }
   }
+}
+
+void ClientConnectionImpl::close(ConnectionCloseType type) {
+  if (type == ConnectionCloseType::ResetNoFlush) {
+    // Set the SO_LINGER option with 0 timeout to avoid sockets lingering in TIME-WAIT state
+    // after closing without flushing, if the source address and port were set to a specific
+    // (non-zero) value. This allows the same address and port to be reused for possible
+    // retries.
+    if (source_port_set_) {
+      auto option = SocketOptionFactory::buildSocketLingerOption(1, 0);
+      // no error processing as the socket is being closed anyway
+      option->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
+    }
+    // re-set the type to 'NoFlush' for the base class.
+    type = ConnectionCloseType::NoFlush;
+  }
+
+  ConnectionImpl::close(type);
 }
 
 void ClientConnectionImpl::connect() {

@@ -268,6 +268,48 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_P(ConnectionImplTest, ResetDuringConnectCallback) {
+  uint32_t port = 46732;
+  std::string address_string = TestUtility::getIpv4Loopback();
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance(address_string, port)};
+  } else {
+    address_string = "::1";
+    source_address_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance(address_string, port)};
+  }
+  setUpBasicConnection();
+
+  Buffer::OwnedImpl buffer("hello world");
+  client_connection_->write(buffer, false);
+  client_connection_->connect();
+
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
+        client_connection_->close(ConnectionCloseType::ResetNoFlush);
+      }));
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
+
+  read_filter_.reset(new NiceMock<MockReadFilter>());
+
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), Network::Test::createRawBufferSocket());
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      }));
+
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
+  EXPECT_EQ(port, server_connection_->remoteAddress()->ip()->port());
+}
+
 TEST_P(ConnectionImplTest, ImmediateConnectError) {
   dispatcher_ = api_->allocateDispatcher();
 

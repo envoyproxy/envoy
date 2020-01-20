@@ -191,8 +191,14 @@ public:
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
 
+  // ConnectionImpl
+  void close(ConnectionCloseType type) override;
+
   // Network::ClientConnection
   void connect() override;
+
+private:
+  bool source_port_set_{false};
 };
 
 } // namespace Network

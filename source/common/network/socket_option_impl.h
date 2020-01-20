@@ -98,6 +98,12 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 // receiving destination address.
 #define ENVOY_SELF_IPV6_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_RECVPKTINFO)
 
+#ifdef SO_LINGER
+#define ENVOY_SOCKET_SO_LINGER ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_LINGER)
+#else
+#define ENVOY_SOCKET_SO_LINGER Network::SocketOptionName()
+#endif
+
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
   SocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
