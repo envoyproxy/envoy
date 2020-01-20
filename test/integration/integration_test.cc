@@ -235,8 +235,10 @@ TEST_P(IntegrationTest, ResponseFramedByConnectionCloseWithReadLimits) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
-  // Send illegal pseudo-header to trigger framing by connection close.
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}, {":illegal", "1"}},
+  // Disable chunk encoding to trigger framing by connection close.
+  // TODO: This request should be propagated to codecs via API, instead of using a pseudo-header.
+  //       See: https://github.com/envoyproxy/envoy/issues/9749
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}, {":no-chunks", "1"}},
                                    false);
   upstream_request_->encodeData(512, true);
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -244,6 +246,8 @@ TEST_P(IntegrationTest, ResponseFramedByConnectionCloseWithReadLimits) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_EQ(512, response->body().size());
 }
 
 TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
