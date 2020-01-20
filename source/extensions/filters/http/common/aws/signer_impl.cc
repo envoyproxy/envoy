@@ -19,13 +19,22 @@ namespace Common {
 namespace Aws {
 
 void SignerImpl::sign(Http::Message& message, bool sign_body) {
+  const auto content_hash = createContentHash(message, sign_body);
+  auto& headers = message.headers();
+  sign(headers, content_hash);
+}
+
+void SignerImpl::sign(Http::HeaderMap& headers) {
+  sign(headers, SignatureConstants::get().HashedEmptyString);
+}
+
+void SignerImpl::sign(Http::HeaderMap& headers, const std::string& content_hash) {
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
     // This behavior matches what the AWS SDK would do.
     return;
   }
-  auto& headers = message.headers();
   const auto* method_header = headers.Method();
   if (method_header == nullptr) {
     throw EnvoyException("Message is missing :method header");
@@ -40,7 +49,6 @@ void SignerImpl::sign(Http::Message& message, bool sign_body) {
   const auto long_date = long_date_formatter_.now(time_source_);
   const auto short_date = short_date_formatter_.now(time_source_);
   headers.addCopy(SignatureHeaders::get().Date, long_date);
-  const auto content_hash = createContentHash(message, sign_body);
   // Phase 1: Create a canonical request
   const auto canonical_headers = Utility::canonicalizeHeaders(headers);
   const auto canonical_request = Utility::createCanonicalRequest(

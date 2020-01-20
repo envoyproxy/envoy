@@ -21,6 +21,13 @@ public:
    * @throws EnvoyException if the request cannot be signed.
    */
   virtual void sign(Http::Message& message, bool sign_body) PURE;
+
+  /**
+   * Sign an AWS request.
+   * @param headers AWS API request headers.
+   * @throws EnvoyException if the request cannot be signed.
+   */
+  virtual void sign(Http::HeaderMap& headers) PURE;
 };
 
 using SignerPtr = std::unique_ptr<Signer>;
