@@ -76,14 +76,16 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
     return gzip.compressor();
   }
   envoy::extensions::filters::http::compressor::v3::Compressor compressor = {};
-  if (gzip.has_content_length()) {
-    compressor.set_allocated_content_length(new Protobuf::UInt32Value(gzip.content_length()));
+  if (gzip.has_hidden_envoy_deprecated_content_length()) {
+    compressor.set_allocated_content_length(
+        new Protobuf::UInt32Value(gzip.hidden_envoy_deprecated_content_length()));
   }
-  for (const auto& ctype : gzip.content_type()) {
+  for (const auto& ctype : gzip.hidden_envoy_deprecated_content_type()) {
     compressor.add_content_type(ctype);
   }
-  compressor.set_disable_on_etag_header(gzip.disable_on_etag_header());
-  compressor.set_remove_accept_encoding_header(gzip.remove_accept_encoding_header());
+  compressor.set_disable_on_etag_header(gzip.hidden_envoy_deprecated_disable_on_etag_header());
+  compressor.set_remove_accept_encoding_header(
+      gzip.hidden_envoy_deprecated_remove_accept_encoding_header());
   return compressor;
 }
 
