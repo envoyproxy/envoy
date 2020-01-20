@@ -2168,14 +2168,14 @@ class MockConnPoolWithDestroy : public Http::ConnectionPool::MockInstance {
 public:
   ~MockConnPoolWithDestroy() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 class MockTcpConnPoolWithDestroy : public Tcp::ConnectionPool::MockInstance {
 public:
   ~MockTcpConnPoolWithDestroy() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3518. Make sure we handle a
@@ -2782,7 +2782,7 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
 
 class ClusterManagerInitHelperTest : public testing::Test {
 public:
-  MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
+  MOCK_METHOD(void, onClusterInit, (Cluster & cluster));
 
   NiceMock<MockClusterManager> cm_;
   ClusterManagerInitHelper init_helper_{cm_, [this](Cluster& cluster) { onClusterInit(cluster); }};

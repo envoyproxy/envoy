@@ -57,7 +57,7 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
 
 class CallbackChecker {
 public:
-  MOCK_METHOD1(check, void(HostSharedPtr host));
+  MOCK_METHOD(void, check, (HostSharedPtr host));
 };
 
 class OutlierDetectorImplTest : public testing::Test {

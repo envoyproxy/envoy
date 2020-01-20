@@ -26,9 +26,9 @@ option java_multiple_files = true;
 // [#protodoc-title: Bootstrap]
 // This proto is supplied via the :option:`-c` CLI flag and acts as the root
 // of the Envoy v2 configuration. See the :ref:`v2 configuration overview
-// <config_overview_v2_bootstrap>` for more detail.
+// <config_overview_bootstrap>` for more detail.
 
-// Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
+// Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
 // [#next-free-field: 21]
 message Bootstrap {
   message StaticResources {
@@ -61,7 +61,7 @@ message Bootstrap {
     // configuration source.
     api.v2.core.ConfigSource cds_config = 2;
 
-    // A single :ref:`ADS <config_overview_v2_ads>` source may be optionally
+    // A single :ref:`ADS <config_overview_ads>` source may be optionally
     // specified. This must have :ref:`api_type
     // <envoy_api_field_core.ApiConfigSource.api_type>` :ref:`GRPC
     // <envoy_api_enum_value_core.ApiConfigSource.ApiType.GRPC>`. Only

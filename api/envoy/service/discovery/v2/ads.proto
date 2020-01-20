@@ -9,6 +9,8 @@ option java_outer_classname = "AdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 
+// [#protodoc-title: Aggregated Discovery Service (ADS)]
+
 // [#not-implemented-hide:] Discovery services for endpoints, clusters, routes,
 // and listeners are retained in the package `envoy.api.v2` for backwards
 // compatibility with existing management servers. New development in discovery
