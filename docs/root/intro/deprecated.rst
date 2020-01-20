@@ -25,6 +25,8 @@ Version 1.13.0 (pending)
 * The `service_name` field in
   :ref:`HTTP health checker <envoy_api_msg_core.HealthCheck.HttpHealthCheck>` has been deprecated in
   favor of the `service_name_matcher` field.
+* The v2 xDS API is deprecated. It will be supported by Envoy until EOY 2020. See
+  :ref:`api_supported_versions`.
 
 Version 1.12.0 (October 31, 2019)
 =================================

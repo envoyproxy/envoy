@@ -508,7 +508,7 @@ message CorsPolicy {
     // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
     // filter will be enabled for 100% of the requests.
     //
-    // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
+    // If :ref:`runtime_key <envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` is
     // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
@@ -519,7 +519,7 @@ message CorsPolicy {
   // This field is intended to be used when ``filter_enabled`` and ``enabled`` are off. One of those
   // fields have to explicitly disable the filter in order for this setting to take effect.
   //
-  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // If :ref:`runtime_key <envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` is specified,
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.RuntimeFractionalPercent shadow_enabled = 10;
@@ -568,12 +568,13 @@ message RouteAction {
     //
     //   **This field is deprecated**. Set the
     //   :ref:`runtime_fraction
-    //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>` field instead.
+    //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>`
+    //   field instead. Mirroring occurs if both this and
+    //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>`
+    //   are not set.
     string runtime_key = 2 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
-    // If both :ref:`runtime_key
-    // <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>` and this field are not
-    // specified, all requests to the target cluster will be mirrored.
+    // If not specified, all requests to the target cluster will be mirrored.
     //
     // If specified, this field takes precedence over the `runtime_key` field and requests must also
     // fall under the percentage of matches indicated by this field.
@@ -1148,7 +1149,7 @@ message Tracing {
 
   // A list of custom tags with unique tag name to create tags for the active span.
   // It will take effect after merging with the :ref:`corresponding configuration
-  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.custom_tags>`
   // configured in the HTTP connection manager. If two tags with the same name are configured
   // each in the HTTP connection manager and the route level, the one configured here takes
   // priority.
