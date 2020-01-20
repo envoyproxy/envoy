@@ -11,7 +11,6 @@
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -295,14 +294,16 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.setReferenceAccessControlAllowOrigin(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_chunks_pseudo_header")) {
-    response_headers.setNoChunksPseudoHeader(0);
-  } else {
-    response_headers.setNoChunks(0);
-  }
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();
+
+  // Disable chunk-encoding in HTTP/1.x.
+  // TODO: This request should be propagated to codecs via API, instead of using a pseudo-header.
+  //       See: https://github.com/envoyproxy/envoy/issues/9749
+  if (stream_decoder_filter_callbacks.streamInfo().protocol() < Http::Protocol::Http2) {
+    response_headers.setNoChunks(0);
+  }
 
   registerConnection(&stream_decoder_filter_callbacks);
 

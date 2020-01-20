@@ -143,9 +143,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
   // content-length. If a client makes a HEAD request for an upstream resource
   // with no bytes but the upstream response doesn't include "Content-length: 0",
   // Envoy will incorrectly assume a subsequent response to GET will be chunk encoded.
-  if (saw_content_length || headers.NoChunks() ||
-      (headers.NoChunksPseudoHeader() &&
-       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_chunks_pseudo_header"))) {
+  if (saw_content_length || headers.NoChunks()) {
     chunk_encoding_ = false;
   } else {
     if (processing_100_continue_) {

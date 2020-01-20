@@ -47,8 +47,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.test_feature_false",
     // Should be removed as part of https://github.com/envoyproxy/envoy/issues/8993
     "envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
-    // Illegal :no-chunks pseudo-header.
-    "envoy.reloadable_features.no_chunks_pseudo_header",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
