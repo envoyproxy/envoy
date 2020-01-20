@@ -16,6 +16,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/process_context.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -104,8 +105,6 @@ class ServerFactoryContext : public virtual CommonFactoryContext {
 public:
   ~ServerFactoryContext() override = default;
 };
-
-class TransportSocketFactoryContext;
 
 /**
  * Context passed to network and HTTP filters to access server resources.
