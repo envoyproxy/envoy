@@ -1,8 +1,8 @@
 Version history
 ---------------
 
-1.13.0 (pending)
-================
+1.13.0 (January 20, 2020)
+=========================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * admin: added the ability to filter :ref:`/config_dump <operations_admin_interface_config_dump>`.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
