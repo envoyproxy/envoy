@@ -110,6 +110,9 @@ extern "C" void proxy_on_delete(uint32_t context_id);
  * return a VM configuration), proxy_on_configure() (where it will return a plugin configuration) or
  * in proxy_validate_configuration() (where it will return a VM configuration before
  * proxy_on_start() has been called and a plugin configuration after).
+ * @param start is the offset of the first byte to retrieve.
+ * @param length is the number of the bytes to retrieve. If start + length exceeds the number of
+ * bytes available then configuration_size will be set to the number of bytes returned.
  * @param configuration_ptr a pointer to a location which will be filled with either nullptr (if no
  * configuration is available) or a pointer to a malloc()ed block containing the configuration
  * bytes.
@@ -118,8 +121,8 @@ extern "C" void proxy_on_delete(uint32_t context_id);
  * @return a WasmResult: OK, InvalidMemoryAccess. Note: if OK is returned  *configuration_ptr may
  * be nullptr.
  */
-extern "C" WasmResult proxy_get_configuration(const char** configuration_ptr,
-                                              size_t* configuration_size);
+extern "C" WasmResult proxy_get_configuration((uint32_t start, uint32_t length,
+      const char** configuration_ptr, size_t* configuration_size);
 
 // Logging
 //
