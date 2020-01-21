@@ -23,8 +23,8 @@ enum class WasmResult : uint32_t {
   InvalidMemoryAccess = 6,
   // Data was requested from an empty container.
   Empty = 7,
-  // The provided CAS did not match that of the stored data.
-  CasMismatch = 8,
+  // The provided value did not match that of the stored data.
+  CompareAndSwapMismatch = 8,
   // Returned result was unexpected, e.g. of the incorrect size.
   ResultMismatch = 9,
   // Internal failure: trying check logs of the surrounding system.
@@ -46,30 +46,10 @@ inline std::string toString(WasmResult r) {
     _CASE(BadExpression);
     _CASE(InvalidMemoryAccess);
     _CASE(Empty);
-    _CASE(CasMismatch);
+    _CASE(CompareAndSwapMismatch);
     _CASE(ResultMismatch);
     _CASE(InternalFailure);
     _CASE(BrokenConnection);
   }
 }
 #undef _CASE
-
-enum class OnVmStartResult : uint32_t {
-  BadConfiguration = 0,
-  Ok = 1,
-};
-
-enum class OnValidateConfigurationResult : uint32_t {
-  BadConfiguration = 0,
-  Ok = 1,
-};
-
-enum class OnConfigureResult : uint32_t {
-  BadConfiguration = 0,
-  Ok = 1,
-};
-
-enum class OnDoneResult : uint32_t {
-  NotDone = 0,
-  Done = 1,
-};
