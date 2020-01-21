@@ -618,7 +618,8 @@ OptProcessContextRef FactoryContextImpl::processContext() { return server_.proce
 Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
 }
-Configuration::TransportSocketFactoryContext& FactoryContextImpl::getTransportSocketFactoryContext() const {
+Configuration::TransportSocketFactoryContext&
+FactoryContextImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
