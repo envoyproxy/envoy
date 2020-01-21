@@ -37,7 +37,8 @@ message VmConfig {
   google.protobuf.Any configuration = 4;
 
   // Allow the wasm file to include pre-compiled code on VMs which support it.
-  // This should only be enable for trusted sources as the precompiled code is not verified.
+  // Warning: this should only be enable for trusted sources as the precompiled code is not
+  // verified.
   bool allow_precompiled = 5;
 }
 
