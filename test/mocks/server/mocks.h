@@ -251,8 +251,7 @@ public:
     return LdsApiPtr{createLdsApi_(lds_config)};
   }
 
-  MOCK_METHOD(LdsApi*, createLdsApi_,
-              (const envoy::config::core::v3::ConfigSource& lds_config));
+  MOCK_METHOD(LdsApi*, createLdsApi_, (const envoy::config::core::v3::ConfigSource& lds_config));
   MOCK_METHOD(std::vector<Network::FilterFactoryCb>, createNetworkFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                Configuration::FilterChainFactoryContext& filter_chain_factory_context));
@@ -280,8 +279,8 @@ public:
   ~MockListenerManager() override;
 
   MOCK_METHOD(bool, addOrUpdateListener,
-              (const envoy::config::listener::v3::Listener& config,
-               const std::string& version_info, bool modifiable));
+              (const envoy::config::listener::v3::Listener& config, const std::string& version_info,
+               bool modifiable));
   MOCK_METHOD(void, createLdsApi, (const envoy::config::core::v3::ConfigSource& lds_config));
   MOCK_METHOD(std::vector<std::reference_wrapper<Network::ListenerConfig>>, listeners, ());
   MOCK_METHOD(uint64_t, numConnections, (), (const));

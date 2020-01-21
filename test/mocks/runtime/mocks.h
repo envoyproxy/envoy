@@ -41,7 +41,8 @@ public:
     }
   }
 
-  MOCK_METHOD(bool, deprecatedFeatureEnabled, (const std::string& key, bool default_enabled), (const));
+  MOCK_METHOD(bool, deprecatedFeatureEnabled, (const std::string& key, bool default_enabled),
+              (const));
   MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
   MOCK_METHOD(bool, featureEnabled, (const std::string& key, uint64_t default_value), (const));
   MOCK_METHOD(bool, featureEnabled,
@@ -51,8 +52,7 @@ public:
                uint64_t num_buckets),
               (const));
   MOCK_METHOD(bool, featureEnabled,
-              (const std::string& key,
-               const envoy::type::v3::FractionalPercent& default_value),
+              (const std::string& key, const envoy::type::v3::FractionalPercent& default_value),
               (const));
   MOCK_METHOD(bool, featureEnabled,
               (const std::string& key, const envoy::type::v3::FractionalPercent& default_value,

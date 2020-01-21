@@ -29,11 +29,10 @@ public:
   MOCK_METHOD(
       TlsCertificateConfigProviderSharedPtr, createInlineTlsCertificateProvider,
       (const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate));
-  MOCK_METHOD(
-      CertificateValidationContextConfigProviderSharedPtr,
-      createInlineCertificateValidationContextProvider,
-      (const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
-           certificate_validation_context));
+  MOCK_METHOD(CertificateValidationContextConfigProviderSharedPtr,
+              createInlineCertificateValidationContextProvider,
+              (const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
+                   certificate_validation_context));
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr, createInlineTlsSessionTicketKeysProvider,
               (const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&
                    tls_session_ticket_keys));

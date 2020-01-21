@@ -232,12 +232,11 @@ public:
   MockSocketOption();
   ~MockSocketOption() override;
 
-  MOCK_METHOD(bool, setOption,
-              (Socket&, envoy::config::core::v3::SocketOption::SocketState state), (const));
+  MOCK_METHOD(bool, setOption, (Socket&, envoy::config::core::v3::SocketOption::SocketState state),
+              (const));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));
   MOCK_METHOD(absl::optional<Socket::Option::Details>, getOptionDetails,
-              (const Socket&, envoy::config::core::v3::SocketOption::SocketState state),
-              (const));
+              (const Socket&, envoy::config::core::v3::SocketOption::SocketState state), (const));
 };
 
 class MockConnectionSocket : public ConnectionSocket {
