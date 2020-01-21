@@ -5,7 +5,20 @@
   white-space: normal !important;
 }
 
+/* Docs sidebar aesthetic */
+.wy-side-nav-search {
+  background-color: #fff;
+}
+
+.wy-side-nav-search .version {
+  color: #a53795;
+}
+
+.wy-side-nav-search .search input[type="text"] {
+  border: 1px solid #F1F1F1;
+}
+
 /* align multi line csv table columns */
 table.docutils div.line-block {
-    margin-left: 0;
+  margin-left: 0;
 }
