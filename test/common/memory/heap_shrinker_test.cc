@@ -24,7 +24,7 @@ protected:
 
   void step() {
     time_system_.sleep(std::chrono::milliseconds(10000));
-    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    //dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 
   Envoy::Stats::IsolatedStoreImpl stats_;

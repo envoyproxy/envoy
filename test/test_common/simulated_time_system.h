@@ -44,7 +44,7 @@ public:
    * @param monotonic_time The desired new current time.
    */
   void setMonotonicTime(const MonotonicTime& monotonic_time) {
-    mutex_.lock();
+    mutex_.Lock();
     setMonotonicTimeAndUnlock(monotonic_time);
   }
 
@@ -77,6 +77,8 @@ private:
    * @param monotonic_time The desired new current time.
    */
   void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
+  void setMonotonicTimeLockHeld(const MonotonicTime& monotonic_time)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   MonotonicTime alarmTimeLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   void alarmActivateLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
@@ -92,17 +94,19 @@ private:
 
   // Keeps track of how many alarms have been activated but not yet called,
   // which helps waitFor() determine when to give up and declare a timeout.
-  void incPending() { ++pending_alarms_; }
-  void decPending() { --pending_alarms_; }
-  bool hasPending() const { return pending_alarms_ > 0; }
+  void incPendingLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_) { ++pending_alarms_; }
+  void decPending() { absl::MutexLock lock(&mutex_); --pending_alarms_; }
+  bool hasPending() const { absl::MutexLock lock(&mutex_); return pending_alarms_ > 0; }
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
   SystemTime system_time_ GUARDED_BY(mutex_);
   AlarmSet alarms_ GUARDED_BY(mutex_);
   uint64_t index_ GUARDED_BY(mutex_);
-  mutable Thread::MutexBasicLockable mutex_;
-  std::atomic<uint32_t> pending_alarms_;
+  mutable absl::Mutex mutex_;
+  uint32_t pending_alarms_ GUARDED_BY(mutex_);
+  absl::flat_hash_map<Thread::ThreadId, uint32_t> thread_pending_map_;
+  //uint32_t pending_alarms_on_other_threads_ GUARDED_BY(mutex_);
   Thread::OnlyOneThread only_one_thread_;
 };
 
