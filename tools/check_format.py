@@ -167,9 +167,19 @@ UNOWNED_EXTENSIONS = {
 # Map a line transformation function across each line of a file.
 # .bak temporaries.
 def replaceLines(path, line_xform):
+  format_flag = True
+  output_lines = []
+  for line in readLines(path):
+    if line.find("// clang-format on") != -1:
+      format_flag = True
+    if line.find("// clang-format off") != -1:
+      format_flag = False
+    if format_flag:
+      output_lines.append(line_xform(line))
+    else:
+      output_lines.append(line)
   # We used to use fileinput in the older Python 2.7 script, but this doesn't do
   # inplace mode and UTF-8 in Python 3, so doing it the manual way.
-  output_lines = [line_xform(line) for line in readLines(path)]
   pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
 
 
@@ -409,12 +419,19 @@ def checkFileContents(file_path, checker):
     # notes have a different format.
     checkCurrentReleaseNotes(file_path, error_messages)
 
+  format_flag = True
   for line_number, line in enumerate(readLines(file_path)):
+
+    if line.find("// clang-format on") != -1:
+      format_flag = True
+    if line.find("// clang-format off") != -1:
+      format_flag = False
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    checker(line, file_path, reportError)
+    if format_flag:
+      checker(line, file_path, reportError)
   return error_messages
 
 
