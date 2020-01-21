@@ -36,29 +36,30 @@ public:
 
 class AdmissionControlConfigTest : public testing::Test {
 public:
-  AdmissionControlConfigTest() = default;
+  AdmissionControlConfigTest() {}
 
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlFilterConfig::AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_source_, random_, scope_, context.threadLocal());
+    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_, scope_, context_.threadLocal());
   }
 
 protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl scope_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Runtime::MockRandomGenerator> random_;
 };
 
 class AdmissionControlTest : public testing::Test {
 public:
-  AdmissionControlTest() = default;
+  AdmissionControlTest() {}
 
-  AdmissionControlFilterConfig makeConfig(const std::string& yaml) {
+  std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlFilterConfig::AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    return AdmissionControlFilterConfig(proto, runtime_, time_source_, random_, scope_, context.threadLocal());
+    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_, scope_, context_.threadLocal());
   }
 
   void generateFilter(std::string yaml) {
@@ -70,6 +71,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl scope_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::shared_ptr<AdmissionControlFilter> filter_;
 };
@@ -191,7 +193,7 @@ TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
   // Empty config. No fields are required.
   AdmissionControlFilterConfig::AdmissionControlProto proto;
 
-  auto config = makeConfig(yaml);
+  auto config = makeConfig("");
 
   EXPECT_TRUE(config->filterEnabled());
   EXPECT_EQ(std::chrono::seconds(120), config->samplingWindow());

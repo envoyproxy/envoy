@@ -87,10 +87,7 @@ public:
   using AdmissionControlProto =
       envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
   AdmissionControlFilterConfig(
-    const AdmissionControlProto& proto_config, TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope(), ThreadLocal::SlotAllocator& threadLocal);
-
-  // Get the per-thread admission controller.
-  ThreadLocalController& getController() const { return tls_->getTyped<ThreadLocalController>(); }
+    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotAllocator& tls);
 
   Runtime::Loader& runtime() const { return runtime_; }
   Runtime::RandomGenerator& random() const { return random_; }
@@ -100,12 +97,14 @@ public:
   std::chrono::seconds samplingWindow() const { return sampling_window_; }
   double aggression() const;
 
+  ThreadLocalController& getController() const { return tls_->getTyped<ThreadLocalController>(); }
+
 private:
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
   Runtime::RandomGenerator& random_;
   Stats::Scope& scope_;
-  ThreadLocalController controller_;
+  const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;
   std::chrono::seconds sampling_window_;
   std::unique_ptr<Runtime::Double> aggression_;
