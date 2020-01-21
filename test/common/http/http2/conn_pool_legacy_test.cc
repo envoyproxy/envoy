@@ -53,7 +53,7 @@ public:
 
 class ActiveTestRequest;
 
-class Http2ConnPoolImplTest : public testing::Test {
+class Http2ConnPoolImplLegacyTest : public testing::Test {
 public:
   struct TestCodecClient {
     Http::MockClientConnection* codec_;
@@ -63,11 +63,11 @@ public:
     Event::DispatcherPtr client_dispatcher_;
   };
 
-  Http2ConnPoolImplTest()
+  Http2ConnPoolImplLegacyTest()
       : api_(Api::createApiForTest(stats_store_)),
         pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr) {}
 
-  ~Http2ConnPoolImplTest() override {
+  ~Http2ConnPoolImplLegacyTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
@@ -141,7 +141,7 @@ public:
 
 class ActiveTestRequest {
 public:
-  ActiveTestRequest(Http2ConnPoolImplTest& test, size_t client_index, bool expect_connected) {
+  ActiveTestRequest(Http2ConnPoolImplLegacyTest& test, size_t client_index, bool expect_connected) {
     if (expect_connected) {
       EXPECT_CALL(*test.test_clients_[client_index].codec_, newStream(_))
           .WillOnce(DoAll(SaveArgAddress(&inner_decoder_), ReturnRef(inner_encoder_)));
@@ -158,42 +158,42 @@ public:
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
 };
 
-void Http2ConnPoolImplTest::expectClientConnect(size_t index, ActiveTestRequest& r) {
+void Http2ConnPoolImplLegacyTest::expectClientConnect(size_t index, ActiveTestRequest& r) {
   expectStreamConnect(index, r);
   EXPECT_CALL(*test_clients_[index].connect_timer_, disableTimer());
   test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
-void Http2ConnPoolImplTest::expectStreamConnect(size_t index, ActiveTestRequest& r) {
+void Http2ConnPoolImplLegacyTest::expectStreamConnect(size_t index, ActiveTestRequest& r) {
   EXPECT_CALL(*test_clients_[index].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&r.inner_decoder_), ReturnRef(r.inner_encoder_)));
   EXPECT_CALL(r.callbacks_.pool_ready_, ready());
 }
 
-void Http2ConnPoolImplTest::expectClientReset(size_t index, ActiveTestRequest& r) {
+void Http2ConnPoolImplLegacyTest::expectClientReset(size_t index, ActiveTestRequest& r) {
   expectStreamReset(r);
   EXPECT_CALL(*test_clients_[0].connect_timer_, disableTimer());
   test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-void Http2ConnPoolImplTest::expectStreamReset(ActiveTestRequest& r) {
+void Http2ConnPoolImplLegacyTest::expectStreamReset(ActiveTestRequest& r) {
   EXPECT_CALL(r.callbacks_.pool_failure_, ready());
 }
 
-void Http2ConnPoolImplTest::closeClient(size_t index) {
+void Http2ConnPoolImplLegacyTest::closeClient(size_t index) {
   test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 }
 
-void Http2ConnPoolImplTest::completeRequest(ActiveTestRequest& r) {
+void Http2ConnPoolImplLegacyTest::completeRequest(ActiveTestRequest& r) {
   EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
   r.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
   EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
   r.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
 }
 
-void Http2ConnPoolImplTest::completeRequestCloseUpstream(size_t index, ActiveTestRequest& r) {
+void Http2ConnPoolImplLegacyTest::completeRequestCloseUpstream(size_t index, ActiveTestRequest& r) {
   completeRequest(r);
   closeClient(index);
 }
@@ -201,12 +201,12 @@ void Http2ConnPoolImplTest::completeRequestCloseUpstream(size_t index, ActiveTes
 /**
  * Verify that the pool retains and returns the host it was constructed with.
  */
-TEST_F(Http2ConnPoolImplTest, Host) { EXPECT_EQ(host_, pool_.host()); }
+TEST_F(Http2ConnPoolImplLegacyTest, Host) { EXPECT_EQ(host_, pool_.host()); }
 
 /**
  * Verify that connections are drained when requested.
  */
-TEST_F(Http2ConnPoolImplTest, DrainConnections) {
+TEST_F(Http2ConnPoolImplLegacyTest, DrainConnections) {
   InSequence s;
   pool_.max_streams_ = 1;
 
@@ -240,7 +240,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
 }
 
 // Verifies that requests are queued up in the conn pool until the connection becomes ready.
-TEST_F(Http2ConnPoolImplTest, PendingRequests) {
+TEST_F(Http2ConnPoolImplLegacyTest, PendingRequests) {
   InSequence s;
 
   // Create three requests. These should be queued up.
@@ -278,7 +278,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequests) {
 
 // Verifies that requests are queued up in the conn pool and fail when the connection
 // fails to be established.
-TEST_F(Http2ConnPoolImplTest, PendingRequestsFailure) {
+TEST_F(Http2ConnPoolImplLegacyTest, PendingRequestsFailure) {
   InSequence s;
   pool_.max_streams_ = 10;
 
@@ -311,7 +311,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsFailure) {
 
 // Verifies that requests are queued up in the conn pool and respect max request circuit breaking
 // when the connection is established.
-TEST_F(Http2ConnPoolImplTest, PendingRequestsRequestOverflow) {
+TEST_F(Http2ConnPoolImplLegacyTest, PendingRequestsRequestOverflow) {
   InSequence s;
 
   // Inflate the resource count to just under the limit.
@@ -347,7 +347,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsRequestOverflow) {
 }
 
 // Verifies that we honor the max pending requests circuit breaker.
-TEST_F(Http2ConnPoolImplTest, PendingRequestsMaxPendingCircuitBreaker) {
+TEST_F(Http2ConnPoolImplLegacyTest, PendingRequestsMaxPendingCircuitBreaker) {
   InSequence s;
 
   // Inflate the resource count to just under the limit.
@@ -383,7 +383,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsMaxPendingCircuitBreaker) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
+TEST_F(Http2ConnPoolImplLegacyTest, VerifyConnectionTimingStats) {
   InSequence s;
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -408,7 +408,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
 /**
  * Test that buffer limits are set.
  */
-TEST_F(Http2ConnPoolImplTest, VerifyBufferLimits) {
+TEST_F(Http2ConnPoolImplLegacyTest, VerifyBufferLimits) {
   InSequence s;
   expectClientCreate(8192);
   ActiveTestRequest r1(*this, 0, false);
@@ -427,7 +427,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyBufferLimits) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
+TEST_F(Http2ConnPoolImplLegacyTest, RequestAndResponse) {
   InSequence s;
 
   expectClientCreate();
@@ -452,7 +452,7 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, LocalReset) {
+TEST_F(Http2ConnPoolImplLegacyTest, LocalReset) {
   InSequence s;
 
   expectClientCreate();
@@ -471,7 +471,7 @@ TEST_F(Http2ConnPoolImplTest, LocalReset) {
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, RemoteReset) {
+TEST_F(Http2ConnPoolImplLegacyTest, RemoteReset) {
   InSequence s;
 
   expectClientCreate();
@@ -490,7 +490,7 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
+TEST_F(Http2ConnPoolImplLegacyTest, DrainDisconnectWithActiveRequest) {
   InSequence s;
   pool_.max_streams_ = 1;
 
@@ -513,7 +513,7 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
+TEST_F(Http2ConnPoolImplLegacyTest, DrainDisconnectDrainingWithActiveRequest) {
   InSequence s;
   pool_.max_streams_ = 1;
 
@@ -548,7 +548,7 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
+TEST_F(Http2ConnPoolImplLegacyTest, DrainPrimary) {
   InSequence s;
   pool_.max_streams_ = 1;
 
@@ -582,7 +582,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
+TEST_F(Http2ConnPoolImplLegacyTest, DrainPrimaryNoActiveRequest) {
   InSequence s;
   pool_.max_streams_ = 1;
 
@@ -614,7 +614,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
+TEST_F(Http2ConnPoolImplLegacyTest, ConnectTimeout) {
   InSequence s;
 
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
@@ -650,7 +650,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
+TEST_F(Http2ConnPoolImplLegacyTest, MaxGlobalRequests) {
   cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
   InSequence s;
 
@@ -673,7 +673,7 @@ TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, GoAway) {
+TEST_F(Http2ConnPoolImplLegacyTest, GoAway) {
   InSequence s;
 
   expectClientCreate();
@@ -702,12 +702,12 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_close_notify_.value());
 }
 
-TEST_F(Http2ConnPoolImplTest, NoActiveConnectionsByDefault) {
+TEST_F(Http2ConnPoolImplLegacyTest, NoActiveConnectionsByDefault) {
   EXPECT_FALSE(pool_.hasActiveConnections());
 }
 
 // Show that an active request on the primary connection is considered active.
-TEST_F(Http2ConnPoolImplTest, ActiveConnectionsHasActiveRequestsTrue) {
+TEST_F(Http2ConnPoolImplLegacyTest, ActiveConnectionsHasActiveRequestsTrue) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
@@ -718,7 +718,7 @@ TEST_F(Http2ConnPoolImplTest, ActiveConnectionsHasActiveRequestsTrue) {
 }
 
 // Show that pending requests are considered active.
-TEST_F(Http2ConnPoolImplTest, PendingRequestsConsideredActive) {
+TEST_F(Http2ConnPoolImplLegacyTest, PendingRequestsConsideredActive) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
 
@@ -730,7 +730,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequestsConsideredActive) {
 
 // Show that even if there is a primary client still, if all of its requests have completed, then it
 // does not have any active connections.
-TEST_F(Http2ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
+TEST_F(Http2ConnPoolImplLegacyTest, ResponseCompletedConnectionReadyNoActiveConnections) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
@@ -742,7 +742,7 @@ TEST_F(Http2ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnection
 }
 
 // Show that if connections are draining, they're still considered active.
-TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
+TEST_F(Http2ConnPoolImplLegacyTest, DrainingConnectionsConsideredActive) {
   pool_.max_streams_ = 1;
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -756,7 +756,7 @@ TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
 }
 
 // Show that once we've drained all connections, there are no longer any active.
-TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
+TEST_F(Http2ConnPoolImplLegacyTest, DrainedConnectionsNotActive) {
   pool_.max_streams_ = 1;
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
