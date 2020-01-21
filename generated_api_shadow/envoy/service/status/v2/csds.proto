@@ -50,6 +50,7 @@ enum ConfigStatus {
 // Request for client status of clients identified by a list of NodeMatchers.
 message ClientStatusRequest {
   // Management server can use these match criteria to identify clients.
+  // The match follows OR semantics.
   repeated type.matcher.NodeMatcher node_matchers = 1;
 }
 

@@ -14,6 +14,7 @@ option java_multiple_files = true;
 // [#protodoc-title:NodeMatcher]
 
 // Specifies the way to match a Node.
+// The match follows AND semantics.
 message NodeMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.NodeMatcher";
 

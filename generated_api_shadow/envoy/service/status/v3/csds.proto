@@ -55,6 +55,7 @@ message ClientStatusRequest {
       "envoy.service.status.v2.ClientStatusRequest";
 
   // Management server can use these match criteria to identify clients.
+  // The match follows OR semantics.
   repeated type.matcher.v3.NodeMatcher node_matchers = 1;
 }
 
