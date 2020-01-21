@@ -4,6 +4,7 @@ package envoy.annotations;
 
 import "google/protobuf/descriptor.proto";
 
+// [#protodoc-title: Deprecation]
 // Allows tagging proto fields as fatal by default. One Envoy release after
 // deprecation, deprecated fields will be disallowed by default, a state which
 // is reversible with :ref:`runtime overrides <config_runtime_deprecation>`.

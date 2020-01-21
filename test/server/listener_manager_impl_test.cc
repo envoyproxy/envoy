@@ -3611,7 +3611,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
             validation_context:
-              match_subject_alt_names: 
+              match_subject_alt_names:
                  exact: "spiffe://lyft.com/testclient"
   )EOF",
                                                        Network::Address::IpVersion::v4);
@@ -3675,6 +3675,124 @@ TEST_F(ListenerManagerImplWithDispatcherStatsTest, DispatherStatsWithCorrectPref
   EXPECT_CALL(*worker_, start(_));
   EXPECT_CALL(*worker_, initializeStats(_, "worker_0."));
   manager_->startWorkers(guard_dog_);
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, ApiListener) {
+  const std::string yaml = R"EOF(
+name: test_api_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    stat_prefix: hcm
+    route_config:
+      name: api_router
+      virtual_hosts:
+        - name: api
+          domains:
+            - "*"
+          routes:
+            - match:
+                prefix: "/"
+              route:
+                cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", false));
+  EXPECT_EQ(0U, manager_->listeners().size());
+  ASSERT_TRUE(manager_->apiListener().has_value());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, ApiListenerNotAllowedAddedViaApi) {
+  const std::string yaml = R"EOF(
+name: test_api_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    stat_prefix: hcm
+    route_config:
+      name: api_router
+      virtual_hosts:
+        - name: api
+          domains:
+            - "*"
+          routes:
+            - match:
+                prefix: "/"
+              route:
+                cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  ASSERT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
+  EXPECT_EQ(0U, manager_->listeners().size());
+  ASSERT_FALSE(manager_->apiListener().has_value());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, ApiListenerOnlyOneApiListener) {
+  const std::string yaml = R"EOF(
+name: test_api_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    stat_prefix: hcm
+    route_config:
+      name: api_router
+      virtual_hosts:
+        - name: api
+          domains:
+            - "*"
+          routes:
+            - match:
+                prefix: "/"
+              route:
+                cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: test_api_listener_2
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    stat_prefix: hcm
+    route_config:
+      name: api_router
+      virtual_hosts:
+        - name: api
+          domains:
+            - "*"
+          routes:
+            - match:
+                prefix: "/"
+              route:
+                cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", false));
+  EXPECT_EQ(0U, manager_->listeners().size());
+  ASSERT_TRUE(manager_->apiListener().has_value());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+
+  // Only one ApiListener is added.
+  ASSERT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", false));
+  EXPECT_EQ(0U, manager_->listeners().size());
+  // The original ApiListener is there.
+  ASSERT_TRUE(manager_->apiListener().has_value());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
 }
 
 } // namespace

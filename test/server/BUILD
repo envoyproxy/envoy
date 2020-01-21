@@ -17,6 +17,19 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "api_listener_test",
+    srcs = ["api_listener_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/server:api_listener_lib",
+        "//source/server:listener_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
     tags = ["backtrace"],
@@ -183,6 +196,7 @@ envoy_cc_test_library(
     hdrs = ["listener_manager_impl_test.h"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
+        "//source/server:api_listener_lib",
         "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
@@ -259,6 +273,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:api_listener_lib",
         "//source/server:filter_chain_manager_lib",
         "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",
@@ -289,6 +304,11 @@ envoy_cc_fuzz_test(
 )
 
 filegroup(
+    name = "server_test_data",
+    srcs = glob(["test_data/server/**"]),
+)
+
+filegroup(
     name = "runtime_test_data",
     srcs = glob(["test_data/runtime/**"]),
 )
@@ -302,26 +322,9 @@ envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
-        ":callbacks_stats_sink_bootstrap.yaml",
-        ":cluster_dupe_bootstrap.yaml",
-        ":cluster_health_check_bootstrap.yaml",
-        ":empty_bootstrap.yaml",
-        ":invalid_bootstrap.yaml",
-        ":invalid_layered_runtime_duplicate_name.yaml",
-        ":invalid_layered_runtime_missing_name.yaml",
-        ":invalid_layered_runtime_no_layer_specifier.yaml",
-        ":invalid_legacy_runtime_bootstrap.yaml",
-        ":invalid_runtime_bootstrap.yaml",
-        ":node_bootstrap.yaml",
-        ":node_bootstrap_no_admin_port.yaml",
-        ":node_bootstrap_with_admin_socket_options.yaml",
-        ":node_bootstrap_without_access_log.yaml",
-        ":proxy_version_bootstrap.yaml",
-        ":runtime_bootstrap.yaml",
         ":runtime_test_data",
+        ":server_test_data",
         ":static_validation_test_data",
-        ":stats_sink_bootstrap.yaml",
-        ":zipkin_tracing.yaml",
     ],
     deps = [
         "//source/common/common:version_lib",

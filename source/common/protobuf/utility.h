@@ -304,6 +304,22 @@ public:
   };
 
   /**
+   * Convert and validate from google.protobuf.Any to a typed message.
+   * @param message source google.protobuf.Any message.
+   *
+   * @return MessageType the typed message inside the Any.
+   * @throw ProtoValidationException if the message does not satisfy its type constraints.
+   */
+  template <class MessageType>
+  static inline MessageType
+  anyConvertAndValidate(const ProtobufWkt::Any& message,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) {
+    MessageType typed_message = anyConvert<MessageType>(message);
+    validate(typed_message, validation_visitor);
+    return typed_message;
+  };
+
+  /**
    * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
    * messages to/from google.protobuf.Struct.
    * TODO(htuch): Avoid round-tripping via JSON strings by doing whatever

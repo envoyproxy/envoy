@@ -9,6 +9,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 
+import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
@@ -49,7 +50,7 @@ message GrpcService {
       DataSource root_certs = 1;
 
       // PEM encoded client private key.
-      DataSource private_key = 2;
+      DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
 
       // PEM encoded client certificate chain.
       DataSource cert_chain = 3;
@@ -200,8 +201,7 @@ message GrpcService {
 
     // The target URI when using the `Google C++ gRPC client
     // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in
-    // :ref:`channel_credentials
-    // <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials>`.
+    // :ref:`channel_credentials <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials>`.
     string target_uri = 1 [(validate.rules).string = {min_bytes: 1}];
 
     ChannelCredentials channel_credentials = 2;
