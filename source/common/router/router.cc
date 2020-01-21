@@ -493,11 +493,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
-    // TODO(#7003): converting this header value into a StatName requires
-    // taking a global symbol-table lock. This is not a frequently used feature,
-    // but may not be the only occurrence of this pattern, where it's difficult
-    // or impossible to pre-compute a StatName for a component of a stat name.
-    alt_stat_prefix_ = std::make_unique<Stats::StatNameManagedStorage>(
+    alt_stat_prefix_ = std::make_unique<Stats::StatNameDynamicStorage>(
         request_alt_name->value().getStringView(), config_.scope_.symbolTable());
     headers.removeEnvoyUpstreamAltStatName();
   }
