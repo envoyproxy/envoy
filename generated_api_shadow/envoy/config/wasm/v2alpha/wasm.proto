@@ -12,7 +12,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.wasm.v2alpha";
 option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.wasm.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.wasm.v3";
 
 // [#protodoc-title: Wasm service]
 

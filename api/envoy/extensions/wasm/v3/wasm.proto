@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.wasm.v3alpha;
+package envoy.extensions.wasm.v3;
 
 import "envoy/config/core/v3/base.proto";
 
@@ -10,7 +10,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.wasm.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.wasm.v3";
 option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
 
@@ -72,7 +72,7 @@ message PluginConfig {
 }
 
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig
-// <envoy_api_msg_extensions.wasm.v3alpha.WasmService>`. This opaque configuration will be used to
+// <envoy_api_msg_extensions.wasm.v3.WasmService>`. This opaque configuration will be used to
 // create a Wasm Service.
 // [#not-implemented-hide:] pending implementation.
 message WasmService {

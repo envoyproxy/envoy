@@ -180,7 +180,7 @@ proto_library(
         "//envoy/extensions/transport_sockets/raw_buffer/v3:pkg",
         "//envoy/extensions/transport_sockets/tap/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/v3:pkg",
-        "//envoy/extensions/wasm/v3alpha:pkg",
+        "//envoy/extensions/wasm/v3:pkg",
         "//envoy/service/accesslog/v2:pkg",
         "//envoy/service/accesslog/v3:pkg",
         "//envoy/service/auth/v2:pkg",
