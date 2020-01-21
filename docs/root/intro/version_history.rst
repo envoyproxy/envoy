@@ -1,8 +1,8 @@
 Version history
 ---------------
 
-1.13.0 (pending)
-================
+1.13.0 (January 20, 2020)
+=========================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * admin: added the ability to filter :ref:`/config_dump <operations_admin_interface_config_dump>`.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
@@ -10,12 +10,14 @@ Version history
 * access log: added HOSTNAME.
 * api: remove all support for v1
 * api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
+* api: support for the v3 xDS API added. See :ref:`api_supported_versions`.
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * cluster: added :ref:`aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
 * config: all category names of internal envoy extensions are prefixed with the 'envoy.' prefix to follow the reverse DNS naming notation.
 * decompressor: remove decompressor hard assert failure and replace with an error flag.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
+* fault: fixed an issue where the http fault filter would repeatedly check the percentage of abort/delay when the `x-envoy-downstream-service-cluster` header was included in the request to ensure that the actual percentage of abort/delay matches the configuration of the filter.
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
 * health check: added :ref:`TlsOptions <envoy_api_msg_core.HealthCheck.TlsOptions>` to allow TLS configuration overrides.
 * health check: added :ref:`service_name_matcher <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher>` to better compare the service name patterns for health check identity.
@@ -60,7 +62,6 @@ Version history
 * tracing: added initial support for AWS X-Ray (local sampling rules only) :ref:`X-Ray Tracing <envoy_api_msg_config.trace.v2alpha.XRayConfig>`.
 * tracing: added tags for gRPC request path, authority, content-type and timeout.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
-* fault: fixed an issue where the http fault filter would repeatedly check the percentage of abort/delay when the `x-envoy-downstream-service-cluster` header was included in the request to ensure that the actual percentage of abort/delay matches the configuration of the filter.
 
 1.12.2 (December 10, 2019)
 ==========================
@@ -330,7 +331,7 @@ Version history
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
 * config: logging warnings when deprecated fields are in use.
 * config: removed deprecated --v2-config-only from command line config.
-* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+* config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_bootstrap>`.
 * config: removed the deprecated_v1 config option from :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * config: finish cluster warming only when a named response i.e. ClusterLoadAssignment associated to the cluster being warmed comes in the EDS response. This is a behavioural change from the current implementation where warming of cluster completes on missing load assignments also.
@@ -883,7 +884,7 @@ Version history
 * admin: added basic :ref:`Prometheus output <operations_admin_interface_stats>` for stats admin
   endpoint. Histograms are not currently output.
 * admin: added ``version_info`` to the :ref:`/clusters admin endpoint<operations_admin_interface_clusters>`.
-* config: the :ref:`v2 API <config_overview_v2>` is now considered production ready.
+* config: the :ref:`v2 API <config_overview>` is now considered production ready.
 * config: added --v2-config-only CLI flag.
 * cors: added :ref:`CORS filter <config_http_filters_cors>`.
 * health check: added :ref:`x-envoy-immediate-health-check-fail
