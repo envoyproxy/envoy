@@ -16,7 +16,7 @@
 // this ABI.
 //
 // The Wasm VM can only access memory in the VM. Consequently, all data must be passed as integral
-// call parameters or by the host allocting memory in the VM which is then owned by the Wasm code.
+// call parameters or by the host allocating memory in the VM which is then owned by the Wasm code.
 // For consistency and to enable diverse Wasm languages (e.g. languages with GC), the ABI uses a
 // single mechanism for allocating memory in the VM and requires that all memory allocations be
 // explicitly requested by calls from the VM and that the Wasm code then owns the allocated memory.
