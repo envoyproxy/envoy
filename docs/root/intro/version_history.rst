@@ -3,7 +3,7 @@ Version history
 
 1.14.0 (Pending)
 ================
-* config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension.
+* config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 
 1.13.0 (January 20, 2020)
 =========================

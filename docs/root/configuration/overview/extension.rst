@@ -1,4 +1,4 @@
-.. _config_overview_v2_extension_configuration:
+.. _config_overview_extension_configuration:
 
 Extension configuration
 -----------------------

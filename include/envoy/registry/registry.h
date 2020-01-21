@@ -377,7 +377,12 @@ private:
 
     factories().emplace(factory.name(), &factory);
     RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
-    factoriesByType().emplace(factory.configType(), &factory);
+
+    auto config_type = factory.configType();
+    Base* prev = getFactoryByType(config_type);
+    if (prev != nullptr) {
+      factoriesByType().emplace(config_type, &factory);
+    }
 
     return displaced;
   }
@@ -389,7 +394,11 @@ private:
   static void removeFactoryForTest(absl::string_view name, absl::string_view config_type) {
     auto result = factories().erase(name);
     RELEASE_ASSERT(result == 1, "");
-    factoriesByType().erase(config_type);
+
+    Base* prev = getFactoryByType(config_type);
+    if (prev != nullptr) {
+      factoriesByType().erase(config_type);
+    }
   }
 };
 
