@@ -499,12 +499,10 @@ TEST_P(ServerStatsTest, FlushStats) {
   EXPECT_EQ(1, recent_lookups.value() - strobed_recent_lookups);
   strobed_recent_lookups = recent_lookups.value();
 
-  // When we use a StatNameSet dynamic, we charge for the SymbolTable lookup and
-  // for the lookup in the StatNameSet as well, as that requires a lock for its
-  // dynamic hash_map.
-  test_set->getDynamic("c.d");
+  // When we create a dynamic stat, there are no locks taken.
+  Stats::StatNameDynamicStorage dynamic_stat("c.d", stats_store_.symbolTable());
   flushStats();
-  EXPECT_EQ(2, recent_lookups.value() - strobed_recent_lookups);
+  EXPECT_EQ(recent_lookups.value(), strobed_recent_lookups);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerStatsTest,

@@ -28,9 +28,9 @@ option java_multiple_files = true;
 // [#protodoc-title: Bootstrap]
 // This proto is supplied via the :option:`-c` CLI flag and acts as the root
 // of the Envoy v2 configuration. See the :ref:`v2 configuration overview
-// <config_overview_v2_bootstrap>` for more detail.
+// <config_overview_bootstrap>` for more detail.
 
-// Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
+// Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
 // [#next-free-field: 21]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
@@ -72,7 +72,7 @@ message Bootstrap {
     // configuration source.
     core.v3.ConfigSource cds_config = 2;
 
-    // A single :ref:`ADS <config_overview_v2_ads>` source may be optionally
+    // A single :ref:`ADS <config_overview_ads>` source may be optionally
     // specified. This must have :ref:`api_type
     // <envoy_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
     // <envoy_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`. Only
@@ -168,8 +168,8 @@ message Bootstrap {
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // This may be overridden on a per-cluster basis in cds_config,
   // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
-  // :ref:`use_tcp_for_dns_lookups
-  // <envoy_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are specified.
+  // :ref:`use_tcp_for_dns_lookups <envoy_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
+  // specified.
   bool use_tcp_for_dns_lookups = 20;
 }
 
