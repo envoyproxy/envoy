@@ -13,6 +13,7 @@ Types
   ../type/v3/semantic_version.proto
   ../type/v3/token_bucket.proto
   ../type/matcher/v3/metadata.proto
+  ../type/matcher/v3/node.proto
   ../type/matcher/v3/number.proto
   ../type/matcher/v3/regex.proto
   ../type/matcher/v3/string.proto
