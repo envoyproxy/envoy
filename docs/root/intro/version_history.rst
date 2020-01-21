@@ -3,6 +3,7 @@ Version history
 
 1.14.0 (Pending)
 ================
+* retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 
 1.13.0 (January 20, 2020)
 =========================
@@ -39,7 +40,6 @@ Version history
 * redis: performance improvement for larger split commands by avoiding string copies.
 * redis: correctly follow MOVE/ASK redirection for mirrored clusters.
 * redis: add :ref:`host_degraded_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.host_degraded_refresh_threshold>` and :ref:`failure_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.failure_refresh_threshold>` to refresh topology when nodes are degraded or when requests fails.
-* retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 * router: added histograms to show timeout budget usage to the :ref:`cluster stats <config_cluster_manager_cluster_stats>`.
 * router check tool: added support for testing and marking coverage for routes of runtime fraction 0.
 * router: added :ref:`request_mirror_policies<envoy_api_field_route.RouteAction.request_mirror_policies>` to support sending multiple mirrored requests in one route.

@@ -9,7 +9,10 @@ namespace Retry {
 namespace Host {
 
 bool OmitHostsRetryPredicate::shouldSelectAnotherHost(const Upstream::Host& host) {
-  return labelSet_.size() &&
+  // Note: The additional check to verify if the labelSet is empty is performed since
+  // metadataLabelMatch returns true in case of an empty labelSet. However, for an empty labelset,
+  // i.e. if there is no matching criteria defined, this method should return false.
+  return !labelSet_.empty() &&
          Envoy::Config::Metadata::metadataLabelMatch(
              labelSet_, *host.metadata(), Envoy::Config::MetadataFilters::get().ENVOY_LB, true);
 }
