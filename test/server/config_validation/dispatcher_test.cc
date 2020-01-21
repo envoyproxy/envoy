@@ -52,9 +52,9 @@ TEST_P(ConfigValidation, createConnection) {
 TEST_F(ConfigValidation, SharedDnsResolver) {
   std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
 
-  Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(resolvers);
+  Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(resolvers, false);
   long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(resolvers);
+  Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(resolvers, false);
 
   EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
   EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.

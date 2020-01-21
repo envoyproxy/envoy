@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/http_uri.pb.h"
-#include "envoy/api/v2/core/protocol.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -167,13 +167,13 @@ bool isWebSocketUpgradeRequest(const HeaderMap& headers);
  * @return Http2Settings An Http2Settings populated from the
  * envoy::api::v2::core::Http2ProtocolOptions config.
  */
-Http2Settings parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& config);
+Http2Settings parseHttp2Settings(const envoy::config::core::v3::Http2ProtocolOptions& config);
 
 /**
  * @return Http1Settings An Http1Settings populated from the
  * envoy::api::v2::core::Http1ProtocolOptions config.
  */
-Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& config);
+Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
 /**
  * Create a locally generated response using filter callbacks.
@@ -261,7 +261,7 @@ void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& hos
 /**
  * Prepare headers for a HttpUri.
  */
-MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
+MessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
 
 /**
  * Serialize query-params into a string.
@@ -404,6 +404,25 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
   return merged;
 }
 
+struct AuthorityAttributes {
+  // whether parsed authority is pure ip address(IPv4/IPv6), if it is true
+  // passed that are not FQDN
+  bool is_ip_address_{};
+
+  // If parsed authority has host, that is stored here.
+  absl::string_view host_;
+
+  // If parsed authority has port, that is stored here.
+  absl::optional<uint16_t> port_;
+};
+
+/**
+ * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name.
+ * @param host host/authority
+ * @param default_port If passed authority does not have port, this value is returned
+ * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
+ */
+AuthorityAttributes parseAuthority(absl::string_view host);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

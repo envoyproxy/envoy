@@ -1,0 +1,11 @@
+#include "envoy/config/overload/v3/overload.pb.h"
+
+using envoy::config::overload::v3::ThresholdTrigger;
+using envoy::config::overload::v3::Trigger;
+using SomePtrAlias = std::unique_ptr<envoy::config::overload::v3::ThresholdTrigger>;
+
+class ThresholdTriggerImpl {
+public:
+  ThresholdTriggerImpl(const ThresholdTrigger& /*config*/) {}
+  ThresholdTriggerImpl(SomePtrAlias /*config*/) {}
+};

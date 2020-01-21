@@ -1,7 +1,6 @@
 #include <numeric>
 
-#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
-#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.validate.h"
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
 
 #include "extensions/filters/listener/original_src/config.h"
 
@@ -18,13 +17,13 @@ namespace {
 class OriginalSrcConfigTest : public testing::Test {
 public:
   Config makeConfigFromProto(
-      const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc& proto_config) {
+      const envoy::extensions::filters::listener::original_src::v3::OriginalSrc& proto_config) {
     return {proto_config};
   }
 };
 
 TEST_F(OriginalSrcConfigTest, TestUsePortTrue) {
-  envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc config_proto;
+  envoy::extensions::filters::listener::original_src::v3::OriginalSrc config_proto;
   config_proto.set_bind_port(true);
   auto config = makeConfigFromProto(config_proto);
 
@@ -32,7 +31,7 @@ TEST_F(OriginalSrcConfigTest, TestUsePortTrue) {
 }
 
 TEST_F(OriginalSrcConfigTest, TestUsePortFalse) {
-  envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc config_proto;
+  envoy::extensions::filters::listener::original_src::v3::OriginalSrc config_proto;
   config_proto.set_bind_port(false);
   auto config = makeConfigFromProto(config_proto);
 
@@ -40,7 +39,7 @@ TEST_F(OriginalSrcConfigTest, TestUsePortFalse) {
 }
 
 TEST_F(OriginalSrcConfigTest, TestUseMark0) {
-  envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc config_proto;
+  envoy::extensions::filters::listener::original_src::v3::OriginalSrc config_proto;
   config_proto.set_mark(0);
   auto config = makeConfigFromProto(config_proto);
 
@@ -48,7 +47,7 @@ TEST_F(OriginalSrcConfigTest, TestUseMark0) {
 }
 
 TEST_F(OriginalSrcConfigTest, TestUseMark1234) {
-  envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc config_proto;
+  envoy::extensions::filters::listener::original_src::v3::OriginalSrc config_proto;
   config_proto.set_mark(1234);
   auto config = makeConfigFromProto(config_proto);
 
@@ -56,7 +55,7 @@ TEST_F(OriginalSrcConfigTest, TestUseMark1234) {
 }
 
 TEST_F(OriginalSrcConfigTest, TestUseMarkMax) {
-  envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc config_proto;
+  envoy::extensions::filters::listener::original_src::v3::OriginalSrc config_proto;
   config_proto.set_mark(std::numeric_limits<uint32_t>::max());
   auto config = makeConfigFromProto(config_proto);
 

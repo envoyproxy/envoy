@@ -1,5 +1,7 @@
 #include "uds_integration_test.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
 
@@ -54,7 +56,7 @@ INSTANTIATE_TEST_SUITE_P(
 #endif
 
 void UdsListenerIntegrationTest::initialize() {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* admin_addr = bootstrap.mutable_admin()->mutable_address();
     admin_addr->clear_socket_address();
     admin_addr->mutable_pipe()->set_path(getAdminSocketName());

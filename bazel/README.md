@@ -397,6 +397,13 @@ Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wi
 bazel test -c dbg --config=clang-tsan //test/...
 ```
 
+For [memory sanitizer (MSAN)](https://github.com/google/sanitizers/wiki/MemorySanitizer) testing,
+it has to be run under the docker sandbox which comes with MSAN instrumented libc++:
+
+```
+bazel test -c dbg --config=docker-msan //test/...
+```
+
 To run the sanitizers on OS X, prefix `macos-` to the config option, e.g.:
 
 ```

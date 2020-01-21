@@ -107,28 +107,28 @@ TEST(GrpcCommonTest, GrpcStatusDetailsBin) {
 }
 
 TEST(GrpcContextTest, ToGrpcTimeout) {
-  Http::HeaderString value;
+  Http::TestHeaderMapImpl headers;
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(0UL), value);
-  EXPECT_EQ("0m", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(0UL), headers);
+  EXPECT_EQ("0m", headers.GrpcTimeout()->value().getStringView());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(1UL), value);
-  EXPECT_EQ("1m", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(1UL), headers);
+  EXPECT_EQ("1m", headers.GrpcTimeout()->value().getStringView());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(100000000UL), value);
-  EXPECT_EQ("100000S", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(100000000UL), headers);
+  EXPECT_EQ("100000S", headers.GrpcTimeout()->value().getStringView());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(100000000000UL), value);
-  EXPECT_EQ("1666666M", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(100000000000UL), headers);
+  EXPECT_EQ("1666666M", headers.GrpcTimeout()->value().getStringView());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(9000000000000UL), value);
-  EXPECT_EQ("2500000H", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(9000000000000UL), headers);
+  EXPECT_EQ("2500000H", headers.GrpcTimeout()->value().getStringView());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(360000000000000UL), value);
-  EXPECT_EQ("99999999H", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(360000000000000UL), headers);
+  EXPECT_EQ("99999999H", headers.GrpcTimeout()->value().getStringView());
 
-  Common::toGrpcTimeout(std::chrono::milliseconds(UINT64_MAX), value);
-  EXPECT_EQ("99999999H", value.getStringView());
+  Common::toGrpcTimeout(std::chrono::milliseconds(UINT64_MAX), headers);
+  EXPECT_EQ("99999999H", headers.GrpcTimeout()->value().getStringView());
 }
 
 TEST(GrpcContextTest, PrepareHeaders) {

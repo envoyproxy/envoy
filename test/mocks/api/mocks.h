@@ -70,11 +70,13 @@ public:
   MOCK_METHOD6(mmap, SysCallPtrResult(void* addr, size_t length, int prot, int flags, int fd,
                                       off_t offset));
   MOCK_METHOD2(stat, SysCallIntResult(const char* name, struct stat* stat));
+  MOCK_METHOD2(chmod, SysCallIntResult(const std::string& name, mode_t mode));
   MOCK_METHOD5(setsockopt_,
                int(int sockfd, int level, int optname, const void* optval, socklen_t optlen));
   MOCK_METHOD5(getsockopt_,
                int(int sockfd, int level, int optname, void* optval, socklen_t* optlen));
   MOCK_METHOD3(socket, SysCallIntResult(int domain, int type, int protocol));
+  MOCK_METHOD2(gethostname, SysCallIntResult(char* name, size_t length));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<int, int, int>;

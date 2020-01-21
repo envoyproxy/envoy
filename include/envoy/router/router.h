@@ -9,14 +9,15 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/matchers.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
@@ -359,8 +360,10 @@ public:
    * @return the default fraction of traffic the should be shadowed, if the runtime key is not
    *         present.
    */
-  virtual const envoy::type::FractionalPercent& defaultValue() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& defaultValue() const PURE;
 };
+
+using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
 
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
@@ -464,7 +467,7 @@ public:
    * @return percent chance that an additional upstream request should be sent
    * on top of the value from initialRequests().
    */
-  virtual const envoy::type::FractionalPercent& additionalRequestChance() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& additionalRequestChance() const PURE;
 
   /**
    * @return bool indicating whether request hedging should occur when a request
@@ -641,10 +644,10 @@ public:
   virtual uint32_t retryShadowBufferLimit() const PURE;
 
   /**
-   * @return const ShadowPolicy& the shadow policy for the route. All routes have a shadow policy
-   *         even if no shadowing takes place.
+   * @return const std::vector<ShadowPolicy>& the shadow policies for the route. The vector is empty
+   *         if no shadowing takes place.
    */
-  virtual const ShadowPolicy& shadowPolicy() const PURE;
+  virtual const std::vector<ShadowPolicyPtr>& shadowPolicies() const PURE;
 
   /**
    * @return std::chrono::milliseconds the route's timeout.
@@ -715,7 +718,7 @@ public:
    * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
    * this route.
    */
-  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 
   /**
    * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
@@ -772,6 +775,12 @@ public:
   virtual InternalRedirectAction internalRedirectAction() const PURE;
 
   /**
+   * @returns the threshold of number of previously handled internal redirects, for this route to
+   * stop handle internal redirects.
+   */
+  virtual uint32_t maxInternalRedirects() const PURE;
+
+  /**
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
@@ -810,19 +819,25 @@ public:
    * This method returns the client sampling percentage.
    * @return the client sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getClientSampling() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& getClientSampling() const PURE;
 
   /**
    * This method returns the random sampling percentage.
    * @return the random sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getRandomSampling() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& getRandomSampling() const PURE;
 
   /**
    * This method returns the overall sampling percentage.
    * @return the overall sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& getOverallSampling() const PURE;
+
+  /**
+   * This method returns the route level tracing custom tags.
+   * @return the tracing custom tags.
+   */
+  virtual const Tracing::CustomTagMap& getCustomTags() const PURE;
 };
 
 using RouteTracingConstPtr = std::unique_ptr<const RouteTracing>;

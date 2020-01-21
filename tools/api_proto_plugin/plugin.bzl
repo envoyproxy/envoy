@@ -1,3 +1,5 @@
+load("@rules_proto//proto:defs.bzl", "ProtoInfo")
+
 # Borrowed from https://github.com/grpc/grpc-java/blob/v1.24.1/java_grpc_library.bzl#L61
 def _path_ignoring_repository(f):
     # Bazel creates a _virtual_imports directory in case the .proto source files
@@ -43,16 +45,24 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
                                              output_suffix) for f in proto_sources]
 
     # Create the protoc command-line args.
+    inputs = target[ProtoInfo].transitive_sources
     ctx_path = ctx.label.package + "/" + ctx.label.name
     output_path = outputs[0].root.path + "/" + outputs[0].owner.workspace_root + "/" + ctx_path
     args = ["-I./" + ctx.label.workspace_root]
     args += ["-I" + import_path for import_path in import_paths]
     args += ["--plugin=protoc-gen-api_proto_plugin=" + ctx.executable._api_proto_plugin.path, "--api_proto_plugin_out=" + output_path]
+    if hasattr(ctx.attr, "_type_db"):
+        inputs = depset(transitive = [inputs] + [ctx.attr._type_db.files])
+        if len(ctx.attr._type_db.files.to_list()) != 1:
+            fail("{} must have one type database file".format(ctx.attr._type_db))
+        args += ["--api_proto_plugin_opt=type_db_path=" + ctx.attr._type_db.files.to_list()[0].path]
     args += [src.path for src in target[ProtoInfo].direct_sources]
+    env = {}
+
     ctx.actions.run(
         executable = ctx.executable._protoc,
         arguments = args,
-        inputs = target[ProtoInfo].transitive_sources,
+        inputs = inputs,
         tools = [ctx.executable._api_proto_plugin],
         outputs = outputs,
         mnemonic = mnemonic,
@@ -62,20 +72,25 @@ def api_proto_plugin_impl(target, ctx, output_group, mnemonic, output_suffixes):
     transitive_outputs = depset(outputs, transitive = [transitive_outputs])
     return [OutputGroupInfo(**{output_group: transitive_outputs})]
 
-def api_proto_plugin_aspect(tool_label, aspect_impl):
+def api_proto_plugin_aspect(tool_label, aspect_impl, use_type_db = False):
+    _attrs = {
+        "_protoc": attr.label(
+            default = Label("@com_google_protobuf//:protoc"),
+            executable = True,
+            cfg = "exec",
+        ),
+        "_api_proto_plugin": attr.label(
+            default = Label(tool_label),
+            executable = True,
+            cfg = "exec",
+        ),
+    }
+    if use_type_db:
+        _attrs["_type_db"] = attr.label(
+            default = Label("@envoy//tools/api_proto_plugin:default_type_db"),
+        )
     return aspect(
         attr_aspects = ["deps"],
-        attrs = {
-            "_protoc": attr.label(
-                default = Label("@com_google_protobuf//:protoc"),
-                executable = True,
-                cfg = "exec",
-            ),
-            "_api_proto_plugin": attr.label(
-                default = Label(tool_label),
-                executable = True,
-                cfg = "exec",
-            ),
-        },
+        attrs = _attrs,
         implementation = aspect_impl,
     )

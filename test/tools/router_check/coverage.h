@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/router/router.h"
 
 #include "test/mocks/server/mocks.h"
@@ -40,7 +41,7 @@ private:
 
 class Coverage : Logger::Loggable<Logger::Id::testing> {
 public:
-  Coverage(envoy::api::v2::RouteConfiguration config) : route_config_(config){};
+  Coverage(envoy::config::route::v3::RouteConfiguration config) : route_config_(config){};
   void markClusterCovered(const Envoy::Router::Route& route);
   void markVirtualClusterCovered(const Envoy::Router::Route& route);
   void markVirtualHostCovered(const Envoy::Router::Route& route);
@@ -55,6 +56,6 @@ private:
   void printMissingTests(const std::set<std::string>& all_route_names,
                          const std::set<std::string>& covered_route_names);
   std::vector<std::unique_ptr<RouteCoverage>> covered_routes_;
-  const envoy::api::v2::RouteConfiguration route_config_;
+  const envoy::config::route::v3::RouteConfiguration route_config_;
 };
 } // namespace Envoy

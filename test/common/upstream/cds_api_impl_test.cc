@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/config_source.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
@@ -33,7 +35,7 @@ MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 class CdsApiImplTest : public testing::Test {
 protected:
   void setup() {
-    envoy::api::v2::core::ConfigSource cds_config;
+    envoy::config::core::v3::ConfigSource cds_config;
     cds_ = CdsApiImpl::create(cds_config, cm_, store_, validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
@@ -76,7 +78,7 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   setup();
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
-  envoy::api::v2::Cluster cluster;
+  envoy::config::cluster::v3::Cluster cluster;
   clusters.Add()->PackFrom(cluster);
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
@@ -101,7 +103,8 @@ resources:
     eds_config:
       path: eds path
 )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   expectAdd("cluster1", "0");
@@ -115,7 +118,8 @@ resources:
 version_info: '1'
 resources:
 )EOF";
-  auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_yaml);
+  auto response2 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1"})));
   EXPECT_CALL(cm_, removeCluster("cluster1")).WillOnce(Return(true));
   cds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
@@ -129,7 +133,7 @@ TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   setup();
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
-  envoy::api::v2::Cluster cluster_1;
+  envoy::config::cluster::v3::Cluster cluster_1;
   cluster_1.set_name("duplicate_cluster");
   clusters.Add()->PackFrom(cluster_1);
   clusters.Add()->PackFrom(cluster_1);
@@ -164,12 +168,12 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
 
-  envoy::api::v2::Cluster cluster_1;
+  envoy::config::cluster::v3::Cluster cluster_1;
   cluster_1.set_name("cluster_1");
   clusters.Add()->PackFrom(cluster_1);
   expectAdd("cluster_1");
 
-  envoy::api::v2::Cluster cluster_2;
+  envoy::config::cluster::v3::Cluster cluster_2;
   cluster_2.set_name("cluster_2");
   clusters.Add()->PackFrom(cluster_2);
   expectAdd("cluster_2");
@@ -185,9 +189,9 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
   EXPECT_CALL(initialized_, ready());
 
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
     {
-      envoy::api::v2::Cluster cluster;
+      envoy::config::cluster::v3::Cluster cluster;
       cluster.set_name("cluster_1");
       expectAdd("cluster_1", "v1");
       auto* resource = resources.Add();
@@ -196,7 +200,7 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
       resource->set_version("v1");
     }
     {
-      envoy::api::v2::Cluster cluster;
+      envoy::config::cluster::v3::Cluster cluster;
       cluster.set_name("cluster_2");
       expectAdd("cluster_2", "v1");
       auto* resource = resources.Add();
@@ -208,9 +212,9 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
   }
 
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resources;
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
     {
-      envoy::api::v2::Cluster cluster;
+      envoy::config::cluster::v3::Cluster cluster;
       cluster.set_name("cluster_3");
       expectAdd("cluster_3", "v2");
       auto* resource = resources.Add();
@@ -236,17 +240,17 @@ TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
 
-  envoy::api::v2::Cluster cluster_1;
+  envoy::config::cluster::v3::Cluster cluster_1;
   cluster_1.set_name("cluster_1");
   clusters.Add()->PackFrom(cluster_1);
   expectAddToThrow("cluster_1", "An exception");
 
-  envoy::api::v2::Cluster cluster_2;
+  envoy::config::cluster::v3::Cluster cluster_2;
   cluster_2.set_name("cluster_2");
   clusters.Add()->PackFrom(cluster_2);
   expectAdd("cluster_2");
 
-  envoy::api::v2::Cluster cluster_3;
+  envoy::config::cluster::v3::Cluster cluster_3;
   cluster_3.set_name("cluster_3");
   clusters.Add()->PackFrom(cluster_3);
   expectAddToThrow("cluster_3", "Another exception");
@@ -277,7 +281,8 @@ resources:
     eds_config:
       path: eds path
 )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
   expectAdd("cluster1", "0");
@@ -303,7 +308,8 @@ resources:
     eds_config:
       path: eds path
 )EOF";
-  auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_yaml);
+  auto response2 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_yaml);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1", "cluster2"})));
   expectAdd("cluster1", "1");
@@ -336,7 +342,8 @@ resources:
     eds_config:
       path: eds path
 )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
   EXPECT_CALL(initialized_, ready());

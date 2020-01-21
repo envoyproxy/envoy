@@ -4,6 +4,7 @@
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 
 #pragma GCC diagnostic push
 
@@ -47,6 +48,13 @@ Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorC
 
 // Called when underlying QUIC connection is closed either locally or by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error);
+
+// Create a connection socket instance and apply given socket options to the
+// socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
+Network::ConnectionSocketPtr
+createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
+                       Network::Address::InstanceConstSharedPtr& local_addr,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
 } // namespace Quic
 } // namespace Envoy

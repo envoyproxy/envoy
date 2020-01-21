@@ -1,9 +1,11 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
@@ -75,7 +77,7 @@ public:
    * envoy::api::v2::core::ApiConfigSource.
    */
   static std::chrono::milliseconds
-  apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  apiConfigSourceRefreshDelay(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Extract request_timeout as a std::chrono::milliseconds from
@@ -83,7 +85,7 @@ public:
    * default value of 1s will be returned.
    */
   static std::chrono::milliseconds
-  apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  apiConfigSourceRequestTimeout(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
@@ -91,7 +93,7 @@ public:
    * default value of 0s will be returned.
    */
   static std::chrono::milliseconds
-  configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source);
+  configSourceInitialFetchTimeout(const envoy::config::core::v3::ConfigSource& config_source);
 
   /**
    * Populate an envoy::api::v2::core::ApiConfigSource.
@@ -103,7 +105,7 @@ public:
    */
   static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
                                        const std::string& api_type,
-                                       envoy::api::v2::core::ApiConfigSource& api_config_source);
+                                       envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Check cluster info for API config sanity. Throws on error.
@@ -147,7 +149,7 @@ public:
    * services or cluster names, depending on expectations set by its API type.
    */
   static void
-  checkApiConfigSourceNames(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.
@@ -166,7 +168,7 @@ public:
    */
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterInfoMap& clusters,
-      const envoy::api::v2::core::ApiConfigSource& api_config_source);
+      const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.
@@ -174,7 +176,7 @@ public:
    * @return RateLimitSettings.
    */
   static RateLimitSettings
-  parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Generate a SubscriptionStats object from stats scope.
@@ -191,7 +193,7 @@ public:
    * @param name string identifier for the particular implementation. Note: this is a proto string
    * because it is assumed that this value will be pulled directly from the configuration proto.
    */
-  template <class Factory> static Factory& getAndCheckFactory(const std::string& name) {
+  template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
       throw EnvoyException("Provided name for static registration lookup was empty.");
     }
@@ -204,6 +206,16 @@ public:
     }
 
     return *factory;
+  }
+
+  /**
+   * Get a Factory from the registry with error checking to ensure the name and the factory are
+   * valid.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory& getAndCheckFactory(const ProtoMessage& message) {
+    return Utility::getAndCheckFactoryByName<Factory>(message.name());
   }
 
   /**
@@ -226,9 +238,12 @@ public:
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
-    translateOpaqueConfig(factory.name(), enclosing_message.typed_config(),
-                          enclosing_message.config(), validation_visitor, *config);
+    // Check that the config type is not google.protobuf.Empty
+    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
 
+    translateOpaqueConfig(enclosing_message.typed_config(),
+                          enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
+                          *config);
     return config;
   }
 
@@ -239,13 +254,13 @@ public:
    * @throws EnvoyException when the conflict of tag names is found.
    */
   static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   /**
    * Create StatsMatcher instance.
    */
   static Stats::StatsMatcherPtr
-  createStatsMatcher(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
@@ -255,7 +270,7 @@ public:
    */
   static Grpc::AsyncClientFactoryPtr
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                                const envoy::api::v2::core::ApiConfigSource& api_config_source,
+                                const envoy::config::core::v3::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope);
 
   /**
@@ -263,26 +278,24 @@ public:
    * @param hosts cluster's list of hosts.
    * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
    */
-  static envoy::api::v2::ClusterLoadAssignment
-  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts);
 
   /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
    * message.
-   * @param extension_name name of extension corresponding to config.
    * @param typed_config opaque config packed in google.protobuf.Any
    * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
    */
-  static void translateOpaqueConfig(absl::string_view extension_name,
-                                    const ProtobufWkt::Any& typed_config,
+  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);
 
   /**
-   * Verify any any filter designed to be terminal is configured to be terminal, and vice versa.
+   * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
    * @param name the name of the filter.
    * @param name the type of filter.
    * @param is_terminal_filter true if the filter is designed to be terminal.
@@ -308,9 +321,9 @@ public:
    * @param random the random generator.
    * @return BackOffStrategyPtr for scheduling refreshes.
    */
-  static BackOffStrategyPtr prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,
-                                                      uint64_t dns_refresh_rate_ms,
-                                                      Runtime::RandomGenerator& random);
+  static BackOffStrategyPtr
+  prepareDnsRefreshStrategy(const envoy::config::cluster::v3::Cluster& cluster,
+                            uint64_t dns_refresh_rate_ms, Runtime::RandomGenerator& random);
 };
 
 } // namespace Config

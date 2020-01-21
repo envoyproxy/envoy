@@ -43,6 +43,15 @@ public:
                            const ScopeTrackedObject* object = nullptr) PURE;
 
   /**
+   * Enable a pending high resolution timeout. If a timeout is already pending, it will be reset to
+   * the new timeout.
+   *
+   * @param us supplies the duration of the alarm in microseconds.
+   * @param object supplies an optional scope for the duration of the alarm.
+   */
+  virtual void enableHRTimer(const std::chrono::microseconds& us,
+                             const ScopeTrackedObject* object = nullptr) PURE;
+  /**
    * Return whether the timer is currently armed.
    */
   virtual bool enabled() PURE;

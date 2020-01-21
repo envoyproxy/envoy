@@ -24,7 +24,7 @@ protected:
 
 class WatchCallback {
 public:
-  MOCK_METHOD1(called, void(uint32_t));
+  MOCK_METHOD(void, called, (uint32_t));
 };
 
 TEST_F(WatcherImplTest, All) {

@@ -1,3 +1,5 @@
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/opencensus/config.h"
@@ -21,7 +23,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
     name: envoy.tracers.opencensus
   )EOF";
 
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   OpenCensusTracerFactory factory;
@@ -59,7 +61,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
       outgoing_trace_context: trace_context
   )EOF";
 
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   OpenCensusTracerFactory factory;

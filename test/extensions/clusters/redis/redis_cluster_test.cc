@@ -3,6 +3,11 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/config/cluster/redis/redis_cluster.pb.h"
+#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"
@@ -66,7 +71,7 @@ public:
         create_(host->address()->asString())};
   }
 
-  MOCK_METHOD1(create_, Extensions::NetworkFilters::Common::Redis::Client::Client*(std::string));
+  MOCK_METHOD(Extensions::NetworkFilters::Common::Redis::Client::Client*, create_, (std::string));
 
 protected:
   RedisClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
@@ -83,7 +88,7 @@ protected:
   void setupFromV2Yaml(const std::string& yaml) {
     expectRedisSessionCreated();
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::api::v2::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
+    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -92,8 +97,7 @@ protected:
         singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().name(),
-                                           cluster_config.cluster_type().typed_config(),
+    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
@@ -114,7 +118,7 @@ protected:
 
   void setupFactoryFromV2Yaml(const std::string& yaml) {
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::api::v2::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
+    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -123,9 +127,9 @@ protected:
         singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
-    Config::Utility::translateOpaqueConfig(
-        cluster_config.cluster_type().name(), cluster_config.cluster_type().typed_config(),
-        ProtobufWkt::Struct::default_instance(), validation_visitor_, config);
+    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
+                                           ProtobufWkt::Struct::default_instance(),
+                                           validation_visitor_, config);
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
@@ -163,7 +167,7 @@ protected:
       EXPECT_CALL(*client_, addConnectionCallbacks(_));
       EXPECT_CALL(*client_, close());
     }
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
+    EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
         .WillOnce(Return(&pool_request_));
   }
 
@@ -507,10 +511,11 @@ protected:
     EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));
     EXPECT_EQ(discovery_session.maxUpstreamUnknownConnections(), 0);
 
-    NetworkFilters::Common::Redis::RespValue dummy_value;
-    dummy_value.type(NetworkFilters::Common::Redis::RespType::Error);
-    dummy_value.asString() = "dummy text";
-    EXPECT_TRUE(discovery_session.onRedirection(dummy_value));
+    NetworkFilters::Common::Redis::RespValuePtr dummy_value{
+        new NetworkFilters::Common::Redis::RespValue()};
+    dummy_value->type(NetworkFilters::Common::Redis::RespType::Error);
+    dummy_value->asString() = "dummy text";
+    EXPECT_TRUE(discovery_session.onRedirection(std::move(dummy_value), "dummy ip", false));
 
     RedisCluster::RedisDiscoveryClient discovery_client(discovery_session);
     EXPECT_NO_THROW(discovery_client.onAboveWriteBufferHighWatermark());
@@ -551,7 +556,7 @@ protected:
   Event::MockTimer* interval_timer_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockClient* client_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
-  Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
+  Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisCluster> cluster_;
   std::shared_ptr<NiceMock<MockClusterSlotUpdateCallBack>> cluster_callback_;
   Network::MockActiveDnsQuery active_dns_query_;

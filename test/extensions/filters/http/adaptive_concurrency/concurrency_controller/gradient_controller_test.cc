@@ -1,7 +1,8 @@
 #include <chrono>
 #include <iostream>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
 #include "common/stats/isolated_store_impl.h"
 
@@ -32,7 +33,7 @@ namespace {
 
 GradientControllerConfig makeConfig(const std::string& yaml_config,
                                     NiceMock<Runtime::MockLoader>& runtime) {
-  envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig proto;
+  envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig proto;
   TestUtility::loadFromYamlAndValidate(yaml_config, proto);
   return GradientControllerConfig{proto, runtime};
 }

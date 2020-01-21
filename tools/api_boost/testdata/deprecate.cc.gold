@@ -1,0 +1,11 @@
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+
+void test() {
+  envoy::config::route::v3::VirtualHost vhost;
+  vhost.hidden_envoy_deprecated_per_filter_config();
+  vhost.mutable_hidden_envoy_deprecated_per_filter_config();
+  static_cast<void>(envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex);
+  static_cast<void>(envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB);
+}

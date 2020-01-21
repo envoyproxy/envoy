@@ -3,12 +3,16 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/metadata/v3/metadata.pb.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/metadata.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 
@@ -42,8 +46,12 @@ public:
   // Non-standard tag names.
   const std::string DownstreamCluster = "downstream_cluster";
   const std::string ErrorReason = "error.reason";
-  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcAuthority = "grpc.authority";
+  const std::string GrpcContentType = "grpc.content_type";
   const std::string GrpcMessage = "grpc.message";
+  const std::string GrpcPath = "grpc.path";
+  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcTimeout = "grpc.timeout";
   const std::string GuidXClientTraceId = "guid:x-client-trace-id";
   const std::string GuidXRequestId = "guid:x-request-id";
   const std::string HttpProtocol = "http.protocol";
@@ -53,6 +61,7 @@ public:
   const std::string ResponseSize = "response_size";
   const std::string RetryCount = "retry.count";
   const std::string Status = "status";
+  const std::string UpstreamAddress = "upstream_address";
   const std::string UpstreamCluster = "upstream_cluster";
   const std::string UserAgent = "user_agent";
   const std::string Zone = "zone";
@@ -119,6 +128,12 @@ public:
                                    const StreamInfo::StreamInfo& stream_info,
                                    const Config& tracing_config);
 
+  /**
+   * Create a custom tag according to the configuration.
+   * @param tag a tracing custom tag configuration.
+   */
+  static CustomTagConstSharedPtr createCustomTag(const envoy::type::tracing::v3::CustomTag& tag);
+
 private:
   static void setCommonTags(Span& span, const Http::HeaderMap* response_headers,
                             const Http::HeaderMap* response_trailers,
@@ -133,14 +148,9 @@ class EgressConfigImpl : public Config {
 public:
   // Tracing::Config
   Tracing::OperationName operationName() const override { return Tracing::OperationName::Egress; }
-  const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override {
-    return request_headers_for_tags_;
-  }
+  const CustomTagMap* customTags() const override { return nullptr; }
   bool verbose() const override { return false; }
   uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
-
-private:
-  const std::vector<Http::LowerCaseString> request_headers_for_tags_{};
 };
 
 using EgressConfig = ConstSingleton<EgressConfigImpl>;
@@ -185,6 +195,66 @@ public:
 private:
   DriverPtr driver_;
   const LocalInfo::LocalInfo& local_info_;
+};
+
+class CustomTagBase : public CustomTag {
+public:
+  explicit CustomTagBase(const std::string& tag) : tag_(tag) {}
+  absl::string_view tag() const override { return tag_; }
+  void apply(Span& span, const CustomTagContext& ctx) const override;
+
+  virtual absl::string_view value(const CustomTagContext& ctx) const PURE;
+
+protected:
+  const std::string tag_;
+};
+
+class LiteralCustomTag : public CustomTagBase {
+public:
+  LiteralCustomTag(const std::string& tag,
+                   const envoy::type::tracing::v3::CustomTag::Literal& literal)
+      : CustomTagBase(tag), value_(literal.value()) {}
+  absl::string_view value(const CustomTagContext&) const override { return value_; }
+
+private:
+  const std::string value_;
+};
+
+class EnvironmentCustomTag : public CustomTagBase {
+public:
+  EnvironmentCustomTag(const std::string& tag,
+                       const envoy::type::tracing::v3::CustomTag::Environment& environment);
+  absl::string_view value(const CustomTagContext&) const override { return final_value_; }
+
+private:
+  const std::string name_;
+  const std::string default_value_;
+  std::string final_value_;
+};
+
+class RequestHeaderCustomTag : public CustomTagBase {
+public:
+  RequestHeaderCustomTag(const std::string& tag,
+                         const envoy::type::tracing::v3::CustomTag::Header& request_header);
+  absl::string_view value(const CustomTagContext& ctx) const override;
+
+private:
+  const Http::LowerCaseString name_;
+  const std::string default_value_;
+};
+
+class MetadataCustomTag : public CustomTagBase {
+public:
+  MetadataCustomTag(const std::string& tag,
+                    const envoy::type::tracing::v3::CustomTag::Metadata& metadata);
+  void apply(Span& span, const CustomTagContext& ctx) const override;
+  absl::string_view value(const CustomTagContext&) const override { return default_value_; }
+  const envoy::config::core::v3::Metadata* metadata(const CustomTagContext& ctx) const;
+
+protected:
+  const envoy::type::metadata::v3::MetadataKind::KindCase kind_;
+  const Envoy::Config::MetadataKey metadata_key_;
+  const std::string default_value_;
 };
 
 } // namespace Tracing

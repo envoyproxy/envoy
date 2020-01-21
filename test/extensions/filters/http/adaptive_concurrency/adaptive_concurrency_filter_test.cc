@@ -1,6 +1,7 @@
 #include <chrono>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
@@ -26,9 +27,9 @@ using ConcurrencyController::RequestForwardingAction;
 
 class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
 public:
-  MOCK_METHOD0(forwardingDecision, RequestForwardingAction());
-  MOCK_METHOD0(cancelLatencySample, void());
-  MOCK_METHOD1(recordLatencySample, void(std::chrono::nanoseconds));
+  MOCK_METHOD(RequestForwardingAction, forwardingDecision, ());
+  MOCK_METHOD(void, cancelLatencySample, ());
+  MOCK_METHOD(void, recordLatencySample, (std::chrono::nanoseconds));
 
   uint32_t concurrencyLimit() const override { return 0; }
 };
@@ -38,7 +39,7 @@ public:
   AdaptiveConcurrencyFilterTest() = default;
 
   void SetUp() override {
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency config;
+    const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency config;
     auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
         config, runtime_, "testprefix.", stats_, time_system_);
 
@@ -49,9 +50,9 @@ public:
 
   void TearDown() override { filter_.reset(); }
 
-  envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency
+  envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency
   makeConfig(const std::string& yaml_config) {
-    envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency proto;
+    envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency proto;
     TestUtility::loadFromYamlAndValidate(yaml_config, proto);
     return proto;
   }

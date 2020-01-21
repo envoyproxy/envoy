@@ -70,16 +70,14 @@ config, and then change the first `HttpConnectionManager` to be different from t
 An example of modifying the bootstrap proto to overwrite runtime defaults:
 
 ```c++
-TestEnvironment::writeStringToFileForTest("runtime/ratelimit.tcp_filter_enabled", "100");
-config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-  bootstrap.mutable_runtime()->set_symlink_root(TestEnvironment::temporaryPath("runtime");
+config_helper_.addRuntimeOverride("Foo", "bar");
 });
 ```
 
 An example of modifying `HttpConnectionManager` to change Envoy’s HTTP/1.1 processing:
 
 ```c++
-config_helper_.addConfigModifier([&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) -> void {
+config_helper_.addConfigModifier([&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) -> void {
   envoy::api::v2::core::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);

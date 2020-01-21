@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+
 #include "common/upstream/maglev_lb.h"
 
 #include "test/common/upstream/utility.h"
@@ -36,7 +38,7 @@ public:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::unique_ptr<MaglevLoadBalancer> lb_;

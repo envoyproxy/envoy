@@ -15,7 +15,8 @@ namespace Envoy {
 namespace StreamInfo {
 
 MockStreamInfo::MockStreamInfo()
-    : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
+    : filter_state_(FilterState::LifeSpan::FilterChain),
+      downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_direct_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));

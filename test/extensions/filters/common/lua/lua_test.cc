@@ -27,8 +27,8 @@ public:
 
   static ExportedFunctions exportedFunctions() { return {{"testCall", static_luaTestCall}}; }
 
-  MOCK_METHOD1(doTestCall, int(lua_State* state));
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(int, doTestCall, (lua_State * state));
+  MOCK_METHOD(void, onDestroy, ());
 
 private:
   DECLARE_LUA_FUNCTION(TestObject, luaTestCall);

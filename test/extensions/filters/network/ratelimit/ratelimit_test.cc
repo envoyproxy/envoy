@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -38,7 +39,7 @@ public:
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
         .WillByDefault(Return(true));
 
-    envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
+    envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
     config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new Filters::Common::RateLimit::MockClient();

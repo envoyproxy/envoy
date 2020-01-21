@@ -26,7 +26,7 @@ public:
                                   opentracing::string_view value) const override {
     Http::LowerCaseString lowercase_key{key};
     request_headers_.remove(lowercase_key);
-    request_headers_.addCopy(std::move(lowercase_key), value);
+    request_headers_.addCopy(std::move(lowercase_key), {value.data(), value.size()});
     return {};
   }
 

@@ -1,7 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.validate.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -14,11 +14,12 @@ namespace DubboProxy {
 namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
-    const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())) {
   if (route.route().cluster_specifier_case() ==
-      envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteAction::kWeightedClusters) {
+      envoy::extensions::filters::network::dubbo_proxy::v3::RouteAction::ClusterSpecifierCase::
+          kWeightedClusters) {
     total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       weighted_clusters_.emplace_back(std::make_shared<WeightedClusterEntry>(*this, cluster));
@@ -54,7 +55,7 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(const RouteEntryI
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {}
 
 ParameterRouteEntryImpl::ParameterRouteEntryImpl(
-    const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
     : RouteEntryImplBase(route) {
   for (auto& config : route.match().method().params_match()) {
     parameter_data_list_.emplace_back(config.first, config.second);
@@ -128,7 +129,7 @@ ParameterRouteEntryImpl::ParameterData::ParameterData(uint32_t index,
 }
 
 MethodRouteEntryImpl::MethodRouteEntryImpl(
-    const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
     : RouteEntryImplBase(route), method_name_(route.match().method().name()) {
   if (route.match().method().params_match_size() != 0) {
     parameter_route_ = std::make_shared<ParameterRouteEntryImpl>(route);
@@ -167,10 +168,10 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
   return clusterEntry(random_value);
 }
 
-SignleRouteMatcherImpl::SignleRouteMatcherImpl(const RouteConfig& config,
+SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
                                                Server::Configuration::FactoryContext&)
     : service_name_(config.interface()), group_(config.group()), version_(config.version()) {
-  using envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteMatch;
+  using envoy::extensions::filters::network::dubbo_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
     routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route));
@@ -178,7 +179,7 @@ SignleRouteMatcherImpl::SignleRouteMatcherImpl(const RouteConfig& config,
   ENVOY_LOG(debug, "dubbo route matcher: routes list size {}", routes_.size());
 }
 
-RouteConstSharedPtr SignleRouteMatcherImpl::route(const MessageMetadata& metadata,
+RouteConstSharedPtr SingleRouteMatcherImpl::route(const MessageMetadata& metadata,
                                                   uint64_t random_value) const {
   ASSERT(metadata.hasInvocationInfo());
   const auto& invocation = metadata.invocation_info();
@@ -205,7 +206,7 @@ MultiRouteMatcher::MultiRouteMatcher(const RouteConfigList& route_config_list,
                                      Server::Configuration::FactoryContext& context) {
   for (const auto& route_config : route_config_list) {
     route_matcher_list_.emplace_back(
-        std::make_unique<SignleRouteMatcherImpl>(route_config, context));
+        std::make_unique<SingleRouteMatcherImpl>(route_config, context));
   }
   ENVOY_LOG(debug, "route matcher list size {}", route_matcher_list_.size());
 }

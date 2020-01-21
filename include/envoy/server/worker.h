@@ -35,7 +35,7 @@ public:
   /**
    * @return uint64_t the number of connections across all listeners that the worker owns.
    */
-  virtual uint64_t numConnections() PURE;
+  virtual uint64_t numConnections() const PURE;
 
   /**
    * Start the worker thread.

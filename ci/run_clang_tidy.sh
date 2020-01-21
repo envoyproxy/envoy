@@ -4,7 +4,7 @@ set -eo pipefail
 
 ENVOY_SRCDIR=${ENVOY_SRCDIR:-$(cd $(dirname $0)/.. && pwd)}
 
-LLVM_CONFIG=${LLVM_CONFIG:-llvm-config}
+export LLVM_CONFIG=${LLVM_CONFIG:-llvm-config}
 LLVM_PREFIX=${LLVM_PREFIX:-$(${LLVM_CONFIG} --prefix)}
 CLANG_TIDY=${CLANG_TIDY:-$(${LLVM_CONFIG} --bindir)/clang-tidy}
 CLANG_APPLY_REPLACEMENTS=${CLANG_APPLY_REPLACEMENTS:-$(${LLVM_CONFIG} --bindir)/clang-apply-replacements}

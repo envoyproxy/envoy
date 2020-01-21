@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
 #include "common/singleton/threadsafe_singleton.h"
@@ -30,10 +31,30 @@ class RandomGenerator {
 public:
   virtual ~RandomGenerator() = default;
 
+  using result_type = uint64_t; // NOLINT(readability-identifier-naming)
+
   /**
    * @return uint64_t a new random number.
    */
-  virtual uint64_t random() PURE;
+  virtual result_type random() PURE;
+
+  /*
+   * @return the smallest value that `operator()` may return. The value is
+   * strictly less than `max()`.
+   */
+  constexpr static result_type min() noexcept { return std::numeric_limits<result_type>::min(); };
+
+  /*
+   * @return the largest value that `operator()` may return. The value is
+   * strictly greater than `min()`.
+   */
+  constexpr static result_type max() noexcept { return std::numeric_limits<result_type>::max(); };
+
+  /*
+   * @return a value in the closed interval `[min(), max()]`. Has amortized
+   * constant complexity.
+   */
+  result_type operator()() { return result_type(random()); };
 
   /**
    * @return std::string containing uuid4 of 36 char length.
@@ -55,7 +76,7 @@ public:
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
     absl::optional<double> double_value_;
-    absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
+    absl::optional<envoy::type::v3::FractionalPercent> fractional_percent_value_;
     absl::optional<bool> bool_value_;
   };
 
@@ -82,13 +103,18 @@ public:
 
   using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
 
-  // Returns true if a deprecated feature is allowed.
-  //
-  // Fundamentally, deprecated features are boolean values.
-  // They are allowed by default or with explicit configuration to "true" via runtime configuration.
-  // They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
-  // configuration of "false" in runtime config.
-  virtual bool deprecatedFeatureEnabled(const std::string& key) const PURE;
+  /**
+   * Returns true if a deprecated feature is allowed.
+   *
+   * Fundamentally, deprecated features are boolean values.
+   * They are allowed by default or with explicit configuration to "true" via runtime configuration.
+   * They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
+   * configuration of "false" in runtime config.
+   * @param key supplies the key to lookup.
+   * @param default_value supplies the default value that will be used if either the key
+   *        does not exist or it is not a boolean.
+   */
+  virtual bool deprecatedFeatureEnabled(const std::string& key, bool default_enabled) const PURE;
 
   // Returns true if a runtime feature is enabled.
   //
@@ -159,7 +185,7 @@ public:
    * @return true if the feature is enabled.
    */
   virtual bool featureEnabled(const std::string& key,
-                              const envoy::type::FractionalPercent& default_value) const PURE;
+                              const envoy::type::v3::FractionalPercent& default_value) const PURE;
 
   /**
    * Test if a feature is enabled using a supplied stable random value. This variant is used if
@@ -176,7 +202,7 @@ public:
    * @return true if the feature is enabled.
    */
   virtual bool featureEnabled(const std::string& key,
-                              const envoy::type::FractionalPercent& default_value,
+                              const envoy::type::v3::FractionalPercent& default_value,
                               uint64_t random_value) const PURE;
 
   /**
@@ -185,6 +211,13 @@ public:
    * @return const std::string& the value or empty string if the key does not exist.
    */
   virtual const std::string& get(const std::string& key) const PURE;
+
+  /**
+   * Returns whether the key has any value set.
+   * @param key supplies the key to check.
+   * @return bool if the key exists.
+   */
+  virtual bool exists(const std::string& key) const PURE;
 
   /**
    * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted

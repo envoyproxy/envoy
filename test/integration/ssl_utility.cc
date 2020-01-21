@@ -1,5 +1,7 @@
 #include "test/integration/ssl_utility.h"
 
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 
@@ -47,7 +49,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 )EOF";
   }
 
-  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
   auto* common_context = tls_context.mutable_common_tls_context();
 
@@ -56,8 +58,8 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
     common_context->add_alpn_protocols("http/1.1");
   }
   if (options.san_) {
-    common_context->mutable_validation_context()->add_verify_subject_alt_name(
-        "spiffe://lyft.com/backend-team");
+    common_context->mutable_validation_context()
+        ->add_hidden_envoy_deprecated_verify_subject_alt_name("spiffe://lyft.com/backend-team");
   }
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
@@ -78,7 +80,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
                                                             Api::Api& api) {
-  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;

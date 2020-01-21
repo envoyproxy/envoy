@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/stats/scope.h"
 
@@ -22,7 +22,7 @@ public:
    * @return SubscriptionPtr subscription object corresponding for config and type_url.
    */
   virtual SubscriptionPtr
-  subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config,
+  subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
                                absl::string_view type_url, Stats::Scope& scope,
                                SubscriptionCallbacks& callbacks) PURE;
 };
