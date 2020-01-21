@@ -43,7 +43,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
   // Create filter for request 1
-  config_.set_name("SimpleHttpCache");
+  config_.set_name("envoy.extensions.http.cache.simple");
   CacheFilterSharedPtr filter = makeFilter();
   ASSERT_TRUE(filter);
 
@@ -78,7 +78,7 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
   // Create filter for request 1
-  config_.set_name("SimpleHttpCache");
+  config_.set_name("envoy.extensions.http.cache.simple");
   CacheFilterSharedPtr filter = makeFilter();
   ASSERT_TRUE(filter);
 

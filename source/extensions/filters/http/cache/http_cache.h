@@ -299,6 +299,7 @@ public:
 // Factory interface for cache implementations to implement and register.
 class HttpCacheFactory {
 public:
+  // name should be in reverse DNS format, though this is not enforced.
   explicit HttpCacheFactory(std::string name) : name_(std::move(name)) {}
   const std::string& name() const { return name_; }
   static std::string category() { return "http_cache_factory"; }

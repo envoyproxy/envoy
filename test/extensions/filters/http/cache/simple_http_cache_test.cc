@@ -206,9 +206,9 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
 
 TEST(Registration, GetFactory) {
   HttpCacheFactory* factory =
-      Registry::FactoryRegistry<HttpCacheFactory>::getFactory("SimpleHttpCache");
+      Registry::FactoryRegistry<HttpCacheFactory>::getFactory("envoy.extensions.http.cache.simple");
   ASSERT_NE(factory, nullptr);
-  EXPECT_EQ(factory->getCache().cacheInfo().name_, "SimpleHttpCache");
+  EXPECT_EQ(factory->getCache().cacheInfo().name_, "envoy.extensions.http.cache.simple");
 }
 
 } // namespace

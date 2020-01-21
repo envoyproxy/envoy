@@ -21,7 +21,7 @@ protected:
 };
 
 TEST_F(CacheFilterFactoryTest, Basic) {
-  config_.set_name("SimpleHttpCache");
+  config_.set_name("envoy.extensions.http.cache.simple");
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));

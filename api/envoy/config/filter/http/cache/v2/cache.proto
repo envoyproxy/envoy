@@ -38,7 +38,8 @@ message CacheConfig {
     repeated api.v2.route.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
-  // Name of cache implementation to use.
+  // Name of cache implementation to use, as specified in the intended HttpCacheFactory
+  // implementation. Cache names should use reverse DNS format, though this is not enforced.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // [#comment: <TODO(toddmgreer) implement vary headers>]
