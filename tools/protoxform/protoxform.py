@@ -13,6 +13,7 @@ from collections import deque
 import functools
 import io
 import os
+import pathlib
 import re
 import subprocess
 
@@ -38,14 +39,42 @@ from envoy.annotations import deprecation_pb2 as _
 from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 
-CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
-                      'AllowShortFunctionsOnASingleLine: false}')
-
 NEXT_FREE_FIELD_MIN = 5
 
 
 class ProtoXformError(Exception):
   """Base error class for the protoxform module."""
+
+
+def ExtractClangProtoStyle(clang_format_text):
+  """Extract a key:value dictionary for proto formatting.
+
+  Args:
+    clang_format_text: text from a .clang-format file.
+
+  Returns:
+    key:value dictionary suitable for passing to clang-format --style.
+  """
+  lang = None
+  format_dict = {}
+  for line in clang_format_text.split('\n'):
+    if lang is None or lang != 'Proto':
+      match = re.match('Language:\s+(\w+)', line)
+      if match:
+        lang = match.group(1)
+      continue
+    match = re.match('(\w+):\s+(\w+)', line)
+    if match:
+      key, value = match.groups()
+      format_dict[key] = value
+    else:
+      break
+  return str(format_dict)
+
+
+# Ensure we are using the canonical clang-format proto style.
+CLANG_FORMAT_STYLE = ExtractClangProtoStyle(
+    pathlib.Path(os.getenv('RUNFILES_DIR'), 'envoy/.clang-format').read_text())
 
 
 def ClangFormat(contents):

@@ -1,14 +1,14 @@
 #include "common/config/metadata.h"
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/type/metadata/v2/metadata.pb.h"
+#include "envoy/type/metadata/v3/metadata.pb.h"
 
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
 
-MetadataKey::MetadataKey(const envoy::type::metadata::v2::MetadataKey& metadata_key)
+MetadataKey::MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key)
     : key_(metadata_key.key()) {
   for (const auto& seg : metadata_key.path()) {
     path_.push_back(seg.key());
