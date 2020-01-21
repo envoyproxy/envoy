@@ -8,5 +8,6 @@ option java_multiple_files = true;
 
 // [#protodoc-title: Omit Canary Hosts Predicate]
 // [#extension: envoy.retry_host_predicates.omit_canary_hosts]
+
 message OmitCanaryHostsPredicate {
 }

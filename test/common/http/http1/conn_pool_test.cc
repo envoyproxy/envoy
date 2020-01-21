@@ -74,8 +74,8 @@ public:
     return CodecClientPtr{createCodecClient_()};
   }
 
-  MOCK_METHOD0(createCodecClient_, CodecClient*());
-  MOCK_METHOD0(onClientDestroy, void());
+  MOCK_METHOD(CodecClient*, createCodecClient_, ());
+  MOCK_METHOD(void, onClientDestroy, ());
 
   void expectClientCreate(Protocol protocol = Protocol::Http11) {
     test_clients_.emplace_back();

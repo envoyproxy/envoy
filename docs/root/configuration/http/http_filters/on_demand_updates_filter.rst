@@ -14,5 +14,5 @@ On-demand VHDS cannot be used with SRDS at this point.
 Configuration
 -------------
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.on_demand.v2.OnDemand>`
-* This filter should be configured with the name *envoy.on_demand*.
+* This filter should be configured with the name *envoy.filters.http.on_demand*.
 * The filter should be placed before *envoy.router* filter in the HttpConnectionManager's filter chain.

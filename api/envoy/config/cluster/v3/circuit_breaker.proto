@@ -96,9 +96,8 @@ message CircuitBreakers {
   }
 
   // If multiple :ref:`Thresholds<envoy_api_msg_config.cluster.v3.CircuitBreakers.Thresholds>`
-  // are defined with the same
-  // :ref:`RoutingPriority<envoy_api_enum_config.core.v3.RoutingPriority>`, the first one in the
-  // list is used. If no Thresholds is defined for a given
+  // are defined with the same :ref:`RoutingPriority<envoy_api_enum_config.core.v3.RoutingPriority>`,
+  // the first one in the list is used. If no Thresholds is defined for a given
   // :ref:`RoutingPriority<envoy_api_enum_config.core.v3.RoutingPriority>`, the default values
   // are used.
   repeated Thresholds thresholds = 1;

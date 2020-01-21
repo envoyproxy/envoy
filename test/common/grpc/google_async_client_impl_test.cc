@@ -25,9 +25,9 @@ namespace {
 
 class MockGenericStub : public GoogleStub {
 public:
-  MOCK_METHOD3(PrepareCall_, grpc::GenericClientAsyncReaderWriter*(grpc::ClientContext* context,
-                                                                   const grpc::string& method,
-                                                                   grpc::CompletionQueue* cq));
+  MOCK_METHOD(grpc::GenericClientAsyncReaderWriter*, PrepareCall_,
+              (grpc::ClientContext * context, const grpc::string& method,
+               grpc::CompletionQueue* cq));
 
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
   PrepareCall(grpc::ClientContext* context, const grpc::string& method,

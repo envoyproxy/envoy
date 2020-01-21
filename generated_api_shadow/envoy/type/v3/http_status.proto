@@ -10,6 +10,8 @@ option java_package = "io.envoyproxy.envoy.type.v3";
 option java_outer_classname = "HttpStatusProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: HTTP status codes]
+
 // HTTP response codes supported in Envoy.
 // For more details: https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 enum StatusCode {
