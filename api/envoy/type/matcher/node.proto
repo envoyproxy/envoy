@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.type.matcher";
 option java_outer_classname = "NodeProto";
 option java_multiple_files = true;
 
-// [#protodoc-title:NodeMatcher]
+// [#protodoc-title: Node matcher]
 
 // Specifies the way to match a Node.
 // The match follows AND semantics.

@@ -13,7 +13,7 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "StringProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: StringMatcher]
+// [#protodoc-title: String matcher]
 
 // Specifies the way to match a string.
 // [#next-free-field: 6]
