@@ -3,6 +3,7 @@ Version history
 
 1.14.0 (Pending)
 ================
+* config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension.
 
 1.13.0 (January 20, 2020)
 =========================
@@ -18,7 +19,6 @@ Version history
 * build: official released binary is now built against libc++.
 * cluster: added :ref:`aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
 * config: all category names of internal envoy extensions are prefixed with the 'envoy.' prefix to follow the reverse DNS naming notation.
-* config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension.
 * decompressor: remove decompressor hard assert failure and replace with an error flag.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
 * fault: fixed an issue where the http fault filter would repeatedly check the percentage of abort/delay when the `x-envoy-downstream-service-cluster` header was included in the request to ensure that the actual percentage of abort/delay matches the configuration of the filter.
