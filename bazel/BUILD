@@ -323,6 +323,11 @@ config_setting(
     values = {"define": "manual_stamp=manual_stamp"},
 )
 
+config_setting(
+    name = "android",
+    values = {"define": "platform=android"},
+)
+
 alias(
     name = "apple",
     actual = select(

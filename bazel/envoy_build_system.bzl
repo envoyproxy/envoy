@@ -121,6 +121,12 @@ def envoy_cc_platform_dep(name):
         "//conditions:default": [name + "_posix"],
     })
 
+def envoy_cc_platform_dep_android(name):
+    return select({
+        "@envoy//bazel:android": [name + "android"],
+        "//conditions:default": [name + "_standard"],
+    })
+
 # Envoy proto descriptor targets should be specified with this function.
 # This is used for testing only.
 def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):

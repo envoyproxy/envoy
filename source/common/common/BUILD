@@ -5,6 +5,7 @@ load(
     "envoy_basic_cc_library",
     "envoy_cc_library",
     "envoy_cc_platform_dep",
+    "envoy_cc_platform_dep_android",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
     "envoy_include_prefix",
@@ -130,13 +131,35 @@ envoy_cc_library(
 envoy_cc_library(
     name = "minimal_logger_lib",
     srcs = ["logger.cc"],
-    hdrs = ["logger.h"],
+    hdrs = [
+        "logger.h",
+    ],
     external_deps = ["abseil_synchronization"],
-    deps = [
+    deps = envoy_cc_platform_dep_android("logger_impl_lib") + [
+        ":base_logger_lib",
         ":lock_guard_lib",
         ":macros",
         ":non_copyable",
     ],
+)
+
+envoy_cc_library(
+    name = "base_logger_lib",
+    srcs = ["base_logger.cc"],
+    hdrs = ["base_logger.h"],
+)
+
+envoy_cc_library(
+    name = "logger_impl_lib_standard",
+    hdrs = ["standard/logger_impl.h"],
+    strip_include_prefix = "standard",
+)
+
+envoy_cc_library(
+    name = "logger_impl_lib_android",
+    srcs = ["android/logger_impl.cc"],
+    hdrs = ["android/logger_impl.h"],
+    strip_include_prefix = "android",
 )
 
 envoy_cc_library(
