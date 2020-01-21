@@ -703,7 +703,7 @@ void ClientConnectionImpl::close(ConnectionCloseType type) {
     // (non-zero) value. This allows the same address and port to be reused for possible
     // retries.
     if (source_port_set_) {
-      auto option = SocketOptionFactory::buildSocketLingerOption(1, 0);
+      auto option = SocketOptionFactory::buildSocketNoLingerOption();
       // no error processing as the socket is being closed anyway
       option->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
     }

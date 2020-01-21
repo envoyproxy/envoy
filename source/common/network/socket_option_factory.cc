@@ -124,9 +124,8 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
   return options;
 }
 
-std::unique_ptr<Socket::Option> SocketOptionFactory::buildSocketLingerOption(int onoff,
-                                                                             int timeout) {
-  int value[2] = {onoff, timeout};
+std::unique_ptr<Socket::Option> SocketOptionFactory::buildSocketNoLingerOption() {
+  int value[2] = {1, 0};
   return std::make_unique<Network::SocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SOCKET_SO_LINGER,
       absl::string_view(reinterpret_cast<char*>(&value), sizeof(value)));

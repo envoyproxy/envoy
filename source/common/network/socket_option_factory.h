@@ -32,7 +32,7 @@ public:
   static std::unique_ptr<Socket::Options> buildIpPacketInfoOptions();
   static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
   static std::unique_ptr<Socket::Options> buildReusePortOptions();
-  static std::unique_ptr<Socket::Option> buildSocketLingerOption(int onoff, int timeout);
+  static std::unique_ptr<Socket::Option> buildSocketNoLingerOption();
 };
 } // namespace Network
 } // namespace Envoy
