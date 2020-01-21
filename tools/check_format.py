@@ -24,7 +24,7 @@ SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".md", ".m
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
-# Files in these paths can make reference to protobuf stuff directly
+# Files in these paths can directly reference protobuf stuff
 GOOGLE_PROTOBUF_WHITELIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
