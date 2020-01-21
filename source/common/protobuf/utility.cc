@@ -3,8 +3,9 @@
 #include <limits>
 #include <numeric>
 
+#include "envoy/annotations/deprecation.pb.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -12,8 +13,10 @@
 #include "common/config/version_converter.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/well_known.h"
 
 #include "absl/strings/match.h"
+#include "udpa/annotations/sensitive.pb.h"
 #include "yaml-cpp/yaml.h"
 
 namespace Envoy {
@@ -170,20 +173,19 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   return max_value * (percent / 100.0);
 }
 
-bool evaluateFractionalPercent(envoy::type::v3alpha::FractionalPercent percent,
-                               uint64_t random_value) {
+bool evaluateFractionalPercent(envoy::type::v3::FractionalPercent percent, uint64_t random_value) {
   return random_value % fractionalPercentDenominatorToInt(percent.denominator()) <
          percent.numerator();
 }
 
 uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::v3alpha::FractionalPercent::DenominatorType& denominator) {
+    const envoy::type::v3::FractionalPercent::DenominatorType& denominator) {
   switch (denominator) {
-  case envoy::type::v3alpha::FractionalPercent::HUNDRED:
+  case envoy::type::v3::FractionalPercent::HUNDRED:
     return 100;
-  case envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND:
+  case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
     return 10000;
-  case envoy::type::v3alpha::FractionalPercent::MILLION:
+  case envoy::type::v3::FractionalPercent::MILLION:
     return 1000000;
   default:
     // Checked by schema.
@@ -298,11 +300,21 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
-    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-      return;
-    }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                         message.GetTypeName() + ")");
+    tryWithApiBoosting(
+        [&contents, &path](Protobuf::Message& message, MessageVersion message_version) {
+          if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+            return;
+          }
+          if (message_version == MessageVersion::LATEST_VERSION) {
+            throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                                 message.GetTypeName() + ")");
+          } else {
+            throw ApiBoostRetryException(
+                "Failed to parse at earlier version, trying again at later version.");
+          }
+        },
+        message);
+    return;
   }
   if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
     loadFromYaml(contents, message, validation_visitor);
@@ -310,6 +322,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     loadFromJson(contents, message, validation_visitor);
   }
 }
+
+namespace {
 
 void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
                                             absl::string_view filename,
@@ -339,9 +353,14 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
   bool warn_only = true;
 #endif
 
-  if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(absl::StrCat(
-                     "envoy.deprecated_features.", filename, ":", enum_value_descriptor->name()))) {
-    warn_only = false;
+  if (runtime) {
+    // This is set here, rather than above, so that in the absence of a
+    // registry (i.e. unit tests) the default for if a feature is allowed or not is
+    // based on ENVOY_DISABLE_DEPRECATED_FEATURES.
+    warn_only &= !enum_value_descriptor->options().GetExtension(
+        envoy::annotations::disallowed_by_default_enum);
+    warn_only = runtime->snapshot().deprecatedFeatureEnabled(
+        absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()), warn_only);
   }
 
   if (warn_only) {
@@ -356,21 +375,26 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
   }
 }
 
-void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
-                                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           Runtime::Loader* runtime) {
+void checkForUnexpectedFields(const Protobuf::Message& message,
+                              ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Runtime::Loader* runtime) {
   // Reject unknown fields.
   const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
   if (!unknown_fields.empty()) {
     std::string error_msg;
     for (int n = 0; n < unknown_fields.field_count(); ++n) {
+      if (unknown_fields.field(n).number() == ProtobufWellKnown::OriginalTypeFieldNumber) {
+        continue;
+      }
       error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
     }
     // We use the validation visitor but have hard coded behavior below for deprecated fields.
     // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
     // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
-    validation_visitor.onUnknownField("type " + message.GetTypeName() +
-                                      " with unknown field set {" + error_msg + "}");
+    if (!error_msg.empty()) {
+      validation_visitor.onUnknownField("type " + message.GetTypeName() +
+                                        " with unknown field set {" + error_msg + "}");
+    }
   }
 
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
@@ -397,10 +421,13 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
     // standalone config validation utilities)
-    if (runtime && field->options().deprecated() &&
-        !runtime->snapshot().deprecatedFeatureEnabled(
-            absl::StrCat("envoy.deprecated_features.", filename, ":", field->name()))) {
-      warn_only = false;
+    if (runtime && field->options().deprecated()) {
+      // This is set here, rather than above, so that in the absence of a
+      // registry (i.e. test) the default for if a feature is allowed or not is
+      // based on ENVOY_DISABLE_DEPRECATED_FEATURES.
+      warn_only &= !field->options().GetExtension(envoy::annotations::disallowed_by_default);
+      warn_only = runtime->snapshot().deprecatedFeatureEnabled(
+          absl::StrCat("envoy.deprecated_features:", field->full_name()), warn_only);
     }
 
     // If this field is deprecated, warn or throw an error.
@@ -436,6 +463,14 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
       }
     }
   }
+}
+
+} // namespace
+
+void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
+                                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                                           Runtime::Loader* runtime) {
+  ::Envoy::checkForUnexpectedFields(API_RECOVER_ORIGINAL(message), validation_visitor, runtime);
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
@@ -594,6 +629,147 @@ std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
   default:
     return "";
   }
+}
+
+namespace {
+
+// Forward declaration for mutually-recursive helper functions.
+void redact(Protobuf::Message* message, bool ancestor_is_sensitive);
+
+using Transform = std::function<void(Protobuf::Message*, const Protobuf::Reflection*,
+                                     const Protobuf::FieldDescriptor*)>;
+
+// To redact opaque types, namely `Any` and `TypedStruct`, we have to reify them to the concrete
+// message types specified by their `type_url` before we can redact their contents. This is mostly
+// identical between `Any` and `TypedStruct`, the only difference being how they are packed and
+// unpacked. Note that we have to use reflection on the opaque type here, rather than downcasting
+// to `Any` or `TypedStruct`, because any message we might be handling could have originated from
+// a `DynamicMessageFactory`.
+bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
+                  absl::string_view opaque_type_name, Transform unpack, Transform repack) {
+  // Ensure this message has the opaque type we're expecting.
+  const auto* opaque_descriptor = message->GetDescriptor();
+  if (opaque_descriptor->full_name() != opaque_type_name) {
+    return false;
+  }
+
+  // Find descriptors for the `type_url` and `value` fields. The `type_url` field must not be
+  // empty, but `value` may be (in which case our work is done).
+  const auto* reflection = message->GetReflection();
+  const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
+  const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
+  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr &&
+         reflection->HasField(*message, type_url_field_descriptor));
+  if (!reflection->HasField(*message, value_field_descriptor)) {
+    return true;
+  }
+
+  // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the
+  // correct concrete type.
+  const std::string type_url(reflection->GetString(*message, type_url_field_descriptor));
+  const std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
+  const auto* concrete_descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
+  if (concrete_descriptor == nullptr) {
+    // If the type URL doesn't correspond to a known proto, don't try to reify it, just treat it
+    // like any other message. See the documented limitation on `MessageUtil::redact()` for more
+    // context.
+    ENVOY_LOG_MISC(warn, "Could not reify {} with unknown type URL {}", opaque_type_name, type_url);
+    return false;
+  }
+  Protobuf::DynamicMessageFactory message_factory;
+  std::unique_ptr<Protobuf::Message> typed_message(
+      message_factory.GetPrototype(concrete_descriptor)->New());
+
+  // Finally we can unpack, redact, and repack the opaque message using the provided callbacks.
+  unpack(typed_message.get(), reflection, value_field_descriptor);
+  redact(typed_message.get(), ancestor_is_sensitive);
+  repack(typed_message.get(), reflection, value_field_descriptor);
+  return true;
+}
+
+bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  return redactOpaque(
+      message, ancestor_is_sensitive, "google.protobuf.Any",
+      [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
+                const Protobuf::FieldDescriptor* field_descriptor) {
+        // To unpack an `Any`, parse the serialized proto.
+        typed_message->ParseFromString(reflection->GetString(*message, field_descriptor));
+      },
+      [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
+                const Protobuf::FieldDescriptor* field_descriptor) {
+        // To repack an `Any`, reserialize its proto.
+        reflection->SetString(message, field_descriptor, typed_message->SerializeAsString());
+      });
+}
+
+// To redact a `TypedStruct`, we have to reify it based on its `type_url` to redact it.
+bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  return redactOpaque(
+      message, ancestor_is_sensitive, "udpa.type.v1.TypedStruct",
+      [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
+                const Protobuf::FieldDescriptor* field_descriptor) {
+        // To unpack a `TypedStruct`, convert the struct from JSON.
+        jsonConvertInternal(reflection->GetMessage(*message, field_descriptor),
+                            ProtobufMessage::getNullValidationVisitor(), *typed_message);
+      },
+      [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
+                const Protobuf::FieldDescriptor* field_descriptor) {
+        // To repack a `TypedStruct`, convert the message back to JSON.
+        jsonConvertInternal(*typed_message, ProtobufMessage::getNullValidationVisitor(),
+                            *(reflection->MutableMessage(message, field_descriptor)));
+      });
+}
+
+// Recursive helper method for MessageUtil::redact() below.
+void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  if (redactAny(message, ancestor_is_sensitive) ||
+      redactTypedStruct(message, ancestor_is_sensitive)) {
+    return;
+  }
+
+  const auto* descriptor = message->GetDescriptor();
+  const auto* reflection = message->GetReflection();
+  for (int i = 0; i < descriptor->field_count(); ++i) {
+    const auto* field_descriptor = descriptor->field(i);
+
+    // Redact if this field or any of its ancestors have the `sensitive` option set.
+    const bool sensitive = ancestor_is_sensitive ||
+                           field_descriptor->options().GetExtension(udpa::annotations::sensitive);
+
+    if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+      // Recursive case: traverse message fields.
+      if (field_descriptor->is_repeated()) {
+        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        for (int i = 0; i < field_size; ++i) {
+          redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);
+        }
+      } else if (reflection->HasField(*message, field_descriptor)) {
+        redact(reflection->MutableMessage(message, field_descriptor), sensitive);
+      }
+    } else if (sensitive) {
+      // Base case: replace strings and bytes with "[redacted]" and clear all others.
+      if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
+          field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_BYTES) {
+        if (field_descriptor->is_repeated()) {
+          const int field_size = reflection->FieldSize(*message, field_descriptor);
+          for (int i = 0; i < field_size; ++i) {
+            reflection->SetRepeatedString(message, field_descriptor, i, "[redacted]");
+          }
+        } else if (reflection->HasField(*message, field_descriptor)) {
+          reflection->SetString(message, field_descriptor, "[redacted]");
+        }
+      } else {
+        reflection->ClearField(message, field_descriptor);
+      }
+    }
+  }
+}
+
+} // namespace
+
+void MessageUtil::redact(Protobuf::Message& message) {
+  ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {

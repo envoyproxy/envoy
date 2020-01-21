@@ -10,8 +10,11 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
-Version 1.13.0 (pending)
-========================
+1.14.0 (Pending)
+================
+
+1.13.0 (January 20, 2020)
+=========================
 * The `request_headers_for_tags` field in :ref:`HTTP connection manager
   <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing>`
   has been deprecated in favor of the :ref:`custom_tags
@@ -22,9 +25,14 @@ Version 1.13.0 (pending)
   <envoy_api_field_auth.CertificateValidationContext.match_subject_alt_names>` field.
 * The `request_mirror_policy` field in :ref:`RouteMatch <envoy_api_msg_route.RouteAction>` has been deprecated in
   favor of the `request_mirror_policies` field.
+* The `service_name` field in
+  :ref:`HTTP health checker <envoy_api_msg_core.HealthCheck.HttpHealthCheck>` has been deprecated in
+  favor of the `service_name_matcher` field.
+* The v2 xDS API is deprecated. It will be supported by Envoy until EOY 2020. See
+  :ref:`api_supported_versions`.
 
-Version 1.12.0 (October 31, 2019)
-=================================
+1.12.0 (October 31, 2019)
+=========================
 * The ORIGINAL_DST_LB :ref:`load balancing policy <envoy_api_field_Cluster.lb_policy>` is
   deprecated, use CLUSTER_PROVIDED policy instead when configuring an :ref:`original destination
   cluster <envoy_api_field_Cluster.type>`.
@@ -67,16 +75,16 @@ Version 1.12.0 (October 31, 2019)
 * Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
   udpa.type.v1.TypedStruct in google.protobuf.Any.
 
-Version 1.11.2 (October 8, 2019)
-================================
+1.11.2 (October 8, 2019)
+========================
 * Use of :ref:`idle_timeout
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>`
   is deprecated. Use :ref:`common_http_protocol_options
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
   instead.
 
-Version 1.11.0 (July 11, 2019)
-==============================
+1.11.0 (July 11, 2019)
+======================
 * The --max-stats and --max-obj-name-len flags no longer has any effect.
 * Use of :ref:`cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
 * Use of :ref:`catch_all_cluster <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` in :ref:`redis_proxy.proto <envoy_api_file_envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto>` is deprecated. Set a :ref:`catch_all_route <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>` instead.
@@ -93,8 +101,8 @@ Version 1.11.0 (July 11, 2019)
   The `envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily
   enable this feature once the deprecation becomes fail by default.
 
-Version 1.10.0 (Apr 5, 2019)
-============================
+1.10.0 (Apr 5, 2019)
+====================
 * Use of `use_alpha` in :ref:`Ext-Authz Authorization Service <envoy_api_file_envoy/service/auth/v2/external_auth.proto>` is deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
 * Use of `enabled` in `CorsPolicy`, found in
   :ref:`route.proto <envoy_api_file_envoy/api/v2/route/route.proto>`.
@@ -104,8 +112,8 @@ Version 1.10.0 (Apr 5, 2019)
   has been deprecated. It was never used and setting it has no effect. It will be removed in the
   following release.
 
-Version 1.9.0 (Dec 20, 2018)
-============================
+1.9.0 (Dec 20, 2018)
+====================
 * Order of execution of the network write filter chain has been reversed. Prior to this release cycle it was incorrect, see `#4599 <https://github.com/envoyproxy/envoy/issues/4599>`_. In the 1.9.0 release cycle we introduced `bugfix_reverse_write_filter_order` in `lds.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/lds.proto>`_ to temporarily support both old and new behaviors. Note this boolean field is deprecated.
 * Order of execution of the HTTP encoder filter chain has been reversed. Prior to this release cycle it was incorrect, see `#4599 <https://github.com/envoyproxy/envoy/issues/4599>`_. In the 1.9.0 release cycle we introduced `bugfix_reverse_encode_order` in `http_connection_manager.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto>`_ to temporarily support both old and new behaviors. Note this boolean field is deprecated.
 * Use of the v1 REST_LEGACY ApiConfigSource is deprecated.
@@ -116,8 +124,8 @@ Version 1.9.0 (Dec 20, 2018)
   is deprecated. Set the `runtime_fraction` field instead.
 * Use of buffer filter `max_request_time` is deprecated in favor of the request timeout found in `HttpConnectionManager <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto>`_
 
-Version 1.8.0 (Oct 4, 2018)
-==============================
+1.8.0 (Oct 4, 2018)
+===================
 * Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.
   See envoy-announce `email <https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U>`_.
 * Use of the legacy
@@ -145,8 +153,8 @@ Version 1.8.0 (Oct 4, 2018)
 * Use of the string `user` field in `Authenticated` in `rbac.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto>`_
   is deprecated in favor of the new `StringMatcher` based `principal_name` field.
 
-Version 1.7.0 (Jun 21, 2018)
-===============================
+1.7.0 (Jun 21, 2018)
+====================
 * Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
   status code and will not have their intended effect. Prior to 1.7, GETs can be used for
   admin mutations, but a warning is logged.
@@ -162,8 +170,8 @@ Version 1.7.0 (Jun 21, 2018)
   field where one can specify HeaderMatch objects to match on.
 * The `sni_domains` field in the filter chain match was deprecated/renamed to `server_names`.
 
-Version 1.6.0 (March 20, 2018)
-=================================
+1.6.0 (March 20, 2018)
+======================
 * DOWNSTREAM_ADDRESS log formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
   instead.
 * CLIENT_IP header formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT instead.
@@ -172,8 +180,8 @@ Version 1.6.0 (March 20, 2018)
 * `value` and `regex` fields in the `HeaderMatcher` message is deprecated. Use the `exact_match`
   or `regex_match` oneof instead.
 
-Version 1.5.0 (Dec 4, 2017)
-==============================
+1.5.0 (Dec 4, 2017)
+===================
 * The outlier detection `ejections_total` stats counter has been deprecated and not replaced. Monitor
   the individual `ejections_detected_*` counters for the detectors of interest, or
   `ejections_enforced_total` for the total number of ejections that actually occurred.
@@ -182,8 +190,8 @@ Version 1.5.0 (Dec 4, 2017)
 * The outlier detection `ejections_success_rate` stats counter has been deprecated in favour of
   `ejections_detected_success_rate` and `ejections_enforced_success_rate`.
 
-Version 1.4.0 (Aug 24, 2017)
-============================
+1.4.0 (Aug 24, 2017)
+====================
 * Config option `statsd_local_udp_port` has been deprecated and has been replaced with
   `statsd_udp_ip_address`.
 * `HttpFilterConfigFactory` filter API has been deprecated in favor of `NamedHttpFilterConfigFactory`.

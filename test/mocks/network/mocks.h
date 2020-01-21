@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -54,7 +54,7 @@ public:
   ~MockAddressResolver() override;
 
   MOCK_METHOD1(resolve,
-               Address::InstanceConstSharedPtr(const envoy::config::core::v3alpha::SocketAddress&));
+               Address::InstanceConstSharedPtr(const envoy::config::core::v3::SocketAddress&));
   MOCK_CONST_METHOD0(name, std::string());
 };
 
@@ -138,6 +138,7 @@ public:
   ~MockUdpListenerCallbacks() override;
 
   MOCK_METHOD1(onData, void(UdpRecvData& data));
+  MOCK_METHOD0(onReadReady, void());
   MOCK_METHOD1(onWriteReady, void(const Socket& socket));
   MOCK_METHOD1(onReceiveError, void(Api::IoError::IoErrorCode err));
 };
@@ -232,12 +233,11 @@ public:
   ~MockSocketOption() override;
 
   MOCK_CONST_METHOD2(setOption,
-                     bool(Socket&, envoy::config::core::v3alpha::SocketOption::SocketState state));
+                     bool(Socket&, envoy::config::core::v3::SocketOption::SocketState state));
   MOCK_CONST_METHOD1(hashKey, void(std::vector<uint8_t>&));
   MOCK_CONST_METHOD2(getOptionDetails,
                      absl::optional<Socket::Option::Details>(
-                         const Socket&,
-                         envoy::config::core::v3alpha::SocketOption::SocketState state));
+                         const Socket&, envoy::config::core::v3::SocketOption::SocketState state));
 };
 
 class MockConnectionSocket : public ConnectionSocket {
@@ -316,8 +316,8 @@ public:
   MOCK_METHOD0(udpListenerFactory, const Network::ActiveUdpListenerFactory*());
   MOCK_METHOD0(connectionBalancer, ConnectionBalancer&());
 
-  envoy::config::core::v3alpha::TrafficDirection direction() const override {
-    return envoy::config::core::v3alpha::UNSPECIFIED;
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
   }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
@@ -342,7 +342,7 @@ public:
   MockConnectionHandler();
   ~MockConnectionHandler() override;
 
-  MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_CONST_METHOD0(numConnections, uint64_t());
   MOCK_METHOD0(incNumConnections, void());
   MOCK_METHOD0(decNumConnections, void());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
@@ -351,7 +351,7 @@ public:
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(disableListeners, void());
   MOCK_METHOD0(enableListeners, void());
-  MOCK_METHOD0(statPrefix, const std::string&());
+  MOCK_CONST_METHOD0(statPrefix, const std::string&());
 };
 
 class MockIp : public Address::Ip {

@@ -18,15 +18,18 @@ namespace JwtAuthn {
 
 class MockAuthFactory : public AuthFactory {
 public:
-  MOCK_CONST_METHOD4(create, AuthenticatorPtr(const ::google::jwt_verify::CheckAudience*,
-                                              const absl::optional<std::string>&, bool, bool));
+  MOCK_METHOD(AuthenticatorPtr, create,
+              (const ::google::jwt_verify::CheckAudience*, const absl::optional<std::string>&, bool,
+               bool),
+              (const));
 };
 
 class MockAuthenticator : public Authenticator {
 public:
-  MOCK_METHOD5(doVerify, void(Http::HeaderMap& headers, Tracing::Span& parent_span,
-                              std::vector<JwtLocationConstPtr>* tokens,
-                              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback));
+  MOCK_METHOD(void, doVerify,
+              (Http::HeaderMap & headers, Tracing::Span& parent_span,
+               std::vector<JwtLocationConstPtr>* tokens, SetPayloadCallback set_payload_cb,
+               AuthenticatorCallback callback));
 
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
@@ -34,24 +37,24 @@ public:
     doVerify(headers, parent_span, &tokens, std::move(set_payload_cb), std::move(callback));
   }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 class MockVerifierCallbacks : public Verifier::Callbacks {
 public:
-  MOCK_METHOD1(setPayload, void(const ProtobufWkt::Struct& payload));
-  MOCK_METHOD1(onComplete, void(const Status& status));
+  MOCK_METHOD(void, setPayload, (const ProtobufWkt::Struct& payload));
+  MOCK_METHOD(void, onComplete, (const Status& status));
 };
 
 class MockVerifier : public Verifier {
 public:
-  MOCK_CONST_METHOD1(verify, void(ContextSharedPtr context));
+  MOCK_METHOD(void, verify, (ContextSharedPtr context), (const));
 };
 
 class MockExtractor : public Extractor {
 public:
-  MOCK_CONST_METHOD1(extract, std::vector<JwtLocationConstPtr>(const Http::HeaderMap& headers));
-  MOCK_CONST_METHOD1(sanitizePayloadHeaders, void(Http::HeaderMap& headers));
+  MOCK_METHOD(std::vector<JwtLocationConstPtr>, extract, (const Http::HeaderMap& headers), (const));
+  MOCK_METHOD(void, sanitizePayloadHeaders, (Http::HeaderMap & headers), (const));
 };
 
 // A mock HTTP upstream with response body.

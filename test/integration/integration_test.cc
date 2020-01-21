@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -37,14 +37,12 @@ std::string normalizeDate(const std::string& s) {
 }
 
 void setDisallowAbsoluteUrl(
-    envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager&
-        hcm) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
   hcm.mutable_http_protocol_options()->mutable_allow_absolute_url()->set_value(false);
 };
 
 void setAllowHttp10WithDefaultHost(
-    envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager&
-        hcm) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
   hcm.mutable_http_protocol_options()->set_accept_http_10(true);
   hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
 }
@@ -58,11 +56,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
   concurrency_ = 2;
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_connection_balance_config()->mutable_exact_balance();
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_connection_balance_config()->mutable_exact_balance();
+  });
   initialize();
 
   // Per-worker listener stats.
@@ -148,8 +145,8 @@ TEST_P(IntegrationTest, RouterDirectResponse) {
   static const std::string prefix("/");
   static const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
         auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("x-additional-header");
@@ -239,6 +236,8 @@ TEST_P(IntegrationTest, ResponseFramedByConnectionCloseWithReadLimits) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   // Disable chunk encoding to trigger framing by connection close.
+  // TODO: This request should be propagated to codecs via API, instead of using a pseudo-header.
+  //       See: https://github.com/envoyproxy/envoy/issues/9749
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}, {":no-chunks", "1"}},
                                    false);
   upstream_request_->encodeData(512, true);
@@ -247,6 +246,8 @@ TEST_P(IntegrationTest, ResponseFramedByConnectionCloseWithReadLimits) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_EQ(512, response->body().size());
 }
 
 TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
@@ -272,7 +273,7 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
 // pending request is not sent on a connection that has been half-closed.
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     // Ensure we only have one connection upstream, one request active at a time.
@@ -703,7 +704,7 @@ TEST_P(IntegrationTest, AbsolutePath) {
   // Configure www.redirect.com to send a redirect, and ensure the redirect is
   // encountered via absolute URL.
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
-  host.set_require_tls(envoy::config::route::v3alpha::VirtualHost::ALL);
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
 
   initialize();
@@ -718,7 +719,7 @@ TEST_P(IntegrationTest, AbsolutePathWithPort) {
   // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
   // encountered via absolute URL with a port.
   auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
-  host.set_require_tls(envoy::config::route::v3alpha::VirtualHost::ALL);
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
   initialize();
   std::string response;
@@ -734,7 +735,7 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
   // Set a matcher for www.namewithport.com:1234 and verify http://www.namewithport.com does not
   // match
   auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
-  host.set_require_tls(envoy::config::route::v3alpha::VirtualHost::ALL);
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
   initialize();
   std::string response;
@@ -747,15 +748,14 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
 // Ensure that connect behaves the same with allow_absolute_url enabled and without
 TEST_P(IntegrationTest, Connect) {
   const std::string& request = "CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n";
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        // Clone the whole listener.
-        auto static_resources = bootstrap.mutable_static_resources();
-        auto* old_listener = static_resources->mutable_listeners(0);
-        auto* cloned_listener = static_resources->add_listeners();
-        cloned_listener->CopyFrom(*old_listener);
-        old_listener->set_name("http_forward");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    // Clone the whole listener.
+    auto static_resources = bootstrap.mutable_static_resources();
+    auto* old_listener = static_resources->mutable_listeners(0);
+    auto* cloned_listener = static_resources->add_listeners();
+    cloned_listener->CopyFrom(*old_listener);
+    old_listener->set_name("http_forward");
+  });
   // Set the first listener to disallow absolute URLs.
   config_helper_.addConfigModifier(&setDisallowAbsoluteUrl);
   initialize();
@@ -908,8 +908,9 @@ TEST_P(IntegrationTest, TestFailedBind) {
 }
 
 ConfigHelper::HttpModifierFunction setVia(const std::string& via) {
-  return [via](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                   HttpConnectionManager& hcm) { hcm.set_via(via); };
+  return
+      [via](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) { hcm.set_via(via); };
 }
 
 // Validate in a basic header-only request we get via header insertion.
@@ -986,8 +987,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
   initialize();
 
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
@@ -1021,11 +1022,12 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3alpha::HttpConnectionManager& hcm) {
-    // 200ms.
-    hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        // 200ms.
+        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
+      });
 
   initialize();
 
@@ -1062,7 +1064,7 @@ TEST_P(IntegrationTest, TestClearingRouteCacheFilter) {
 
 // Test that if no connection pools are free, Envoy fails to establish an upstream connection.
 TEST_P(IntegrationTest, NoConnectionPoolsFree) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
 

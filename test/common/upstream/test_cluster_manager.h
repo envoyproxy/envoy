@@ -3,9 +3,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
 
@@ -63,7 +63,7 @@ public:
   TestClusterManagerFactory() : api_(Api::createApiForTest(stats_)) {
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
-            [&](const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
+            [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
@@ -91,36 +91,34 @@ public:
   }
 
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  clusterFromProto(const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
     auto result = clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
-  CdsApiPtr createCds(const envoy::config::core::v3alpha::ConfigSource&, ClusterManager&) override {
+  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource&, ClusterManager&) override {
     return CdsApiPtr{createCds_()};
   }
 
   ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) override {
+  clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override {
     return ClusterManagerPtr{clusterManagerFromProto_(bootstrap)};
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
-  MOCK_METHOD1(clusterManagerFromProto_,
-               ClusterManager*(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap));
-  MOCK_METHOD3(allocateConnPool_,
-               Http::ConnectionPool::Instance*(HostConstSharedPtr host,
-                                               Network::ConnectionSocket::OptionsSharedPtr,
-                                               Network::TransportSocketOptionsSharedPtr));
-  MOCK_METHOD1(allocateTcpConnPool_, Tcp::ConnectionPool::Instance*(HostConstSharedPtr host));
-  MOCK_METHOD4(clusterFromProto_,
-               std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>(
-                   const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
-  MOCK_METHOD0(createCds_, CdsApi*());
+  MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
+              (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
+  MOCK_METHOD(Http::ConnectionPool::Instance*, allocateConnPool_,
+              (HostConstSharedPtr host, Network::ConnectionSocket::OptionsSharedPtr,
+               Network::TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
+  MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
+              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+               Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
+  MOCK_METHOD(CdsApi*, createCds_, ());
 
   Stats::IsolatedStoreImpl stats_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -143,13 +141,13 @@ public:
 // Helper to intercept calls to postThreadLocalClusterUpdate.
 class MockLocalClusterUpdate {
 public:
-  MOCK_METHOD3(post, void(uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed));
+  MOCK_METHOD(void, post,
+              (uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed));
 };
 
 class MockLocalHostsRemoved {
 public:
-  MOCK_METHOD1(post, void(const HostVector&));
+  MOCK_METHOD(void, post, (const HostVector&));
 };
 
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
@@ -158,7 +156,7 @@ class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
   using ClusterManagerImpl::ClusterManagerImpl;
 
-  TestClusterManagerImpl(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap,
+  TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                          ClusterManagerFactory& factory, Stats::Store& stats,
                          ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
@@ -183,7 +181,7 @@ public:
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
   MockedUpdatedClusterManagerImpl(
-      const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
       Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,

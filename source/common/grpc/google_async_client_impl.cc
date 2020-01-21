@@ -1,6 +1,6 @@
 #include "common/grpc/google_async_client_impl.h"
 
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/base64.h"
@@ -68,10 +68,12 @@ void GoogleAsyncClientThreadLocal::completionThread() {
   ENVOY_LOG(debug, "completionThread exiting");
 }
 
-GoogleAsyncClientImpl::GoogleAsyncClientImpl(
-    Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
-    GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-    const envoy::config::core::v3alpha::GrpcService& config, Api::Api& api)
+GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
+                                             GoogleAsyncClientThreadLocal& tls,
+                                             GoogleStubFactory& stub_factory,
+                                             Stats::ScopeSharedPtr scope,
+                                             const envoy::config::core::v3::GrpcService& config,
+                                             Api::Api& api)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
@@ -84,7 +86,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
   for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::MaximumKnown; ++i) {
-    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
+    stats_.streams_closed_[i] = &scope_->counter(absl::StrCat("streams_closed_", i));
   }
 }
 

@@ -12,11 +12,11 @@ option java_outer_classname = "FilterProto";
 option java_multiple_files = true;
 option csharp_namespace = "Envoy.Api.V2.ClusterNS";
 option ruby_package = "Envoy.Api.V2.ClusterNS";
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3";
 
 // [#protodoc-title: Upstream filters]
-//
 // Upstream filters apply to the connections to the upstream cluster hosts.
+
 message Filter {
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.

@@ -471,6 +471,8 @@ ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,
 
 void ActiveUdpListener::onData(Network::UdpRecvData& data) { read_filter_->onData(data); }
 
+void ActiveUdpListener::onReadReady() {}
+
 void ActiveUdpListener::onWriteReady(const Network::Socket&) {
   // TODO(sumukhs): This is not used now. When write filters are implemented, this is a
   // trigger to invoke the on write ready API on the filters which is when they can write

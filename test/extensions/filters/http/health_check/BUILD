@@ -21,7 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/health_check:health_check_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/health_check:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/health_check/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/health_check/v3:pkg_cc_proto",
     ],
 )

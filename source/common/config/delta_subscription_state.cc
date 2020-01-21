@@ -1,6 +1,6 @@
 #include "common/config/delta_subscription_state.h"
 
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -54,7 +54,7 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
 }
 
 UpdateAck DeltaSubscriptionState::handleResponse(
-    const envoy::service::discovery::v3alpha::DeltaDiscoveryResponse& message) {
+    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(message.nonce(), type_url_);
@@ -67,13 +67,17 @@ UpdateAck DeltaSubscriptionState::handleResponse(
 }
 
 void DeltaSubscriptionState::handleGoodResponse(
-    const envoy::service::discovery::v3alpha::DeltaDiscoveryResponse& message) {
+    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   disableInitFetchTimeoutTimer();
   absl::flat_hash_set<std::string> names_added_removed;
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
+    }
+    // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
+    if (!resource.has_resource() && resource.aliases_size() > 0) {
+      continue;
     }
     if (message.type_url() != resource.resource().type_url()) {
       throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
@@ -124,9 +128,9 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
                                   nullptr);
 }
 
-envoy::service::discovery::v3alpha::DeltaDiscoveryRequest
+envoy::service::discovery::v3::DeltaDiscoveryRequest
 DeltaSubscriptionState::getNextRequestAckless() {
-  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest request;
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".
@@ -157,9 +161,9 @@ DeltaSubscriptionState::getNextRequestAckless() {
   return request;
 }
 
-envoy::service::discovery::v3alpha::DeltaDiscoveryRequest
+envoy::service::discovery::v3::DeltaDiscoveryRequest
 DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
-  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest request = getNextRequestAckless();
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request = getNextRequestAckless();
   request.set_response_nonce(ack.nonce_);
   if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
     // Don't needlessly make the field present-but-empty if status is ok.

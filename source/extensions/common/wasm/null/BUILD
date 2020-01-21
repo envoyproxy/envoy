@@ -27,6 +27,7 @@ envoy_cc_library(
         "//external:abseil_node_hash_map",
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
+        "//source/extensions/common/wasm:wasm_vm_base",
         "//source/extensions/common/wasm:wasm_vm_interface",
         "//source/extensions/common/wasm:well_known_names",
     ],

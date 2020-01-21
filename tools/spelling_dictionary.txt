@@ -25,6 +25,7 @@ CHACHA
 CHLO
 CHMOD
 CHLOS
+CHLOs
 CIDR
 CLA
 CLI
@@ -396,6 +397,7 @@ builtin
 builtins
 bulkstrings
 bursty
+bytecode
 callee
 callsite
 callsites
@@ -421,6 +423,7 @@ ciphersuites
 circllhist
 CITT
 cloneable
+cloneability
 cmd
 cmsghdr
 codebase
@@ -507,6 +510,7 @@ dir
 dirname
 djb
 downcasted
+downcasting
 downstreams
 dtor
 dubbo
@@ -572,6 +576,7 @@ gcov
 genrule
 getaddrinfo
 getaffinity
+gethostname
 getifaddrs
 getpeername
 getsockname
@@ -879,6 +884,8 @@ referer
 refetch
 regex
 regexes
+reified
+reify
 reimplements
 rele
 releasor
@@ -890,6 +897,7 @@ repicked
 repo
 requirepass
 reselecting
+reserialize
 reservable
 resize
 resized

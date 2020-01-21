@@ -11,9 +11,9 @@ edge use case may need to be adjusted when using Envoy in a multi-level deployme
 
 **In summary, if you run level two Envoy version 1.11.1 or greater which terminates 
 HTTP/2, we strongly advise you to change the HTTP/2 configuration of your level 
-two Envoy, by setting its downstream
+two Envoy, by setting its downstream**
 :ref:`validation of HTTP/2 messaging option <envoy_api_field_core.Http2ProtocolOptions.stream_error_on_invalid_http_messaging>`
-to true.**
+**to true.**
 
 If there is an invalid HTTP/2 request and this option is not set, the Envoy in 
 question will reset the entire connection. This behavior was changed as part of 

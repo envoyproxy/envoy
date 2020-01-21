@@ -1,7 +1,7 @@
 #include "common/network/resolver_impl.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
@@ -21,11 +21,11 @@ class IpResolver : public Resolver {
 
 public:
   InstanceConstSharedPtr
-  resolve(const envoy::config::core::v3alpha::SocketAddress& socket_address) override {
+  resolve(const envoy::config::core::v3::SocketAddress& socket_address) override {
     switch (socket_address.port_specifier_case()) {
-    case envoy::config::core::v3alpha::SocketAddress::PortSpecifierCase::kPortValue:
+    case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kPortValue:
     // Default to port 0 if no port value is specified.
-    case envoy::config::core::v3alpha::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET:
+    case envoy::config::core::v3::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET:
       return Network::Utility::parseInternetAddress(
           socket_address.address(), socket_address.port_value(), !socket_address.ipv4_compat());
 
@@ -43,11 +43,11 @@ public:
  */
 REGISTER_FACTORY(IpResolver, Resolver);
 
-InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3alpha::Address& address) {
+InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   switch (address.address_case()) {
-  case envoy::config::core::v3alpha::Address::AddressCase::kSocketAddress:
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
-  case envoy::config::core::v3alpha::Address::AddressCase::kPipe:
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
     return InstanceConstSharedPtr{new PipeInstance(address.pipe().path())};
   default:
     throw EnvoyException("Address must be a socket or pipe: " + address.DebugString());
@@ -55,7 +55,7 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3alpha::A
 }
 
 InstanceConstSharedPtr
-resolveProtoSocketAddress(const envoy::config::core::v3alpha::SocketAddress& socket_address) {
+resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& socket_address) {
   Resolver* resolver = nullptr;
   const std::string& resolver_name = socket_address.resolver_name();
   if (resolver_name.empty()) {

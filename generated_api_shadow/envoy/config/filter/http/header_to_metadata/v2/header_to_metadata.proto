@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.header_to_metadata
 option java_outer_classname = "HeaderToMetadataProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.header_to_metadata.v3alpha";
+    "envoy.extensions.filters.http.header_to_metadata.v3";
 
 // [#protodoc-title: Header-To-Metadata Filter]
 //

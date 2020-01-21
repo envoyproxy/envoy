@@ -19,18 +19,19 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3";
 
 // [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 46]
+// [#next-free-field: 48]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -90,7 +91,7 @@ message Cluster {
     //
     //   **This load balancing policy is deprecated**. Use CLUSTER_PROVIDED instead.
     //
-    ORIGINAL_DST_LB = 4 [deprecated = true];
+    ORIGINAL_DST_LB = 4 [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
 
     // Refer to the :ref:`Maglev load balancing policy<arch_overview_load_balancing_types_maglev>`
     // for an explanation.
@@ -551,21 +552,18 @@ message Cluster {
   //   **This field is deprecated**. Set the
   //   :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>` field instead.
   //
-  repeated core.Address hosts = 7;
+  repeated core.Address hosts = 7 [deprecated = true];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` clusters.
-  // This field supersedes :ref:`hosts<envoy_api_field_Cluster.hosts>` field.
-  // [#comment:TODO(dio): Deprecate the hosts field and add it to :ref:`deprecated log<deprecated>`
-  // once load_assignment is implemented.]
+  // This field supersedes the *hosts* field in the v2 API.
   //
   // .. attention::
   //
   //   Setting this allows non-EDS cluster types to contain embedded EDS equivalent
   //   :ref:`endpoint assignments<envoy_api_msg_ClusterLoadAssignment>`.
-  //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
   //
   ClusterLoadAssignment load_assignment = 33;
 
@@ -590,7 +588,12 @@ message Cluster {
   //
   //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
   //   set, `transport_socket` takes priority.
-  auth.UpstreamTlsContext tls_context = 11 [deprecated = true];
+  auth.UpstreamTlsContext tls_context = 11
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+
+  // HTTP protocol options that are applied only to upstream HTTP connections.
+  // These options apply to all HTTP versions.
+  core.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46;
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
@@ -611,7 +614,8 @@ message Cluster {
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
-  map<string, google.protobuf.Struct> extension_protocol_options = 35 [deprecated = true];
+  map<string, google.protobuf.Struct> extension_protocol_options = 35
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as
@@ -785,6 +789,13 @@ message Cluster {
   // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
   // from the LRS stream here.]
   core.ConfigSource lrs_server = 42;
+
+  // If track_timeout_budgets is true, the :ref:`timeout budget histograms
+  // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
+  // request. These show what percentage of a request's per try and global timeout was used. A value
+  // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
+  // of 100 would indicate that the request took the entirety of the timeout given to it.
+  bool track_timeout_budgets = 47;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

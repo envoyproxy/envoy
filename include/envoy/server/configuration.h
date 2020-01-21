@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/stats/sink.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -82,12 +82,12 @@ public:
   /**
    * @return const std::string& the admin access log path.
    */
-  virtual const std::string& accessLogPath() PURE;
+  virtual const std::string& accessLogPath() const PURE;
 
   /**
    * @return const std::string& profiler output path.
    */
-  virtual const std::string& profilePath() PURE;
+  virtual const std::string& profilePath() const PURE;
 
   /**
    * @return Network::Address::InstanceConstSharedPtr the server address.
@@ -115,13 +115,13 @@ public:
   /**
    * @return absl::optional<std::string> the path to look for flag files.
    */
-  virtual absl::optional<std::string> flagsPath() PURE;
+  virtual absl::optional<std::string> flagsPath() const PURE;
 
   /**
    * @return const envoy::config::bootstrap::v2::LayeredRuntime& runtime
    *         configuration.
    */
-  virtual const envoy::config::bootstrap::v3alpha::LayeredRuntime& runtime() PURE;
+  virtual const envoy::config::bootstrap::v3::LayeredRuntime& runtime() PURE;
 };
 
 } // namespace Configuration

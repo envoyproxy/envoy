@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/router/v3alpha/router.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -20,6 +20,7 @@
 
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/cleanup.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/linked_object.h"
@@ -188,7 +189,7 @@ public:
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
-               const envoy::extensions::filters::http::router::v3alpha::Router& config)
+               const envoy::extensions::filters::http::router::v3::Router& config)
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
@@ -470,6 +471,7 @@ private:
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
     StreamInfo::UpstreamTiming upstream_timing_;
+    const MonotonicTime start_time_;
     // Copies of upstream headers/trailers. These are only set if upstream
     // access logging is configured.
     Http::HeaderMapPtr upstream_headers_;
@@ -487,6 +489,10 @@ private:
     // Tracks whether we deferred a per try timeout because the downstream request
     // had not been completed yet.
     bool create_per_try_timeout_on_request_complete_ : 1;
+
+    // Sentinel to indicate if timeout budget tracking is configured for the cluster,
+    // and if so, if the per-try histogram should record a value.
+    bool record_timeout_budget_ : 1;
   };
 
   using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
@@ -559,7 +565,7 @@ private:
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  std::unique_ptr<Stats::StatNameManagedStorage> alt_stat_prefix_;
+  std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;

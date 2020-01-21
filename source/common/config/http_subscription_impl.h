@@ -3,7 +3,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/http/rest_api_fetcher.h"
@@ -27,6 +27,7 @@ public:
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
                        std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
+                       envoy::config::core::v3::ApiVersion transport_api_version,
                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                        std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -47,13 +48,14 @@ private:
 
   std::string path_;
   Protobuf::RepeatedPtrField<std::string> resources_;
-  envoy::service::discovery::v3alpha::DiscoveryRequest request_;
+  envoy::service::discovery::v3::DiscoveryRequest request_;
   Config::SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 } // namespace Config

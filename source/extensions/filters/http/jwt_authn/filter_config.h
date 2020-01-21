@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/router/string_accessor.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
@@ -26,9 +26,8 @@ namespace JwtAuthn {
 class ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
 public:
   // Load the config from envoy config.
-  ThreadLocalCache(
-      const envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication& config,
-      TimeSource& time_source, Api::Api& api) {
+  ThreadLocalCache(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
+                   TimeSource& time_source, Api::Api& api) {
     jwks_cache_ = JwksCache::create(config, time_source, api);
   }
 
@@ -62,7 +61,7 @@ class FilterConfig : public Logger::Loggable<Logger::Id::jwt>, public AuthFactor
 public:
   ~FilterConfig() override = default;
 
-  FilterConfig(envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication proto_config,
+  FilterConfig(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
                const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : proto_config_(std::move(proto_config)),
         stats_(generateStats(stats_prefix, context.scope())),
@@ -140,7 +139,7 @@ private:
   };
 
   // The proto config.
-  envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication proto_config_;
+  envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config_;
   // The stats for the filter.
   JwtAuthnFilterStats stats_;
   // Thread local slot to store per-thread auth store

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.v3;
+
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.v3";
+option java_outer_classname = "OneofProto";
+option java_multiple_files = true;
+
+message OneofExample {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.v2.OneofExample";
+
+  oneof baz_specifier {
+    string foo = 1;
+  }
+
+  oneof bar_specifier {
+    string bar = 2;
+
+    string blah = 3;
+  }
+}
