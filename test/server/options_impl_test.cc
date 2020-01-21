@@ -10,7 +10,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/utility.h"
@@ -532,7 +532,7 @@ TEST(FactoryByTypeTest, EarlierVersionConfigType) {
   EXPECT_NE(factory, nullptr);
   EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().IpTagging);
 
-  envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging v3_config;
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging v3_config;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v3_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
