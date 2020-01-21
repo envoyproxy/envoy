@@ -208,7 +208,6 @@ proto_library(
         "//envoy/extensions/transport_sockets/tap/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/v3:pkg",
         "//envoy/extensions/wasm/v3:pkg",
-        "//envoy/service/accesslog/v2:pkg",
         "//envoy/service/accesslog/v3:pkg",
         "//envoy/service/auth/v3:pkg",
         "//envoy/service/cluster/v3:pkg",
