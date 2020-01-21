@@ -14,6 +14,8 @@ option java_outer_classname = "CsdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 
+// [#protodoc-title: Client Status Discovery Service (CSDS)]
+
 // CSDS is Client Status Discovery Service. It can be used to get the status of
 // an xDS-compliant client from the management server's point of view. In the
 // future, it can potentially be used as an interface to get the current
