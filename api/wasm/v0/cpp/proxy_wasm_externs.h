@@ -9,16 +9,17 @@
 #include <stdint.h>
 
 //
-//  ABI calls from the host into the VM.
+// ABI calls from the host into the VM.
 //
-//  These will typically be implemented by a language specific SDK which will provide an API on top
-//  of this ABI e.g. the C++ SDK provides a proxy_wasm_api.h implementation of the API on top of
-//  this ABI.
+// These will typically be implemented by a language specific SDK which will provide an API on top
+// of this ABI e.g. the C++ SDK provides a proxy_wasm_api.h implementation of the API on top of
+// this ABI.
 //
 // The Wasm VM can only access memory in the VM. Consequently, all data must be passed as integral
-// call parameters or by malloc()ing data in the VM. For consistency and to enable diverse Wasm
-// languages (e.g. languages with GC), the ABI uses a single mechanism for allocating memory in the
-// VM and requires that all memory allocations be explicitly requested by calls from the VM.
+// call parameters or by the host allocting memory in the VM which is then owned by the Wasm code.
+// For consistency and to enable diverse Wasm languages (e.g. languages with GC), the ABI uses a
+// single mechanism for allocating memory in the VM and requires that all memory allocations be
+// explicitly requested by calls from the VM and that the Wasm code then owns the allocated memory.
 //
 
 // Non-stream calls.
@@ -114,7 +115,7 @@ extern "C" void proxy_on_delete(uint32_t context_id);
  * @param length is the number of the bytes to retrieve. If start + length exceeds the number of
  * bytes available then configuration_size will be set to the number of bytes returned.
  * @param configuration_ptr a pointer to a location which will be filled with either nullptr (if no
- * configuration is available) or a pointer to a malloc()ed block containing the configuration
+ * configuration is available) or a pointer to a allocated block containing the configuration
  * bytes.
  * @param configuration_size a pointer to a location containing the size (or zero) of any returned
  * configuration byte block.
