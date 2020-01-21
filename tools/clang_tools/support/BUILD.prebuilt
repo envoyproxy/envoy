@@ -1,0 +1,397 @@
+# Clang 9.0 library pre-built Bazel.
+#
+# This file was mostly manually assembled (with some hacky Python scripts) from
+# clang+llvm-9.0.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz and corresponding
+# https://github.com/llvm/llvm-project.git source. It needs Clang 9.0 to work.
+#
+# The BUILD file has sufficient dependency relationships
+# between the prebuilt libraries in a clang-llvm distribution to support building libtooling
+# based binaries in the Envoy repository. We're chasing a moving target and as new libraries are
+# depended upon in new Clang versions, it will be necessary to augment these definitions.
+#
+# The key to understanding llvm-project layout is that there are a collection of libraries in
+# {clang,llvm}/lib. For the clang libraries, the CMakeLists.txt supplies the Clang library deps in
+# LINK_LIBS inside add_clang_library() and the llvm deps in LLVM_LINK_COMPONENTS. For the llvm
+# libraries, LLVMBuild.txt provides llvm deps (it does not reference any of the clang libs).
+#
+# It's kind of terrible that we need to do this by hand, but llvm-project is CMake canonical, and we
+# don't want to use rules_foreign_cc to build the libraries from source just to access some
+# developer libs which will exist on the filesystem of most devs who are using Clang.
+
+package(default_visibility = ["//visibility:public"])
+
+# We should use cc_import below, but it doesn't like .def files in Clang. See
+# https://github.com/bazelbuild/bazel/issues/6767.
+#
+
+cc_library(
+    name = "clang_analysis",
+    srcs = ["lib/libclangAnalysis.a"],
+    hdrs = glob(["clang/Analysis/**"]),
+    deps = [
+        ":clang_ast",
+        ":clang_astmatchers",
+        ":clang_basic",
+        ":clang_lex",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_basic",
+    srcs = ["lib/libclangBasic.a"],
+    hdrs = glob([
+        "clang/Basic/**",
+        "clang-c/**",
+    ]),
+    deps = [
+        ":llvm_core",
+        ":llvm_mc",
+        ":llvm_support",
+        ":llvm_target",
+    ],
+)
+
+cc_library(
+    name = "clang_ast",
+    srcs = ["lib/libclangAST.a"],
+    hdrs = glob(["clang/AST/**"]),
+    deps = [
+        ":clang_basic",
+        ":clang_lex",
+        ":llvm_binaryformat",
+        ":llvm_core",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_astmatchers",
+    srcs = ["lib/libclangASTMatchers.a"],
+    hdrs = glob(["clang/ASTMatchers/**"]),
+    deps = [
+        ":clang_ast",
+        ":clang_basic",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_driver",
+    srcs = ["lib/libclangDriver.a"],
+    hdrs = glob(["clang/Driver/**"]),
+    deps = [
+        ":clang_basic",
+        ":llvm_binaryformat",
+        ":llvm_option",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_edit",
+    srcs = ["lib/libclangEdit.a"],
+    hdrs = glob(["clang/Edit/**"]),
+    deps = [
+        ":clang_ast",
+        ":clang_basic",
+        ":clang_lex",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_format",
+    srcs = ["lib/libclangFormat.a"],
+    hdrs = glob(["clang/Format/**"]),
+    deps = [
+        ":clang_basic",
+        ":clang_lex",
+        ":clang_toolingcore",
+        ":clang_toolinginclusions",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_frontend",
+    srcs = ["lib/libclangFrontend.a"],
+    hdrs = glob(["clang/Frontend/**"]),
+    deps = [
+        ":clang_ast",
+        ":clang_basic",
+        ":clang_driver",
+        ":clang_edit",
+        ":clang_lex",
+        ":clang_parse",
+        ":clang_sema",
+        ":clang_serialization",
+        ":llvm_bitreader",
+        ":llvm_option",
+        ":llvm_profiledata",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_lex",
+    srcs = ["lib/libclangLex.a"],
+    hdrs = glob(["clang/Lex/**"]),
+    deps = [
+        ":clang_basic",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_parse",
+    srcs = ["lib/libclangParse.a"],
+    hdrs = glob(["clang/Parse/**"]),
+    deps = [
+        ":clang_ast",
+        ":clang_basic",
+        ":clang_lex",
+        ":clang_sema",
+        ":llvm_mc",
+        ":llvm_mcparser",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_rewrite",
+    srcs = ["lib/libclangRewrite.a"],
+    hdrs = glob(["clang/Rewrite/**"]),
+    deps = [
+        ":clang_basic",
+        ":clang_lex",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_sema",
+    srcs = ["lib/libclangSema.a"],
+    hdrs = glob(["clang/Sema/**"]),
+    deps = [
+        ":clang_analysis",
+        ":clang_ast",
+        ":clang_basic",
+        ":clang_edit",
+        ":clang_lex",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_serialization",
+    srcs = ["lib/libclangSerialization.a"],
+    hdrs = glob(["clang/Serialization/**"]),
+    deps = [
+        ":clang_ast",
+        ":clang_basic",
+        ":clang_lex",
+        ":clang_sema",
+        ":llvm_bitreader",
+        ":llvm_bitstreamreader",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_tooling",
+    srcs = ["lib/libclangTooling.a"],
+    hdrs = glob(["clang/Tooling/**"]),
+    deps = [
+        ":clang_ast",
+        ":clang_astmatchers",
+        ":clang_basic",
+        ":clang_driver",
+        ":clang_format",
+        ":clang_frontend",
+        ":clang_lex",
+        ":clang_rewrite",
+        ":clang_serialization",
+        ":clang_toolingcore",
+        ":llvm_option",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_toolingcore",
+    srcs = ["lib/libclangToolingCore.a"],
+    hdrs = glob(["clang/Tooling/Core/**"]),
+    deps = [
+        ":clang_ast",
+        ":clang_basic",
+        ":clang_lex",
+        ":clang_rewrite",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "clang_toolinginclusions",
+    srcs = ["lib/libclangToolingInclusions.a"],
+    hdrs = glob(["clang/Tooling/Inclusions/**"]),
+    deps = [
+        ":clang_basic",
+        ":clang_lex",
+        ":clang_rewrite",
+        ":clang_toolingcore",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_analysis",
+    srcs = ["lib/libLLVMAnalysis.a"],
+    hdrs = glob(["llvm/Analysis/**"]),
+    deps = [
+        ":llvm_binaryformat",
+        ":llvm_core",
+        ":llvm_object",
+        ":llvm_profiledata",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_binaryformat",
+    srcs = ["lib/libLLVMBinaryFormat.a"],
+    hdrs = glob(["llvm/BinaryFormat/**"]),
+    deps = [":llvm_support"],
+)
+
+cc_library(
+    name = "llvm_bitreader",
+    srcs = ["lib/libLLVMBitReader.a"],
+    hdrs = glob(["llvm/Bitcode/**"]),
+    deps = [
+        ":llvm_bitstreamreader",
+        ":llvm_core",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_bitstreamreader",
+    srcs = ["lib/libLLVMBitstreamReader.a"],
+    hdrs = glob(["llvm/Bitstream/**"]),
+    deps = [
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_core",
+    srcs = ["lib/libLLVMCore.a"],
+    hdrs = glob([
+        "llvm/ADT/**",
+        "llvm/IR/**",
+        "llvm/*",
+        "llvm-c/**",
+    ]),
+    deps = [
+        ":llvm_binaryformat",
+        ":llvm_remarks",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_demangle",
+    srcs = ["lib/libLLVMDemangle.a"],
+    hdrs = glob(["llvm/Demangle/**"]),
+)
+
+cc_library(
+    name = "llvm_mc",
+    srcs = ["lib/libLLVMMC.a"],
+    hdrs = glob(["llvm/MC/**"]),
+    deps = [
+        ":llvm_binaryformat",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_mcparser",
+    srcs = ["lib/libLLVMMCParser.a"],
+    hdrs = glob(["llvm/MC/MCParser/**"]),
+    deps = [
+        ":llvm_mc",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_object",
+    srcs = ["lib/libLLVMObject.a"],
+    hdrs = glob(["llvm/Object/**"]),
+    deps = [
+        ":llvm_binaryformat",
+        ":llvm_bitreader",
+        ":llvm_core",
+        ":llvm_mc",
+        ":llvm_mcparser",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_option",
+    srcs = ["lib/libLLVMOption.a"],
+    hdrs = glob(["llvm/Option/**"]),
+    deps = [
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_profiledata",
+    srcs = ["lib/libLLVMProfileData.a"],
+    hdrs = glob(["llvm/ProfileData/**"]),
+    deps = [
+        ":llvm_core",
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_remarks",
+    srcs = ["lib/libLLVMRemarks.a"],
+    hdrs = glob(["llvm/Remarks/**"]),
+    deps = [
+        ":llvm_support",
+    ],
+)
+
+cc_library(
+    name = "llvm_support",
+    srcs = ["lib/libLLVMSupport.a"],
+    hdrs = glob([
+        "llvm/Config/**",
+        "llvm/Support/**",
+    ]),
+    linkopts = [
+        "-lcurses",
+        "-lpthread",
+    ],
+    deps = [
+        ":llvm_demangle",
+    ],
+)
+
+cc_library(
+    name = "llvm_target",
+    srcs = ["lib/libLLVMTarget.a"],
+    hdrs = glob(["llvm/Target/**"]),
+    deps = [
+        ":llvm_analysis",
+        ":llvm_core",
+        ":llvm_mc",
+        ":llvm_support",
+    ],
+)

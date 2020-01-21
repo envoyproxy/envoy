@@ -1,5 +1,8 @@
 #include "test/integration/proxy_proto_integration_test.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 
 #include "test/test_common/network_utility.h"
@@ -93,11 +96,12 @@ TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {
   // Change the cluster to an original destination cluster. An original destination cluster
   // ignores the configured hosts, and instead uses the restored destination address from the
   // incoming (server) connection as the destination address for the outgoing (client) connection.
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_hosts()->Clear();
-    cluster->set_type(envoy::api::v2::Cluster::ORIGINAL_DST);
-    cluster->set_lb_policy(envoy::api::v2::Cluster::ORIGINAL_DST_LB);
+    cluster->clear_load_assignment();
+    cluster->set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
+    cluster->set_lb_policy(
+        envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB);
   });
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -123,11 +127,11 @@ TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
   // Change the cluster to an original destination cluster. An original destination cluster
   // ignores the configured hosts, and instead uses the restored destination address from the
   // incoming (server) connection as the destination address for the outgoing (client) connection.
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_hosts()->Clear();
-    cluster->set_type(envoy::api::v2::Cluster::ORIGINAL_DST);
-    cluster->set_lb_policy(envoy::api::v2::Cluster::CLUSTER_PROVIDED);
+    cluster->clear_load_assignment();
+    cluster->set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
+    cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
   });
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {

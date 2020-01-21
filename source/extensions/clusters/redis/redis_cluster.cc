@@ -2,6 +2,12 @@
 
 #include <err.h>
 
+#include "envoy/config/cluster/redis/redis_cluster.pb.h"
+#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -12,7 +18,7 @@ Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_p
 } // namespace
 
 RedisCluster::RedisCluster(
-    const envoy::api::v2::Cluster& cluster,
+    const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
     Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
@@ -31,20 +37,25 @@ RedisCluster::RedisCluster(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, redirect_refresh_interval, 5000))),
       redirect_refresh_threshold_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(redis_cluster, redirect_refresh_threshold, 5)),
+      failure_refresh_threshold_(redis_cluster.failure_refresh_threshold()),
+      host_degraded_refresh_threshold_(redis_cluster.host_degraded_refresh_threshold()),
       dispatcher_(factory_context.dispatcher()), dns_resolver_(std::move(dns_resolver)),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
-      load_assignment_(cluster.has_load_assignment()
-                           ? cluster.load_assignment()
-                           : Config::Utility::translateClusterHosts(cluster.hosts())),
+      load_assignment_(
+          cluster.has_load_assignment()
+              ? cluster.load_assignment()
+              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(*this, redis_client_factory), lb_factory_(std::move(lb_factory)),
       auth_password_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)),
-      redirection_manager_(Common::Redis::getRedirectionManager(
+      cluster_name_(cluster.name()),
+      refresh_manager_(Common::Redis::getClusterRefreshManager(
           factory_context.singletonManager(), factory_context.dispatcher(),
           factory_context.clusterManager(), factory_context.api().timeSource())),
-      registration_handle_(redirection_manager_->registerCluster(
-          cluster.name(), redirect_refresh_interval_, redirect_refresh_threshold_, [&]() {
+      registration_handle_(refresh_manager_->registerCluster(
+          cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
+          failure_refresh_threshold_, host_degraded_refresh_threshold_, [&]() {
             redis_discovery_session_.resolve_timer_->enableTimer(std::chrono::milliseconds(0));
           })) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
@@ -122,6 +133,10 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
 void RedisCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) {
   if (lb_factory_) {
     lb_factory_->onHostHealthUpdate();
+  }
+  if (host && (host->health() == Upstream::Host::Health::Degraded ||
+               host->health() == Upstream::Host::Health::Unhealthy)) {
+    refresh_manager_->onHostDegraded(cluster_name_);
   }
   ClusterImplBase::reloadHealthyHostsHelper(host);
 }
@@ -347,7 +362,7 @@ RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 RedisClusterFactory::createClusterWithConfig(
-    const envoy::api::v2::Cluster& cluster,
+    const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
@@ -358,7 +373,7 @@ RedisClusterFactory::createClusterWithConfig(
   }
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy
   // in the future
-  if (cluster.lb_policy() != envoy::api::v2::Cluster::CLUSTER_PROVIDED) {
+  if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     return std::make_pair(std::make_shared<RedisCluster>(
                               cluster, proto_config,
                               NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,

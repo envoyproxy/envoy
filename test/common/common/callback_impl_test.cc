@@ -10,7 +10,7 @@ namespace Common {
 
 class CallbackManagerTest : public testing::Test {
 public:
-  MOCK_METHOD1(called, void(int arg));
+  MOCK_METHOD(void, called, (int arg));
 };
 
 TEST_F(CallbackManagerTest, All) {

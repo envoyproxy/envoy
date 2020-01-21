@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
@@ -21,7 +21,7 @@ namespace ThriftProxy {
 namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       rate_limit_policy_(route.route().rate_limits()),
@@ -37,7 +37,8 @@ RouteEntryImplBase::RouteEntryImplBase(
   }
 
   if (route.route().cluster_specifier_case() ==
-      envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
+      envoy::extensions::filters::network::thrift_proxy::v3::RouteAction::ClusterSpecifierCase::
+          kWeightedClusters) {
 
     total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
@@ -79,7 +80,7 @@ bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase& parent,
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+    const envoy::extensions::filters::network::thrift_proxy::v3::WeightedCluster::ClusterWeight&
         cluster)
     : parent_(parent), cluster_name_(cluster.name()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {
@@ -99,7 +100,7 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : RouteEntryImplBase(route), method_name_(route.match().method_name()),
       invert_(route.match().invert()) {
   if (method_name_.empty() && invert_) {
@@ -122,7 +123,7 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
 }
 
 ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : RouteEntryImplBase(route), invert_(route.match().invert()) {
   const std::string service_name = route.match().service_name();
   if (service_name.empty() && invert_) {
@@ -152,8 +153,8 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 }
 
 RouteMatcher::RouteMatcher(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration& config) {
-  using envoy::config::filter::network::thrift_proxy::v2alpha1::RouteMatch;
+    const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config) {
+  using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
     switch (route.match().match_specifier_case()) {
@@ -209,13 +210,10 @@ FilterStatus Router::transportEnd() {
 }
 
 FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
-  // TODO(zuercher): route stats (e.g., no_route, no_cluster, upstream_rq_maintenance_mode, no
-  // healthy upstream)
-
   route_ = callbacks_->route();
   if (!route_) {
-    ENVOY_STREAM_LOG(debug, "no cluster match for method '{}'", *callbacks_,
-                     metadata->methodName());
+    ENVOY_STREAM_LOG(debug, "no route match for method '{}'", *callbacks_, metadata->methodName());
+    stats_.route_missing_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
                      fmt::format("no route for method '{}'", metadata->methodName())),
@@ -229,6 +227,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
   if (!cluster) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
+    stats_.unknown_cluster_.inc();
     callbacks_->sendLocalReply(AppException(AppExceptionType::InternalError,
                                             fmt::format("unknown cluster '{}'", cluster_name)),
                                true);
@@ -240,6 +239,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                    metadata->methodName());
 
   if (cluster_->maintenanceMode()) {
+    stats_.upstream_rq_maintenance_mode_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
                      fmt::format("maintenance mode for cluster '{}'", cluster_name)),
@@ -263,6 +263,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
       cluster_name, Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
+    stats_.no_healthy_upstream_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
                      fmt::format("no healthy upstream for '{}'", cluster_name)),

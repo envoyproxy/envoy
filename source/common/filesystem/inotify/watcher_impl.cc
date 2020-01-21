@@ -24,7 +24,8 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
             onInotifyEvent();
           },
           Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {
-  RELEASE_ASSERT(inotify_fd_ >= 0, "");
+  RELEASE_ASSERT(inotify_fd_ >= 0,
+                 "Consider increasing value of user.max_inotify_watches via sysctl");
 }
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
@@ -34,7 +35,7 @@ void WatcherImpl::addWatch(const std::string& path, uint32_t events, OnChangedCb
   // and then synthetically raise per file events.
   size_t last_slash = path.rfind('/');
   if (last_slash == std::string::npos) {
-    throw EnvoyException(fmt::format("invalid watch path {}", path));
+    throw EnvoyException(absl::StrCat("invalid watch path ", path));
   }
 
   std::string directory = last_slash != 0 ? path.substr(0, last_slash) : "/";

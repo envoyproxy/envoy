@@ -2,6 +2,9 @@
 
 #include <string>
 
+#include "envoy/admin/v3/server_info.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"
@@ -39,8 +42,9 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, signalHandlingEnabled()).WillByDefault(ReturnPointee(&signal_handling_enabled_));
   ON_CALL(*this, mutexTracingEnabled()).WillByDefault(ReturnPointee(&mutex_tracing_enabled_));
   ON_CALL(*this, cpusetThreadsEnabled()).WillByDefault(ReturnPointee(&cpuset_threads_enabled_));
+  ON_CALL(*this, disabledExtensions()).WillByDefault(ReturnRef(disabled_extensions_));
   ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {
-    return std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+    return std::make_unique<envoy::admin::v3::CommandLineOptions>();
   }));
 }
 MockOptions::~MockOptions() = default;
@@ -91,15 +95,16 @@ MockOverloadManager::~MockOverloadManager() = default;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
-      .WillByDefault(Invoke(
-          [&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-              const Network::Socket::OptionsSharedPtr& options, bool) -> Network::SocketSharedPtr {
-            if (!Network::Socket::applyOptions(options, *socket_,
-                                               envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
-              throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
-            }
-            return socket_;
-          }));
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
+                                Network::Address::SocketType,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
+        if (!Network::Socket::applyOptions(options, *socket_,
+                                           envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+          throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+        }
+        return socket_;
+      }));
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
@@ -263,6 +268,8 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
+MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
+MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

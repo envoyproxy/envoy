@@ -19,7 +19,6 @@ cscope.*
 *.pyc
 **/pyformat
 SOURCE_VERSION
-source/common/config/api_type_db.generated.pb_text
 .settings/
 *.sw*
 tags
@@ -31,3 +30,5 @@ TAGS
 .vscode
 clang.bazelrc
 user.bazelrc
+CMakeLists.txt
+cmake-build-debug

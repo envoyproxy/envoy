@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/stats_macros.h"
@@ -22,7 +23,7 @@ enum EngineResult { Unknown, None, Allow, Deny };
 class RoleBasedAccessControlFilterConfig {
 public:
   RoleBasedAccessControlFilterConfig(
-      const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope);
+      const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
 
@@ -32,7 +33,7 @@ public:
                                                                     : shadow_engine_.get();
   }
 
-  envoy::config::filter::network::rbac::v2::RBAC::EnforcementType enforcementType() const {
+  envoy::extensions::filters::network::rbac::v3::RBAC::EnforcementType enforcementType() const {
     return enforcement_type_;
   }
 
@@ -41,7 +42,7 @@ private:
 
   std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
   std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
-  const envoy::config::filter::network::rbac::v2::RBAC::EnforcementType enforcement_type_;
+  const envoy::extensions::filters::network::rbac::v3::RBAC::EnforcementType enforcement_type_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =

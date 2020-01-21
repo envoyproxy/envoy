@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/http/headers.h"
@@ -30,6 +31,7 @@ constexpr absl::string_view UserAgent = "useragent";
 constexpr absl::string_view Size = "size";
 constexpr absl::string_view TotalSize = "total_size";
 constexpr absl::string_view Duration = "duration";
+constexpr absl::string_view Protocol = "protocol";
 
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";
@@ -145,13 +147,13 @@ private:
 
 class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
 public:
-  MetadataProducer(const envoy::api::v2::core::Metadata& metadata) : metadata_(metadata) {}
+  MetadataProducer(const envoy::config::core::v3::Metadata& metadata) : metadata_(metadata) {}
   CelValue Produce(ProtobufWkt::Arena* arena) override {
     return CelValue::CreateMessage(&metadata_, arena);
   }
 
 private:
-  const envoy::api::v2::core::Metadata& metadata_;
+  const envoy::config::core::v3::Metadata& metadata_;
 };
 
 } // namespace Expr

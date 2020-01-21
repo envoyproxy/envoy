@@ -362,27 +362,49 @@ TEST_F(TimerImplTimingTest, TheoreticalTimerTiming) {
   }
 }
 
-TEST(TimerImplTest, TimerValueConversion) {
+class TimerUtilsTest : public testing::Test {
+public:
+  template <typename Duration>
+  void checkConversion(const Duration& duration, const uint64_t expected_secs,
+                       const uint64_t expected_usecs) {
+    timeval tv;
+    TimerUtils::durationToTimeval(duration, tv);
+    EXPECT_EQ(tv.tv_sec, expected_secs);
+    EXPECT_EQ(tv.tv_usec, expected_usecs);
+  }
+};
+
+TEST_F(TimerUtilsTest, TimerNegativeValueThrows) {
   timeval tv;
-  std::chrono::milliseconds msecs;
+  const int negative_sample = -1;
+  EXPECT_THROW_WITH_MESSAGE(
+      TimerUtils::durationToTimeval(std::chrono::seconds(negative_sample), tv), EnvoyException,
+      fmt::format("Negative duration passed to durationToTimeval(): {}", negative_sample));
+}
+
+TEST_F(TimerUtilsTest, TimerValueConversion) {
+  // Check input is bounded.
+  checkConversion(std::chrono::nanoseconds::duration::max(), INT32_MAX, 0);
+  checkConversion(std::chrono::microseconds::duration::max(), INT32_MAX, 0);
+  checkConversion(std::chrono::milliseconds::duration::max(), INT32_MAX, 0);
+  checkConversion(std::chrono::seconds::duration::max(), INT32_MAX, 0);
+
+  // Test the clipping boundary
+  checkConversion(std::chrono::seconds(INT32_MAX) - std::chrono::seconds(1), INT32_MAX - 1, 0);
+  checkConversion(std::chrono::seconds(INT32_MAX) - std::chrono::nanoseconds(1), INT32_MAX - 1,
+                  999999);
 
   // Basic test with zero milliseconds.
-  msecs = std::chrono::milliseconds(0);
-  TimerUtils::microsecondsToTimeval(msecs, tv);
-  EXPECT_EQ(tv.tv_sec, 0);
-  EXPECT_EQ(tv.tv_usec, 0);
+  checkConversion(std::chrono::milliseconds(0), 0, 0);
 
   // 2050 milliseconds is 2 seconds and 50000 microseconds.
-  msecs = std::chrono::milliseconds(2050);
-  TimerUtils::microsecondsToTimeval(msecs, tv);
-  EXPECT_EQ(tv.tv_sec, 2);
-  EXPECT_EQ(tv.tv_usec, 50000);
+  checkConversion(std::chrono::milliseconds(2050), 2, 50000);
 
-  // Check maximum value conversion.
-  const auto usecs = std::chrono::microseconds::duration::max();
-  TimerUtils::microsecondsToTimeval(usecs, tv);
-  EXPECT_EQ(tv.tv_sec, usecs.count() / 1000000);
-  EXPECT_EQ(tv.tv_usec, usecs.count() % tv.tv_sec);
+  // Some arbitrary tests for good measure.
+  checkConversion(std::chrono::microseconds(233), 0, 233);
+
+  // Some arbitrary tests for good measure.
+  checkConversion(std::chrono::milliseconds(600014), 600, 14000);
 }
 
 } // namespace

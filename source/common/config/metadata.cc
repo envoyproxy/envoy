@@ -1,11 +1,26 @@
 #include "common/config/metadata.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/metadata/v3/metadata.pb.h"
+
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
+MetadataKey::MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key)
+    : key_(metadata_key.key()) {
+  for (const auto& seg : metadata_key.path()) {
+    path_.push_back(seg.key());
+  }
+}
+
+const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata& metadata,
+                                                  const MetadataKey& metadata_key) {
+  return metadataValue(metadata, metadata_key.key_, metadata_key.path_);
+}
+
+const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata& metadata,
                                                   const std::string& filter,
                                                   const std::vector<std::string>& path) {
   const auto filter_it = metadata.filter_metadata().find(filter);
@@ -36,21 +51,21 @@ const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Me
   return *val;
 }
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
+const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata& metadata,
                                                   const std::string& filter,
                                                   const std::string& key) {
   const std::vector<std::string> path{key};
   return metadataValue(metadata, filter, path);
 }
 
-ProtobufWkt::Value& Metadata::mutableMetadataValue(envoy::api::v2::core::Metadata& metadata,
+ProtobufWkt::Value& Metadata::mutableMetadataValue(envoy::config::core::v3::Metadata& metadata,
                                                    const std::string& filter,
                                                    const std::string& key) {
   return (*(*metadata.mutable_filter_metadata())[filter].mutable_fields())[key];
 }
 
 bool Metadata::metadataLabelMatch(const LabelSet& label_set,
-                                  const envoy::api::v2::core::Metadata& host_metadata,
+                                  const envoy::config::core::v3::Metadata& host_metadata,
                                   const std::string& filter_key, bool list_as_any) {
   const auto filter_it = host_metadata.filter_metadata().find(filter_key);
   if (filter_it == host_metadata.filter_metadata().end()) {

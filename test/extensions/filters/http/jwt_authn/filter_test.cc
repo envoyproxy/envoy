@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+
 #include "extensions/filters/http/jwt_authn/filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -8,7 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using ::google::jwt_verify::Status;
 
 using testing::_;
@@ -23,17 +25,18 @@ namespace {
 
 class MockMatcher : public Matcher {
 public:
-  MOCK_CONST_METHOD1(matches, bool(const Http::HeaderMap& headers));
+  MOCK_METHOD(bool, matches, (const Http::HeaderMap& headers), (const));
 };
 
 class MockFilterConfig : public FilterConfig {
 public:
   MockFilterConfig(
-      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
+      const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : FilterConfig(proto_config, stats_prefix, context) {}
-  MOCK_CONST_METHOD2(findVerifier, const Verifier*(const Http::HeaderMap& headers,
-                                                   const StreamInfo::FilterState& filter_state));
+  MOCK_METHOD(const Verifier*, findVerifier,
+              (const Http::HeaderMap& headers, const StreamInfo::FilterState& filter_state),
+              (const));
 };
 
 class FilterTest : public testing::Test {

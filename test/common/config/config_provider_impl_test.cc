@@ -1,5 +1,8 @@
 #include <memory>
 
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+
 #include "common/config/config_provider_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -85,7 +88,7 @@ public:
 
     ConfigSubscriptionCommonBase::onConfigUpdate();
   }
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
@@ -249,8 +252,8 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   Init::ExpectableWatcherImpl watcher;
   factory_context_.init_manager_.initialize(watcher);
 
-  envoy::api::v2::core::ApiConfigSource config_source_proto;
-  config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+  envoy::config::core::v3::ApiConfigSource config_source_proto;
+  config_source_proto.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   ConfigProviderPtr provider1 = provider_manager_->createXdsConfigProvider(
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
@@ -280,7 +283,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
             provider2->config<const DummyConfig>().get());
 
   // Change the config source and verify that a new subscription is used.
-  config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+  config_source_proto.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
   ConfigProviderPtr provider3 = provider_manager_->createXdsConfigProvider(
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
@@ -349,8 +352,8 @@ TEST_F(ConfigProviderImplTest, DuplicateConfigProto) {
   // This provider manager returns a DummyDynamicConfigProvider.
   auto provider_manager =
       std::make_unique<DummyConfigProviderManagerMockConfigProvider>(factory_context_.admin_);
-  envoy::api::v2::core::ApiConfigSource config_source_proto;
-  config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+  envoy::config::core::v3::ApiConfigSource config_source_proto;
+  config_source_proto.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   ConfigProviderPtr provider = provider_manager->createXdsConfigProvider(
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
@@ -435,8 +438,8 @@ dynamic_dummy_configs:
                             expected_config_dump);
   EXPECT_EQ(expected_config_dump.DebugString(), dummy_config_dump2.DebugString());
 
-  envoy::api::v2::core::ApiConfigSource config_source_proto;
-  config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+  envoy::config::core::v3::ApiConfigSource config_source_proto;
+  config_source_proto.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   ConfigProviderPtr dynamic_provider = provider_manager_->createXdsConfigProvider(
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
@@ -494,8 +497,8 @@ TEST_F(ConfigProviderImplTest, LocalInfoNotDefined) {
   factory_context_.local_info_.node_.set_cluster("");
   factory_context_.local_info_.node_.set_id("");
 
-  envoy::api::v2::core::ApiConfigSource config_source_proto;
-  config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+  envoy::config::core::v3::ApiConfigSource config_source_proto;
+  config_source_proto.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   EXPECT_THROW_WITH_MESSAGE(
       provider_manager_->createXdsConfigProvider(config_source_proto, factory_context_,
                                                  "dummy_prefix",
@@ -546,7 +549,7 @@ public:
     ConfigSubscriptionCommonBase::onConfigUpdate();
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
   }
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
@@ -671,8 +674,8 @@ protected:
 // Validate that delta config subscriptions are shared across delta dynamic config providers and
 // that the underlying Config implementation can be shared as well.
 TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
-  envoy::api::v2::core::ApiConfigSource config_source_proto;
-  config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+  envoy::config::core::v3::ApiConfigSource config_source_proto;
+  config_source_proto.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   ConfigProviderPtr provider1 = provider_manager_->createXdsConfigProvider(
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
@@ -719,8 +722,8 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
 
 // Tests a config update failure.
 TEST_F(DeltaConfigProviderImplTest, DeltaSubscriptionFailure) {
-  envoy::api::v2::core::ApiConfigSource config_source_proto;
-  config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+  envoy::config::core::v3::ApiConfigSource config_source_proto;
+  config_source_proto.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   ConfigProviderPtr provider = provider_manager_->createXdsConfigProvider(
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());

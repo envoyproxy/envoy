@@ -1,8 +1,7 @@
 #pragma once
 
 #include "envoy/common/time.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
@@ -44,9 +43,9 @@ class ConnectionManager : public Network::ReadFilter,
                           public RequestDecoderCallbacks,
                           Logger::Loggable<Logger::Id::dubbo> {
 public:
-  using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
+  using ConfigProtocolType = envoy::extensions::filters::network::dubbo_proxy::v3::ProtocolType;
   using ConfigSerializationType =
-      envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
+      envoy::extensions::filters::network::dubbo_proxy::v3::SerializationType;
 
   ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
                     TimeSource& time_system);

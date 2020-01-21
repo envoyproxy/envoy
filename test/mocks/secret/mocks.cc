@@ -1,5 +1,7 @@
 #include "test/mocks/secret/mocks.h"
 
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+
 #include "common/secret/secret_provider_impl.h"
 
 using testing::_;
@@ -10,15 +12,17 @@ namespace Secret {
 
 MockSecretManager::MockSecretManager() {
   ON_CALL(*this, createInlineTlsCertificateProvider(_))
-      .WillByDefault(Invoke([](const envoy::api::v2::auth::TlsCertificate& tls_certificate) {
-        return std::make_shared<Secret::TlsCertificateConfigProviderImpl>(tls_certificate);
-      }));
+      .WillByDefault(Invoke(
+          [](const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate) {
+            return std::make_shared<Secret::TlsCertificateConfigProviderImpl>(tls_certificate);
+          }));
   ON_CALL(*this, createInlineCertificateValidationContextProvider(_))
-      .WillByDefault(Invoke([](const envoy::api::v2::auth::CertificateValidationContext&
-                                   certificate_validation_context) {
-        return std::make_shared<Secret::CertificateValidationContextConfigProviderImpl>(
-            certificate_validation_context);
-      }));
+      .WillByDefault(Invoke(
+          [](const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
+                 certificate_validation_context) {
+            return std::make_shared<Secret::CertificateValidationContextConfigProviderImpl>(
+                certificate_validation_context);
+          }));
 }
 
 MockSecretManager::~MockSecretManager() = default;

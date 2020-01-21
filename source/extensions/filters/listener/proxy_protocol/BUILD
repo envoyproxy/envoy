@@ -41,5 +41,6 @@ envoy_cc_extension(
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
+        "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],
 )

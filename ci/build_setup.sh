@@ -70,7 +70,17 @@ if [[ -f "/etc/redhat-release" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS+="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1"
 fi
 
-bazel/setup_clang.sh /opt/llvm
+function cleanup() {
+  # Remove build artifacts. This doesn't mess with incremental builds as these
+  # are just symlinks.
+  rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
+}
+
+cleanup
+trap cleanup EXIT
+
+export LLVM_ROOT=/opt/llvm
+bazel/setup_clang.sh "${LLVM_ROOT}"
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
 
@@ -91,9 +101,8 @@ if [ "$1" != "-nofetch" ]; then
   fi
 
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 03b45933284b332fd1df42cfb3270751fe543842)
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 25eac570dd2bf3256dff01a04a9ce2a308e61f60)
   sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
-  cp -f "${ENVOY_SRCDIR}"/.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/.bazelversion
 fi
 
 # Also setup some space for building Envoy standalone.
@@ -115,15 +124,6 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 # This is where we copy the build profile to.
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
-
-function cleanup() {
-  # Remove build artifacts. This doesn't mess with incremental builds as these
-  # are just symlinks.
-  rm -rf "${ENVOY_SRCDIR}"/bazel-*
-}
-
-cleanup
-trap cleanup EXIT
 
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/

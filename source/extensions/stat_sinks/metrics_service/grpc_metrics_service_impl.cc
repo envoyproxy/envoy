@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/metrics/v3/metrics_service.pb.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -19,7 +20,7 @@ GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& f
                                                  const LocalInfo::LocalInfo& local_info)
     : client_(factory->create()), local_info_(local_info) {}
 
-void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v2::StreamMetricsMessage& message) {
+void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v3::StreamMetricsMessage& message) {
   if (stream_ == nullptr) {
     stream_ = client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                                  "envoy.service.metrics.v2.MetricsService.StreamMetrics"),

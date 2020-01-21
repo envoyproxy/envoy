@@ -23,10 +23,11 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     uint32_t send_buffer_limit)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      QuicFilterManagerConnectionImpl(connection.get(), dispatcher, send_buffer_limit),
+      QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
       quic_connection_(std::move(connection)) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
+  ASSERT(!quic_connection_->connected());
   QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
 }
 
@@ -92,12 +93,21 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
   }
 }
 
+void EnvoyQuicServerSession::OnCanWrite() {
+  quic::QuicServerSessionBase::OnCanWrite();
+  // Do not update delay close state according to connection level packet egress because that is
+  // equivalent to TCP transport layer egress. But only do so if the session gets chance to write.
+  maybeApplyDelayClosePolicy();
+}
+
 void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
     raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }
+
+bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 } // namespace Quic
 } // namespace Envoy

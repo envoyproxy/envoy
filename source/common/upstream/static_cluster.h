@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -12,7 +14,7 @@ namespace Upstream {
  */
 class StaticClusterImpl : public ClusterImplBase {
 public:
-  StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+  StaticClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                     Stats::ScopePtr&& stats_scope, bool added_via_api);
 
@@ -37,7 +39,7 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
-      const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;
 };

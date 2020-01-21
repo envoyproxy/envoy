@@ -1,5 +1,8 @@
 #include "server/listener_impl.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -26,23 +29,58 @@
 namespace Envoy {
 namespace Server {
 
-ListenSocketFactoryImplBase::ListenSocketFactoryImplBase(
-    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
-    Network::Address::SocketType socket_type, const Network::Socket::OptionsSharedPtr& options,
-    bool bind_to_port, const std::string& listener_name)
-    : factory_(factory), local_address_(local_address), socket_type_(socket_type),
-      options_(options), bind_to_port_(bind_to_port), listener_name_(listener_name) {}
+ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                                                 Network::Address::InstanceConstSharedPtr address,
+                                                 Network::Address::SocketType socket_type,
+                                                 const Network::Socket::OptionsSharedPtr& options,
+                                                 bool bind_to_port,
+                                                 const std::string& listener_name, bool reuse_port)
+    : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
+      bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
 
-Network::SocketSharedPtr ListenSocketFactoryImplBase::createListenSocketAndApplyOptions() {
+  bool create_socket = false;
+  if (local_address_->type() == Network::Address::Type::Ip) {
+    if (socket_type_ == Network::Address::SocketType::Datagram) {
+      ASSERT(reuse_port_ == true);
+    }
+
+    if (reuse_port_ == false) {
+      // create a socket which will be used by all worker threads
+      create_socket = true;
+    } else if (local_address_->ip()->port() == 0) {
+      // port is 0, need to create a socket here for reserving a real port number,
+      // then all worker threads should use same port.
+      create_socket = true;
+    }
+  } else {
+    ASSERT(local_address_->type() == Network::Address::Type::Pipe);
+    // Listeners with Unix domain socket always use shared socket.
+    create_socket = true;
+  }
+
+  if (create_socket) {
+    socket_ = createListenSocketAndApplyOptions();
+  }
+
+  if (socket_ && local_address_->ip() && local_address_->ip()->port() == 0) {
+    local_address_ = socket_->localAddress();
+  }
+
+  ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
+            local_address_->asString());
+}
+
+Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOptions() {
   // socket might be nullptr depending on factory_ implementation.
-  Network::SocketSharedPtr socket =
-      factory_.createListenSocket(local_address_, socket_type_, options_, bind_to_port_);
+  Network::SocketSharedPtr socket = factory_.createListenSocket(
+      local_address_, socket_type_, options_, {bind_to_port_, !reuse_port_});
+
   // Binding is done by now.
-  ENVOY_LOG(info, "Create listen socket for listener {} on address {}", listener_name_,
+  ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
             local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
-    const bool ok = Network::Socket::applyOptions(options_, *socket,
-                                                  envoy::api::v2::core::SocketOption::STATE_BOUND);
+    const bool ok = Network::Socket::applyOptions(
+        options_, *socket, envoy::config::core::v3::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -59,55 +97,45 @@ Network::SocketSharedPtr ListenSocketFactoryImplBase::createListenSocketAndApply
   return socket;
 }
 
-void ListenSocketFactoryImplBase::setLocalAddress(
-    Network::Address::InstanceConstSharedPtr local_address) {
-  ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
-            local_address->asString());
-  local_address_ = local_address;
-}
-
-TcpListenSocketFactory::TcpListenSocketFactory(
-    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-    const std::string& listener_name)
-    : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Stream,
-                                  options, bind_to_port, listener_name) {
-  socket_ = createListenSocketAndApplyOptions();
-  if (socket_ != nullptr && localAddress()->ip() != nullptr && localAddress()->ip()->port() == 0) {
-    setLocalAddress(socket_->localAddress());
+Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
+  if (!reuse_port_) {
+    return socket_;
   }
-}
 
-Network::SocketSharedPtr TcpListenSocketFactory::getListenSocket() { return socket_; }
+  Network::SocketSharedPtr socket;
+  absl::call_once(steal_once_, [this, &socket]() {
+    if (socket_) {
+      // If a listener's port is set to 0, socket_ should be created for reserving a port
+      // number, it is handed over to the first worker thread came here.
+      // There are several reasons for doing this:
+      // - for UDP, once a socket being bound, it begins to receive packets, it can't be
+      //   left unused, and closing it will lost packets received by it.
+      // - port number should be reserved before adding listener to active_listeners_ list,
+      //   otherwise admin API /listeners might return 0 as listener's port.
+      socket = std::move(socket_);
+    }
+  });
 
-UdpListenSocketFactory::UdpListenSocketFactory(
-    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr local_address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-    const std::string& listener_name)
-    : ListenSocketFactoryImplBase(factory, local_address, Network::Address::SocketType::Datagram,
-                                  options, bind_to_port, listener_name) {}
-
-Network::SocketSharedPtr UdpListenSocketFactory::getListenSocket() {
-  // TODO(danzh) add support of SO_REUSEPORT. Currently calling this method twice will fail because
-  // the port is already in use.
-  Network::SocketSharedPtr socket = createListenSocketAndApplyOptions();
-  if (socket != nullptr && localAddress()->ip() != nullptr && localAddress()->ip()->port() == 0) {
-    setLocalAddress(socket->localAddress());
+  if (socket) {
+    return socket;
   }
-  return socket;
+
+  return createListenSocketAndApplyOptions();
 }
 
-ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
-                           ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-                           bool workers_started, uint64_t hash,
-                           ProtobufMessage::ValidationVisitor& validation_visitor)
+ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
+                           const std::string& version_info, ListenerManagerImpl& parent,
+                           const std::string& name, bool added_via_api, bool workers_started,
+                           uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
+                           uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
+      filter_chain_manager_(address_, *this),
+      global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       hand_off_restored_destination_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
@@ -120,18 +148,24 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()) {
+  Network::Address::SocketType socket_type =
+      Network::Utility::protobufAddressSocketType(config.address());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
+  if (config.reuse_port()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
+  } else if (socket_type == Network::Address::SocketType::Datagram && concurrency > 1) {
+    ENVOY_LOG(warn, "Listening on UDP without SO_REUSEPORT socket option may result to unstable "
+                    "packet proxying. Consider configuring the reuse_port listener option.");
+  }
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
-  Network::Address::SocketType socket_type =
-      Network::Utility::protobufAddressSocketType(config.address());
   if (socket_type == Network::Address::SocketType::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
@@ -141,8 +175,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     if (udp_config.udp_listener_name().empty()) {
       udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
     }
-    auto& config_factory = Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
-        udp_config.udp_listener_name());
+    auto& config_factory =
+        Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(
+            udp_config.udp_listener_name());
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
@@ -187,14 +222,17 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
-  factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
-  filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
+  transport_factory_context.setInitManager(initManager());
+  // The init manager is a little messy. Will refactor when filter chain manager could accept
+  // network filter chain update.
+  // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
+  ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+  filter_chain_manager_.addFilterChain(config.filter_chains(), builder, filter_chain_manager_);
 
   if (socket_type == Network::Address::SocketType::Datagram) {
     return;
@@ -215,9 +253,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   // Add original dst listener filter if 'use_original_dst' flag is set.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)) {
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
@@ -228,7 +266,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   //                   selected.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
@@ -258,7 +296,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     ENVOY_LOG(warn, "{}", message);
 
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
@@ -295,10 +333,10 @@ Singleton::Manager& ListenerImpl::singletonManager() { return parent_.server_.si
 OverloadManager& ListenerImpl::overloadManager() { return parent_.server_.overloadManager(); }
 ThreadLocal::Instance& ListenerImpl::threadLocal() { return parent_.server_.threadLocal(); }
 Admin& ListenerImpl::admin() { return parent_.server_.admin(); }
-const envoy::api::v2::core::Metadata& ListenerImpl::listenerMetadata() const {
+const envoy::config::core::v3::Metadata& ListenerImpl::listenerMetadata() const {
   return config_.metadata();
 };
-envoy::api::v2::core::TrafficDirection ListenerImpl::direction() const {
+envoy::config::core::v3::TrafficDirection ListenerImpl::direction() const {
   return config_.traffic_direction();
 };
 TimeSource& ListenerImpl::timeSource() { return api().timeSource(); }

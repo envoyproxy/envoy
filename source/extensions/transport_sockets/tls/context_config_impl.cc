@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
@@ -20,7 +22,7 @@ namespace Tls {
 namespace {
 
 std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConfigProviders(
-    const envoy::api::v2::auth::CommonTlsContext& config,
+    const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   if (!config.tls_certificates().empty()) {
     std::vector<Secret::TlsCertificateConfigProviderSharedPtr> providers;
@@ -53,9 +55,9 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
   return {};
 }
 
-Secret::CertificateValidationContextConfigProviderSharedPtr
-getProviderFromSds(Server::Configuration::TransportSocketFactoryContext& factory_context,
-                   const envoy::api::v2::auth::SdsSecretConfig& sds_secret_config) {
+Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& sds_secret_config) {
   if (sds_secret_config.has_sds_config()) {
     // Fetch dynamic secret.
     return factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
@@ -76,24 +78,27 @@ getProviderFromSds(Server::Configuration::TransportSocketFactoryContext& factory
 
 Secret::CertificateValidationContextConfigProviderSharedPtr
 getCertificateValidationContextConfigProvider(
-    const envoy::api::v2::auth::CommonTlsContext& config,
+    const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>* default_cvc) {
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>*
+        default_cvc) {
   switch (config.validation_context_type_case()) {
-  case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::kValidationContext: {
+  case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
+      kValidationContext: {
     auto secret_provider =
         factory_context.secretManager().createInlineCertificateValidationContextProvider(
             config.validation_context());
     return secret_provider;
   }
-  case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
+  case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kValidationContextSdsSecretConfig: {
     const auto& sds_secret_config = config.validation_context_sds_secret_config();
     return getProviderFromSds(factory_context, sds_secret_config);
   }
-  case envoy::api::v2::auth::CommonTlsContext::ValidationContextTypeCase::
+  case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kCombinedValidationContext: {
-    *default_cvc = std::make_unique<envoy::api::v2::auth::CertificateValidationContext>(
+    *default_cvc = std::make_unique<
+        envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
         config.combined_validation_context().default_validation_context());
     const auto& sds_secret_config =
         config.combined_validation_context().validation_context_sds_secret_config();
@@ -106,13 +111,15 @@ getCertificateValidationContextConfigProvider(
 
 Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfigProvider(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    const envoy::api::v2::auth::DownstreamTlsContext& config) {
+    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config) {
 
   switch (config.session_ticket_keys_type_case()) {
-  case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeys:
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      SessionTicketKeysTypeCase::kSessionTicketKeys:
     return factory_context.secretManager().createInlineTlsSessionTicketKeysProvider(
         config.session_ticket_keys());
-  case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig: {
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      SessionTicketKeysTypeCase::kSessionTicketKeysSdsSecretConfig: {
     const auto& sds_secret_config = config.session_ticket_keys_sds_secret_config();
     if (sds_secret_config.has_sds_config()) {
       // Fetch dynamic secret.
@@ -130,7 +137,8 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
       return secret_provider;
     }
   }
-  case envoy::api::v2::auth::DownstreamTlsContext::SESSION_TICKET_KEYS_TYPE_NOT_SET:
+  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
+      SessionTicketKeysTypeCase::SESSION_TICKET_KEYS_TYPE_NOT_SET:
     return nullptr;
   default:
     throw EnvoyException(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
@@ -141,7 +149,7 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
-    const envoy::api::v2::auth::CommonTlsContext& config,
+    const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
     const std::string& default_cipher_suites, const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
@@ -168,9 +176,9 @@ ContextConfigImpl::ContextConfigImpl(
     // get updated.
     cvc_validation_callback_handle_ =
         certificate_validation_context_provider_->addValidationCallback(
-            [this](const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
-              getCombinedValidationContextConfig(dynamic_cvc);
-            });
+            [this](
+                const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
+                    dynamic_cvc) { getCombinedValidationContextConfig(dynamic_cvc); });
   }
   // Load inline or static secret into tls_certificate_config_.
   if (!tls_certificate_providers_.empty()) {
@@ -189,8 +197,10 @@ ContextConfigImpl::ContextConfigImpl(
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
-    const envoy::api::v2::auth::CertificateValidationContext& dynamic_cvc) {
-  envoy::api::v2::auth::CertificateValidationContext combined_cvc = *default_cvc_;
+    const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
+        dynamic_cvc) {
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext combined_cvc =
+      *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
   return std::make_unique<Envoy::Ssl::CertificateValidationContextConfigImpl>(combined_cvc, api_);
 }
@@ -254,17 +264,18 @@ ContextConfigImpl::~ContextConfigImpl() {
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(
-    const envoy::api::v2::auth::TlsParameters_TlsProtocol& version, unsigned default_version) {
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol& version,
+    unsigned default_version) {
   switch (version) {
-  case envoy::api::v2::auth::TlsParameters::TLS_AUTO:
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO:
     return default_version;
-  case envoy::api::v2::auth::TlsParameters::TLSv1_0:
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0:
     return TLS1_VERSION;
-  case envoy::api::v2::auth::TlsParameters::TLSv1_1:
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_1:
     return TLS1_1_VERSION;
-  case envoy::api::v2::auth::TlsParameters::TLSv1_2:
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2:
     return TLS1_2_VERSION;
-  case envoy::api::v2::auth::TlsParameters::TLSv1_3:
+  case envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3:
     return TLS1_3_VERSION;
   default:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -302,7 +313,8 @@ const std::string ClientContextConfigImpl::DEFAULT_CURVES =
     "P-256";
 
 ClientContextConfigImpl::ClientContextConfigImpl(
-    const envoy::api::v2::auth::UpstreamTlsContext& config, absl::string_view sigalgs,
+    const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
+    absl::string_view sigalgs,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
@@ -355,7 +367,7 @@ const std::string ServerContextConfigImpl::DEFAULT_CURVES =
     "P-256";
 
 ServerContextConfigImpl::ServerContextConfigImpl(
-    const envoy::api::v2::auth::DownstreamTlsContext& config,
+    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context)
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
@@ -366,7 +378,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
     stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(
-        [this](const envoy::api::v2::auth::TlsSessionTicketKeys& keys) {
+        [this](const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys) {
           getSessionTicketKeys(keys);
         });
   }
@@ -383,6 +395,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   } else if (!config.common_tls_context().tls_certificates().empty() &&
              !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
     throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
+  }
+
+  if (config.has_session_timeout()) {
+    session_timeout_ =
+        std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
   }
 }
 
@@ -413,7 +430,7 @@ void ServerContextConfigImpl::setSecretUpdateCallback(std::function<void()> call
 
 std::vector<Ssl::ServerContextConfig::SessionTicketKey>
 ServerContextConfigImpl::getSessionTicketKeys(
-    const envoy::api::v2::auth::TlsSessionTicketKeys& keys) {
+    const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys) {
   std::vector<Ssl::ServerContextConfig::SessionTicketKey> result;
   for (const auto& datasource : keys.keys()) {
     result.emplace_back(getSessionTicketKey(Config::DataSource::read(datasource, false, api_)));

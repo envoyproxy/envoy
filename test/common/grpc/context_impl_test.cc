@@ -61,7 +61,7 @@ TEST(GrpcContextTest, ResolveServiceAndMethod) {
   std::string service;
   std::string method;
   Http::HeaderMapImpl headers;
-  headers.setPath("/service_name/method_name");
+  headers.setPath("/service_name/method_name?a=b");
   const Http::HeaderEntry* path = headers.Path();
   Stats::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
