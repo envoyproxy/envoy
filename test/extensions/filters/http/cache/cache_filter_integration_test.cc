@@ -29,7 +29,7 @@ public:
     name: envoy.filters.http.cache
     typed_config:
         "@type": type.googleapis.com/envoy.config.filter.http.cache.v2.CacheConfig
-        name: SimpleHttpCache
+        name: envoy.extensions.http.cache.simple
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
 };
