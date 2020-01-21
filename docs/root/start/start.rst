@@ -167,6 +167,7 @@ features. The following sandboxes are available:
     sandboxes/grpc_bridge
     sandboxes/jaeger_native_tracing
     sandboxes/jaeger_tracing
+    sandboxes/kafka
     sandboxes/lua
     sandboxes/mysql
     sandboxes/redis

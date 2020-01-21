@@ -1,0 +1,52 @@
+version: "3.7"
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    volumes:
+      - ./envoy.yaml:/etc/envoy.yaml
+    networks:
+      envoymesh:
+        aliases:
+          - envoy
+    expose:
+      - "19092"
+      - "8001"
+    ports:
+      - "19092:19092"
+      - "8001:8001"
+
+  zookeeper:
+    image: wurstmeister/zookeeper:3.4.6
+    networks:
+      envoymesh:
+        aliases:
+          - zookeeper
+
+    expose:
+    - "2181"
+
+  kafka:
+    image: wurstmeister/kafka:2.11-2.0.0
+    depends_on:
+    - zookeeper
+    networks:
+      envoymesh:
+        aliases:
+          - kafka
+    ports:
+    - "31001:31001"
+
+    environment:
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://envoy:19092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+    expose:
+    - "9092"
+
+networks:
+  envoymesh:
+    name: envoymesh

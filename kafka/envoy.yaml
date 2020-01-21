@@ -1,0 +1,37 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0 # Host that Kafka clients should connect to.
+        port_value: 19092  # Port that Kafka clients should connect to.
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.kafka_broker
+        config:
+          stat_prefix: kafka_custom_prefix
+      - name: envoy.tcp_proxy
+        config:
+          stat_prefix: kafka_tcp
+          cluster: localkafka
+          access_log:
+          - name: envoy.file_access_log
+            config:
+              path: /dev/stdout
+  clusters:
+  - name: localkafka
+    connect_timeout: 1s
+    type: strict_dns
+    lb_policy: round_robin
+    hosts:
+    - socket_address:
+        address: kafka # Kafka broker's host.
+        port_value: 9092   # Kafka broker's port.
+
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001
+
+
