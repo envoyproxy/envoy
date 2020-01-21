@@ -67,6 +67,17 @@ void GrpcSubscriptionImpl::onConfigUpdate(
             resources.size(), version_info);
 }
 
+void GrpcSubscriptionImpl::onConfigUpdate(                                                                              
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,                    
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,                                                   
+    const std::string& system_version_info) {                                                                           
+  disableInitFetchTimeoutTimer();
+  stats_.update_attempt_.inc();                                                                                         
+  callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);                                   
+  stats_.update_success_.inc();                                                                                         
+  stats_.version_.set(HashUtil::xxHash64(system_version_info));                                                         
+}                                                                                                                       
+ 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
                                                 const EnvoyException* e) {
   switch (reason) {
