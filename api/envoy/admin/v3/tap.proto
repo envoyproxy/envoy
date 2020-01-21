@@ -12,6 +12,8 @@ option java_package = "io.envoyproxy.envoy.admin.v3";
 option java_outer_classname = "TapProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: Tap]
+
 // The /tap admin request body that is used to configure an active tap session.
 message TapRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.TapRequest";

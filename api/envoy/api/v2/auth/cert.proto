@@ -192,8 +192,8 @@ message CertificateValidationContext {
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`, or
-  // :ref:`verify_subject_alt_name
-  // <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`) is also
+  // :ref:`match_subject_alt_names
+  // <envoy_api_field_auth.CertificateValidationContext.match_subject_alt_names>`) is also
   // specified.
   //
   // It can optionally contain certificate revocation lists, in which case Envoy will verify

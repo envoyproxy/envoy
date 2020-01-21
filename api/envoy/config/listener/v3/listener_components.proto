@@ -195,10 +195,9 @@ message FilterChain {
 
   // Optional custom transport socket implementation to use for downstream connections.
   // To setup TLS, set a transport socket with name `tls` and
-  // :ref:`DownstreamTlsContext
-  // <envoy_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the
-  // `typed_config`. If no transport socket configuration is specified, new connections will be set
-  // up with plaintext.
+  // :ref:`DownstreamTlsContext <envoy_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the `typed_config`.
+  // If no transport socket configuration is specified, new connections
+  // will be set up with plaintext.
   core.v3.TransportSocket transport_socket = 6;
 
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no

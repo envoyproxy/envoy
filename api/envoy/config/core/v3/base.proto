@@ -67,10 +67,9 @@ message Locality {
 
   // Defines the local service zone where Envoy is running. Though optional, it
   // should be set if discovery service routing is used and the discovery
-  // service exposes :ref:`zone data
-  // <envoy_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`, either in this message or
-  // via :option:`--service-zone`. The meaning of zone is context dependent, e.g. `Availability Zone
-  // (AZ)
+  // service exposes :ref:`zone data <envoy_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`,
+  // either in this message or via :option:`--service-zone`. The meaning of zone
+  // is context dependent, e.g. `Availability Zone (AZ)
   // <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_
   // on AWS, `Zone <https://cloud.google.com/compute/docs/regions-zones/>`_ on
   // GCP, etc.
@@ -147,7 +146,8 @@ message Node {
   // Defines the local service cluster name where Envoy is running. Though
   // optional, it should be set if any of the following features are used:
   // :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
-  // verification <envoy_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name>`,
+  // verification
+  // <envoy_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name_matcher>`,
   // :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v3.Runtime>`,
   // :ref:`user agent addition
   // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_user_agent>`,
@@ -392,10 +392,10 @@ message SocketOption {
 // .. note::
 //
 //   Parsing of the runtime key's data is implemented such that it may be represented as a
-//   :ref:`FractionalPercent <envoy_api_msg_type.v3.FractionalPercent>` proto represented as
-//   JSON/YAML and may also be represented as an integer with the assumption that the value is an
-//   integral percentage out of 100. For instance, a runtime key lookup returning the value "42"
-//   would parse as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.
+//   :ref:`FractionalPercent <envoy_api_msg_type.v3.FractionalPercent>` proto represented as JSON/YAML
+//   and may also be represented as an integer with the assumption that the value is an integral
+//   percentage out of 100. For instance, a runtime key lookup returning the value "42" would parse
+//   as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.
 message RuntimeFractionalPercent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.RuntimeFractionalPercent";

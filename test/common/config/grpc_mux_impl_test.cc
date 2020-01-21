@@ -204,8 +204,7 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   setup();
 
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> invalid_response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto invalid_response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   InSequence s;
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
 
@@ -214,8 +213,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-        new envoy::service::discovery::v3::DiscoveryResponse());
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url("bar");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
@@ -251,8 +249,7 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-        new envoy::service::discovery::v3::DiscoveryResponse());
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
@@ -288,8 +285,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-        new envoy::service::discovery::v3::DiscoveryResponse());
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
@@ -311,8 +307,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   }
 
   {
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-        new envoy::service::discovery::v3::DiscoveryResponse());
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("2");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_x;
@@ -372,8 +367,7 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   expectSendMessage(type_url, {"x", "y"}, "", true);
   grpc_mux_->start();
 
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_version_info("1");
 
@@ -395,8 +389,7 @@ TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   expectSendMessage(type_url, {}, "", true);
   grpc_mux_->start();
 
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_version_info("1");
   // Validate that onConfigUpdate is called with empty resources.
@@ -436,8 +429,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-          new envoy::service::discovery::v3::DiscoveryResponse());
+      auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -489,8 +481,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-          new envoy::service::discovery::v3::DiscoveryResponse());
+      auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -545,8 +536,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-          new envoy::service::discovery::v3::DiscoveryResponse());
+      auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -596,8 +586,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   }
 
   // simulate the server sending empty CLA message to notify envoy that the CLA was removed.
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_nonce("bar");
   response->set_version_info("1");
   response->set_type_url(type_url);
@@ -632,8 +621,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
 
   // simulate the server sending CLA message to notify envoy that the CLA was added,
   // even though envoy doesn't expect it. Envoy should reject this update.
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_nonce("bar");
   response->set_version_info("1");
   response->set_type_url(type_url);

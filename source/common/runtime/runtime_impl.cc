@@ -556,8 +556,8 @@ RtdsSubscription::RtdsSubscription(
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
   validateUpdateSize(resources.size());
-  auto runtime = MessageUtil::anyConvert<envoy::service::runtime::v3::Runtime>(resources[0]);
-  MessageUtil::validate(runtime, validation_visitor_);
+  auto runtime = MessageUtil::anyConvertAndValidate<envoy::service::runtime::v3::Runtime>(
+      resources[0], validation_visitor_);
   if (runtime.name() != resource_name_) {
     throw EnvoyException(
         fmt::format("Unexpected RTDS runtime (expecting {}): {}", resource_name_, runtime.name()));
