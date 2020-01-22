@@ -7,6 +7,8 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 
+#include "envoy/stats/store.h"
+
 namespace Envoy {
 namespace Stats {
 namespace TestUtil {
@@ -70,6 +72,22 @@ public:
 
 private:
   const size_t memory_at_construction_;
+};
+
+class StatNames {
+ public:
+  explicit StatNames(Store& store);
+
+  StatName join(const std::vector<StatName>& names);
+  StatName symbolic(absl::string_view name) { return pool_.add(name); }
+  StatName dynamic(absl::string_view name) { return dynamic_pool_.add(name); }
+  uint64_t counterValue(const std::vector<StatName>& names);
+
+ private:
+  Store& store_;
+  StatNamePool pool_;
+  StatNameDynamicPool dynamic_pool_;
+  std::vector<SymbolTable::StoragePtr> joins_;
 };
 
 // Compares the memory consumed against an exact expected value, but only on

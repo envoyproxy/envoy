@@ -17,6 +17,7 @@
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/common/http/common.h"
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/http/fault/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -119,6 +120,8 @@ public:
 
   const std::string v2_empty_fault_config_yaml = "{}";
 
+  FaultFilterTest() : stat_names_(stats_) {}
+
   void SetUpTest(const envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
     config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_, time_system_));
     filter_ = std::make_unique<FaultFilter>(config_);
@@ -139,6 +142,7 @@ public:
                                 const Router::RouteSpecificFilterConfig* vhost_fault);
 
   Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::StatNames stat_names_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
@@ -421,8 +425,11 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
-  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.delays_injected").value());
-  EXPECT_EQ(0UL, stats_.counter("prefix.fault.cluster.aborts_injected").value());
+
+  Stats::StatName prefix = stat_names_.join({
+      stat_names_.symbolic("prefix.fault"), stat_names_.dynamic("cluster")});
+  EXPECT_EQ(1UL, stat_names_.counterValue({prefix, stat_names_.symbolic("delays_injected")}));
+  EXPECT_EQ(0UL, stat_names_.counterValue({prefix, stat_names_.symbolic("aborts_injected")}));
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
@@ -484,8 +491,12 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
-  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.delays_injected").value());
-  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.aborts_injected").value());
+
+  Stats::StatName prefix = stat_names_.join({
+      stat_names_.symbolic("prefix.fault"), stat_names_.dynamic("cluster")});
+  EXPECT_EQ(1UL, stat_names_.counterValue({prefix, stat_names_.symbolic("delays_injected")}));
+  EXPECT_EQ(1UL, stat_names_.counterValue({prefix, stat_names_.symbolic("aborts_injected")}));
+
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
 }
 

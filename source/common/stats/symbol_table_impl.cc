@@ -464,7 +464,7 @@ void StatNameStorage::free(SymbolTable& table) {
 
 void StatNamePool::clear() {
   for (StatNameStorage& storage : storage_vector_) {
-   storage.free(symbol_table_);
+    storage.free(symbol_table_);
   }
   storage_vector_.clear();
 }
@@ -514,9 +514,7 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
 SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
-    if (!stat_name.empty()) {
-      num_bytes += stat_name.dataSize();
-    }
+    num_bytes += stat_name.dataSize();
   }
   MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
