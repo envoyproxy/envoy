@@ -142,6 +142,7 @@ public:
   /**
    * @return a ThreadLocalHistogram within the scope's namespace.
    * @param name name of the histogram with scope prefix attached.
+   * @param parent the parent histogram.
    */
   virtual Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) PURE;
 };
@@ -323,6 +324,12 @@ private:
                                                            absl::string_view tag_extracted_name,
                                                            const std::vector<Tag>& tags)>;
 
+    /**
+     * Combines the given name of a stat with its statically defined tags to create a unique identifier
+     * for the name/tags.
+     */
+    StatName finalStatName(StatName name,
+                                                        const std::vector<Tag>& tags);
     /**
      * Makes a stat either by looking it up in the central cache,
      * generating it from the parent allocator, or as a last

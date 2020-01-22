@@ -167,6 +167,7 @@ public:
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   StoragePtr join(const StatNameVec& stat_names) const override;
+  StoragePtr join(const StatNameVec& stat_names, const StatNameList& stat_name_list) const override;
   void populateList(const absl::string_view* names, uint32_t num_names,
                     StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;

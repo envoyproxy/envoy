@@ -457,6 +457,25 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   return gauge;
 }
 
+StatName ThreadLocalStoreImpl::ScopeImpl::finalStatName(StatName name,
+                                                        const std::vector<Tag>& tags) {
+  std::vector<absl::string_view> tag_names_and_values;
+  tag_names_and_values.reserve(tags.size() * 2);
+
+  for (const auto& tag : tags) {
+    tag_names_and_values.emplace_back(tag.name_);
+    tag_names_and_values.emplace_back(tag.value_);
+  }
+
+  StatNameList dynamic_names;
+  symbolTable().populateList(tag_names_and_values.data(), tag_names_and_values.size(), dynamic_names);
+
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name}, dynamic_names);
+  auto sname = StatName(final_name.get());
+  std::cout << symbolTable().toString(sname) << std::endl;
+  return sname;
+}
+
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
                                                                   const std::vector<Tag>& tags,
                                                                   Histogram::Unit unit) {
@@ -472,9 +491,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
-  StatName final_stat_name(final_name.get());
 
+  auto final_stat_name = finalStatName(name, tags);
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {

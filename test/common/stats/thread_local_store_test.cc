@@ -4,7 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
 
 #include "common/common/c_smart_ptr.h"
