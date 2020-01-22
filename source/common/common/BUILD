@@ -157,8 +157,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "logger_impl_lib_android",
-    srcs = ["android/logger_impl.cc"],
-    hdrs = ["android/logger_impl.h"],
+    srcs = select({
+        "//bazel:android_logger": ["android/logger_impl.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:android_logger": ["android/logger_impl.h"],
+        "//conditions:default": [],
+    }),
     strip_include_prefix = "android",
     deps = [":base_logger_lib"],
 )
