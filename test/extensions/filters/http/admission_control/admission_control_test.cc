@@ -193,7 +193,10 @@ TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
   // Empty config. No fields are required.
   AdmissionControlFilterConfig::AdmissionControlProto proto;
 
-  auto config = makeConfig("");
+  const std::string yaml = R"EOF(
+enabled:
+)EOF";
+  auto config = makeConfig(yaml);
 
   EXPECT_TRUE(config->filterEnabled());
   EXPECT_EQ(std::chrono::seconds(120), config->samplingWindow());
@@ -214,10 +217,10 @@ aggression_coefficient:
 
   auto config = makeConfig(yaml);
 
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getBoolean("foo.enabled", false))
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.enabled", false))
       .WillOnce(Return(true));
   EXPECT_TRUE(config->filterEnabled());
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, getDouble("foo.aggression", 4.2))
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 4.2))
       .WillOnce(Return(1.3));
   EXPECT_EQ(1.3, config->aggression());
 }
