@@ -548,10 +548,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   }
 
   std::vector<Tag> tags;
-  std::string tag_extracted_name =
-      parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
+  StatNameManagedStorage tag_extracted_name(
+      parent_.tagProducer().produceTags(symbolTable().toString(name), tags), symbolTable());
   TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(name, parent.unit(), tag_extracted_name, tags, symbolTable()));
+      new ThreadLocalHistogramImpl(name, parent.unit(), tag_extracted_name.statName(), tags,
+                                   symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -562,7 +563,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
 }
 
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
-                                                   const std::string& tag_extracted_name,
+                                                   StatName tag_extracted_name,
                                                    const std::vector<Tag>& tags,
                                                    SymbolTable& symbol_table)
     : HistogramImplHelper(name, tag_extracted_name, tags, symbol_table), unit_(unit),
