@@ -13,9 +13,9 @@ enum class WasmResult : uint32_t {
   NotFound = 1,
   // An argument was bad, e.g. did not not conform to the required range.
   BadArgument = 2,
-  // A protobuf could not be serialized.
+  // Data could not be serialized.
   SerializationFailure = 3,
-  // A protobuf could not be parsed.
+  // Data could not be parsed.
   ParseFailure = 4,
   // A provided expression (e.g. "foo.bar") was illegal or unrecognized.
   BadExpression = 5,
