@@ -109,7 +109,7 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         true);
   });
-  done.WaitForNotification();
+  ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
 }
 
 } // namespace
