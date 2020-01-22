@@ -74,26 +74,27 @@ private:
   const size_t memory_at_construction_;
 };
 
-// Helps tests allocate and join stat-names and look them up in a Store.
-class StatNames {
+// Helps tests construct StatName with symbolic and dynamic components.
+class MixedStatNames {
 public:
-  explicit StatNames(Store& store);
+  explicit MixedStatNames(Store& store);
 
   /**
-   * Joins a vector of StatName and lookups up the counter value.
+   * Parses an stat name based on injectDynamics (below) and looks up its value.
    *
+   * @param name the stat name with backquotes surrounding dynamic portions.
    * @return the counter value, or 0 if the counter is not found.
    */
   uint64_t counterValue(absl::string_view name);
 
   /**
-   * Parses 'in' into dynamic and symbolic segements. The dynamic segments
+   * Parses 'in' into dynamic and symbolic segments. The dynamic segments
    * are delimited by backquotes. For example, "hello.`world`" joins a
    * a StatName where the "hello" is symbolic, created via a StatNamePool,
    * and the "world" is dynamic -- created via a StatNameDynamicPool.
    *
    * Dots must go immediately outside the backquotes, e.g.
-   * "symbolic.`dynamic`.symbolic, or they can be nested inside the dyanmic,
+   * "symbolic.`dynamic`.symbolic, or they can be nested inside the dynamic,
    * such as "`dynamic.group`.symbolic".
    *
    * This makes it easier to write unit tests that look up stats created
@@ -101,9 +102,9 @@ public:
    *
    * This method is exposed for testing.
    *
-   * @param in the input name, surrounding dynamic portions with backquotes.
+   * @param name the stat name with backquotes surrounding dynamic portions.
    */
-  StatName injectDynamics(absl::string_view in);
+  StatName injectDynamics(absl::string_view name);
 
 private:
   Store& store_;

@@ -3673,7 +3673,8 @@ TEST_F(RouterTest, AltStatName) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
                 .value());
 
-  Stats::TestUtil::StatNames stat_names(cm_.thread_local_cluster_.cluster_.info_->stats_store_);
+  Stats::TestUtil::MixedStatNames stat_names(
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_);
   EXPECT_EQ(1U, stat_names.counterValue("`alt_stat`.upstream_rq_200"));
   EXPECT_EQ(1U, stat_names.counterValue("`alt_stat`.zone.zone_name.to_az.upstream_rq_200"));
 }

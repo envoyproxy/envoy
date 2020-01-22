@@ -135,13 +135,13 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
-StatNames::StatNames(Store& store)
+MixedStatNames::MixedStatNames(Store& store)
     : store_(store), pool_(store.symbolTable()), dynamic_pool_(store.symbolTable()) {}
 
-StatName StatNames::injectDynamics(absl::string_view in) {
+StatName MixedStatNames::injectDynamics(absl::string_view name) {
   std::vector<StatName> names;
   // symbolized.stats.`dymamic.stats`.more.symbolized
-  const std::vector<absl::string_view> segments = absl::StrSplit(in, '`');
+  const std::vector<absl::string_view> segments = absl::StrSplit(name, '`');
   ASSERT((segments.size() % 2) == 1); // Expect even # of backquotes, so an odd # segments.
   bool symbolized = true;
   for (absl::string_view segment : segments) {
@@ -162,7 +162,7 @@ StatName StatNames::injectDynamics(absl::string_view in) {
   return StatName(joins_.back().get());
 }
 
-uint64_t StatNames::counterValue(absl::string_view name) {
+uint64_t MixedStatNames::counterValue(absl::string_view name) {
   return store_.counterFromStatName(injectDynamics(name)).value();
 }
 
