@@ -354,8 +354,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
       per_stream_buffer_limit_(http2_settings.initial_stream_window_size_),
       stream_error_on_invalid_http_messaging_(
           http2_settings.stream_error_on_invalid_http_messaging_),
-      flood_detected_(false),
-      max_outbound_frames_(http2_settings.max_outbound_frames_),
+      flood_detected_(false), max_outbound_frames_(http2_settings.max_outbound_frames_),
       frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundFrame(fragment);
       }),
@@ -364,9 +363,9 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
         releaseOutboundControlFrame(fragment);
       }),
       max_consecutive_inbound_frames_with_empty_payload_(
-                              http2_settings.max_consecutive_inbound_frames_with_empty_payload_),
+          http2_settings.max_consecutive_inbound_frames_with_empty_payload_),
       max_inbound_priority_frames_per_stream_(
-                              http2_settings.max_inbound_priority_frames_per_stream_),
+          http2_settings.max_inbound_priority_frames_per_stream_),
       max_inbound_window_update_frames_per_data_frame_sent_(
           http2_settings.max_inbound_window_update_frames_per_data_frame_sent_),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
