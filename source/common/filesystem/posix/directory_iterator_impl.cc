@@ -55,7 +55,11 @@ FileType DirectoryIteratorImpl::fileType(const std::string& full_path) const {
 
   const Api::SysCallIntResult result = os_sys_calls_.stat(full_path.c_str(), &stat_buf);
   if (result.rc_ != 0) {
-    throw EnvoyException(fmt::format("unable to stat file: '{}'", full_path));
+    if (errno == ENOENT)
+      // Special case, a symlink is broken, target couldn't be stat'ed
+      if (::lstat(full_path.c_str(), &stat_buf) == 0 && S_ISLNK(stat_buf.st_mode))
+        return FileType::Regular;
+    throw EnvoyException(fmt::format("unable to stat file: '{}' ({})", full_path, errno));
   }
 
   if (S_ISDIR(stat_buf.st_mode)) {

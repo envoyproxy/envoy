@@ -181,6 +181,20 @@ TEST_F(DirectoryTest, DirectoryWithSymlinkToDirectory) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
+// Test that a broken symlink can be listed
+TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
+  addSubDirs({"sub_dir"});
+  addSymlinks({{"sub_dir", "link_dir"}});
+  TestEnvironment::removePath(dir_path_ + "/sub_dir");
+
+  const EntrySet expected = {
+      {".", FileType::Directory},
+      {"..", FileType::Directory},
+      {"link_dir", FileType::Regular},
+  };
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
+}
+
 // Test that we can list an empty directory
 TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
   const EntrySet expected = {
