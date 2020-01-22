@@ -68,9 +68,8 @@ void GrpcSubscriptionImpl::onConfigUpdate(
 }
 
 void GrpcSubscriptionImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-    const std::string& system_version_info) {
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   RELEASE_ASSERT(false, "delta onConfigUpdate called on GrpcSubscriptionImpl");
 }
 
