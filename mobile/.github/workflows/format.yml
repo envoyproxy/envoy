@@ -27,7 +27,7 @@ jobs:
           ./tools/check_format.sh
   precommit:
     name: precommit
-    runs-on: macOS-10.14
+    runs-on: macOS-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1

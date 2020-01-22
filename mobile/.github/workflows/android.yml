@@ -35,7 +35,7 @@ jobs:
           bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
   macdist:
     name: mac_dist
-    runs-on: macOS-10.14
+    runs-on: macOS-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
@@ -52,7 +52,7 @@ jobs:
   macjava:
     name: mac_java_helloworld
     needs: macdist
-    runs-on: macOS-10.14
+    runs-on: macOS-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
@@ -74,7 +74,7 @@ jobs:
   mackotlin:
     name: mac_kotlin_helloworld
     needs: macdist
-    runs-on: macOS-10.14
+    runs-on: macOS-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1
