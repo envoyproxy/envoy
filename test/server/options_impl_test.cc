@@ -95,7 +95,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_TRUE(options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
-  EXPECT_FALSE(options->fakeSymbolTableEnabled()); // TODO(#9798): EXPECT_TRUE when fixed.
+  EXPECT_TRUE(options->fakeSymbolTableEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
