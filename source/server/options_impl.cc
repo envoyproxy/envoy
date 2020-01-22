@@ -164,7 +164,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   // is not safe to use real symbol tables.
   //   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
   fake_symbol_table_enabled_ = false;
-  if (use_fake_symbol_table.getValue()) {
+  if (!use_fake_symbol_table.getValue()) {
     ENVOY_LOG(warn, "Real symbol tables are temporarily disabled due to #9768. "
                     "Using fake symbol tables");
   }
