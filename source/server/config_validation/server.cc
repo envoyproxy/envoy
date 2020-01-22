@@ -50,7 +50,8 @@ ValidationInstance::ValidationInstance(
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system), server_context_(*this) {
+      http_context_(stats_store_.symbolTable()), time_system_(time_system),
+      server_contexts_(*this) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {

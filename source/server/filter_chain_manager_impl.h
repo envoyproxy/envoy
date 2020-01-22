@@ -68,6 +68,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override;
   OptProcessContextRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
 private:
@@ -106,6 +107,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override;
   OptProcessContextRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
