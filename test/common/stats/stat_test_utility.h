@@ -80,29 +80,28 @@ public:
   explicit StatNames(Store& store);
 
   /**
-   * Joins together multiple StatNames holding onto the storage until this
-   * class is destroyed.
-   *
-   * TODO(jmarantz): consider using absl::variant to auto-convert strings
-   * to symbolic StatNames in the vector, allowing the user to only explicitly
-   * construct dynamics.
-   *
-   * @return the joined StatName
-   */
-  StatName join(const std::vector<StatName>& names);
-  StatName symbolic(absl::string_view name) { return pool_.add(name); }
-  StatName dynamic(absl::string_view name) { return dynamic_pool_.add(name); }
-
-  /**
    * Joins a vector of StatName and lookups up the counter value.
    *
    * @return the counter value, or 0 if the counter is not found.
    */
-  uint64_t counterValue(const std::vector<StatName>& names);
   uint64_t counterValue(absl::string_view name);
 
   /**
+   * Parses 'in' into dynamic and symbolic segements. The dynamic segments
+   * are delimited by backquotes. For example, "hello.`world`" joins a
+   * a StatName where the "hello" is symbolic, created via a StatNamePool,
+   * and the "world" is dynamic -- created via a StatNameDynamicPool.
    *
+   * Dots must go immediately outside the backquotes, e.g.
+   * "symbolic.`dynamic`.symbolic, or they can be nested inside the dyanmic,
+   * such as "`dynamic.group`.symbolic".
+   *
+   * This makes it easier to write unit tests that look up stats created
+   * from a combination of dynamic and symbolic components.
+   *
+   * This method is exposed for testing.
+   *
+   * @param in the input name, surrounding dynamic portions with backquotes.
    */
   StatName injectDynamics(absl::string_view in);
 

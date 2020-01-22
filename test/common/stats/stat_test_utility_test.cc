@@ -37,7 +37,8 @@ TEST_F(StatTestUtilityTest, InjectDynamics) {
   EXPECT_NE(hello_world_dynamic2, hello_world_dynamic1);
   EXPECT_NE(hello_world_dynamic2, hello_world_symbolic);
 
-  // Ditto for declaring all of "hello.world" as dynamic.
+  // Ditto for declaring all of "hello.world" as dynamic, which also
+  // demonstrates that we can embed dots in the dynamic.
   StatName hello_world_dynamic3 = stat_names_.injectDynamics("`hello.world`");
   EXPECT_EQ("hello.world", symbol_table_.toString(hello_world_dynamic3));
   EXPECT_NE(hello_world_dynamic3, hello_world_dynamic1);

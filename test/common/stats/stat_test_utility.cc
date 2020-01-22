@@ -138,11 +138,6 @@ MemoryTest::Mode MemoryTest::mode() {
 StatNames::StatNames(Store& store)
     : store_(store), pool_(store.symbolTable()), dynamic_pool_(store.symbolTable()) {}
 
-StatName StatNames::join(const std::vector<StatName>& names) {
-  joins_.push_back(store_.symbolTable().join(names));
-  return StatName(joins_.back().get());
-}
-
 StatName StatNames::injectDynamics(absl::string_view in) {
   std::vector<StatName> names;
   // symbolized.stats.`dymamic.stats`.more.symbolized
@@ -163,18 +158,8 @@ StatName StatNames::injectDynamics(absl::string_view in) {
     }
     symbolized = !symbolized;
   }
-  return join(names);
-}
-
-uint64_t StatNames::counterValue(const std::vector<StatName>& names) {
-  return store_.counterFromStatName(join(names)).value();
-  /*
-  StatName name = join(names);
-  OptionalCounter opt_counter = store_.findCounter(join(names));
-  RELEASE_ASSERT(opt_counter, absl::StrCat("Cannot find counter: ",
-                                           store_.symbolTable().toString(name)));
-  return opt_counter->get().value();
-  */
+  joins_.push_back(store_.symbolTable().join(names));
+  return StatName(joins_.back().get());
 }
 
 uint64_t StatNames::counterValue(absl::string_view name) {
