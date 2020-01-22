@@ -130,9 +130,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "minimal_logger_lib",
     srcs = ["logger.cc"],
-    hdrs = [
-        "logger.h",
-    ],
+    hdrs = ["logger.h"],
     external_deps = ["abseil_synchronization"],
     deps = [
         ":base_logger_lib",
