@@ -154,6 +154,7 @@ void CacheFilter::onBodyAsync(const CacheFilterSharedPtr& self, Buffer::Instance
   self->post([self, body = body.release()] { self->onBody(absl::WrapUnique(body)); });
 }
 
+// TODO(toddmgreer): Handle downstream backpressure.
 void CacheFilter::onBody(Buffer::InstancePtr&& body) {
   if (!lookup_) {
     return;

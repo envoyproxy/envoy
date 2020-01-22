@@ -16,7 +16,9 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filte
 // [#protodoc-title: HTTP Cache Filter]
 // HTTP Cache Filter :ref:`overview <config_http_filters_cache>`.
 // [#extension: envoy.filters.http.cache]
+
 message CacheConfig {
+  // [#not-implemented-hide:]
   // Modifies cache key creation by restricting which parts of the URL are included.
   message KeyCreatorParams {
     // If true, exclude the URL scheme from the cache key. Set to true if your origins always
@@ -42,22 +44,26 @@ message CacheConfig {
   // implementation. Cache names should use reverse DNS format, though this is not enforced.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // [#comment: <TODO(toddmgreer) implement *vary* headers>]
+  // [#not-implemented-hide:]
+  // <TODO(toddmgreer) implement *vary* headers>
   //
   // List of allowed *Vary* headers. Headers matched by allowed_vary_headers will
   // be provided to caches in lookups, and the cache filter will only insert
-  // responses whose *Vary* headers (if any) are matched my a matcher in this
+  // responses whose *Vary* headers (if any) are matched by a matcher in this
   // list. If allowed_vary_headers is empty, responses with *vary* headers will
   // not be cached.
   repeated type.matcher.StringMatcher allowed_vary_headers = 2;
 
-  // [#comment: <TODO(toddmgreer) implement key customization>]
+  // [#not-implemented-hide:]
+  // <TODO(toddmgreer) implement key customization>
   //
   // Modifies cache key creation by restricting which parts of the URL are included.
   KeyCreatorParams key_creator_params = 3;
 
-  // [#comment: <TODO(toddmgreer) implement size limit>]
+  // [#not-implemented-hide:]
+  // <TODO(toddmgreer) implement size limit>
   //
-  // Max body size the cache filter will insert into a cache.
+  // Max body size the cache filter will insert into a cache. 0 means unlimited (though the cache
+  // storage implementation may have its own limit beyond which it will reject insertions).
   uint32 max_body_bytes = 4;
 }

@@ -2,7 +2,7 @@
 
 HTTP Cache Filter
 =================
-**Work in Progress--not ready for deployment**
+.. attention:: Work in Progress--not ready for deployment
 
 HTTP caching can improve system throughput, latency, and network/backend load
 levels when the same content is requested multiple times. Caching is
@@ -21,8 +21,8 @@ specify a valid cache storage implementation linked into your Envoy
 binary. Specifying 'envoy.extensions.http.cache.simple' will select a proof-of-concept
 implementation included in the Envoy source. More implementations can (and will)
 be provided by implementing Envoy::Extensions::HttpFilters::Cache::HttpCache. To
-write a cache storage implementation, see `Writing Cache Filter
-Implementations <https://github.com/envoyproxy/envoy/blob/master/source/docs/cache_filter_plugins.md>`_
+write a cache storage implementation, see :repo:`Writing Cache Filter
+Implementations <source/docs/cache_filter_plugins.md>`
 
 The remaining configuration options control caching behavior and limits. By
 default, this filter will cache almost all responses that are considered
