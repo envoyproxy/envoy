@@ -123,6 +123,16 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
   return createListenSocketAndApplyOptions();
 }
 
+XXFactoryContextImpl::XXFactoryContextImpl(Envoy::Server::Instance& server,
+                                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                                           const envoy::config::listener::v3alpha::Listener& config)
+    : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
+      global_scope_(server.stats().createScope("")),
+      // Not ideal
+      listener_scope_(server_.stats().createScope(fmt::format(
+          "listener.{}.", Network::Address::resolveProtoAddress(config.address())->asString()))),
+      validation_visitor_(validation_visitor) {}
+
 AccessLog::AccessLogManager& XXFactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
 }
@@ -161,9 +171,10 @@ OptProcessContextRef XXFactoryContextImpl::processContext() { return server_.pro
 Configuration::ServerFactoryContext& XXFactoryContextImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
 }
+Stats::Scope& XXFactoryContextImpl::listenerScope() { return *listener_scope_; }
 // Must be overrided
 Network::DrainDecision& XXFactoryContextImpl::drainDecision() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-
+Init::Manager& XXFactoryContextImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 /*
 filter_chain_manager_, watcher_ vary from plain constructor
 */
@@ -551,7 +562,7 @@ Upstream::ClusterManager& ListenerFactoryContextImpl::clusterManager() {
 Event::Dispatcher& ListenerFactoryContextImpl::dispatcher() {
   return xx_factory_context_->dispatcher();
 }
-Network::DrainDecision& ListenerFactoryContextImpl::drainDecision() { return drain_decision_; }
+Network::DrainDecision& ListenerFactoryContextImpl::drainDecision() { return listener_impl_; }
 Grpc::Context& ListenerFactoryContextImpl::grpcContext() {
   return xx_factory_context_->grpcContext();
 }
@@ -607,6 +618,10 @@ OptProcessContextRef ListenerFactoryContextImpl::processContext() {
 Configuration::ServerFactoryContext& ListenerFactoryContextImpl::getServerFactoryContext() const {
   return xx_factory_context_->getServerFactoryContext();
 }
+Stats::Scope& ListenerFactoryContextImpl::listenerScope() {
+  return xx_factory_context_->listenerScope();
+}
+Init::Manager& ListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
 bool ListenerImpl::createNetworkFilterChain(
     Network::Connection& connection,

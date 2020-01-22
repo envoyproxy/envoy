@@ -79,9 +79,7 @@ class XXFactoryContextImpl final : public Configuration::FactoryContext {
 public:
   XXFactoryContextImpl(Envoy::Server::Instance& server,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
-                       const envoy::config::listener::v3alpha::Listener& config)
-      : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
-        global_scope_(server.stats().createScope("")), validation_visitor_(validation_visitor) {}
+                       const envoy::config::listener::v3alpha::Listener& config);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
@@ -114,24 +112,26 @@ private:
   const envoy::config::core::v3alpha::Metadata metadata_;
   envoy::config::core::v3alpha::TrafficDirection direction_;
   Stats::ScopePtr global_scope_;
+  Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
+class ListenerImpl;
 class ListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
 public:
   ListenerFactoryContextImpl(Envoy::Server::Instance& server,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              const envoy::config::listener::v3alpha::Listener& config_message,
                              const Network::ListenerConfig* listener_config,
-                             Network::DrainDecision& drain_decision)
+                             ListenerImpl& listener_impl)
       : xx_factory_context_(
             std::make_shared<XXFactoryContextImpl>(server, validation_visitor, config_message)),
-        listener_config_(listener_config), drain_decision_(drain_decision) {}
+        listener_config_(listener_config), listener_impl_(listener_impl) {}
   ListenerFactoryContextImpl(std::shared_ptr<XXFactoryContextImpl> xx_factory_context,
                              const Network::ListenerConfig* listener_config,
-                             Network::DrainDecision& drain_decision)
+                             ListenerImpl& listener_impl)
       : xx_factory_context_(xx_factory_context), listener_config_(listener_config),
-        drain_decision_(drain_decision) {}
+        listener_impl_(listener_impl) {}
 
   // FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -170,7 +170,7 @@ public:
 private:
   std::shared_ptr<XXFactoryContextImpl> xx_factory_context_;
   const Network::ListenerConfig* listener_config_;
-  Network::DrainDecision& drain_decision_;
+  ListenerImpl& listener_impl_;
 };
 
 /**

@@ -87,6 +87,9 @@ public:
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
     return admin_filter_chain_.get();
   }
+  std::unordered_set<const Network::FilterChain*> allFilterChains() const override {
+    return {admin_filter_chain_.get()};
+  }
 
   // Network::FilterChainFactory
   bool
