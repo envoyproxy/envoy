@@ -69,6 +69,21 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
+  void sampleFailedRequest() {
+    Http::TestHeaderMapImpl failure_headers{{":status", "504"}};
+    filter_->encodeHeaders(failure_headers, true);
+  }
+
+  void sampleSuccessfulRequest() {
+    Http::TestHeaderMapImpl success_headers{{":status", "200"}};
+    filter_->encodeHeaders(success_headers, true);
+  }
+
+  void sampleCustomRequest(std::string&& http_error_code) {
+    Http::TestHeaderMapImpl headers{{":status", http_error_code}};
+    filter_->encodeHeaders(headers, true);
+  }
+
 protected:
   std::string stats_prefix_{""};
   NiceMock<Runtime::MockLoader> runtime_;
@@ -78,7 +93,7 @@ protected:
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::shared_ptr<AdmissionControlFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  std::string default_yaml_{R"EOF(
+  const std::string default_yaml_{R"EOF(
 enabled:
   default_value: true
   runtime_key: "foo.enabled"
@@ -252,12 +267,12 @@ aggression_coefficient:
   // Fail lots of requests so that we would normally expect a ~100% rejection rate. It should pass
   // below since the filter is disabled.
   for (int i = 0; i < 1000; ++i) {
-    config->getController().recordFailure();
+    sampleFailedRequest();
   }
 
   // We expect no rejections.
   Http::TestHeaderMapImpl request_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 TEST_F(AdmissionControlTest, DisregardHealthChecks) {
@@ -271,11 +286,11 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   // Fail lots of requests so that we would normally expect a ~100% rejection rate. It should pass
   // below since the request is a healthcheck.
   for (int i = 0; i < 1000; ++i) {
-    config->getController().recordFailure();
+    sampleFailedRequest();
   }
 
   Http::TestHeaderMapImpl request_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
@@ -284,38 +299,60 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
 
   // Fail lots of requests so that we can expect a ~100% rejection rate.
   for (int i = 0; i < 1000; ++i) {
-    config->getController().recordFailure();
+    sampleFailedRequest();
   }
 
   // We expect rejections due to the failure rate.
   Http::TestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-      filter_->decodeHeaders(request_headers, false));
+            filter_->decodeHeaders(request_headers, true));
 
   // Wait to phase out historical data.
   time_system_.sleep(std::chrono::seconds(10));
 
   // Should continue since SR has become stale and there's no additional data.
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-      filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   // Fail exactly half of the requests so we get a ~50% rejection rate.
   for (int i = 0; i < 1000; ++i) {
-    config->getController().recordFailure();
+    sampleFailedRequest();
   }
   for (int i = 0; i < 1000; ++i) {
-    config->getController().recordSuccess();
+    sampleSuccessfulRequest();
   }
 
   // Random numbers in the range [0,1e4) are considered for the rejection calculation. One request
   // should fail and the other should pass.
   EXPECT_CALL(random_, random()).WillOnce(Return(5500));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-      filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   EXPECT_CALL(random_, random()).WillOnce(Return(4500));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-      filter_->decodeHeaders(request_headers, false));
+            filter_->decodeHeaders(request_headers, true));
+}
+
+// Verify only 5xx codes count as errors.
+TEST_F(AdmissionControlTest, ErrorCodes) {
+  auto config = makeConfig(default_yaml_);
+  setupFilter(config);
+
+  EXPECT_EQ(0, config->getController().requestTotalCount());
+  EXPECT_EQ(0, config->getController().requestSuccessCount());
+
+  sampleCustomRequest("200");
+
+  EXPECT_EQ(1, config->getController().requestTotalCount());
+  EXPECT_EQ(1, config->getController().requestSuccessCount());
+
+  sampleCustomRequest("400");
+
+  EXPECT_EQ(2, config->getController().requestTotalCount());
+  EXPECT_EQ(2, config->getController().requestSuccessCount());
+
+  sampleCustomRequest("500");
+
+  EXPECT_EQ(3, config->getController().requestTotalCount());
+  EXPECT_EQ(2, config->getController().requestSuccessCount());
 }
 
 } // namespace
