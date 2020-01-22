@@ -7,11 +7,11 @@
 
 #include "envoy/thread/thread.h"
 
+#include "common/common/base_logger.h"
 #include "common/common/fmt.h"
+#include "common/common/logger_impl.h"
 #include "common/common/macros.h"
 #include "common/common/non_copyable.h"
-#include "common/common/logger_impl.h"
-#include "common/common/base_logger.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"

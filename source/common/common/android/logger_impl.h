@@ -7,9 +7,9 @@ namespace Logger {
 
 class AndroidLogger : public Logger {
 private:
-AndroidLogger(const std:string& name);
+  AndroidLogger(const std : string& name);
 
-friend class Registry;
+  friend class Registry;
 };
 
 } // namespace Logger
