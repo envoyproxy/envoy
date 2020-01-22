@@ -62,8 +62,8 @@ public:
     return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_, scope_, context_.threadLocal());
   }
 
-  void generateFilter(std::string yaml) {
-    auto config = makeConfig(yaml);
+  void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
+    filter_ = std::make_shared<AdmissionControlFilter>(config, "foo.bar.");
   }
 
 protected:
@@ -226,7 +226,6 @@ aggression_coefficient:
 }
 
 TEST_F(AdmissionControlTest, FilterDisabled) {
-#if 0
   const std::string yaml = R"EOF(
 enabled:
   default_value: false
@@ -238,16 +237,16 @@ aggression_coefficient:
 )EOF";
   
   auto config = makeConfig(yaml);
+  setupFilter(config);
 
-  // Fail lots of requests so that we'd expect a ~100% rejection rate.
+  // Fail lots of requests so that we can expect a ~100% rejection rate.
   for (int i = 0; i < 1000; ++i) {
-    config_->getController().recordFailure();
+    config->getController().recordFailure();
   }
 
-  // We expect no rejection.
+  // We expect no rejections.
   Http::TestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-#endif
 }
 
 } // namespace
