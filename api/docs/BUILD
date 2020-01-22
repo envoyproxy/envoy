@@ -111,6 +111,7 @@ proto_library(
         "//envoy/service/load_stats/v2:pkg",
         "//envoy/service/metrics/v2:pkg",
         "//envoy/service/ratelimit/v2:pkg",
+        "//envoy/service/status/v2:pkg",
         "//envoy/service/tap/v2alpha:pkg",
         "//envoy/service/trace/v2:pkg",
         "//envoy/type:pkg",
