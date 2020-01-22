@@ -41,7 +41,8 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlFilterConfig::AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_, scope_, context_.threadLocal());
+    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_,
+                                                          scope_, context_.threadLocal());
   }
 
 protected:
@@ -59,7 +60,8 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlFilterConfig::AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_, scope_, context_.threadLocal());
+    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_,
+                                                          scope_, context_.threadLocal());
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
@@ -180,7 +182,6 @@ aggression_coefficient:
   runtime_key: "foo.aggression"
 )EOF";
 
-
   auto config = makeConfig(yaml);
 
   EXPECT_FALSE(config->filterEnabled());
@@ -217,11 +218,9 @@ aggression_coefficient:
 
   auto config = makeConfig(yaml);
 
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.enabled", false))
-      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.enabled", false)).WillOnce(Return(true));
   EXPECT_TRUE(config->filterEnabled());
-  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 4.2))
-      .WillOnce(Return(1.3));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 4.2)).WillOnce(Return(1.3));
   EXPECT_EQ(1.3, config->aggression());
 }
 
@@ -235,7 +234,7 @@ aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
 )EOF";
-  
+
   auto config = makeConfig(yaml);
   setupFilter(config);
 

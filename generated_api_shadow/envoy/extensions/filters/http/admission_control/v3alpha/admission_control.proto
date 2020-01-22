@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.admission_control.v3alpha;
 
-import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/core/v3/base.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -27,7 +27,7 @@ message AdmissionControl {
 
   // If set to false, the admission control filter will operate as a pass-through filter. If the
   // message is unspecified, the filter will be enabled.
-  config.core.v3alpha.RuntimeFeatureFlag enabled = 1;
+  config.core.v3.RuntimeFeatureFlag enabled = 1;
 
   // The time window over which the success rate is calculated. The window is rounded to the nearest
   // second. Defaults to 120s.
@@ -41,5 +41,5 @@ message AdmissionControl {
   // the success rate drops. Lower values will cause throttling to kick in at higher success rates
   // and result in more aggressive throttling. Any values less than 1.0, will be set to 1.0. If the
   // message is unspecified, the coefficient is 2.0.
-  config.core.v3alpha.RuntimeDouble aggression_coefficient = 3;
+  config.core.v3.RuntimeDouble aggression_coefficient = 3;
 }

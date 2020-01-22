@@ -26,11 +26,10 @@ static constexpr std::chrono::seconds defaultSamplingWindow{120};
 static constexpr std::chrono::seconds defaultHistoryGranularity{1};
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
-    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotAllocator& tls)
-    : runtime_(runtime), time_source_(time_source), random_(random),
-      scope_(scope),
-      tls_(tls.allocateSlot()),
-      admission_control_feature_(proto_config.enabled(), runtime_),
+    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource& time_source,
+    Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotAllocator& tls)
+    : runtime_(runtime), time_source_(time_source), random_(random), scope_(scope),
+      tls_(tls.allocateSlot()), admission_control_feature_(proto_config.enabled(), runtime_),
       sampling_window_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, sampling_window,
                                                   1000 * defaultSamplingWindow.count()) /
                        1000),

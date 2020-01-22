@@ -86,8 +86,9 @@ class AdmissionControlFilterConfig {
 public:
   using AdmissionControlProto =
       envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
-  AdmissionControlFilterConfig(
-    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotAllocator& tls);
+  AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
+                               TimeSource& time_source, Runtime::RandomGenerator& random,
+                               Stats::Scope& scope, ThreadLocal::SlotAllocator& tls);
 
   Runtime::Loader& runtime() const { return runtime_; }
   Runtime::RandomGenerator& random() const { return random_; }

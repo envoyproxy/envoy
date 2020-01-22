@@ -31,7 +31,7 @@ private:
 // Helper class for runtime-derived doubles.
 class Double {
 public:
-  Double(const envoy::config::core::v3alpha::RuntimeDouble& double_proto, Runtime::Loader& runtime)
+  Double(const envoy::config::core::v3::RuntimeDouble& double_proto, Runtime::Loader& runtime)
       : runtime_key_(double_proto.runtime_key()), default_value_(double_proto.default_value()),
         runtime_(runtime) {}
 
