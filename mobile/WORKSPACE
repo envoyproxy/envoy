@@ -61,6 +61,13 @@ http_archive(
     urls = ["https://github.com/bazelbuild/rules_apple/archive/a595f71b94f75d531ebdf8ae31cc8eb1ead6a480.tar.gz"],
 )
 
+http_archive(
+    name = "build_bazel_rules_swift",
+    sha256 = "1a0ad44a137bf56df24c5b09daa51abdb92ebb5dbe219fd9ce92e2196676c314",
+    strip_prefix = "rules_swift-90995572723ed47cbf2968480db250e97a9f5894",
+    urls = ["https://github.com/bazelbuild/rules_swift/archive/90995572723ed47cbf2968480db250e97a9f5894.tar.gz"],
+)
+
 load("@envoy//bazel:api_binding.bzl", "envoy_api_binding")
 
 envoy_api_binding()
@@ -88,13 +95,6 @@ http_archive(
     sha256 = "595a6652d8d65380a3d764826bf1a856a8cc52371bbd961dfcd942fdb14bc133",
     strip_prefix = "apple_support-e16463ef91ed77622c17441f9569bda139d45b18",
     urls = ["https://github.com/bazelbuild/apple_support/archive/e16463ef91ed77622c17441f9569bda139d45b18.tar.gz"],
-)
-
-http_archive(
-    name = "build_bazel_rules_swift",
-    sha256 = "1a0ad44a137bf56df24c5b09daa51abdb92ebb5dbe219fd9ce92e2196676c314",
-    strip_prefix = "rules_swift-90995572723ed47cbf2968480db250e97a9f5894",
-    urls = ["https://github.com/bazelbuild/rules_swift/archive/90995572723ed47cbf2968480db250e97a9f5894.tar.gz"],
 )
 
 load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
