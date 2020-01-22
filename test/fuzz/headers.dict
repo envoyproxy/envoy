@@ -1,4 +1,6 @@
 # Dictionary to populate HeaderValueOptions
-"path"
-"method"
+":path"
+":method"
 ":content-length"
+"chunked"
+":transfer-encoding"
