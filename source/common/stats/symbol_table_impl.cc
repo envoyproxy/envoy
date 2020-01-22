@@ -542,7 +542,7 @@ void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names, St
   for (uint32_t i = 0; i < num_names; ++i) {
     const StatName stat_name = names[i];
     incRefCount(stat_name);
-    mem_block.appendData(absl::MakeSpan(stat_name.dataIncludingSize(), stat_name.size()));
+    mem_block.appendData(absl::MakeSpan(stat_name.sizeAndData(), stat_name.size()));
   }
 
   // This assertion double-checks the arithmetic where we computed

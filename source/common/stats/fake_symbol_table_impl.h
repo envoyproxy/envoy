@@ -74,7 +74,7 @@ public:
     mem_block.appendOne(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
       const StatName name = names[i];
-      mem_block.appendData(absl::MakeSpan(name.dataIncludingSize(), name.size()));
+      mem_block.appendData(absl::MakeSpan(name.sizeAndData(), name.size()));
     }
 
     // This assertion double-checks the arithmetic where we computed

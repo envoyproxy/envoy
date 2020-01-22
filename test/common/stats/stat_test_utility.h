@@ -74,13 +74,30 @@ private:
   const size_t memory_at_construction_;
 };
 
+// Helps tests allocate and join stat-names and look them up in a Store.
 class StatNames {
 public:
   explicit StatNames(Store& store);
 
+  /**
+   * Joins together multiple StatNames holding onto the storage until this
+   * class is destroyed.
+   *
+   * TODO(jmarantz): consider using absl::variant to auto-convert strings
+   * to symbolic StatNames in the vector, allowing the user to only explicitly
+   * construct dynamics.
+   *
+   * @return the joined StatName
+   */
   StatName join(const std::vector<StatName>& names);
   StatName symbolic(absl::string_view name) { return pool_.add(name); }
   StatName dynamic(absl::string_view name) { return dynamic_pool_.add(name); }
+
+  /**
+   * Joins a vector of StatName and lookups up the counter value.
+   *
+   * @return the counter value, or 0 if the counter is not found.
+   */
   uint64_t counterValue(const std::vector<StatName>& names);
 
 private:

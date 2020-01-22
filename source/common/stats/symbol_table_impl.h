@@ -388,8 +388,7 @@ public:
     // hasher.
     const char* cdata = reinterpret_cast<const char*>(stat_name.data());
     absl::string_view data_as_string_view = absl::string_view(cdata, stat_name.dataSize());
-    auto hh = H::combine(std::move(h), data_as_string_view);
-    return hh;
+    return H::combine(std::move(h), data_as_string_view);
   }
 
   /**
@@ -453,7 +452,10 @@ public:
     return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
   }
 
-  const uint8_t* dataIncludingSize() const { return size_and_data_; }
+  /**
+   * @return A pointer to the buffer, including the size bytes.
+   */
+  const uint8_t* sizeAndData() const { return size_and_data_; }
 
   /**
    * @return whether this is empty.
