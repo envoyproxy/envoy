@@ -150,7 +150,6 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
 
   // Fuzz filter.
   static UberFilterFuzzer fuzzer;
-  std::cout << input.config().DebugString() << std::endl;
   fuzzer.fuzz(input.config(), input.data());
 }
 
