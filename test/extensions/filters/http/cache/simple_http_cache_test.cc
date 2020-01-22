@@ -205,10 +205,11 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
 }
 
 TEST(Registration, GetFactory) {
+  envoy::config::filter::http::cache::v2::CacheConfig config;
   HttpCacheFactory* factory =
       Registry::FactoryRegistry<HttpCacheFactory>::getFactory("envoy.extensions.http.cache.simple");
   ASSERT_NE(factory, nullptr);
-  EXPECT_EQ(factory->getCache().cacheInfo().name_, "envoy.extensions.http.cache.simple");
+  EXPECT_EQ(factory->getCache(config).cacheInfo().name_, "envoy.extensions.http.cache.simple");
 }
 
 } // namespace

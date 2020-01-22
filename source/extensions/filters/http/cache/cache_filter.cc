@@ -2,8 +2,9 @@
 
 #include "envoy/registry/registry.h"
 
-#include "common/http/headers.h"
 #include "common/config/utility.h"
+#include "common/http/headers.h"
+
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
 
@@ -37,7 +38,7 @@ bool CacheFilter::isCacheableResponse(Http::HeaderMap& headers) {
 
 HttpCache&
 CacheFilter::getCache(const envoy::config::filter::http::cache::v2::CacheConfig& config) {
-  return Config::Utility::getAndCheckFactory<HttpCacheFactory>(config).getCache();
+  return Config::Utility::getAndCheckFactory<HttpCacheFactory>(config).getCache(config);
 }
 
 CacheFilter::CacheFilter(const envoy::config::filter::http::cache::v2::CacheConfig& config,

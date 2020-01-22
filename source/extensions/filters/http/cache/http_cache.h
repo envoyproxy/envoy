@@ -6,6 +6,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
+#include "envoy/config/filter/http/cache/v2/cache.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
@@ -306,7 +307,8 @@ public:
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
-  virtual HttpCache& getCache() PURE;
+  virtual HttpCache&
+  getCache(const envoy::config::filter::http::cache::v2::CacheConfig& config) PURE;
   virtual ~HttpCacheFactory() = default;
 
 private:
