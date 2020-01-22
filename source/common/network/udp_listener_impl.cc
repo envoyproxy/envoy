@@ -13,11 +13,11 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 
+#include "absl/container/fixed_array.h"
 #include "event2/listener.h"
 
 #define ENVOY_UDP_LOG(LEVEL, FORMAT, ...)                                                          \

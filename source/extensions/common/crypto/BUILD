@@ -26,7 +26,6 @@ envoy_cc_extension(
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:stack_array",
         "//source/common/crypto:utility_lib",
     ],
 )
