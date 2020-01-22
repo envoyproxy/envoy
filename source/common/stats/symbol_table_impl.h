@@ -182,8 +182,7 @@ public:
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   StoragePtr join(const StatNameVec& stat_names) const override;
-  void populateList(const absl::string_view* names, uint32_t num_names,
-                    StatNameList& list) override;
+  void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
   StoragePtr makeDynamicStorage(absl::string_view name) override;
   void callWithStringView(StatName stat_name,
@@ -389,7 +388,8 @@ public:
     // hasher.
     const char* cdata = reinterpret_cast<const char*>(stat_name.data());
     absl::string_view data_as_string_view = absl::string_view(cdata, stat_name.dataSize());
-    return H::combine(std::move(h), data_as_string_view);
+    auto hh = H::combine(std::move(h), data_as_string_view);
+    return hh;
   }
 
   /**
@@ -452,6 +452,8 @@ public:
   const uint8_t* data() const {
     return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
   }
+
+  const uint8_t* dataIncludingSize() const { return size_and_data_; }
 
   /**
    * @return whether this is empty.

@@ -51,7 +51,9 @@ class HistogramImplHelper : public MetricImpl<Histogram> {
 public:
   HistogramImplHelper(StatName name, const std::string& tag_extracted_name,
                       const std::vector<Tag>& tags, SymbolTable& symbol_table)
-      : MetricImpl<Histogram>(name, tag_extracted_name, tags, symbol_table) {}
+      : MetricImpl<Histogram>(name,
+                              StatNameManagedStorage(tag_extracted_name, symbol_table).statName(),
+                              tags, symbol_table) {}
   HistogramImplHelper(SymbolTable& symbol_table) : MetricImpl<Histogram>(symbol_table) {}
 
   // RefcountInterface
