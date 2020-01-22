@@ -93,6 +93,15 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "stat_test_utility_test",
+    srcs = ["stat_test_utility_test.cc"],
+    deps = [
+        ":stat_test_utility_lib",
+        "//source/common/stats:isolated_store_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stats_matcher_impl_test",
     srcs = ["stats_matcher_impl_test.cc"],
     deps = [

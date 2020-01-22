@@ -143,6 +143,29 @@ StatName StatNames::join(const std::vector<StatName>& names) {
   return StatName(joins_.back().get());
 }
 
+StatName StatNames::injectDynamics(absl::string_view in) {
+  std::vector<StatName> names;
+  // symbolized.stats.`dymamic.stats`.more.symbolized
+  const std::vector<absl::string_view> segments = absl::StrSplit(in, '`');
+  ASSERT((segments.size() % 2) == 1); // Expect even # of backquotes, so an odd # segments.
+  bool symbolized = true;
+  for (absl::string_view segment : segments) {
+    if (symbolized) {
+      segment = StringUtil::trim(segment, ".");
+      if (!segment.empty()) {
+        names.push_back(pool_.add(segment));
+      }
+    } else {
+      ASSERT(!absl::StartsWith(segment, "."));
+      ASSERT(!absl::EndsWith(segment, "."));
+      ASSERT(!segment.empty());
+      names.push_back(dynamic_pool_.add(segment));
+    }
+    symbolized = !symbolized;
+  }
+  return join(names);
+}
+
 uint64_t StatNames::counterValue(const std::vector<StatName>& names) {
   return store_.counterFromStatName(join(names)).value();
   /*
@@ -152,6 +175,10 @@ uint64_t StatNames::counterValue(const std::vector<StatName>& names) {
                                            store_.symbolTable().toString(name)));
   return opt_counter->get().value();
   */
+}
+
+uint64_t StatNames::counterValue(absl::string_view name) {
+  return store_.counterFromStatName(injectDynamics(name)).value();
 }
 
 // TODO(jmarantz): this utility is intended to be used both for unit tests

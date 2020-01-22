@@ -99,6 +99,12 @@ public:
    * @return the counter value, or 0 if the counter is not found.
    */
   uint64_t counterValue(const std::vector<StatName>& names);
+  uint64_t counterValue(absl::string_view name);
+
+  /**
+   *
+   */
+  StatName injectDynamics(absl::string_view in);
 
 private:
   Store& store_;
