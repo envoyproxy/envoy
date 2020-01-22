@@ -60,7 +60,7 @@ Terminal 2
 
 .. code-block:: console
 
-  $ docker run --rm -it --network envoymesh wurstmeister/kafka:2.11-2.0.0 /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server envoy:19092 --topic test --from-beginning
+  $ docker run --rm -it --network envoymesh wurstmeister/kafka:2.11-2.0.0 /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server envoy:19092 --topic test_topic --from-beginning
   test_event_1
   test_event_2
 
