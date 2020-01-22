@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package envoy.test;
+
+option java_package = "io.envoyproxy.envoy.test";
+option java_outer_classname = "SensitiveProto";
+option java_multiple_files = true;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
+
+import "udpa/annotations/sensitive.proto";
+import "udpa/type/v1/typed_struct.proto";
+
+message Sensitive {
+  string sensitive_string = 1 [(udpa.annotations.sensitive) = true];
+  repeated string sensitive_repeated_string = 2 [(udpa.annotations.sensitive) = true];
+  bytes sensitive_bytes = 3 [(udpa.annotations.sensitive) = true];
+  repeated bytes sensitive_repeated_bytes = 4 [(udpa.annotations.sensitive) = true];
+  int64 sensitive_int = 5 [(udpa.annotations.sensitive) = true];
+  repeated int64 sensitive_repeated_int = 6 [(udpa.annotations.sensitive) = true];
+  Sensitive sensitive_message = 7 [(udpa.annotations.sensitive) = true];
+  repeated Sensitive sensitive_repeated_message = 8 [(udpa.annotations.sensitive) = true];
+  google.protobuf.Any sensitive_any = 9 [(udpa.annotations.sensitive) = true];
+  repeated google.protobuf.Any sensitive_repeated_any = 10 [(udpa.annotations.sensitive) = true];
+  udpa.type.v1.TypedStruct sensitive_typed_struct = 11 [(udpa.annotations.sensitive) = true];
+  repeated udpa.type.v1.TypedStruct sensitive_repeated_typed_struct = 12
+      [(udpa.annotations.sensitive) = true];
+
+  string insensitive_string = 101;
+  repeated string insensitive_repeated_string = 102;
+  bytes insensitive_bytes = 103;
+  repeated bytes insensitive_repeated_bytes = 104;
+  int64 insensitive_int = 105;
+  repeated int64 insensitive_repeated_int = 106;
+  Sensitive insensitive_message = 107;
+  repeated Sensitive insensitive_repeated_message = 108;
+  google.protobuf.Any insensitive_any = 109;
+  repeated google.protobuf.Any insensitive_repeated_any = 110;
+  udpa.type.v1.TypedStruct insensitive_typed_struct = 111;
+  repeated udpa.type.v1.TypedStruct insensitive_repeated_typed_struct = 112;
+}

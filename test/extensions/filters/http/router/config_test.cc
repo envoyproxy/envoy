@@ -1,7 +1,7 @@
 #include <string>
 
-#include "envoy/extensions/filters/http/router/v3alpha/router.pb.h"
-#include "envoy/extensions/filters/http/router/v3alpha/router.pb.validate.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/router/config.h"
@@ -26,7 +26,7 @@ TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
   start_child_span: true
   )EOF";
 
-  envoy::extensions::filters::http::router::v3alpha::Router proto_config;
+  envoy::extensions::filters::http::router::v3::Router proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
@@ -42,7 +42,7 @@ TEST(RouterFilterConfigTest, BadRouterFilterConfig) {
   route: {}
   )EOF";
 
-  envoy::extensions::filters::http::router::v3alpha::Router proto_config;
+  envoy::extensions::filters::http::router::v3::Router proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
                           "route: Cannot find field");
 }
@@ -53,7 +53,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
   - unsupportedHeader
   )EOF";
 
-  envoy::extensions::filters::http::router::v3alpha::Router router_config;
+  envoy::extensions::filters::http::router::v3::Router router_config;
   TestUtility::loadFromYaml(yaml, router_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -72,14 +72,14 @@ TEST(RouterFilterConfigTest, RouterFilterWithUnsupportedStrictHeaderCheck) {
 }
 
 TEST(RouterFilterConfigTest, RouterV2Filter) {
-  envoy::extensions::filters::http::router::v3alpha::Router router_config;
+  envoy::extensions::filters::http::router::v3::Router router_config;
   router_config.mutable_dynamic_stats()->set_value(true);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_)).Times(1);
   cb(filter_callback);
 }
 
@@ -89,7 +89,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_)).Times(1);
   cb(filter_callback);
 }
 

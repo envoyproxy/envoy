@@ -494,3 +494,6 @@ The following command operators are supported:
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+%HOSTNAME%
+  The system hostname.

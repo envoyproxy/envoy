@@ -14,13 +14,14 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.route";
 option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.route.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.route.v3";
 
 // [#protodoc-title: HTTP route components]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -76,7 +77,7 @@ message VirtualHost {
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.
-  TlsRequirementType require_tls = 4;
+  TlsRequirementType require_tls = 4 [(validate.rules).enum = {defined_only: true}];
 
   // A list of virtual clusters defined for this virtual host. Virtual clusters
   // are used for additional statistics gathering.
@@ -383,7 +384,11 @@ message RouteMatch {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
     //   untrusted input in all cases.
-    string regex = 3 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
+    string regex = 3 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
 
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
@@ -456,7 +461,8 @@ message CorsPolicy {
   //
   // .. attention::
   //  This field has been deprecated in favor of `allow_origin_string_match`.
-  repeated string allow_origin = 1 [deprecated = true];
+  repeated string allow_origin = 1
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Specifies regex patterns that match allowed origins.
   //
@@ -494,14 +500,15 @@ message CorsPolicy {
     //
     //   **This field is deprecated**. Set the
     //   :ref:`filter_enabled<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
-    google.protobuf.BoolValue enabled = 7 [deprecated = true];
+    google.protobuf.BoolValue enabled = 7
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
     // Specifies the % of requests for which the CORS filter is enabled.
     //
     // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
     // filter will be enabled for 100% of the requests.
     //
-    // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
+    // If :ref:`runtime_key <envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` is
     // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
@@ -512,13 +519,13 @@ message CorsPolicy {
   // This field is intended to be used when ``filter_enabled`` and ``enabled`` are off. One of those
   // fields have to explicitly disable the filter in order for this setting to take effect.
   //
-  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // If :ref:`runtime_key <envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` is specified,
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 31]
+// [#next-free-field: 32]
 message RouteAction {
   enum ClusterNotFoundResponseCode {
     // HTTP status code - 503 Service Unavailable.
@@ -541,6 +548,10 @@ message RouteAction {
   //
   // During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
   // useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
+  //
+  // .. note::
+  //
+  //   Shadowing will not be triggered if the primary cluster does not exist.
   message RequestMirrorPolicy {
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
@@ -557,12 +568,13 @@ message RouteAction {
     //
     //   **This field is deprecated**. Set the
     //   :ref:`runtime_fraction
-    //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>` field instead.
-    string runtime_key = 2 [deprecated = true];
+    //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>`
+    //   field instead. Mirroring occurs if both this and
+    //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>`
+    //   are not set.
+    string runtime_key = 2 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
-    // If both :ref:`runtime_key
-    // <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>` and this field are not
-    // specified, all requests to the target cluster will be mirrored.
+    // If not specified, all requests to the target cluster will be mirrored.
     //
     // If specified, this field takes precedence over the `runtime_key` field and requests must also
     // fall under the percentage of matches indicated by this field.
@@ -875,6 +887,22 @@ message RouteAction {
 
   InternalRedirectAction internal_redirect_action = 26;
 
+  // An internal redirect is handled, iff the number of previous internal redirects that a
+  // downstream request has encountered is lower than this value, and
+  // :ref:`internal_redirect_action <envoy_api_field_route.RouteAction.internal_redirect_action>`
+  // is set to :ref:`HANDLE_INTERNAL_REDIRECT
+  // <envoy_api_enum_value_route.RouteAction.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
+  // In the case where a downstream request is bounced among multiple routes by internal redirect,
+  // the first route that hits this threshold, or has
+  // :ref:`internal_redirect_action <envoy_api_field_route.RouteAction.internal_redirect_action>`
+  // set to
+  // :ref:`PASS_THROUGH_INTERNAL_REDIRECT
+  // <envoy_api_enum_value_route.RouteAction.InternalRedirectAction.PASS_THROUGH_INTERNAL_REDIRECT>`
+  // will pass the redirect back to downstream.
+  //
+  // If not specified, at most one redirect will be followed.
+  google.protobuf.UInt32Value max_internal_redirects = 31;
+
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
@@ -1121,7 +1149,7 @@ message Tracing {
 
   // A list of custom tags with unique tag name to create tags for the active span.
   // It will take effect after merging with the :ref:`corresponding configuration
-  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing.custom_tags>`
   // configured in the HTTP connection manager. If two tags with the same name are configured
   // each in the HTTP connection manager and the route level, the one configured here takes
   // priority.
@@ -1159,7 +1187,11 @@ message VirtualCluster {
   // .. attention::
   //   This field has been deprecated in favor of `headers` as it is not safe for use with
   //   untrusted input in all cases.
-  string pattern = 1 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
+  string pattern = 1 [
+    deprecated = true,
+    (validate.rules).string = {max_bytes: 1024},
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 
   // Specifies a list of header matchers to use for matching requests. Each specified header must
   // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
@@ -1176,7 +1208,8 @@ message VirtualCluster {
   //
   // .. attention::
   //   This field has been deprecated in favor of `headers`.
-  core.RequestMethod method = 3 [deprecated = true];
+  core.RequestMethod method = 3
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
@@ -1364,7 +1397,11 @@ message HeaderMatcher {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
     //   with untrusted input in all cases.
-    string regex_match = 5 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
+    string regex_match = 5 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
@@ -1428,7 +1465,7 @@ message QueryParameterMatcher {
   //
   // ..attention::
   //   This field is deprecated. Use an `exact` match inside the `string_match` field.
-  string value = 3 [deprecated = true];
+  string value = 3 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Specifies whether the query parameter value is a regular expression.
   // Defaults to false. The entire query parameter value (i.e., the part to
@@ -1437,7 +1474,8 @@ message QueryParameterMatcher {
   //
   // ..attention::
   //   This field is deprecated. Use a `safe_regex` match inside the `string_match` field.
-  google.protobuf.BoolValue regex = 4 [deprecated = true];
+  google.protobuf.BoolValue regex = 4
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.

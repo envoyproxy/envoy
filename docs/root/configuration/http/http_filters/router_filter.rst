@@ -371,7 +371,7 @@ owning HTTP connection manager.
   :widths: 1, 1, 2
 
   no_route, Counter, Total requests that had no route and resulted in a 404
-  no_cluster, Counter, Total requests in which the target cluster did not exist and resulted in a 404
+  no_cluster, Counter, Total requests in which the target cluster did not exist and which by default result in a 503
   rq_redirect, Counter, Total requests that resulted in a redirect response
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests

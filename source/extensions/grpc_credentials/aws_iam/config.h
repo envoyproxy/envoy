@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
-#include "envoy/config/grpc_credential/v3alpha/aws_iam.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/grpc_credential/v3/aws_iam.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/http/header_map.h"
 
@@ -21,17 +21,17 @@ namespace AwsIam {
 class AwsIamGrpcCredentialsFactory : public Grpc::GoogleGrpcCredentialsFactory {
 public:
   std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::config::core::v3alpha::GrpcService& grpc_service_config,
+  getChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
                         Api::Api& api) override;
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() {
-    return std::make_unique<envoy::config::grpc_credential::v3alpha::AwsIamConfig>();
+    return std::make_unique<envoy::config::grpc_credential::v3::AwsIamConfig>();
   }
 
   std::string name() const override { return GrpcCredentialsNames::get().AwsIam; }
 
 private:
-  static std::string getRegion(const envoy::config::grpc_credential::v3alpha::AwsIamConfig& config);
+  static std::string getRegion(const envoy::config::grpc_credential::v3::AwsIamConfig& config);
 };
 
 /**

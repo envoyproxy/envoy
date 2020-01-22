@@ -1,7 +1,7 @@
 #include "common/ssl/certificate_validation_context_config_impl.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -13,7 +13,7 @@ namespace Ssl {
 static const std::string INLINE_STRING = "<inline>";
 
 CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
-    const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext& config,
+    const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
     Api::Api& api)
     : ca_cert_(Config::DataSource::read(config.trusted_ca(), true, api)),
       ca_cert_path_(Config::DataSource::getPath(config.trusted_ca())

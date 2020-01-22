@@ -1,4 +1,4 @@
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
@@ -65,7 +65,7 @@ public:
                    bool bind_to_port)
       : ListenerImpl(dispatcher, std::move(socket), cb, bind_to_port) {}
 
-  MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
+  MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (int fd));
 };
 
 using ListenerImplTest = ListenerImplTestBase;
@@ -82,7 +82,7 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_LISTENING))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
   TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 }
@@ -96,7 +96,7 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_LISTENING))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(false));
   EXPECT_THROW_WITH_MESSAGE(TestListenerImpl(dispatcherImpl(), socket, listener_callbacks, true),
                             CreateListenerException,
@@ -173,7 +173,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
 TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   auto option = std::make_unique<MockSocketOption>();
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
       .WillOnce(Return(true));
   options->emplace_back(std::move(option));
 

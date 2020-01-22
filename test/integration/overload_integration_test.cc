@@ -1,5 +1,5 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/overload/v3alpha/overload.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -14,9 +14,8 @@ protected:
         file_updater_(injected_resource_filename_) {}
 
   void initialize() override {
-    config_helper_.addConfigModifier(
-        [this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-          const std::string overload_config = fmt::format(R"EOF(
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      const std::string overload_config = fmt::format(R"EOF(
         refresh_interval:
           seconds: 0
           nanos: 1000000
@@ -42,11 +41,10 @@ protected:
                 threshold:
                   value: 0.95
       )EOF",
-                                                          injected_resource_filename_);
-          *bootstrap.mutable_overload_manager() =
-              TestUtility::parseYaml<envoy::config::overload::v3alpha::OverloadManager>(
-                  overload_config);
-        });
+                                                      injected_resource_filename_);
+      *bootstrap.mutable_overload_manager() =
+          TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
+    });
     updateResource(0);
     HttpIntegrationTest::initialize();
   }

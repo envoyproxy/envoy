@@ -16,7 +16,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/filters/common/fault/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/common/fault/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

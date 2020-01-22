@@ -76,7 +76,7 @@ implementations within a major version should set explicit values for these fiel
 
 # API lifecycle
 
-The API lifecycle follows a calendar clock. At the end of Q3 each year, a major API version
+The API lifecycle follows a calendar clock. At the end of Q4 each year, a major API version
 increment may occur for any Envoy API package, in concert with the quarterly Envoy release.
 
 Envoy will support at most three major versions of any API package at all times:
@@ -134,17 +134,9 @@ methods, depending on whether the change is mechanical or manual.
 
 ## Mechanical breaking changes
 
-Field deprecations, renames, etc. are mechanical changes that will be supported by the
+Field deprecations, renames, etc. are mechanical changes that are supported by the
 [protoxform](https://github.com/envoyproxy/envoy/tree/master/tools/protoxform) tool. These are
-guided by annotations in protobuf.
-* Deprecations are specified with the built-in protobuf deprecated option set on a message, enum,
-  field or enum value. No field may be marked as deprecated unless a replacement for this
-  functionality exists and the corresponding Envoy implementation is production ready.
-
-* Renames are specified with a `[(udpa.annotations.field_migrate).rename = "<new name>"]` annotation.
-
-* We anticipate that `protoxform` will also support `oneof` promotion, package movement, etc. via
-  similar annotations.
+guided by [annotations](STYLE.md#api-annotations).
 
 ## Manual breaking changes
 

@@ -16,7 +16,7 @@ envoy_cc_library(
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:dump_state_utils",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -37,5 +37,13 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/stream_info:stream_info_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "uint32_accessor_lib",
+    hdrs = ["uint32_accessor_impl.h"],
+    deps = [
+        "//include/envoy/stream_info:uint32_accessor_interface",
     ],
 )

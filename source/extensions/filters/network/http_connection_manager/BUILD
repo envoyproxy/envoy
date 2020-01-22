@@ -20,6 +20,7 @@ envoy_cc_extension(
     deps = [
         "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/registry",
         "//include/envoy/router:route_config_provider_manager_interface",
@@ -42,9 +43,9 @@ envoy_cc_extension(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/tracing/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

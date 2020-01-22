@@ -1,6 +1,6 @@
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
-#include "envoy/extensions/filters/http/gzip/v3alpha/gzip.pb.h"
+#include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/macros.h"
@@ -40,9 +40,9 @@ const std::vector<std::string>& defaultContentEncoding() {
 
 } // namespace
 
-GzipFilterConfig::GzipFilterConfig(
-    const envoy::extensions::filters::http::gzip::v3alpha::Gzip& gzip,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip,
+                                   const std::string& stats_prefix, Stats::Scope& scope,
+                                   Runtime::Loader& runtime)
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       content_length_(contentLengthUint(gzip.content_length().value())),
@@ -54,12 +54,11 @@ GzipFilterConfig::GzipFilterConfig(
       stats_(generateStats(stats_prefix + "gzip.", scope)), runtime_(runtime) {}
 
 Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
-    envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionLevel::Enum
-        compression_level) {
+    envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::Enum compression_level) {
   switch (compression_level) {
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionLevel::BEST:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::BEST:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Best;
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionLevel::SPEED:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::SPEED:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
   default:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
@@ -67,14 +66,13 @@ Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLe
 }
 
 Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressionStrategyEnum(
-    envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionStrategy
-        compression_strategy) {
+    envoy::extensions::filters::http::gzip::v3::Gzip::CompressionStrategy compression_strategy) {
   switch (compression_strategy) {
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::RLE:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::RLE:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::FILTERED:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::FILTERED:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::HUFFMAN:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::HUFFMAN:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
   default:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;

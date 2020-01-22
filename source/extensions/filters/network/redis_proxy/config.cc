@@ -1,7 +1,7 @@
 #include "extensions/filters/network/redis_proxy/config.h"
 
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
@@ -17,9 +17,10 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 namespace {
-inline void addUniqueClusters(absl::flat_hash_set<std::string>& clusters,
-                              const envoy::extensions::filters::network::redis_proxy::v3alpha::
-                                  RedisProxy::PrefixRoutes::Route& route) {
+inline void addUniqueClusters(
+    absl::flat_hash_set<std::string>& clusters,
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes::Route&
+        route) {
   clusters.emplace(route.cluster());
   for (auto& mirror : route.request_mirror_policy()) {
     clusters.emplace(mirror.cluster());
@@ -28,7 +29,7 @@ inline void addUniqueClusters(absl::flat_hash_set<std::string>& clusters,
 } // namespace
 
 Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy& proto_config,
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
@@ -42,7 +43,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
       proto_config, context.scope(), context.drainDecision(), context.runtime(), context.api()));
 
-  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::PrefixRoutes prefix_routes(
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
 
   // Set the catch-all route from the deprecated cluster and settings parameters.

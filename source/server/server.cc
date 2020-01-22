@@ -7,9 +7,9 @@
 #include <string>
 #include <unordered_set>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.validate.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -217,11 +217,11 @@ void InstanceImpl::flushStatsInternal() {
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
-    envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap, const Options& options,
+    envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
-  const envoy::config::bootstrap::v3alpha::Bootstrap& config_proto = options.configProto();
+  const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
   // Exactly one of config_path and config_yaml should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
@@ -233,7 +233,7 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
-    envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_override;
+    envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -304,7 +304,7 @@ void InstanceImpl::initialize(const Options& options,
   }
   server_stats_->version_.set(version_int);
 
-  bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
   bootstrap_.mutable_node()->set_user_agent_name("envoy");
   *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -418,9 +418,9 @@ void InstanceImpl::initialize(const Options& options,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                        stats_store_)
             ->create(),
-        *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
-        *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
-        *local_info_, *admin_, *singleton_manager_, thread_local_,
+        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
+        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
+        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 
@@ -660,7 +660,7 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
 }
 
 ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
-  auto config_dump = std::make_unique<envoy::admin::v3alpha::BootstrapConfigDump>();
+  auto config_dump = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));

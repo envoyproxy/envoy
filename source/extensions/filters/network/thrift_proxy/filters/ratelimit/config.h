@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3alpha/rate_limit.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3alpha/rate_limit.pb.validate.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.validate.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
 #include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
@@ -17,19 +17,18 @@ using namespace Envoy::Extensions::NetworkFilters;
 /**
  * Config registration for the rate limit filter. @see NamedThriftFilterConfigFactory.
  */
-class RateLimitFilterConfig : public ThriftProxy::ThriftFilters::FactoryBase<
-                                  envoy::extensions::filters::network::thrift_proxy::filters::
-                                      ratelimit::v3alpha::RateLimit> {
+class RateLimitFilterConfig
+    : public ThriftProxy::ThriftFilters::FactoryBase<
+          envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit> {
 public:
   RateLimitFilterConfig()
       : FactoryBase(ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT) {}
 
 private:
-  ThriftProxy::ThriftFilters::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::network::thrift_proxy::
-                                        filters::ratelimit::v3alpha::RateLimit& proto_config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
+  ThriftProxy::ThriftFilters::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit&
+          proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace RateLimitFilter

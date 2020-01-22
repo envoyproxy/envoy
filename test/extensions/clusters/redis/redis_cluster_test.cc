@@ -5,9 +5,9 @@
 
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"
@@ -71,7 +71,7 @@ public:
         create_(host->address()->asString())};
   }
 
-  MOCK_METHOD1(create_, Extensions::NetworkFilters::Common::Redis::Client::Client*(std::string));
+  MOCK_METHOD(Extensions::NetworkFilters::Common::Redis::Client::Client*, create_, (std::string));
 
 protected:
   RedisClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
@@ -88,8 +88,7 @@ protected:
   void setupFromV2Yaml(const std::string& yaml) {
     expectRedisSessionCreated();
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::config::cluster::v3alpha::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml);
+    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -119,8 +118,7 @@ protected:
 
   void setupFactoryFromV2Yaml(const std::string& yaml) {
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::config::cluster::v3alpha::Cluster cluster_config =
-        Upstream::parseClusterFromV2Yaml(yaml);
+    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));

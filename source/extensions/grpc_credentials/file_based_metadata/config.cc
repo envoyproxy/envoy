@@ -1,8 +1,8 @@
 #include "extensions/grpc_credentials/file_based_metadata/config.h"
 
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
-#include "envoy/config/grpc_credential/v3alpha/file_based_metadata.pb.h"
-#include "envoy/config/grpc_credential/v3alpha/file_based_metadata.pb.validate.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/grpc_credential/v3/file_based_metadata.pb.h"
+#include "envoy/config/grpc_credential/v3/file_based_metadata.pb.validate.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
@@ -19,14 +19,14 @@ namespace FileBasedMetadata {
 
 std::shared_ptr<grpc::ChannelCredentials>
 FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
-    const envoy::config::core::v3alpha::GrpcService& grpc_service_config, Api::Api& api) {
+    const envoy::config::core::v3::GrpcService& grpc_service_config, Api::Api& api) {
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
       Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, api);
   std::shared_ptr<grpc::CallCredentials> call_creds = nullptr;
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {
-    case envoy::config::core::v3alpha::GrpcService::GoogleGrpc::CallCredentials::
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::CallCredentials::
         CredentialSpecifierCase::kFromPlugin: {
       if (credential.from_plugin().name() == GrpcCredentialsNames::get().FileBasedMetadata) {
         FileBasedMetadataGrpcCredentialsFactory file_based_metadata_credentials_factory;
@@ -37,7 +37,7 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
                 credential.from_plugin(), ProtobufMessage::getNullValidationVisitor(),
                 file_based_metadata_credentials_factory);
         const auto& file_based_metadata_config = Envoy::MessageUtil::downcastAndValidate<
-            const envoy::config::grpc_credential::v3alpha::FileBasedMetadataConfig&>(
+            const envoy::config::grpc_credential::v3::FileBasedMetadataConfig&>(
             *file_based_metadata_config_message, ProtobufMessage::getNullValidationVisitor());
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<FileBasedMetadataAuthenticator>(file_based_metadata_config, api));

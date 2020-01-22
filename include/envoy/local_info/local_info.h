@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 
 namespace Envoy {
@@ -39,7 +39,7 @@ public:
   /**
    * v2 API Node protobuf. This is the full node identity presented to management servers.
    */
-  virtual const envoy::config::core::v3alpha::Node& node() const PURE;
+  virtual const envoy::config::core::v3::Node& node() const PURE;
 };
 
 using LocalInfoPtr = std::unique_ptr<LocalInfo>;
