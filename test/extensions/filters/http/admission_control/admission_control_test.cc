@@ -66,6 +66,7 @@ public:
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
     filter_ = std::make_shared<AdmissionControlFilter>(config, "foo.bar.");
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
 protected:
@@ -76,6 +77,16 @@ protected:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::shared_ptr<AdmissionControlFilter> filter_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  std::string default_yaml_{R"EOF(
+enabled:
+  default_value: true
+  runtime_key: "foo.enabled"
+sampling_window: 10s
+aggression_coefficient:
+  default_value: 1.0
+  runtime_key: "foo.aggression"
+)EOF"};
 };
 
 class ThreadLocalControllerTest : public testing::Test {
@@ -238,7 +249,8 @@ aggression_coefficient:
   auto config = makeConfig(yaml);
   setupFilter(config);
 
-  // Fail lots of requests so that we can expect a ~100% rejection rate.
+  // Fail lots of requests so that we would normally expect a ~100% rejection rate. It should pass
+  // below since the filter is disabled.
   for (int i = 0; i < 1000; ++i) {
     config->getController().recordFailure();
   }
@@ -246,6 +258,64 @@ aggression_coefficient:
   // We expect no rejections.
   Http::TestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(AdmissionControlTest, DisregardHealthChecks) {
+  auto config = makeConfig(default_yaml_);
+  setupFilter(config);
+
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, healthCheck()).WillOnce(Return(true));
+
+  // Fail lots of requests so that we would normally expect a ~100% rejection rate. It should pass
+  // below since the request is a healthcheck.
+  for (int i = 0; i < 1000; ++i) {
+    config->getController().recordFailure();
+  }
+
+  Http::TestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
+  auto config = makeConfig(default_yaml_);
+  setupFilter(config);
+
+  // Fail lots of requests so that we can expect a ~100% rejection rate.
+  for (int i = 0; i < 1000; ++i) {
+    config->getController().recordFailure();
+  }
+
+  // We expect rejections due to the failure rate.
+  Http::TestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+      filter_->decodeHeaders(request_headers, false));
+
+  // Wait to phase out historical data.
+  time_system_.sleep(std::chrono::seconds(10));
+
+  // Should continue since SR has become stale and there's no additional data.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+      filter_->decodeHeaders(request_headers, false));
+
+  // Fail exactly half of the requests so we get a ~50% rejection rate.
+  for (int i = 0; i < 1000; ++i) {
+    config->getController().recordFailure();
+  }
+  for (int i = 0; i < 1000; ++i) {
+    config->getController().recordSuccess();
+  }
+
+  // Random numbers in the range [0,1e4) are considered for the rejection calculation. One request
+  // should fail and the other should pass.
+  EXPECT_CALL(random_, random()).WillOnce(Return(5500));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+      filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(4500));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+      filter_->decodeHeaders(request_headers, false));
 }
 
 } // namespace
