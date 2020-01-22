@@ -18,20 +18,10 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType> class MockSubscriptionCallbacks : public SubscriptionCallbacks {
+class MockSubscriptionCallbacks : public SubscriptionCallbacks {
 public:
-  MockSubscriptionCallbacks() {
-    ON_CALL(*this, resourceName(testing::_))
-        .WillByDefault(testing::Invoke([](const ProtobufWkt::Any& resource) -> std::string {
-          return resourceName_(TestUtility::anyConvert<ResourceType>(resource));
-        }));
-  }
-  ~MockSubscriptionCallbacks() override = default;
-  static std::string
-  resourceName_(const envoy::config::endpoint::v3::ClusterLoadAssignment& resource) {
-    return resource.cluster_name();
-  }
-  template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
+  MockSubscriptionCallbacks();
+  ~MockSubscriptionCallbacks() override;
 
   MOCK_METHOD(void, onConfigUpdate,
               (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -82,9 +72,9 @@ public:
   MOCK_METHOD(void, start, ());
   MOCK_METHOD(GrpcMuxWatch*, subscribe_,
               (const std::string& type_url, const std::set<std::string>& resources,
-               GrpcMuxCallbacks& callbacks));
+               SubscriptionCallbacks& callbacks));
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            GrpcMuxCallbacks& callbacks) override;
+                            SubscriptionCallbacks& callbacks) override;
   MOCK_METHOD(void, pause, (const std::string& type_url));
   MOCK_METHOD(void, resume, (const std::string& type_url));
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
@@ -100,19 +90,6 @@ public:
               (const std::string& type_url, Watch* watch, const std::set<std::string>& resources,
                SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD(void, removeWatch, (const std::string& type_url, Watch* watch));
-};
-
-class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
-public:
-  MockGrpcMuxCallbacks();
-  ~MockGrpcMuxCallbacks() override;
-
-  MOCK_METHOD(void, onConfigUpdate,
-              (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-               const std::string& version_info));
-  MOCK_METHOD(void, onConfigUpdateFailed,
-              (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD(std::string, resourceName, (const ProtobufWkt::Any& resource));
 };
 
 class MockGrpcStreamCallbacks
