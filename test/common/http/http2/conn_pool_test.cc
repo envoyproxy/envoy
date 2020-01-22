@@ -43,7 +43,7 @@ public:
     return CodecClientPtr{createCodecClient_(data)};
   }
 
-  MOCK_METHOD1(createCodecClient_, CodecClient*(Upstream::Host::CreateConnectionData& data));
+  MOCK_METHOD(CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData & data));
 
   uint32_t maxTotalStreams() override { return max_streams_; }
 
@@ -126,7 +126,7 @@ public:
    */
   void completeRequestCloseUpstream(size_t index, ActiveTestRequest& r);
 
-  MOCK_METHOD0(onClientDestroy, void());
+  MOCK_METHOD(void, onClientDestroy, ());
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;

@@ -41,8 +41,9 @@ public:
     EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
     EXPECT_CALL(callbacks_, streamId()).Times(1).WillOnce(Return(0));
     EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
-    EXPECT_CALL(callbacks_, streamInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
+    EXPECT_CALL(callbacks_, streamInfo()).Times(1).WillOnce(ReturnRef(req_info_));
     EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+    EXPECT_CALL(req_info_, startTime()).Times(1).WillOnce(Return(SystemTime()));
   }
 
   void callHttpCheckAndValidateRequestAttributes(bool include_peer_certificate) {
@@ -159,6 +160,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
             request_.attributes().request().http().headers().find(
                 Http::Headers::get().EnvoyAuthPartialBody.get()));
+  EXPECT_TRUE(request_.attributes().request().has_time());
 }
 
 // Verify that check request object has only a portion of the request data.

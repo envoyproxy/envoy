@@ -135,7 +135,7 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
-// TODO(jmarantz): this utility is intended to be costs both for unit tests
+// TODO(jmarantz): this utility is intended to be used both for unit tests
 // and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs
 // FUZZ_ASSERT.
 std::vector<uint8_t> serializeDeserializeNumber(uint64_t number) {

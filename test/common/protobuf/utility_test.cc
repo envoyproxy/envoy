@@ -1,10 +1,13 @@
 #include <unordered_set>
 
 #include "envoy/api/v2/cluster.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/filter.pb.h"
+#include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
@@ -252,6 +255,20 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+}
+
+TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadV2TextProtoFromFile)) {
+  API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap) bootstrap;
+  bootstrap.mutable_node()->set_build_version("foo");
+
+  std::string bootstrap_text;
+  ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
+
+  API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_from_file;
+  TestUtility::loadFromFile(filename, proto_from_file, *api_);
+  EXPECT_EQ("foo", proto_from_file.node().hidden_envoy_deprecated_build_version());
 }
 
 TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
@@ -1090,6 +1107,16 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   EXPECT_THROW_WITH_REGEX(
       TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+// Validated exception thrown when anyConvertAndValidate observes a PGV failures.
+TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
+  envoy::config::cluster::v3::Filter filter;
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(filter);
+  EXPECT_THROW(MessageUtil::anyConvertAndValidate<envoy::config::cluster::v3::Filter>(
+                   source_any, ProtobufMessage::getStrictValidationVisitor()),
+               ProtoValidationException);
 }
 
 // MessageUtility::unpackTo() with the wrong type throws.

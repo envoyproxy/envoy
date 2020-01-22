@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.retry.previous_priorities";
 option java_outer_classname = "PreviousPrioritiesConfigProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: Previous priorities retry selector]
+
 // A retry host selector that attempts to spread retries between priorities, even if certain
 // priorities would not normally be attempted due to higher priorities being available.
 //

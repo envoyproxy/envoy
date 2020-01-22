@@ -21,12 +21,12 @@ namespace Broker {
 
 class MockKafkaMetricsFacade : public KafkaMetricsFacade {
 public:
-  MOCK_METHOD1(onMessage, void(AbstractRequestSharedPtr));
-  MOCK_METHOD1(onMessage, void(AbstractResponseSharedPtr));
-  MOCK_METHOD1(onFailedParse, void(RequestParseFailureSharedPtr));
-  MOCK_METHOD1(onFailedParse, void(ResponseMetadataSharedPtr));
-  MOCK_METHOD0(onRequestException, void());
-  MOCK_METHOD0(onResponseException, void());
+  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr));
+  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
+  MOCK_METHOD(void, onRequestException, ());
+  MOCK_METHOD(void, onResponseException, ());
 };
 
 using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
@@ -34,9 +34,9 @@ using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
 class MockResponseDecoder : public ResponseDecoder {
 public:
   MockResponseDecoder() : ResponseDecoder{{}} {};
-  MOCK_METHOD1(onData, void(Buffer::Instance&));
-  MOCK_METHOD3(expectResponse, void(const int32_t, const int16_t, const int16_t));
-  MOCK_METHOD0(reset, void());
+  MOCK_METHOD(void, onData, (Buffer::Instance&));
+  MOCK_METHOD(void, expectResponse, (const int32_t, const int16_t, const int16_t));
+  MOCK_METHOD(void, reset, ());
 };
 
 using MockResponseDecoderSharedPtr = std::shared_ptr<MockResponseDecoder>;
@@ -44,30 +44,30 @@ using MockResponseDecoderSharedPtr = std::shared_ptr<MockResponseDecoder>;
 class MockRequestDecoder : public RequestDecoder {
 public:
   MockRequestDecoder() : RequestDecoder{{}} {};
-  MOCK_METHOD1(onData, void(Buffer::Instance&));
-  MOCK_METHOD0(reset, void());
+  MOCK_METHOD(void, onData, (Buffer::Instance&));
+  MOCK_METHOD(void, reset, ());
 };
 
 using MockRequestDecoderSharedPtr = std::shared_ptr<MockRequestDecoder>;
 
 class MockTimeSource : public TimeSource {
 public:
-  MOCK_METHOD0(systemTime, SystemTime());
-  MOCK_METHOD0(monotonicTime, MonotonicTime());
+  MOCK_METHOD(SystemTime, systemTime, ());
+  MOCK_METHOD(MonotonicTime, monotonicTime, ());
 };
 
 class MockRichRequestMetrics : public RichRequestMetrics {
 public:
-  MOCK_METHOD1(onRequest, void(const int16_t));
-  MOCK_METHOD0(onUnknownRequest, void());
-  MOCK_METHOD0(onBrokenRequest, void());
+  MOCK_METHOD(void, onRequest, (const int16_t));
+  MOCK_METHOD(void, onUnknownRequest, ());
+  MOCK_METHOD(void, onBrokenRequest, ());
 };
 
 class MockRichResponseMetrics : public RichResponseMetrics {
 public:
-  MOCK_METHOD2(onResponse, void(const int16_t, const long long duration));
-  MOCK_METHOD0(onUnknownResponse, void());
-  MOCK_METHOD0(onBrokenResponse, void());
+  MOCK_METHOD(void, onResponse, (const int16_t, const long long duration));
+  MOCK_METHOD(void, onUnknownResponse, ());
+  MOCK_METHOD(void, onBrokenResponse, ());
 };
 
 class MockRequest : public AbstractRequest {
