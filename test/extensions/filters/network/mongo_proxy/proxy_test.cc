@@ -65,8 +65,9 @@ public:
 class MongoProxyFilterTest : public testing::Test {
 public:
   MongoProxyFilterTest()
-      : stat_names_(store_),
-        mongo_stats_(std::make_shared<MongoStats>(store_, "test")) { setup(); }
+      : stat_names_(store_), mongo_stats_(std::make_shared<MongoStats>(store_, "test")) {
+    setup();
+  }
 
   void setup() {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
@@ -327,8 +328,8 @@ TEST_F(MongoProxyFilterTest, Stats) {
   EXPECT_EQ(1U, store_.counter("test.op_query_no_max_time").value());
   EXPECT_EQ(1U, store_.counter("test.op_query_scatter_get").value());
 
-  Stats::StatName prefix = stat_names_.join({
-      stat_names_.symbolic("test.collection"), stat_names_.dynamic("test")});
+  Stats::StatName prefix =
+      stat_names_.join({stat_names_.symbolic("test.collection"), stat_names_.dynamic("test")});
   EXPECT_EQ(1U, stat_names_.counterValue({prefix, stat_names_.symbolic("query.total")}));
   EXPECT_EQ(1U, stat_names_.counterValue({prefix, stat_names_.symbolic("query.scatter_get")}));
 
@@ -438,14 +439,14 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
   }));
   filter_->onData(fake_data_, false);
 
-  Stats::StatName prefix = stat_names_.join({
-      stat_names_.symbolic("test.collection"), stat_names_.dynamic("test")});
+  Stats::StatName prefix =
+      stat_names_.join({stat_names_.symbolic("test.collection"), stat_names_.dynamic("test")});
   Stats::StatName query_total = stat_names_.symbolic("query.total");
   Stats::StatName query_scatter_get = stat_names_.symbolic("query.scatter_get");
   EXPECT_EQ(1U, stat_names_.counterValue({prefix, query_total}));
   EXPECT_EQ(1U, stat_names_.counterValue({prefix, query_scatter_get}));
-  Stats::StatName callsite_mongo = stat_names_.join({
-      mongo_stats_->callsite_, stat_names_.dynamic("getByMongoId")});
+  Stats::StatName callsite_mongo =
+      stat_names_.join({mongo_stats_->callsite_, stat_names_.dynamic("getByMongoId")});
   EXPECT_EQ(1U, stat_names_.counterValue({prefix, callsite_mongo, query_total}));
   EXPECT_EQ(1U, stat_names_.counterValue({prefix, callsite_mongo, query_scatter_get}));
 
@@ -497,9 +498,9 @@ TEST_F(MongoProxyFilterTest, MultiGet) {
   filter_->onData(fake_data_, false);
 
   EXPECT_EQ(1U, store_.counter("test.op_query_multi_get").value());
-  EXPECT_EQ(1U, stat_names_.counterValue({
-        stat_names_.symbolic("test.collection"), stat_names_.dynamic("test"),
-        stat_names_.symbolic("query.multi_get")}));
+  EXPECT_EQ(1U, stat_names_.counterValue({stat_names_.symbolic("test.collection"),
+                                          stat_names_.dynamic("test"),
+                                          stat_names_.symbolic("query.multi_get")}));
 }
 
 TEST_F(MongoProxyFilterTest, MaxTime) {

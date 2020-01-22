@@ -1,13 +1,13 @@
 #pragma once
 
+#include "envoy/stats/store.h"
+
 #include "common/common/logger.h"
 #include "common/memory/stats.h"
 #include "common/stats/symbol_table_creator.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
-
-#include "envoy/stats/store.h"
 
 namespace Envoy {
 namespace Stats {
@@ -75,7 +75,7 @@ private:
 };
 
 class StatNames {
- public:
+public:
   explicit StatNames(Store& store);
 
   StatName join(const std::vector<StatName>& names);
@@ -83,7 +83,7 @@ class StatNames {
   StatName dynamic(absl::string_view name) { return dynamic_pool_.add(name); }
   uint64_t counterValue(const std::vector<StatName>& names);
 
- private:
+private:
   Store& store_;
   StatNamePool pool_;
   StatNameDynamicPool dynamic_pool_;

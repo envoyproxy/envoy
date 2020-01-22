@@ -426,8 +426,8 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 
-  Stats::StatName prefix = stat_names_.join({
-      stat_names_.symbolic("prefix.fault"), stat_names_.dynamic("cluster")});
+  Stats::StatName prefix =
+      stat_names_.join({stat_names_.symbolic("prefix.fault"), stat_names_.dynamic("cluster")});
   EXPECT_EQ(1UL, stat_names_.counterValue({prefix, stat_names_.symbolic("delays_injected")}));
   EXPECT_EQ(0UL, stat_names_.counterValue({prefix, stat_names_.symbolic("aborts_injected")}));
 }
@@ -492,8 +492,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
 
-  Stats::StatName prefix = stat_names_.join({
-      stat_names_.symbolic("prefix.fault"), stat_names_.dynamic("cluster")});
+  Stats::StatName prefix =
+      stat_names_.join({stat_names_.symbolic("prefix.fault"), stat_names_.dynamic("cluster")});
   EXPECT_EQ(1UL, stat_names_.counterValue({prefix, stat_names_.symbolic("delays_injected")}));
   EXPECT_EQ(1UL, stat_names_.counterValue({prefix, stat_names_.symbolic("aborts_injected")}));
 

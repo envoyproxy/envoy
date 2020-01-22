@@ -42,7 +42,7 @@ uint64_t StatName::dataSize() const {
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
-    std::cerr <<  "Null StatName" << std::endl;
+    std::cerr << "Null StatName" << std::endl;
   } else {
     const uint64_t nbytes = dataSize();
     std::cerr << "dataSize=" << nbytes << ":";
@@ -525,8 +525,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   return mem_block.release();
 }
 
-void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names,
-                                   StatNameList& list) {
+void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names, StatNameList& list) {
   RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
   // First encode all the names.

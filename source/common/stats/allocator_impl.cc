@@ -52,9 +52,9 @@ public:
   StatsSharedImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
                   const std::vector<Tag>& tags)
       : MetricImpl<BaseClass>(
-            name,
-            StatNameManagedStorage(tag_extracted_name, alloc.symbolTable()).statName(),
-            tags, alloc.symbolTable()), alloc_(alloc) {}
+            name, StatNameManagedStorage(tag_extracted_name, alloc.symbolTable()).statName(), tags,
+            alloc.symbolTable()),
+        alloc_(alloc) {}
 
   ~StatsSharedImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it

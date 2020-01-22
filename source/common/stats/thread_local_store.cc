@@ -594,8 +594,8 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, St
                                          TlsScope& tls_scope, absl::string_view tag_extracted_name,
                                          const std::vector<Tag>& tags)
     : MetricImpl(name, StatNameManagedStorage(tag_extracted_name, parent.symbolTable()).statName(),
-                 tags, parent.symbolTable()), unit_(unit),
-      parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
+                 tags, parent.symbolTable()),
+      unit_(unit), parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()), interval_statistics_(interval_histogram_),
       cumulative_statistics_(cumulative_histogram_), merged_(false) {}
 

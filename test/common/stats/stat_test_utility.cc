@@ -136,9 +136,7 @@ MemoryTest::Mode MemoryTest::mode() {
 }
 
 StatNames::StatNames(Store& store)
-    : store_(store),
-      pool_(store.symbolTable()),
-      dynamic_pool_(store.symbolTable()) {}
+    : store_(store), pool_(store.symbolTable()), dynamic_pool_(store.symbolTable()) {}
 
 StatName StatNames::join(const std::vector<StatName>& names) {
   joins_.push_back(store_.symbolTable().join(names));
