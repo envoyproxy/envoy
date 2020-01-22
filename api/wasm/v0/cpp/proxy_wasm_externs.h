@@ -137,7 +137,10 @@ extern "C" WasmResult proxy_get_configuration((uint32_t start, uint32_t length,
  * terminated.
  * @return a WasmResult: OK, InvalidMemoryAccess.
  */
-extern "C" WasmResult proxy_log(uint32_t level, const char* log_message, size_t log_message_size);
+enum class LogLevel : uint32_t {
+  Trace = 0, Debug = 1, Info = 2, Warning = 3, Error = 4, Critical = 5,
+}
+extern "C" WasmResult proxy_log(LogLevel level, const char* log_message, size_t log_message_size);
 
 // System
 
