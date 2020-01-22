@@ -65,7 +65,6 @@ defining the key construction algorithm used by Envoy to look up the scope corre
 
 For example, for the following scoped route configuration, Envoy will look into the "addr" header value, split the header value by ";" first, and use the first value for key 'x-foo-key' as the scope key.
 If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", then "127.0.0.1" will be computed as the scope key to look up for corresponding route configuration.
-
 .. code-block:: yaml
 
   name: scope_by_addr
@@ -78,6 +77,10 @@ If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", the
           separator: =
 
 .. _arch_overview_http_routing_route_table:
+
+For a key to match a ScopedRouteConfiguration, the number of fragments in the computed key has to match that of the ScopedRouteConfiguration.
+Then fragments are matched in order. A missing fragment(treated as NULL) in the built key means the request will not be able to match any scope,
+which means no route entry can be found for the request.
 
 Route table
 -----------
