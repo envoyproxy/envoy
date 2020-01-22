@@ -32,7 +32,7 @@ namespace Stats {
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
-                           StatName tag_extracted_name, const std::vector<Tag>& tags,
+                           const std::string& tag_extracted_name, const std::vector<Tag>& tags,
                            SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 

@@ -548,11 +548,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   }
 
   std::vector<Tag> tags;
-  StatNameManagedStorage tag_extracted_name(
-      parent_.tagProducer().produceTags(symbolTable().toString(name), tags), symbolTable());
+  std::string tag_extracted_name =
+      parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
   TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(name, parent.unit(), tag_extracted_name.statName(), tags,
-                                   symbolTable()));
+      new ThreadLocalHistogramImpl(name, parent.unit(), tag_extracted_name, tags, symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -563,7 +562,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
 }
 
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
-                                                   StatName tag_extracted_name,
+                                                   const std::string& tag_extracted_name,
                                                    const std::vector<Tag>& tags,
                                                    SymbolTable& symbol_table)
     : HistogramImplHelper(name, tag_extracted_name, tags, symbol_table), unit_(unit),
@@ -594,9 +593,8 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent,
                                          TlsScope& tls_scope, absl::string_view tag_extracted_name,
                                          const std::vector<Tag>& tags)
-    : MetricImpl(name, StatNameManagedStorage(tag_extracted_name, parent.symbolTable()).statName(),
-                 tags, parent.symbolTable()),
-      unit_(unit), parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
+    : MetricImpl(name, tag_extracted_name, tags, parent.symbolTable()), unit_(unit),
+      parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()), interval_statistics_(interval_histogram_),
       cumulative_statistics_(cumulative_histogram_), merged_(false) {}
 
