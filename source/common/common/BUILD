@@ -140,7 +140,7 @@ envoy_cc_library(
         ":macros",
         ":non_copyable",
     ] + select({
-        "@envoy//bazel:android_logger": ["logger_impl_lib_android"],
+        "//bazel:android_logger": ["logger_impl_lib_android"],
         "//conditions:default": ["logger_impl_lib_standard"],
     }),
 )
