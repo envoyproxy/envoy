@@ -64,6 +64,7 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
   OptProcessContextRef processContext() override;
@@ -101,6 +102,7 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override;
   Admin& admin() override;
   TimeSource& timeSource() override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;

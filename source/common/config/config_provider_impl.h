@@ -115,7 +115,7 @@ public:
   ConfigProviderInstanceType instanceType() const { return instance_type_; }
 
 protected:
-  ImmutableConfigProviderBase(Server::Configuration::FactoryContext& factory_context,
+  ImmutableConfigProviderBase(Server::Configuration::ServerFactoryContext& factory_context,
                               ConfigProviderManagerImplBase& config_provider_manager,
                               ConfigProviderInstanceType instance_type, ApiType api_type);
 
@@ -136,12 +136,6 @@ class MutableConfigProviderCommonBase;
  *
  * A subscription is intended to be co-owned by config providers with the same config source, it's
  * designed to be created/destructed on admin thread only.
- *
- * xDS config providers and subscriptions are split to avoid lifetime issues with arguments
- * required by the config providers. An example is the Server::Configuration::FactoryContext, which
- * is owned by listeners and therefore may be destroyed while an associated config provider is still
- * in use (see #3960). This split enables single ownership of the config providers, while enabling
- * shared ownership of the underlying subscription.
  *
  */
 class ConfigSubscriptionCommonBase : protected Logger::Loggable<Logger::Id::config> {
@@ -202,7 +196,7 @@ protected:
 
   ConfigSubscriptionCommonBase(const std::string& name, const uint64_t manager_identifier,
                                ConfigProviderManagerImplBase& config_provider_manager,
-                               Server::Configuration::FactoryContext& factory_context)
+                               Server::Configuration::ServerFactoryContext& factory_context)
       : name_(name), tls_(factory_context.threadLocal().allocateSlot()),
         init_target_(absl::StrCat("ConfigSubscriptionCommonBase ", name_), [this]() { start(); }),
         manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),
@@ -259,7 +253,7 @@ class ConfigSubscriptionInstance : public ConfigSubscriptionCommonBase {
 public:
   ConfigSubscriptionInstance(const std::string& name, const uint64_t manager_identifier,
                              ConfigProviderManagerImplBase& config_provider_manager,
-                             Server::Configuration::FactoryContext& factory_context)
+                             Server::Configuration::ServerFactoryContext& factory_context)
       : ConfigSubscriptionCommonBase(name, manager_identifier, config_provider_manager,
                                      factory_context) {}
 

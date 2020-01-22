@@ -53,8 +53,8 @@ public:
   static RouteConfigProviderSharedPtr create(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           config,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-      RouteConfigProviderManager& route_config_provider_manager);
+      Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
+      const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager);
 };
 
 class RouteConfigProviderManagerImpl;
@@ -65,7 +65,7 @@ class RouteConfigProviderManagerImpl;
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
-                                Server::Configuration::FactoryContext& factory_context,
+                                Server::Configuration::ServerFactoryContext& factory_context,
                                 RouteConfigProviderManagerImpl& route_config_provider_manager);
   ~StaticRouteConfigProviderImpl() override;
 
@@ -119,7 +119,9 @@ public:
     return route_config_providers_;
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
+
   void updateOnDemand(const std::string& aliases);
+
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
                               std::unique_ptr<Cleanup>& resume_rds);
@@ -145,22 +147,29 @@ private:
   RdsRouteConfigSubscription(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const uint64_t manager_identifier,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-      const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
   static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
 
-  Init::Manager& getRdsConfigInitManager() { return init_manager_; }
-
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
-  Init::Manager& init_manager_;
-  Init::SharedTargetImpl init_target_;
+
+  // Init target used to notify the parent init manager that the subscription [and its sub resource]
+  // is ready.
+  Init::SharedTargetImpl parent_init_target_;
+
+  // Init watcher on RDS and VHDS ready event. This watcher marks parent_init_target_ ready.
+  Init::WatcherImpl init_watcher_;
+
+  // Target which starts the RDS subscription.
+  Init::TargetImpl local_init_target_;
+  // Init manager used in intializing sub-resources (VHDS subscription if configured), it may get
+  // recreated when a RDS response contains a new VHDS subscription message.
+  Init::ManagerImpl local_init_manager_;
   Stats::ScopePtr scope_;
   std::string stat_prefix_;
   RdsStats stats_;
@@ -215,7 +224,7 @@ private:
   };
 
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
-                             Server::Configuration::FactoryContext& factory_context);
+                             Server::Configuration::ServerFactoryContext& factory_context);
 
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;
@@ -237,12 +246,12 @@ public:
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 
-  RouteConfigProviderPtr
-  createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
-                                  Server::Configuration::FactoryContext& factory_context) override;
+  RouteConfigProviderPtr createStaticRouteConfigProvider(
+      const envoy::config::route::v3::RouteConfiguration& route_config,
+      Server::Configuration::ServerFactoryContext& factory_context) override;
 
 private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map

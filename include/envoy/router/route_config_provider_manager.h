@@ -39,7 +39,7 @@ public:
    */
   virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) PURE;
 
   /**
@@ -49,9 +49,9 @@ public:
    * @param runtime supplies the runtime loader.
    * @param cm supplies the ClusterManager.
    */
-  virtual RouteConfigProviderPtr
-  createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
-                                  Server::Configuration::FactoryContext& factory_context) PURE;
+  virtual RouteConfigProviderPtr createStaticRouteConfigProvider(
+      const envoy::config::route::v3::RouteConfiguration& route_config,
+      Server::Configuration::ServerFactoryContext& factory_context) PURE;
 };
 
 } // namespace Router

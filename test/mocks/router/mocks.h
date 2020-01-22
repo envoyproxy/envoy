@@ -447,12 +447,12 @@ public:
   MOCK_METHOD4(createRdsRouteConfigProvider,
                RouteConfigProviderSharedPtr(
                    const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-                   Server::Configuration::FactoryContext& factory_context,
+                   Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix, Init::Manager& init_manager));
   MOCK_METHOD2(
       createStaticRouteConfigProvider,
       RouteConfigProviderPtr(const envoy::config::route::v3::RouteConfiguration& route_config,
-                             Server::Configuration::FactoryContext& factory_context));
+                             Server::Configuration::ServerFactoryContext& factory_context));
 };
 
 class MockScopedConfig : public ScopedConfig {
