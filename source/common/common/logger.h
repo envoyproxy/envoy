@@ -73,6 +73,9 @@ enum class Id {
 };
 // clang-format on
 
+/**
+ * Logger that uses the DelegatingLogSink.
+ */
 class StandardLogger : public Logger {
 private:
   StandardLogger(const std::string& name);

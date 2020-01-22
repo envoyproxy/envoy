@@ -324,8 +324,8 @@ config_setting(
 )
 
 config_setting(
-    name = "android",
-    values = {"define": "platform=android"},
+    name = "android_logger",
+    values = {"define": "logger=android"},
 )
 
 alias(
