@@ -9,7 +9,7 @@ on:
 jobs:
   unittests:
     name: unit_tests
-    runs-on: macOS-10.14
+    runs-on: macOS-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v1

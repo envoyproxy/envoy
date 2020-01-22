@@ -34,7 +34,7 @@ jobs:
           path: dist/envoy_aar_sources.zip
   master_ios_dist:
     name: master_ios_dist
-    runs-on: macOS-10.14
+    runs-on: macOS-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v1
@@ -54,7 +54,7 @@ jobs:
           path: dist/ios_artifact
   master_ios_cocoapods:
     name: master_ios_cocoapods
-    runs-on: macOS-10.14
+    runs-on: macOS-latest
     timeout-minutes: 45
     needs: [master_ios_dist]
     steps:
