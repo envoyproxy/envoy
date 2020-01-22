@@ -94,7 +94,7 @@ public:
 
   std::string resourceName(const ProtobufWkt::Any&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-  void kickFallback() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void kickFallback() override;
 
   WatchMap(const WatchMap&) = delete;
   WatchMap& operator=(const WatchMap&) = delete;
@@ -122,6 +122,10 @@ private:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
+
+public:
+  // Did subscriptions call fallback?
+  bool tried_fallback_;
 };
 
 } // namespace Config

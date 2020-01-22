@@ -96,6 +96,7 @@ private:
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override {}
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
+  void retry() override{};
 
   ThreadLocal::SlotPtr tls_;
   Network::Address::IpList ip_white_list_;

@@ -75,7 +75,7 @@ TEST_F(HttpSubscriptionImplTestV3Alpha, FallbackSuccess) {
   Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "404"}}};
   Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
   http_callbacks_->onSuccess(std::move(message));
-  subscription_->fallback({"cluster0"});
+  subscription_->updateTypeUrl({"cluster0"});
   startSubscription({"cluster0"});
   EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
 }

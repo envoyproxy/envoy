@@ -36,7 +36,8 @@ public:
 
   Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                           const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                          std::chrono::milliseconds init_fetch_timeout) override;
+                          std::chrono::milliseconds init_fetch_timeout,
+                          bool tried_fallback = false) override;
   void removeWatch(const std::string& type_url, Watch* watch) override;
 
   // TODO(fredlas) PR #8478 will remove this.
@@ -51,9 +52,11 @@ public:
 
   void onStreamEstablished() override;
 
-  void onEstablishmentFailure(bool) override;
+  void onEstablishmentFailure() override;
 
   void onWriteable() override;
+
+  void onFallback() override;
 
   void kickOffAck(UpdateAck ack);
 
@@ -83,7 +86,8 @@ public:
 
 private:
   Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                  SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout);
+                  SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout,
+                  bool tried_fallback = false);
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the

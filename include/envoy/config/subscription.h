@@ -99,10 +99,10 @@ public:
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
 
   /**
-   * Update current type_url to lower version (e.g. v3alpha -> v2).
+   * Update current type_url.
    * @param resources vector of resource names to fetch.
    */
-  virtual void fallback(const std::set<std::string>& resources) PURE;
+  virtual void updateTypeUrl(const std::set<std::string>& resources) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

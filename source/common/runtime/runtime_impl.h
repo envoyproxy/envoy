@@ -223,7 +223,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
-  void kickFallback() override { subscription_->fallback({resource_name_}); }
+  void kickFallback() override { subscription_->updateTypeUrl({resource_name_}); }
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   LoaderImpl& parent_;

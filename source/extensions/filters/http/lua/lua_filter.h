@@ -263,7 +263,7 @@ private:
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::MessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason = nullptr) override;
+  void onFailure(Http::AsyncClient::FailureReason) override;
 
   Filters::Common::Lua::Coroutine& coroutine_;
   Http::HeaderMap& headers_;

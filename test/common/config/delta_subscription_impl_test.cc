@@ -152,12 +152,35 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
       xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, stats,
       std::chrono::milliseconds(12345), false);
 
-  EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*async_client, startRaw(_, _, _, _, _)).WillOnce(Return(nullptr));
 
   subscription->start({"name1"});
   subscription->updateResourceInterest({"name1", "name2"});
 }
 
+class DeltaSubscriptionImplTestAlphaVersion : public testing::Test,
+                                              public DeltaSubscriptionTestHarness {
+protected:
+  DeltaSubscriptionImplTestAlphaVersion()
+      : DeltaSubscriptionTestHarness(envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {}
+
+  // We need to destroy the subscription before the test's destruction, because the subscription's
+  // destructor removes its watch from the NewGrpcMuxImpl, and that removal process involves
+  // some things held by the test fixture.
+  void TearDown() override { doSubscriptionTearDown(); }
+};
+
+TEST_F(DeltaSubscriptionImplTestAlphaVersion, FallbackSuccess) {
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _)).Times(testing::AtLeast(1));
+  subscription_->start({"name0"});
+
+  EXPECT_CALL(callbacks_, kickFallback()).WillRepeatedly(Invoke([&]() {
+    subscription_->updateTypeUrl({"name0"});
+  }));
+  subscription_->getContextForTest()->onFallback();
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
+  verifyControlPlaneStats(1);
+}
 } // namespace
 } // namespace Config
 } // namespace Envoy

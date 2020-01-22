@@ -5,7 +5,8 @@
 namespace Envoy {
 namespace Config {
 
-DeltaSubscriptionImpl::DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
+DeltaSubscriptionImpl::DeltaSubscriptionImpl(std::shared_ptr<Config::NewGrpcMuxImpl> context,
+                                             absl::string_view type_url,
                                              SubscriptionCallbacks& callbacks,
                                              SubscriptionStats stats,
                                              std::chrono::milliseconds init_fetch_timeout,
@@ -41,9 +42,10 @@ void DeltaSubscriptionImpl::updateResourceInterest(
   stats_.update_attempt_.inc();
 }
 
-void DeltaSubscriptionImpl::fallback(const std::set<std::string>& resources) {
-  type_url_ = TypeUrl::get().fallback(type_url_);
-  updateResourceInterest(resources);
+void DeltaSubscriptionImpl::updateTypeUrl(const std::set<std::string>& resources) {
+  type_url_ = TypeUrl::get().downgrade(type_url_);
+  watch_ =
+      context_->addOrUpdateWatch(type_url_, nullptr, resources, *this, init_fetch_timeout_, true);
 }
 
 // Config::SubscriptionCallbacks
@@ -94,7 +96,11 @@ void DeltaSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reaso
   }
 }
 
-void DeltaSubscriptionImpl::kickFallback() {}
+void DeltaSubscriptionImpl::kickFallback() {
+  stats_.update_failure_.inc();
+  callbacks_.kickFallback();
+  stats_.update_attempt_.inc();
+}
 
 std::string DeltaSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
   return callbacks_.resourceName(resource);

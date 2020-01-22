@@ -171,6 +171,12 @@ void WatchMap::onConfigUpdateFailed(ConfigUpdateFailureReason reason, const Envo
   }
 }
 
+void WatchMap::kickFallback() {
+  for (auto& watch : watches_) {
+    watch->callbacks_.kickFallback();
+  }
+}
+
 std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& newly_added_to_watch,
                                               Watch* watch) {
   std::set<std::string> newly_added_to_subscription;

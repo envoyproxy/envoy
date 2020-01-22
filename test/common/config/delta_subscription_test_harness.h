@@ -31,8 +31,13 @@ namespace {
 
 class DeltaSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  DeltaSubscriptionTestHarness() : DeltaSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
-  DeltaSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
+  DeltaSubscriptionTestHarness()
+      : DeltaSubscriptionTestHarness(std::chrono::milliseconds(0),
+                                     envoy::config::core::v3alpha::ApiVersion::V2) {}
+  DeltaSubscriptionTestHarness(const envoy::config::core::v3alpha::ApiVersion api_version)
+      : DeltaSubscriptionTestHarness(std::chrono::milliseconds(0), api_version) {}
+  DeltaSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout,
+                               const envoy::config::core::v3alpha::ApiVersion api_version)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()) {
@@ -43,10 +48,21 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3alpha::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
         local_info_);
-    subscription_ = std::make_unique<DeltaSubscriptionImpl>(
-        xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
-        init_fetch_timeout, false);
-    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    switch (api_version) {
+    case envoy::config::core::v3alpha::ApiVersion::V2:
+      subscription_ = std::make_unique<DeltaSubscriptionImpl>(
+          xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
+          init_fetch_timeout, false);
+      break;
+    case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
+      subscription_ = std::make_unique<DeltaSubscriptionImpl>(
+          xds_context_, Config::TypeUrl::get().ClusterLoadAssignmentV3Alpha, callbacks_, stats_,
+          init_fetch_timeout, false);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _, _)).WillOnce(Return(&async_stream_));
   }
 
   void doSubscriptionTearDown() override {

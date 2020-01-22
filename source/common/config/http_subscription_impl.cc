@@ -64,8 +64,8 @@ void HttpSubscriptionImpl::updateResourceInterest(
   request_.mutable_resource_names()->Swap(&resources_vector);
 }
 
-void HttpSubscriptionImpl::fallback(const std::set<std::string>& resources) {
-  const auto new_type_url = TypeUrl::get().fallback(request_.type_url());
+void HttpSubscriptionImpl::updateTypeUrl(const std::set<std::string>& resources) {
+  const auto new_type_url = TypeUrl::get().downgrade(request_.type_url());
   request_.set_type_url(new_type_url);
   updateResourceInterest(resources);
 }
@@ -109,7 +109,10 @@ void HttpSubscriptionImpl::onFetchFailure(Config::ConfigUpdateFailureReason reas
 }
 
 void HttpSubscriptionImpl::retry() {
-  if (!tried_fallback_) {
+  const auto& current_type_url = request_.type_url();
+  // Check whether it can fallback with checking if attempted type url is alpha version, done
+  // fallback already.
+  if (!tried_fallback_ && TypeUrl::get().isAlphaApiVersion(current_type_url)) {
     tried_fallback_ = true;
     callbacks_.kickFallback();
   }

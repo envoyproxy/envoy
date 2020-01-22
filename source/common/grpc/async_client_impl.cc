@@ -45,9 +45,10 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
 RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
                                           absl::string_view method_name,
                                           RawAsyncStreamCallbacks& callbacks,
-                                          const Http::AsyncClient::StreamOptions& options) {
-  auto grpc_stream =
-      std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name, callbacks, options);
+                                          const Http::AsyncClient::StreamOptions& options,
+                                          std::function<void()> retryer) {
+  auto grpc_stream = std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name,
+                                                       callbacks, options, retryer);
 
   grpc_stream->initialize(false);
   if (grpc_stream->hasResetStream()) {
@@ -60,9 +61,10 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
-                                 const Http::AsyncClient::StreamOptions& options)
+                                 const Http::AsyncClient::StreamOptions& options,
+                                 std::function<void()> retryer)
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
-      callbacks_(callbacks), options_(options) {}
+      callbacks_(callbacks), options_(options), retryer_(retryer) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
@@ -102,7 +104,11 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   const auto grpc_status = Common::getGrpcStatus(*headers);
   callbacks_.onReceiveInitialMetadata(end_stream ? std::make_unique<Http::HeaderMapImpl>()
                                                  : std::move(headers));
-  if (http_response_status != enumToInt(Http::Code::OK)) {
+  std::cout << headers->Path() << std::endl;
+  if (http_response_status == enumToInt(Http::Code::NotFound)) {
+    retryer_();
+    return;
+  } else if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
     if (end_stream && grpc_status) {

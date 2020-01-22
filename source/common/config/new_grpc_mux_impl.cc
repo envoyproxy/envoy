@@ -5,6 +5,7 @@
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
 #include "common/common/token_bucket_impl.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
@@ -28,9 +29,10 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
 Watch* NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                         const std::set<std::string>& resources,
                                         SubscriptionCallbacks& callbacks,
-                                        std::chrono::milliseconds init_fetch_timeout) {
+                                        std::chrono::milliseconds init_fetch_timeout,
+                                        bool tried_fallback) {
   if (watch == nullptr) {
-    return addWatch(type_url, resources, callbacks, init_fetch_timeout);
+    return addWatch(type_url, resources, callbacks, init_fetch_timeout, tried_fallback);
   } else {
     updateWatch(type_url, watch, resources);
     return watch;
@@ -89,7 +91,21 @@ void NewGrpcMuxImpl::onStreamEstablished() {
   trySendDiscoveryRequests();
 }
 
-void NewGrpcMuxImpl::onEstablishmentFailure(bool) {
+void NewGrpcMuxImpl::onFallback() {
+  const auto current_type_url = subscription_ordering_.back();
+  const auto& sub = subscriptions_.find(current_type_url);
+  assert(sub != subscriptions_.end());
+
+  // Check whether it can fallback with checking if attempted type url is alpha version and
+  // done fallback already.
+  bool challenge_fallback = !sub->second->watch_map_.tried_fallback_ &&
+                            TypeUrl::get().isAlphaApiVersion(current_type_url);
+  if (challenge_fallback) {
+    sub->second->watch_map_.kickFallback();
+  }
+}
+
+void NewGrpcMuxImpl::onEstablishmentFailure() {
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
   // crash, the iteration needs to dance around a little: collect pointers to all
@@ -126,14 +142,14 @@ void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
                                 SubscriptionCallbacks& callbacks,
-                                std::chrono::milliseconds init_fetch_timeout) {
+                                std::chrono::milliseconds init_fetch_timeout, bool tried_fallback) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     addSubscription(type_url, init_fetch_timeout);
-    return addWatch(type_url, resources, callbacks, init_fetch_timeout);
+    return addWatch(type_url, resources, callbacks, init_fetch_timeout, tried_fallback);
   }
-
+  entry->second->watch_map_.tried_fallback_ = tried_fallback;
   Watch* watch = entry->second->watch_map_.addWatch(callbacks);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
   updateWatch(type_url, watch, resources);
@@ -178,7 +194,6 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     RELEASE_ASSERT(sub != subscriptions_.end(),
                    fmt::format("Tried to send discovery request for non-existent subscription {}.",
                                next_request_type_url));
-
     // Try again later if paused/rate limited/stream down.
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;

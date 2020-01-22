@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <queue>
 
 #include "envoy/api/api.h"
@@ -179,7 +180,8 @@ public:
                         const Http::AsyncClient::RequestOptions& options) override;
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
                            RawAsyncStreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions& options) override;
+                           const Http::AsyncClient::StreamOptions& options,
+                           std::function<void()> retryer = {}) override;
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
 

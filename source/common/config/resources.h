@@ -41,7 +41,7 @@ public:
       "type.googleapis.com/envoy.config.endpoint.v3alpha.ClusterLoadAssignment"};
 
   // TODO(shikugawa): integrate with resource name loader
-  std::string fallback(const std::string& type_url) const {
+  std::string downgrade(const std::string& type_url) const {
     if (type_url == SecretV3Alpha) {
       return Secret;
     } else if (type_url == ClusterLoadAssignmentV3Alpha) {
@@ -72,6 +72,11 @@ public:
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
+  }
+
+  bool isAlphaApiVersion(const std::string& type_url) const {
+    return type_url.find(apiVersionString(envoy::config::core::v3alpha::V3ALPHA)) !=
+           std::string::npos;
   }
 };
 

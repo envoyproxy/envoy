@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 
 #include "envoy/grpc/async_client.h"
 
@@ -17,7 +18,8 @@ ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& messag
 RawAsyncStream* startUntyped(RawAsyncClient* client,
                              const Protobuf::MethodDescriptor& service_method,
                              RawAsyncStreamCallbacks& callbacks,
-                             const Http::AsyncClient::StreamOptions& options);
+                             const Http::AsyncClient::StreamOptions& options,
+                             std::function<void()> retryer = {});
 AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
                           const Protobuf::Message& request, RawAsyncRequestCallbacks& callbacks,
                           Tracing::Span& parent_span,
@@ -107,9 +109,10 @@ public:
   }
   virtual AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
                                      AsyncStreamCallbacks<Response>& callbacks,
-                                     const Http::AsyncClient::StreamOptions& options) {
+                                     const Http::AsyncClient::StreamOptions& options,
+                                     std::function<void()> retryer = {}) {
     return AsyncStream<Request>(
-        Internal::startUntyped(client_.get(), service_method, callbacks, options));
+        Internal::startUntyped(client_.get(), service_method, callbacks, options, retryer));
   }
 
   AsyncClient* operator->() { return this; }

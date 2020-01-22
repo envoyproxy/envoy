@@ -50,7 +50,7 @@ class MockSubscription : public Subscription {
 public:
   MOCK_METHOD1(start, void(const std::set<std::string>& resources));
   MOCK_METHOD1(updateResourceInterest, void(const std::set<std::string>& update_to_these_names));
-  MOCK_METHOD1(fallback, void(const std::set<std::string>& resource_names));
+  MOCK_METHOD1(updateTypeUrl, void(const std::set<std::string>& resource_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -98,10 +98,10 @@ public:
   MOCK_METHOD2(updateResourceInterest,
                void(const std::set<std::string>& resources, const std::string& type_url));
 
-  MOCK_METHOD5(addOrUpdateWatch,
+  MOCK_METHOD6(addOrUpdateWatch,
                Watch*(const std::string& type_url, Watch* watch,
                       const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                      std::chrono::milliseconds init_fetch_timeout));
+                      std::chrono::milliseconds init_fetch_timeout, bool tried_fallback));
   MOCK_METHOD2(removeWatch, void(const std::string& type_url, Watch* watch));
 };
 
@@ -114,7 +114,7 @@ public:
                                     const std::string& version_info));
   MOCK_METHOD2(onConfigUpdateFailed,
                void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD1(onTryFallback, void(Envoy::Config::ConfigUpdateFailureReason reason));
+  MOCK_METHOD1(startFallback, void(Envoy::Config::ConfigUpdateFailureReason reason));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
@@ -125,7 +125,7 @@ public:
   ~MockGrpcStreamCallbacks() override;
 
   MOCK_METHOD0(onStreamEstablished, void());
-  MOCK_METHOD1(onEstablishmentFailure, void(bool));
+  MOCK_METHOD0(onEstablishmentFailure, void());
   MOCK_METHOD1(
       onDiscoveryResponse,
       void(std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message));

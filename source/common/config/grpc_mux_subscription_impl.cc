@@ -94,7 +94,7 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
   callbacks_.onConfigUpdateFailed(reason, e);
 }
 
-void GrpcMuxSubscriptionImpl::onTryFallback(ConfigUpdateFailureReason reason) {
+void GrpcMuxSubscriptionImpl::startFallback(ConfigUpdateFailureReason reason) {
   assert(reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure);
   stats_.update_failure_.inc();
   ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
@@ -102,8 +102,8 @@ void GrpcMuxSubscriptionImpl::onTryFallback(ConfigUpdateFailureReason reason) {
   callbacks_.kickFallback();
 }
 
-void GrpcMuxSubscriptionImpl::fallback(const std::set<std::string>& resources) {
-  type_url_ = TypeUrl::get().fallback(type_url_);
+void GrpcMuxSubscriptionImpl::updateTypeUrl(const std::set<std::string>& resources) {
+  type_url_ = TypeUrl::get().downgrade(type_url_);
   updateResourceInterest(resources);
 }
 

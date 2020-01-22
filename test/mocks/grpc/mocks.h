@@ -8,6 +8,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
 
+#include "common/grpc/async_client_impl.h"
 #include "common/grpc/typed_async_client.h"
 
 #include "test/test_common/utility.h"
@@ -78,10 +79,11 @@ public:
                                Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
                                Tracing::Span& parent_span,
                                const Http::AsyncClient::RequestOptions& options));
-  MOCK_METHOD4_T(startRaw,
+  MOCK_METHOD5_T(startRaw,
                  RawAsyncStream*(absl::string_view service_full_name, absl::string_view method_name,
                                  RawAsyncStreamCallbacks& callbacks,
-                                 const Http::AsyncClient::StreamOptions& options));
+                                 const Http::AsyncClient::StreamOptions& options,
+                                 std::function<void()> retryer));
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {

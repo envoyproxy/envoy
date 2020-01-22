@@ -55,7 +55,7 @@ public:
    * @param reason supplies the update failure reason. It takes only
    * ConfigUpdateFailureReason::ConnectionFailure.
    */
-  virtual void onTryFallback(Envoy::Config::ConfigUpdateFailureReason reason) PURE;
+  virtual void startFallback(Envoy::Config::ConfigUpdateFailureReason reason) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
@@ -97,12 +97,14 @@ public:
    *                  resources for type_url will result in callbacks.
    * @param callbacks the callbacks to be notified of configuration updates. These must be valid
    *                  until GrpcMuxWatch is destroyed.
+   * @param tried_fallback this subscription is treated as already fallbacked them. this parameter
+   * is used to prevent double fallback.
    * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
    * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
    */
   virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
                                     const std::set<std::string>& resources,
-                                    GrpcMuxCallbacks& callbacks, bool fallbacked = false) PURE;
+                                    GrpcMuxCallbacks& callbacks, bool tried_fallback = false) PURE;
 
   /**
    * Pause discovery requests for a given API type. This is useful when we're processing an update
@@ -131,7 +133,8 @@ public:
   virtual Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                   const std::set<std::string>& resources,
                                   SubscriptionCallbacks& callbacks,
-                                  std::chrono::milliseconds init_fetch_timeout) PURE;
+                                  std::chrono::milliseconds init_fetch_timeout,
+                                  bool tried_fallback = false) PURE;
   virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
 
   /**
@@ -163,7 +166,7 @@ public:
    * For the GrpcStream to prompt the context to take appropriate action in response to
    * failure to establish the gRPC stream.
    */
-  virtual void onEstablishmentFailure(bool remote_close = true) PURE;
+  virtual void onEstablishmentFailure() PURE;
 
   /**
    * For the GrpcStream to pass received protos to the context.
@@ -174,6 +177,11 @@ public:
    * For the GrpcStream to call when its rate limiting logic allows more requests to be sent.
    */
   virtual void onWriteable() PURE;
+
+  /**
+   * For gRPC stream to try fallback.
+   */
+  virtual void onFallback() PURE;
 };
 
 } // namespace Config

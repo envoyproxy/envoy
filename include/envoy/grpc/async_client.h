@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
@@ -177,7 +178,8 @@ public:
   virtual RawAsyncStream* startRaw(absl::string_view service_full_name,
                                    absl::string_view method_name,
                                    RawAsyncStreamCallbacks& callbacks,
-                                   const Http::AsyncClient::StreamOptions& options) PURE;
+                                   const Http::AsyncClient::StreamOptions& options,
+                                   std::function<void()> retryer) PURE;
 };
 
 using RawAsyncClientPtr = std::unique_ptr<RawAsyncClient>;

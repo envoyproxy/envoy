@@ -117,7 +117,8 @@ AsyncRequest* GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name
 RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_name,
                                                 absl::string_view method_name,
                                                 RawAsyncStreamCallbacks& callbacks,
-                                                const Http::AsyncClient::StreamOptions& options) {
+                                                const Http::AsyncClient::StreamOptions& options,
+                                                std::function<void()>) {
   auto grpc_stream = std::make_unique<GoogleAsyncStreamImpl>(*this, service_full_name, method_name,
                                                              callbacks, options);
 

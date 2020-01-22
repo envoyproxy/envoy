@@ -34,7 +34,7 @@ void FilesystemSubscriptionImpl::updateResourceInterest(const std::set<std::stri
   stats_.update_attempt_.inc();
 }
 
-void FilesystemSubscriptionImpl::fallback(const std::set<std::string>&) {}
+void FilesystemSubscriptionImpl::updateTypeUrl(const std::set<std::string>&) {}
 
 void FilesystemSubscriptionImpl::configRejected(const EnvoyException& e,
                                                 const std::string& message) {

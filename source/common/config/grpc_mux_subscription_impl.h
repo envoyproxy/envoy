@@ -24,14 +24,14 @@ public:
   // Config::Subscription
   void start(const std::set<std::string>& resource_names) override;
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
-  void fallback(const std::set<std::string>& resources) override;
+  void updateTypeUrl(const std::set<std::string>& resources) override;
 
   // Config::GrpcMuxCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
-  void onTryFallback(Envoy::Config::ConfigUpdateFailureReason reason) override;
+  void startFallback(Envoy::Config::ConfigUpdateFailureReason reason) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
 
 private:

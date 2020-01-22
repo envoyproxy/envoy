@@ -1,5 +1,7 @@
 #include "common/config/subscription_factory_impl.h"
 
+#include <memory>
+
 #include "envoy/config/core/v3alpha/config_source.pb.h"
 
 #include "common/config/delta_subscription_impl.h"
@@ -86,12 +88,12 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   case envoy::config::core::v3alpha::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     if (cm_.adsMux()->isDelta()) {
       result = std::make_unique<DeltaSubscriptionImpl>(
-          cm_.adsMux(), type_url, callbacks, stats,
-          Utility::configSourceInitialFetchTimeout(config), true);
+          std::dynamic_pointer_cast<Config::NewGrpcMuxImpl>(cm_.adsMux()), type_url, callbacks,
+          stats, Utility::configSourceInitialFetchTimeout(config), true);
     } else {
       result = std::make_unique<GrpcMuxSubscriptionImpl>(
-          cm_.adsMux(), callbacks, stats, type_url, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config));
+          std::dynamic_pointer_cast<Config::GrpcMuxImpl>(cm_.adsMux()), callbacks, stats, type_url,
+          dispatcher_, Utility::configSourceInitialFetchTimeout(config));
     }
     break;
   }

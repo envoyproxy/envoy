@@ -35,7 +35,7 @@ public:
   // Config::Subscription
   void start(const std::set<std::string>& resource_names) override;
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
-  void fallback(const std::set<std::string>& resources) override;
+  void updateTypeUrl(const std::set<std::string>& resources) override;
 
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;

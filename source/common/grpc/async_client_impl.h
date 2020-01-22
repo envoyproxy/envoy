@@ -28,7 +28,8 @@ public:
                         const Http::AsyncClient::RequestOptions& options) override;
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
                            RawAsyncStreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions& options) override;
+                           const Http::AsyncClient::StreamOptions& options,
+                           std::function<void()> retryer = {}) override;
 
 private:
   Upstream::ClusterManager& cm_;
@@ -48,7 +49,8 @@ class AsyncStreamImpl : public RawAsyncStream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                   absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
-                  const Http::AsyncClient::StreamOptions& options);
+                  const Http::AsyncClient::StreamOptions& options,
+                  std::function<void()> retryer = {});
 
   virtual void initialize(bool buffer_body_for_retry);
 
@@ -88,6 +90,8 @@ private:
   Decoder decoder_;
   // This is a member to avoid reallocation on every onData().
   std::vector<Frame> decoded_frames_;
+  // This is used to retry.
+  std::function<void()> retryer_;
 
   friend class AsyncClientImpl;
 };

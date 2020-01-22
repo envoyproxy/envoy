@@ -38,7 +38,7 @@ public:
 
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            GrpcMuxCallbacks& callbacks, bool fallbacked = false) override;
+                            GrpcMuxCallbacks& callbacks, bool tried_fallback = false) override;
 
   // GrpcMux
   // TODO(fredlas) PR #8478 will remove this.
@@ -48,7 +48,7 @@ public:
   bool paused(const std::string& type_url) const override;
 
   Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
-                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
+                          SubscriptionCallbacks&, std::chrono::milliseconds, bool) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -60,10 +60,11 @@ public:
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
-  void onEstablishmentFailure(bool) override;
+  void onEstablishmentFailure() override;
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message) override;
   void onWriteable() override;
+  void onFallback() override;
 
   GrpcStream<envoy::service::discovery::v3alpha::DiscoveryRequest,
              envoy::service::discovery::v3alpha::DiscoveryResponse>&
@@ -117,7 +118,7 @@ private:
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
     // Has this api ever downgraded api version?
-    bool fallbacked_{};
+    bool tried_fallback_{};
   };
 
   // Request queue management logic.
@@ -156,7 +157,7 @@ public:
   bool paused(const std::string&) const override { return false; }
 
   Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
-                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
+                          SubscriptionCallbacks&, std::chrono::milliseconds, bool) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
   void removeWatch(const std::string&, Watch*) override {
@@ -165,9 +166,10 @@ public:
 
   void onWriteable() override {}
   void onStreamEstablished() override {}
-  void onEstablishmentFailure(bool) override {}
+  void onEstablishmentFailure() override {}
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&&) override {}
+  void onFallback() override{};
 };
 
 } // namespace Config

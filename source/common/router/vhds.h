@@ -70,7 +70,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::route::v3alpha::VirtualHost>(resource).name();
   }
-  void kickFallback() override { subscription_->fallback({}); }
+  void kickFallback() override { subscription_->updateTypeUrl({}); }
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   RouteConfigUpdatePtr& config_update_info_;

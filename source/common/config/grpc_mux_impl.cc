@@ -86,7 +86,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 
 GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
                                        const std::set<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks, bool fallbacked) {
+                                       GrpcMuxCallbacks& callbacks, bool tried_fallback) {
   auto watch =
       std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
   ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
@@ -99,7 +99,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
     api_state_[type_url].request_.set_type_url(type_url);
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
-    api_state_[type_url].fallbacked_ = fallbacked;
+    api_state_[type_url].tried_fallback_ = tried_fallback;
     subscriptions_.emplace_back(type_url);
   }
 
@@ -139,6 +139,25 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
     return false;
   }
   return entry->second.paused_;
+}
+
+void GrpcMuxImpl::onFallback() {
+  const auto current_type_url = subscriptions_.back();
+  const auto& fallback_sub = api_state_.find(current_type_url);
+  assert(fallback_sub != api_state_.end());
+  // Check whether it can fallback with checking if attempted type url is alpha version, closed
+  // remotely, done fallback already.
+  bool challenge_fallback =
+      !fallback_sub->second.tried_fallback_ && TypeUrl::get().isAlphaApiVersion(current_type_url);
+
+  // Try to execute fallback to downgrade xDS api version if specified API version is not
+  // supported on management server. It attempts once.
+  if (challenge_fallback) {
+    while (!fallback_sub->second.watches_.empty()) {
+      auto& watch = fallback_sub->second.watches_.front();
+      watch->callbacks_.startFallback(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure);
+    }
+  }
 }
 
 void GrpcMuxImpl::onDiscoveryResponse(
@@ -232,30 +251,11 @@ void GrpcMuxImpl::onStreamEstablished() {
   }
 }
 
-void GrpcMuxImpl::onEstablishmentFailure(bool remote_close) {
-  for (auto& api_state : api_state_) {
-    // check whether attempted type url is alpha version
-    bool is_alpha = false;
-    const auto current_type_url = api_state.second.request_.type_url();
-    if (current_type_url.find(TypeUrl::get().apiVersionString(
-            envoy::config::core::v3alpha::V3ALPHA)) != std::string::npos) {
-      is_alpha = true;
-    }
-
-    // Try to execute fallback to downgrade xDS api version if specified API version is not
-    // supported on management server. It attempts once.
-    bool try_fallback = !api_state.second.fallbacked_ && !remote_close && is_alpha;
-    if (try_fallback) {
-      for (auto watch : api_state.second.watches_) {
-        watch->callbacks_.onTryFallback(
-            Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure);
-      }
-      pause(current_type_url);
-    } else {
-      for (auto watch : api_state.second.watches_) {
-        watch->callbacks_.onConfigUpdateFailed(
-            Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
-      }
+void GrpcMuxImpl::onEstablishmentFailure() {
+  for (const auto& api_state : api_state_) {
+    for (auto watch : api_state.second.watches_) {
+      watch->callbacks_.onConfigUpdateFailed(
+          Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
     }
   }
 }

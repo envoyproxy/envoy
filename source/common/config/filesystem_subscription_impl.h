@@ -28,7 +28,7 @@ public:
   // unused, and updateResourceInterest is a no-op (other than updating a stat).
   void start(const std::set<std::string>&) override;
   void updateResourceInterest(const std::set<std::string>&) override;
-  void fallback(const std::set<std::string>&) override;
+  void updateTypeUrl(const std::set<std::string>&) override;
 
 private:
   void refresh();

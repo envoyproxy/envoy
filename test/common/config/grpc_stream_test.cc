@@ -76,7 +76,7 @@ TEST_F(GrpcStreamTest, EstablishStream) {
 // sendMessage would segfault.
 TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(callbacks_, onEstablishmentFailure(false));
+  EXPECT_CALL(callbacks_, onEstablishmentFailure());
   grpc_stream_.establishNewStream();
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
 }

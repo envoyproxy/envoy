@@ -34,7 +34,7 @@ public:
   // is_aggregated: whether the underlying mux/context is providing ADS to us and others, or whether
   // it's all ours. The practical difference is that we ourselves must call start() on it only in
   // the latter case.
-  DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
+  DeltaSubscriptionImpl(std::shared_ptr<Config::NewGrpcMuxImpl> context, absl::string_view type_url,
                         SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                         std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
   ~DeltaSubscriptionImpl() override;
@@ -46,7 +46,7 @@ public:
   void start(const std::set<std::string>& resource_names) override;
 
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
-  void fallback(const std::set<std::string>& resources) override;
+  void updateTypeUrl(const std::set<std::string>& resources) override;
 
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -60,10 +60,10 @@ public:
   void kickFallback() override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
 
-  GrpcMuxSharedPtr getContextForTest() { return context_; }
+  std::shared_ptr<Config::NewGrpcMuxImpl> getContextForTest() { return context_; }
 
 private:
-  GrpcMuxSharedPtr context_;
+  std::shared_ptr<Config::NewGrpcMuxImpl> context_;
   std::string type_url_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
