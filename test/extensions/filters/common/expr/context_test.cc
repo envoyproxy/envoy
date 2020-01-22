@@ -296,10 +296,7 @@ TEST(Context, ResponseAttributes) {
     Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
     ResponseWrapper response_no_status(&header_map, &trailer_map, info_without_code);
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
-    EXPECT_TRUE(value.has_value());
-    ASSERT_TRUE(value.value().IsInt64());
-    EXPECT_EQ(0x2,
-              value.value().Int64OrDie()); // unknown when not in trailers, headers, or http code
+    EXPECT_FALSE(value.has_value());
   }
 }
 
