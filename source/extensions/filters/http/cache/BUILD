@@ -21,6 +21,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//source/common/common:logger_lib",
         "//source/common/common:macros",
+        "//source/common/config:utility_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",

@@ -37,8 +37,7 @@ TEST_F(CacheFilterFactoryTest, NoName) {
 TEST_F(CacheFilterFactoryTest, UnregisteredName) {
   config_.set_name("Wrong");
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_THROW(cb(filter_callback_), ProtoValidationException);
-  ;
+  EXPECT_THROW(cb(filter_callback_), EnvoyException);
 }
 } // namespace
 } // namespace Cache

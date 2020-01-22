@@ -3,7 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/http/headers.h"
-
+#include "common/config/utility.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
 
@@ -37,13 +37,7 @@ bool CacheFilter::isCacheableResponse(Http::HeaderMap& headers) {
 
 HttpCache&
 CacheFilter::getCache(const envoy::config::filter::http::cache::v2::CacheConfig& config) {
-  HttpCacheFactory* factory =
-      Registry::FactoryRegistry<HttpCacheFactory>::getFactory(config.name());
-  if (!factory) {
-    throw ProtoValidationException(
-        fmt::format("Didn't find a registered HttpCacheFactory for '{}'", config.name()), config);
-  }
-  return factory->getCache();
+  return Config::Utility::getAndCheckFactory<HttpCacheFactory>(config).getCache();
 }
 
 CacheFilter::CacheFilter(const envoy::config::filter::http::cache::v2::CacheConfig& config,

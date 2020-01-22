@@ -40,9 +40,12 @@ message CacheConfig {
     repeated api.v2.route.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
+  // Config specific to the cache storage implementation.
+  google.protobuf.Any typed_config = 1;
+
   // Name of cache implementation to use, as specified in the intended HttpCacheFactory
   // implementation. Cache names should use reverse DNS format, though this is not enforced.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 2;
 
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement *vary* headers>
@@ -52,18 +55,18 @@ message CacheConfig {
   // responses whose *Vary* headers (if any) are matched by a matcher in this
   // list. If allowed_vary_headers is empty, responses with *vary* headers will
   // not be cached.
-  repeated type.matcher.StringMatcher allowed_vary_headers = 2;
+  repeated type.matcher.StringMatcher allowed_vary_headers = 3;
 
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement key customization>
   //
   // Modifies cache key creation by restricting which parts of the URL are included.
-  KeyCreatorParams key_creator_params = 3;
+  KeyCreatorParams key_creator_params = 4;
 
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement size limit>
   //
   // Max body size the cache filter will insert into a cache. 0 means unlimited (though the cache
   // storage implementation may have its own limit beyond which it will reject insertions).
-  uint32 max_body_bytes = 4;
+  uint32 max_body_bytes = 5;
 }
