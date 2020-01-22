@@ -310,7 +310,7 @@ public:
   virtual ~HttpCacheFactory() = default;
 
 private:
-  std::string name_;
+  const std::string name_;
 };
 using HttpCacheFactoryPtr = std::unique_ptr<HttpCacheFactory>;
 } // namespace Cache
