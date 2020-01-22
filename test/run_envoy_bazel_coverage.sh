@@ -26,7 +26,7 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
 
 BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
-    -c fastbuild --copt=-DNDEBUG --config=clang-asan --instrumentation_filter=//source/...,//include/... \
+    -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
     --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=errors \
     --test_arg="--log-path /dev/null" --test_arg="-l trace" --test_env=HEAPCHECK= \
     //test/coverage:coverage_tests
