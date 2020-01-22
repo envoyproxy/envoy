@@ -106,7 +106,8 @@ public:
    * @path full file path on input which is truncated to the path
    * @name the resulting file name component from the input path
    */
-  virtual void splitFileName(std::string& path, std::string& name) PURE;
+  virtual std::pair<absl::string_view, absl::string_view>
+  splitPathFromFilename(absl::string_view path) PURE;
 
   /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This

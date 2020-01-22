@@ -164,23 +164,24 @@ UNOWNED_EXTENSIONS = {
 # yapf: enable
 
 
-# Map a line transformation function across each line of a file.
-# .bak temporaries.
-def replaceLines(path, line_xform):
+# Map a line transformation function across each line of a file,
+# writing the result lines as requested.
+def evaluateLines(path, line_xform, write=True):
   format_flag = True
   output_lines = []
-  for line in readLines(path):
+  for line_number, line in enumerate(readLines(path)):
     if line.find("// clang-format on") != -1:
       format_flag = True
     if line.find("// clang-format off") != -1:
       format_flag = False
     if format_flag:
-      output_lines.append(line_xform(line))
+      output_lines.append(line_xform(line, line_number))
     else:
       output_lines.append(line)
   # We used to use fileinput in the older Python 2.7 script, but this doesn't do
   # inplace mode and UTF-8 in Python 3, so doing it the manual way.
-  pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
+  if write:
+    pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
 
 
 # Obtain all the lines in a given file.
@@ -419,26 +420,22 @@ def checkFileContents(file_path, checker):
     # notes have a different format.
     checkCurrentReleaseNotes(file_path, error_messages)
 
-  format_flag = True
-  for line_number, line in enumerate(readLines(file_path)):
-
-    if line.find("// clang-format on") != -1:
-      format_flag = True
-    if line.find("// clang-format off") != -1:
-      format_flag = False
+  def checkFormatErrors(line, line_number):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
-    if format_flag:
-      checker(line, file_path, reportError)
+    checker(line, file_path, reportError)
+
+  evaluateLines(file_path, checkFormatErrors, False)
+
   return error_messages
 
 
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 
 
-def fixSourceLine(line):
+def fixSourceLine(line, line_number):
   # Strip double space after '.'  This may prove overenthusiastic and need to
   # be restricted to comments and metadata files but works for now.
   line = re.sub(DOT_MULTI_SPACE_REGEX, ". ", line)
@@ -623,7 +620,7 @@ def checkBuildLine(line, file_path, reportError):
     reportError("Superfluous '@envoy//' prefix")
 
 
-def fixBuildLine(file_path, line):
+def fixBuildLine(file_path, line, line_number):
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
       not isExternalBuildFile(file_path)):
     line = line.replace("@envoy//", "//")
@@ -631,7 +628,7 @@ def fixBuildLine(file_path, line):
 
 
 def fixBuildPath(file_path):
-  replaceLines(file_path, functools.partial(fixBuildLine, file_path))
+  evaluateLines(file_path, functools.partial(fixBuildLine, file_path))
 
   error_messages = []
 
@@ -671,7 +668,7 @@ def checkBuildPath(file_path):
 
 
 def fixSourcePath(file_path):
-  replaceLines(file_path, fixSourceLine)
+  evaluateLines(file_path, fixSourceLine)
 
   error_messages = []
 

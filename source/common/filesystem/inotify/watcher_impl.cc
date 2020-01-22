@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
@@ -15,8 +16,8 @@
 namespace Envoy {
 namespace Filesystem {
 
-WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
-    : inotify_fd_(inotify_init1(IN_NONBLOCK)),
+WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
+    : api_(api), inotify_fd_(inotify_init1(IN_NONBLOCK)),
       inotify_event_(dispatcher.createFileEvent(
           inotify_fd_,
           [this](uint32_t events) -> void {
@@ -30,15 +31,15 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 
-void WatcherImpl::addWatch(const std::string& path, uint32_t events, OnChangedCb callback) {
+void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb callback) {
   // Because of general inotify pain, we always watch the directory that the file lives in,
   // and then synthetically raise per file events.
-  std::string directory(path);
-  std::string file;
-  file_system_.splitFileName(directory, file);
+  auto result = api_.fileSystem().splitPathFromFilename(path);
+  auto directory = result.first;
+  auto file = std::string(result.second);
 
   const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
-  int watch_fd = inotify_add_watch(inotify_fd_, directory.c_str(), watch_mask);
+  int watch_fd = inotify_add_watch(inotify_fd_, std::string(directory).c_str(), watch_mask);
   if (watch_fd == -1) {
     throw EnvoyException(
         fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(errno)));

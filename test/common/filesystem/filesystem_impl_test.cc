@@ -121,46 +121,40 @@ TEST_F(FileSystemImplTest, CanonicalPathFail) {
 }
 #endif
 
-TEST_F(FileSystemImplTest, splitFileName) {
-  std::string name;
-  name.reserve(255);
-  std::string path = "/foo/bar/baz";
-  file_system_.splitFileName(path, name);
-  EXPECT_EQ(path, "/foo/bar");
-  EXPECT_EQ(name, "baz");
-  file_system_.splitFileName(path, name);
-  EXPECT_EQ(path, "/foo");
-  EXPECT_EQ(name, "bar");
-  file_system_.splitFileName(path, name);
-  EXPECT_EQ(path, "/");
-  EXPECT_EQ(name, "foo");
-  file_system_.splitFileName(path, name);
-  EXPECT_EQ(path, "/");
-  EXPECT_EQ(name, "");
-  std::string invalid_path = "nopathdelimeter";
-  EXPECT_THROW(file_system_.splitFileName(invalid_path, name), EnvoyException);
+TEST_F(FileSystemImplTest, splitPathFromFilename) {
+  std::pair<absl::string_view, absl::string_view> result;
+  result = file_system_.splitPathFromFilename("/foo/bar/baz");
+  EXPECT_EQ(result.first, "/foo/bar");
+  EXPECT_EQ(result.second, "baz");
+  result = file_system_.splitPathFromFilename("/foo/bar");
+  EXPECT_EQ(result.first, "/foo");
+  EXPECT_EQ(result.second, "bar");
+  result = file_system_.splitPathFromFilename("/foo");
+  EXPECT_EQ(result.first, "/");
+  EXPECT_EQ(result.second, "foo");
+  result = file_system_.splitPathFromFilename("/");
+  EXPECT_EQ(result.first, "/");
+  EXPECT_EQ(result.second, "");
+  EXPECT_THROW(file_system_.splitPathFromFilename("nopathdelimeter"), EnvoyException);
 #ifdef WIN32
-  std::string win32_path = "C:\\foo/bar/baz";
-  file_system_.splitFileName(win32_path, name);
-  EXPECT_EQ(win32_path, "C:\\foo/bar");
-  EXPECT_EQ(name, "baz");
-  file_system_.splitFileName(win32_path, name);
-  EXPECT_EQ(win32_path, "C:\\foo");
-  EXPECT_EQ(name, "bar");
-  file_system_.splitFileName(win32_path, name);
-  EXPECT_EQ(win32_path, "C:\\");
-  EXPECT_EQ(name, "foo");
-  file_system_.splitFileName(win32_path, name);
-  EXPECT_EQ(win32_path, "C:\\");
-  EXPECT_EQ(name, "");
-  win32_path.pop_back();
-  file_system_.splitFileName(win32_path, name);
-  EXPECT_EQ(win32_path, "C:");
-  EXPECT_EQ(name, "");
-  std::string unc_path = "\\\\?\\C:\\";
-  file_system_.splitFileName(unc_path, name);
-  EXPECT_EQ(unc_path, "\\\\?\\C:\\");
-  EXPECT_EQ(name, "");
+  result = file_system_.splitPathFromFilename("c:\\foo/bar");
+  EXPECT_EQ(result.first, "c:\\foo");
+  EXPECT_EQ(result.second, "bar");
+  result = file_system_.splitPathFromFilename("c:/foo\\bar");
+  EXPECT_EQ(result.first, "c:/foo");
+  EXPECT_EQ(result.second, "bar");
+  result = file_system_.splitPathFromFilename("c:\\foo");
+  EXPECT_EQ(result.first, "c:\\");
+  EXPECT_EQ(result.second, "foo");
+  result = file_system_.splitPathFromFilename("c:foo");
+  EXPECT_EQ(result.first, "c:");
+  EXPECT_EQ(result.second, "foo");
+  result = file_system_.splitPathFromFilename("c:");
+  EXPECT_EQ(result.first, "c:");
+  EXPECT_EQ(result.second, "");
+  result = file_system_.splitPathFromFilename("\\\\?\\C:\\");
+  EXPECT_EQ(result.first, "\\\\?\\C:\\");
+  EXPECT_EQ(result.second, "");
 #endif
 }
 

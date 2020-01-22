@@ -8,7 +8,8 @@ namespace Envoy {
 namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
-    : os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+    WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
+    : api_(api), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
   SOCKET_FD socks[2];
   Api::SysCallIntResult result = os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
   ASSERT(result.rc_ == 0);
@@ -41,72 +42,63 @@ WatcherImpl::~WatcherImpl() {
   watch_thread_->join();
 
   for (auto& entry : callback_map_) {
-    ::CloseHandle(entry.second->hDir_);
-    ::CloseHandle(entry.second->op_.hEvent);
+    ::CloseHandle(entry.second->dir_handle_);
+    ::CloseHandle(entry.second->overlapped_.hEvent);
   }
   ::CloseHandle(thread_exit_event_);
   ::closesocket(event_read_);
   ::closesocket(event_write_);
 }
 
-void WatcherImpl::addWatch(const std::string& path, uint32_t events, OnChangedCb cb) {
-  std::string dir_narrow(path);
-  std::string file_narrow;
-  file_system_.splitFileName(dir_narrow, file_narrow);
+void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
+  auto result = api_.fileSystem().splitPathFromFilename(path);
+  auto dir_narrow = result.first;
+  auto file_narrow = result.second;
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
-  const std::wstring directory = cvt_.from_bytes(dir_narrow);
-  const std::wstring file = cvt_.from_bytes(file_narrow);
+  const std::wstring directory = wstring_converter_.from_bytes(dir_narrow);
+  const std::wstring file = wstring_converter_.from_bytes(file_narrow);
 
-  const HANDLE hDir = CreateFileW(
+  const HANDLE dir_handle = CreateFileW(
       directory.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
       nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
-  if (hDir == INVALID_HANDLE_VALUE) {
+  if (dir_handle == INVALID_HANDLE_VALUE) {
     throw EnvoyException(
         fmt::format("unable to open directory {}: {}", dir_narrow, GetLastError()));
   }
   std::string fii_key(sizeof(FILE_ID_INFO), '\0');
-  if (!GetFileInformationByHandleEx(hDir, FileIdInfo, &fii_key[0], sizeof(FILE_ID_INFO))) {
-    throw EnvoyException(
-        fmt::format("unable to identify directory {}: {}", dir_narrow, GetLastError()));
-  }
-
+  RELEASE_ASSERT(GetFileInformationByHandleEx(dir_handle, FileIdInfo, &fii_key[0], sizeof(FILE_ID_INFO)),
+                 fmt::format("unable to identify directory {}: {}", dir_narrow, GetLastError());
   if (callback_map_.find(fii_key) != callback_map_.end()) {
-    CloseHandle(hDir);
+    CloseHandle(dir_handle);
   } else {
     callback_map_[fii_key] = std::make_unique<DirectoryWatch>();
-    callback_map_[fii_key]->hDir_ = hDir;
+    callback_map_[fii_key]->dir_handle_ = dir_handle;
     callback_map_[fii_key]->buffer_.resize(16384);
     callback_map_[fii_key]->watcher_ = this;
 
     // According to Microsoft docs, "the hEvent member of the OVERLAPPED structure is not used by
     // the system, so you can use it yourself". We will use it for synchronization of the completion
     // routines
-    HANDLE hEvent = ::CreateEvent(nullptr, false, false, nullptr);
-    if (hEvent == NULL) {
-      throw EnvoyException(fmt::format("CreateEvent failed: {}", GetLastError()));
-    }
+    HANDLE event_handle = ::CreateEvent(nullptr, false, false, nullptr);
+    RELEASE_ASSERT(event_handle, fmt::format("CreateEvent failed: {}", GetLastError()));
 
-    callback_map_[fii_key]->op_.hEvent = hEvent;
-    dir_watch_complete_events_.push_back(hEvent);
+    callback_map_[fii_key]->overlapped_.hEvent = event_handle;
+    dir_watch_complete_events_.push_back(event_handle);
 
     // send the first ReadDirectoryChangesW request to our watch thread. This ensures that all of
     // the io completion routines will run in that thread
     DWORD rc = ::QueueUserAPC(&issueFirstRead,
                               static_cast<Thread::ThreadImplWin32*>(watch_thread_.get())->handle(),
                               reinterpret_cast<ULONG_PTR>(callback_map_[fii_key].get()));
-
-    if (rc == 0) {
-      throw EnvoyException(fmt::format("QueueUserAPC failed: {}", GetLastError()));
-    }
+    RELEASE_ASSERT(rc, fmt::format("QueueUserAPC failed: {}", GetLastError()));
 
     // wait for issueFirstRead to confirm that it has issued a call to ReadDirectoryChangesW
-    rc = ::WaitForSingleObject(hEvent, INFINITE);
-    if (rc != WAIT_OBJECT_0) {
-      throw EnvoyException(fmt::format("WaitForSingleObject failed: {}", GetLastError()));
-    }
+    rc = ::WaitForSingleObject(event_handle, INFINITE);
+    RELEASE_ASSERT(rc == WAIT_OBJECT_0,
+                   fmt::format("WaitForSingleObject failed: {}", GetLastError()));
 
-    ENVOY_LOG(debug, "created watch for directory: '{}' handle: {}", dir_narrow, hDir);
+    ENVOY_LOG(debug, "created watch for directory: '{}' handle: {}", dir_narrow, dir_handle);
   }
 
   callback_map_[fii_key]->watches_.push_back({file, events, cb});
@@ -142,16 +134,17 @@ void WatcherImpl::issueFirstRead(ULONG_PTR param) {
   // a pointer to DirectoryWatch as the OVERLAPPED for ReadDirectoryChangesW. Then, the
   // completion routine can use its OVERLAPPED* parameter to access the DirectoryWatch see:
   // https://docs.microsoft.com/en-us/windows/desktop/ipc/named-pipe-server-using-completion-routines
-  ReadDirectoryChangesW(dir_watch->hDir_, &(dir_watch->buffer_[0]), dir_watch->buffer_.capacity(),
-                        false, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
-                        nullptr, reinterpret_cast<LPOVERLAPPED>(param), &directoryChangeCompletion);
+  ReadDirectoryChangesW(dir_watch->dir_handle_, &(dir_watch->buffer_[0]),
+                        dir_watch->buffer_.capacity(), false,
+                        FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, nullptr,
+                        reinterpret_cast<LPOVERLAPPED>(param), &directoryChangeCompletion);
 
-  const BOOL rc = ::SetEvent(dir_watch->op_.hEvent);
+  const BOOL rc = ::SetEvent(dir_watch->overlapped_.hEvent);
   ASSERT(rc);
 }
 
-void WatcherImpl::endDirectoryWatch(SOCKET_FD sock, HANDLE hEvent) {
-  const BOOL rc = ::SetEvent(hEvent);
+void WatcherImpl::endDirectoryWatch(SOCKET_FD sock, HANDLE event_handle) {
+  const BOOL rc = ::SetEvent(event_handle);
   ASSERT(rc);
   // let libevent know that a ReadDirectoryChangesW call returned
   const char data = 0;
@@ -167,16 +160,16 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
 
   if (err == ERROR_OPERATION_ABORTED) {
     ENVOY_LOG(debug, "ReadDirectoryChangesW aborted, exiting");
-    endDirectoryWatch(watcher->event_write_, dir_watch->op_.hEvent);
+    endDirectoryWatch(watcher->event_write_, dir_watch->overlapped_.hEvent);
     return;
   } else if (err != 0) {
     ENVOY_LOG(error, "ReadDirectoryChangesW errored: {}, exiting", err);
-    endDirectoryWatch(watcher->event_write_, dir_watch->op_.hEvent);
+    endDirectoryWatch(watcher->event_write_, dir_watch->overlapped_.hEvent);
     return;
   } else if (num_bytes < sizeof(_FILE_NOTIFY_INFORMATION)) {
     ENVOY_LOG(error, "ReadDirectoryChangesW returned {} bytes, expected {}, exiting", num_bytes,
               sizeof(_FILE_NOTIFY_INFORMATION));
-    endDirectoryWatch(watcher->event_write_, dir_watch->op_.hEvent);
+    endDirectoryWatch(watcher->event_write_, dir_watch->overlapped_.hEvent);
     return;
   }
 
@@ -185,8 +178,8 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
     fni = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(reinterpret_cast<char*>(fni) + next_entry);
     // the length of the file name is given in bytes, not wide characters
     std::wstring file(fni->FileName, fni->FileNameLength / 2);
-    ENVOY_LOG(debug, "notification: handle: {} action: {:x} file: {}", dir_watch->hDir_,
-              fni->Action, watcher->cvt_.to_bytes(file));
+    ENVOY_LOG(debug, "notification: handle: {} action: {:x} file: {}", dir_watch->dir_handle_,
+              fni->Action, watcher->wstring_converter_.to_bytes(file));
 
     uint32_t events = 0;
     if (fni->Action == FILE_ACTION_RENAMED_NEW_NAME) {
@@ -198,7 +191,7 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
 
     for (FileWatch& watch : dir_watch->watches_) {
       if (watch.file_ == file && (watch.events_ & events)) {
-        ENVOY_LOG(debug, "matched callback: file: {}", watcher->cvt_.to_bytes(file));
+        ENVOY_LOG(debug, "matched callback: file: {}", watcher->wstring_converter_.to_bytes(file));
         const auto cb = watch.cb_;
         const auto cb_closure = [cb, events]() -> void { cb(events); };
         watcher->active_callbacks_.push(cb_closure);
@@ -217,14 +210,15 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
   } while (next_entry != 0);
 
   if (!watcher->keep_watching_.load()) {
-    ENVOY_LOG(debug, "ending watch on directory: handle: {}", dir_watch->hDir_);
-    endDirectoryWatch(watcher->event_write_, dir_watch->op_.hEvent);
+    ENVOY_LOG(debug, "ending watch on directory: handle: {}", dir_watch->dir_handle_);
+    endDirectoryWatch(watcher->event_write_, dir_watch->overlapped_.hEvent);
     return;
   }
 
-  ReadDirectoryChangesW(dir_watch->hDir_, &(dir_watch->buffer_[0]), dir_watch->buffer_.capacity(),
-                        false, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE,
-                        nullptr, overlapped, directoryChangeCompletion);
+  ReadDirectoryChangesW(dir_watch->dir_handle_, &(dir_watch->buffer_[0]),
+                        dir_watch->buffer_.capacity(), false,
+                        FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE, nullptr,
+                        overlapped, directoryChangeCompletion);
 }
 
 void WatcherImpl::watchLoop() {
@@ -246,7 +240,7 @@ void WatcherImpl::watchLoop() {
   }
 
   for (auto& entry : callback_map_) {
-    ::CancelIoEx(entry.second->hDir_, nullptr);
+    ::CancelIoEx(entry.second->dir_handle_, nullptr);
   }
 
   const int num_directories = dir_watch_complete_events_.size();

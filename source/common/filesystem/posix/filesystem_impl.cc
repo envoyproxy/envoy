@@ -108,18 +108,17 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
-void InstanceImplPosix::splitFileName(std::string& path, std::string& name) {
+std::pair<absl::string_view, absl::string_view>
+InstanceImplPosix::splitPathFromFilename(absl::string_view path) {
   size_t last_slash = path.rfind('/');
   if (last_slash == std::string::npos) {
     throw EnvoyException(fmt::format("invalid file path {}", path));
   }
-
-  name.clear();
-  name.append(path.substr(last_slash + 1, std::string::npos));
-
-  // Retain entire single '/' root path
-  // truncate all other trailing slashes
-  path.resize(last_slash + (last_slash == 0));
+  absl::string_view name = path.substr(last_slash + 1);
+  // truncate all trailing slashes, except root slash
+  if (last_slash == 0)
+    ++last_slash;
+  return std::make_pair(path.substr(0, last_slash), name);
 }
 
 bool InstanceImplPosix::illegalPath(const std::string& path) {

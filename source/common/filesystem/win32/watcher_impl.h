@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 
@@ -16,7 +17,6 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/thread_impl.h"
-#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -27,7 +27,7 @@ public:
   ~WatcherImpl();
 
   // Filesystem::Watcher
-  void addWatch(const std::string& path, uint32_t events, OnChangedCb cb) override;
+  void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
 
 private:
   static void issueFirstRead(ULONG_PTR param);
@@ -46,16 +46,17 @@ private:
   typedef std::function<void(void)> CbClosure;
 
   struct DirectoryWatch {
-    OVERLAPPED op_;
+    OVERLAPPED overlapped_;
     std::list<FileWatch> watches_;
-    HANDLE hDir_;
+    HANDLE dir_handle_;
     std::vector<uint8_t> buffer_;
     WatcherImpl* watcher_;
   };
 
   typedef std::unique_ptr<DirectoryWatch> DirectoryWatchPtr;
 
-  std::unordered_map<std::string, DirectoryWatchPtr> callback_map_;
+  Api::Api& api_;
+  std::unordered_map<absl::string_view, DirectoryWatchPtr> callback_map_;
   Event::FileEventPtr directory_event_;
   SOCKET_FD event_write_;
   SOCKET_FD event_read_;
@@ -66,8 +67,7 @@ private:
   std::atomic<bool> keep_watching_;
   concurrency::concurrent_queue<CbClosure> active_callbacks_;
   Api::OsSysCallsImpl& os_sys_calls_;
-  InstanceImplWin32 file_system_;
-  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> cvt_;
+  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> wstring_converter_;
 };
 
 } // namespace Filesystem

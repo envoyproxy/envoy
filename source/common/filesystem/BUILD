@@ -106,7 +106,7 @@ envoy_cc_library(
         "//conditions:default": "inotify",
     }),
     deps = [
-        ":filesystem_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",

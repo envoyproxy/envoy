@@ -52,7 +52,8 @@ public:
   MOCK_METHOD1(directoryExists, bool(const std::string&));
   MOCK_METHOD1(fileSize, ssize_t(const std::string&));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string&));
-  MOCK_METHOD2(splitFileName, void(std::string&, std::string&));
+  MOCK_METHOD1(splitPathFromFilename,
+               std::pair<absl::string_view, absl::string_view>(absl::string_view));
   MOCK_METHOD1(illegalPath, bool(const std::string&));
 };
 
@@ -61,7 +62,7 @@ public:
   MockWatcher();
   ~MockWatcher() override;
 
-  MOCK_METHOD3(addWatch, void(const std::string&, uint32_t, OnChangedCb));
+  MOCK_METHOD3(addWatch, void(absl::string_view, uint32_t, OnChangedCb));
 };
 
 } // namespace Filesystem

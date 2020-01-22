@@ -10,6 +10,8 @@
 
 #include "common/json/json_loader.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "tools/cpp/runfiles/runfiles.h"
 
@@ -74,8 +76,8 @@ public:
    * @param path path suffix.
    * @return std::string path qualified with temporary directory.
    */
-  static std::string temporaryPath(const std::string& path) {
-    return temporaryDirectory() + "/" + path;
+  static std::string temporaryPath(absl::string_view path) {
+    return absl::StrCat(temporaryDirectory(), "/", path);
   }
 
   /**

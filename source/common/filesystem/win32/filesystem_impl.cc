@@ -12,6 +12,7 @@
 #include "common/common/fmt.h"
 #include "common/filesystem/filesystem_impl.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 
 namespace Envoy {
@@ -103,19 +104,18 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
-void InstanceImplWin32::splitFileName(std::string& path, std::string& name) {
+std::pair<absl::string_view, absl::string_view>
+InstanceImplWin32::splitPathFromFilename(absl::string_view path) {
   size_t last_slash = path.find_last_of(":/\\");
   if (last_slash == std::string::npos) {
     throw EnvoyException(fmt::format("invalid file path {}", path));
   }
-
-  name.clear();
-  name.append(path.substr(last_slash + 1, std::string::npos));
-
-  // Retain entire single '/', 'd:' drive, and 'd:\' drive root paths
-  // truncate all other trailing slashes
-  path.resize(last_slash +
-              (last_slash == 0 || path[last_slash] == ':' || path[last_slash - 1] == ':'));
+  absl::string_view name = path.substr(last_slash + 1);
+  // Truncate all trailing slashes, but retain the entire
+  // single '/', 'd:' drive, and 'd:\' drive root paths
+  if (last_slash == 0 || path[last_slash] == ':' || path[last_slash - 1] == ':')
+    ++last_slash;
+  return std::make_pair(path.substr(0, last_slash), name);
 }
 
 // clang-format off
@@ -172,15 +172,12 @@ bool InstanceImplWin32::illegalPath(const std::string& path) {
     else
       return true;
   }
-  // TODO(Pivotal): Handle \??\ NT syntax? Reject it?
-
   // Examine and accept D: drive prefix (last opportunity to
   // accept a colon in the file path) and skip the D: component
   // This may result in a relative-to working directory or absolute path on D:
   if (pathname.size() >= 2 && std::isalpha(pathname[0]) && pathname[1] == ':') {
     pathname = pathname.substr(2);
   }
-
   std::string ucase_prefix("   ");
   std::vector<std::string> pathelts = absl::StrSplit(pathname, absl::ByAnyChar("/\\"));
   for (const std::string& elt : pathelts) {
