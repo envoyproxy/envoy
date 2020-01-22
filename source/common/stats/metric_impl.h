@@ -60,16 +60,7 @@ public:
              SymbolTable& symbol_table)
       : helper_(name, tag_extracted_name, tags, symbol_table) {}
 
-  /*
-  // Alternate API to take the name as a StatName, which is needed at most call-sites.
-  // TODO(jmarantz): refactor impl to either be able to pass string_view at call-sites
-  // always, or to make it more efficient to populate a StatNameList with a mixture of
-  // StatName and string_view.
-  MetricImpl(absl::string_view name, absl::string_view tag_extracted_name,
-             const std::vector<Tag>& tags, SymbolTable& symbol_table)
-
-      : MetricImpl(symbol_table.toString(name), tag_extracted_name, tags, symbol_table) {}
-  */
+  // Empty construction of a MetricImpl; used for null stats.
   explicit MetricImpl(SymbolTable& symbol_table)
       : MetricImpl(StatNameManagedStorage("", symbol_table).statName(), "", std::vector<Tag>(),
                    symbol_table) {}
