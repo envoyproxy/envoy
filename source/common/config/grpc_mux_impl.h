@@ -138,34 +138,5 @@ private:
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
-class NullGrpcMuxImpl : public GrpcMux,
-                        GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
-public:
-  void start() override {}
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
-  // TODO(fredlas) PR #8478 will remove this.
-  bool isDelta() const override { return false; }
-  void pause(const std::string&) override {}
-  void resume(const std::string&) override {}
-  bool paused(const std::string&) const override { return false; }
-
-  Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
-                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
-  void removeWatch(const std::string&, Watch*) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
-
-  void onWriteable() override {}
-  void onStreamEstablished() override {}
-  void onEstablishmentFailure() override {}
-  void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&&) override {}
-};
-
 } // namespace Config
 } // namespace Envoy
