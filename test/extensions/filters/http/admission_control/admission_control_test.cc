@@ -65,7 +65,7 @@ public:
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
-    filter_ = std::make_shared<AdmissionControlFilter>(config, "foo.bar.");
+    filter_ = std::make_shared<AdmissionControlFilter>(config, "test_prefix.");
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -303,9 +303,11 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   }
 
   // We expect rejections due to the failure rate.
+  EXPECT_EQ(0, scope_.counter("test_prefix.rq_rejected").value());
   Http::TestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, scope_.counter("test_prefix.rq_rejected").value());
 
   // Wait to phase out historical data.
   time_system_.sleep(std::chrono::seconds(10));
