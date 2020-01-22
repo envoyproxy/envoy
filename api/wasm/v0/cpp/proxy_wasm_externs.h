@@ -32,8 +32,8 @@
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
 enum class OnVmStartResult : uint32_t {
-  BadConfiguration = 0,
-  Ok = 1,
+  Ok = 0,
+  BadConfiguration = 1,
 };
 extern "C" OnVmStartResult proxy_on_vm_start(uint32_t root_context_id,
                                              uint32_t vm_configuration_size);
@@ -48,8 +48,8 @@ extern "C" OnVmStartResult proxy_on_vm_start(uint32_t root_context_id,
  * @return non-zero on success and zero on failure (i.e. bad configuration).
  */
 enum class OnValidateConfigurationResult : uint32_t {
-  BadConfiguration = 0,
-  Ok = 1,
+  Ok = 0,
+  BadConfiguration = 1,
 };
 extern "C" OnValidateConfigurationResult proxy_validate_configuration(uint32_t root_context_id,
                                                                       uint32_t configuration_size);
@@ -61,8 +61,8 @@ extern "C" OnValidateConfigurationResult proxy_validate_configuration(uint32_t r
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
 enum class OnConfigureResult : uint32_t {
-  BadConfiguration = 0,
-  Ok = 1,
+  Ok = 0,
+  BadConfiguration = 1,
 }
 extern "C" OnConfigureResult proxy_on_configure(uint32_t root_context_id,
                                                 uint32_t plugin_configuration_size);
@@ -89,8 +89,8 @@ extern "C" void proxy_on_context_create(uint32_t context_id, uint32_t root_conte
  * future proxy_done() call by the root context.
  */
 enum class OnDoneResult : uint32_t {
-  NotDone = 0,
-  Done = 1,
+  Done = 0,
+  NotDone = 1,
 }
 extern "C" OnDoneResult proxy_on_done(uint32_t context_id);
 
