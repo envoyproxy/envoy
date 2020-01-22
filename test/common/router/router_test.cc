@@ -3674,11 +3674,8 @@ TEST_F(RouterTest, AltStatName) {
                 .value());
 
   Stats::TestUtil::StatNames stat_names(cm_.thread_local_cluster_.cluster_.info_->stats_store_);
-  Stats::StatName alt_stat = stat_names.dynamic("alt_stat");
-  EXPECT_EQ(1U, stat_names.counterValue({alt_stat, stat_names.symbolic("upstream_rq_200")}));
-  EXPECT_EQ(1U, stat_names.counterValue(
-                    {alt_stat, stat_names.symbolic("zone.zone_name.to_az.upstream_rq_200")}));
-  EXPECT_EQ(1U, stat_names.counterValue({alt_stat, stat_names.symbolic("upstream_rq_200")}));
+  EXPECT_EQ(1U, stat_names.counterValue("`alt_stat`.upstream_rq_200"));
+  EXPECT_EQ(1U, stat_names.counterValue("`alt_stat`.zone.zone_name.to_az.upstream_rq_200"));
 }
 
 TEST_F(RouterTest, Redirect) {
