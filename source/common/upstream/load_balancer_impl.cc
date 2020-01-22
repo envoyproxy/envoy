@@ -133,9 +133,13 @@ LoadBalancerBase::LoadBalancerBase(
 // - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
 // Continue distributing the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
-// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0.
-//   And if panic threshold > 0% then enable panic mode for P=0, otherwise disable.
-
+// - all host sets are in panic mode. Situation called TotalPanic. Load distribution is
+//   calculated based on the number of hosts in each priority regardless of their health.
+// - all hosts in all priorities are down (normalized total health is 0%). If panic
+//   threshold > 0% the cluster is in TotalPanic (see above). If panic threshold == 0
+//   then priorities are not in panic, but there are no healthy hosts to route to.
+//   In this case just mark P=0 as recipient of 100% of the traffic (nothing will be routed
+//   to P=0 anyways as there are no healthy hosts there).
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
                                                    HealthyAndDegradedLoad& per_priority_load,
@@ -239,9 +243,12 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
 
   // This is corner case when panic is disabled and there is no hosts available.
-  // But the load must be distributed somewhere.
-  // This is just a placeholder, because no traffic will be directed to
-  // priority 0 anyways, because it is empty.
+  // LoadBalancerBase::choosePriority method expects that the sum of
+  // load percentages always adds up to 100.
+  // To satisfy that requirement 100% is assigned to P=0.
+  // In reality no traffic will be routed to P=0 priority, because
+  // the panic mode is disabled and LoadBalancer will try to find
+  // a healthy node and none is available.
   if (panic_threshold == 0 && normalized_total_availability == 0) {
     per_priority_load_.healthy_priority_load_.get()[0] = 100;
     return;

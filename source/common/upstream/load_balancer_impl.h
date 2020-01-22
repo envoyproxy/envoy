@@ -59,6 +59,12 @@ protected:
    * requests to hosts regardless of whether they are healthy or not.
    */
   bool isHostSetInPanic(const HostSet& host_set);
+
+  /**
+   * Method is called when all host sets are in panic mode.
+   * In such state the load is distributed based on the number of hosts
+   * in given priority regardless of their health.
+   */
   void recalculateLoadInTotalPanic();
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
