@@ -113,6 +113,7 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_stopped)                                                                        \
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
+  GAUGE(total_filter_chains_draining, NeverImport)                                                 \
   GAUGE(total_listeners_warming, NeverImport)
 
 /**
@@ -120,6 +121,21 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
  */
 struct ListenerManagerStats {
   ALL_LISTENER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * Struct to bind the draining listener instance and the filter chains. Due to the decedent of the
+ * listener could take over some of the filter chains, the draining filter chains are a subset of
+ * which listener manages.
+ */
+struct DrainingFilterChains {
+  // The draining listener.
+  ListenerImplPtr draining_listener_;
+  // The draining filter chains.
+  // std::list<FilterChainImpl> draining_filter_chains_;
+  uint64_t workers_pending_removal_;
+
+  DrainingFilterChains(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal);
 };
 
 /**
@@ -131,6 +147,7 @@ public:
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats);
 
   void onListenerWarmed(ListenerImpl& listener);
+  void onIntelligentListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::config::listener::v3alpha::Listener& config,
@@ -167,6 +184,8 @@ private:
   };
 
   void addListenerToWorker(Worker& worker, ListenerImpl& listener);
+  void addIntelligentListenerToWorker(Worker& worker, uint64_t overrided_listener,
+                                      ListenerImpl& listener);
   ProtobufTypes::MessagePtr dumpListenerConfigs();
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
@@ -195,6 +214,14 @@ private:
    * @param listener supplies the listener to drain.
    */
   void drainListener(ListenerImplPtr&& listener);
+
+  /**
+   * Mark filter chains which owned by listener for draining. Expecting the decendent of the
+   * listener took over the listener socket but these filter chains are not attached by that
+   * decendent.
+   * @param listener supplies the listener to drain.
+   */
+  void drainFilterChains(ListenerImplPtr&& listener, ListenerImpl& new_listener);
 
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be
@@ -228,6 +255,7 @@ private:
   // connections are drained. Then after that time period the listener is removed from all workers
   // and any remaining connections are closed.
   std::list<DrainingListener> draining_listeners_;
+  std::list<DrainingFilterChains> draining_filter_groups_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
   absl::optional<StopListenersType> stop_listeners_type_;
@@ -256,9 +284,10 @@ public:
                    FilterChainFactoryContextCreator& context_creator) const override;
 
 private:
-  std::shared_ptr<Network::FilterChain> buildFilterChainInternal(
-      const envoy::config::listener::v3alpha::FilterChain& filter_chain,
-      Configuration::FilterChainFactoryContext& filter_chain_factory_context) const;
+  std::shared_ptr<Network::FilterChain>
+  buildFilterChainInternal(const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+                           std::unique_ptr<Configuration::FilterChainFactoryContext>&&
+                               filter_chain_factory_context) const;
 
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;

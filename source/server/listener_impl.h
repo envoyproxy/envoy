@@ -7,6 +7,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
@@ -74,11 +75,108 @@ enum class UpdateDecision { Update, NotSupported };
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
 
+class XXFactoryContextImpl final : public Configuration::FactoryContext {
+public:
+  XXFactoryContextImpl(Envoy::Server::Instance& server,
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       const envoy::config::listener::v3alpha::Listener& config)
+      : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
+        global_scope_(server.stats().createScope("")), validation_visitor_(validation_visitor) {}
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Network::DrainDecision& drainDecision() override;
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::Instance& threadLocal() override;
+  Admin& admin() override;
+  const envoy::config::core::v3alpha::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3alpha::TrafficDirection direction() const override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  OptProcessContextRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Stats::Scope& listenerScope() override;
+
+private:
+  Envoy::Server::Instance& server_;
+  const envoy::config::core::v3alpha::Metadata metadata_;
+  envoy::config::core::v3alpha::TrafficDirection direction_;
+  Stats::ScopePtr global_scope_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+class ListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
+public:
+  ListenerFactoryContextImpl(Envoy::Server::Instance& server,
+                             ProtobufMessage::ValidationVisitor& validation_visitor,
+                             const envoy::config::listener::v3alpha::Listener& config_message,
+                             const Network::ListenerConfig* listener_config,
+                             Network::DrainDecision& drain_decision)
+      : xx_factory_context_(
+            std::make_shared<XXFactoryContextImpl>(server, validation_visitor, config_message)),
+        listener_config_(listener_config), drain_decision_(drain_decision) {}
+  ListenerFactoryContextImpl(std::shared_ptr<XXFactoryContextImpl> xx_factory_context,
+                             const Network::ListenerConfig* listener_config,
+                             Network::DrainDecision& drain_decision)
+      : xx_factory_context_(xx_factory_context), listener_config_(listener_config),
+        drain_decision_(drain_decision) {}
+
+  // FactoryContext
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Network::DrainDecision& drainDecision() override;
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::Instance& threadLocal() override;
+  Admin& admin() override;
+  const envoy::config::core::v3alpha::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3alpha::TrafficDirection direction() const override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  OptProcessContextRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Stats::Scope& listenerScope() override;
+
+  // ListenerFactoryContext
+  const Network::ListenerConfig& listenerConfig() const override;
+
+  XXFactoryContextImpl& parent_factory_context() { return *xx_factory_context_; }
+  friend class ListenerImpl;
+
+private:
+  std::shared_ptr<XXFactoryContextImpl> xx_factory_context_;
+  const Network::ListenerConfig* listener_config_;
+  Network::DrainDecision& drain_decision_;
+};
+
 /**
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
 class ListenerImpl : public Network::ListenerConfig,
-                     public Configuration::ListenerFactoryContext,
                      public Network::DrainDecision,
                      public Network::FilterChainFactory,
                      Logger::Loggable<Logger::Id::config> {
@@ -99,27 +197,42 @@ public:
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
                ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
+  // TODO: remove unnessary
+  ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3alpha::Listener& config,
+               const std::string& version_info, ListenerManagerImpl& parent,
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
   ~ListenerImpl() override;
 
-  // TODO(lambdai): Alternatively, always create ListenerImpl on both filter chain update and full
-  // listener update.
+  // ListenerFactoryContext may be shared by generations of listeners
+  std::shared_ptr<Configuration::ListenerFactoryContext> getListenerFactoryContext();
 
   /**
    * Determine if in place filter chain update could be executed at this moment.
    */
-  UpdateDecision supportUpdateFilterChain(const envoy::api::v2::Listener& config,
+  UpdateDecision supportUpdateFilterChain(const envoy::config::listener::v3alpha::Listener& config,
                                           bool worker_started);
   /**
    * Execute in place filter chain update. The filter chain update is less expensive than full
    * listener update.
    */
-  void updateFilterChain(const envoy::api::v2::Listener& config);
+  std::unique_ptr<ListenerImpl>
+  newListenerWithFilterChain(const envoy::config::listener::v3alpha::Listener& config,
+                             uint64_t hash);
+
+  /**
+   * Run the callback on each filter chain exists in this listener but not in another listener.
+   */
+  void diffFilterChain(const ListenerImpl& listener,
+                       std::function<void(FilterChainImpl&)> callback);
 
   /**
    * Cancel the in place filter chain update if any. Should be called when full listener update is
    * triggered.
    */
   void cancelUpdate();
+
+  Init::Manager& initManager();
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -173,33 +286,9 @@ public:
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 
-  // Server::Configuration::ListenerFactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
-  Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  bool healthCheckFailed() override;
-  Tracing::HttpTracer& httpTracer() override;
-  Http::Context& httpContext() override;
-  Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::RandomGenerator& random() override;
-  Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& scope() override;
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::Instance& threadLocal() override;
-  Admin& admin() override;
-  const envoy::config::core::v3alpha::Metadata& listenerMetadata() const override;
-  envoy::config::core::v3alpha::TrafficDirection direction() const override;
-  TimeSource& timeSource() override;
-  const Network::ListenerConfig& listenerConfig() const override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
-  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  envoy::config::core::v3alpha::TrafficDirection direction() const override {
+    return config().traffic_direction();
+  }
 
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
@@ -231,7 +320,6 @@ private:
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
-  FilterChainManagerImpl filter_chain_manager_;
 
   Network::ListenSocketFactorySharedPtr socket_factory_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
@@ -264,6 +352,8 @@ private:
   const bool continue_on_listener_filters_timeout_;
   Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
   Network::ConnectionBalancerPtr connection_balancer_;
+  std::shared_ptr<ListenerFactoryContextImpl> listener_factory_context_;
+  FilterChainManagerImpl filter_chain_manager_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

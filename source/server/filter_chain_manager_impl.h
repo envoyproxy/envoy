@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 
@@ -74,8 +75,12 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
+  void setDraining() { is_draining_.store(true, std::memory_order_release); }
+
 private:
   Configuration::FactoryContext& parent_context_;
+  // atomic_flag is guaranteed to be lock free but there is no light weight load().
+  std::atomic<bool> is_draining_{false};
 };
 
 class FilterChainImpl : public Network::FilterChain {
@@ -93,6 +98,8 @@ public:
   const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
     return filters_factory_;
   }
+
+  void setDrainClose() { factory_context_->setDraining(); }
   // TODO(lambdai): reconsider the ownership of `factory_context_`
   std::unique_ptr<FilterChainFactoryContextImpl> factory_context_;
 
@@ -117,7 +124,7 @@ public:
 
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context,
-                         FilterChainManagerImpl& parent_manager);
+                         const FilterChainManagerImpl& parent_manager);
 
   // FilterChainFactoryContextCreator
   std::unique_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
@@ -239,7 +246,7 @@ private:
   // Reference to the previous generation of filter chain manager. *this need to copy a subset from
   // the origin fc_contexts_ Caution: origin_ is not legit all the time.
   // TODO(lambdai): safer usage
-  FilterChainManagerImpl* origin_{};
+  const FilterChainManagerImpl* origin_{};
 };
 } // namespace Server
 } // namespace Envoy

@@ -30,8 +30,8 @@ FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
     : parent_context_(parent_context) {}
 
 bool FilterChainFactoryContextImpl::drainClose() const {
-  // TODO(lambdai): will provide individual value for each filter chain context.
-  return parent_context_.drainDecision().drainClose();
+  return is_draining_.load(std::memory_order_acquire) ||
+         parent_context_.getServerFactoryContext().drainManager().drainClose();
 }
 
 Network::DrainDecision& FilterChainFactoryContextImpl::drainDecision() { return *this; }
@@ -131,7 +131,7 @@ Stats::Scope& FilterChainFactoryContextImpl::listenerScope() {
 
 FilterChainManagerImpl::FilterChainManagerImpl(
     const Network::Address::InstanceConstSharedPtr& address,
-    Configuration::FactoryContext& factory_context, FilterChainManagerImpl& parent_manager)
+    Configuration::FactoryContext& factory_context, const FilterChainManagerImpl& parent_manager)
     : address_(address), parent_context_(factory_context), origin_(&parent_manager) {}
 
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {

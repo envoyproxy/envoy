@@ -161,6 +161,7 @@ public:
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
+  Envoy::Server::DrainManager drainManager() override { return server_.drain_manager_; }
 
 private:
   Instance& server_;

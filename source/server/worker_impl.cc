@@ -87,7 +87,7 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
   });
 }
 
-void WorkerImpl::removeUntrackedFilterChains(Network::ListenerConfig& listener,
+void WorkerImpl::removeUntrackedFilterChains(const Network::ListenerConfig& listener,
                                              std::function<void()> completion) {
   ASSERT(thread_);
   const uint64_t listener_tag = listener.listenerTag();

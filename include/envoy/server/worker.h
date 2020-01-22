@@ -80,7 +80,7 @@ public:
    * untracked connections. This completion is called on the worker thread. No locking is performed
    * by the worker.
    */
-  virtual void removeUntrackedFilterChains(Network::ListenerConfig& listener,
+  virtual void removeUntrackedFilterChains(const Network::ListenerConfig& listener,
                                            std::function<void()> completion) PURE;
 
   /**

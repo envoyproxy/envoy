@@ -234,6 +234,11 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
+DrainingFilterChains::DrainingFilterChains(ListenerImplPtr&& draining_listener,
+                                           uint64_t workers_pending_removal)
+    : draining_listener_(std::move(draining_listener)),
+      workers_pending_removal_(workers_pending_removal) {}
+
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory,
@@ -371,6 +376,8 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
+  ListenerImplPtr new_listener{};
+
   // Support in place update only when no tradition update is occurring.
   if (existing_active_listener != active_listeners_.end() &&
       existing_warming_listener == warming_listeners_.end()) {
@@ -380,21 +387,16 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // TODO(lambdai): Optimize when ongoing update is equivalent to the new config
     /*case UpdateDecision::UpdateInFlight*/
     case UpdateDecision::Update:
-      (*existing_active_listener)->updateFilterChain(config);
-      stats_.listener_modified_.inc();
-      return true;
+      new_listener = (*existing_active_listener)->newListenerWithFilterChain(config, hash);
     case UpdateDecision::NotSupported:
-      // noop if there is no ongoing update
-      (*existing_active_listener)->cancelUpdate();
-      break;
+      // Fallback to traditional listener update. This is rare.
+      new_listener = std::make_unique<ListenerImpl>(
+          config, version_info, *this, name, added_via_api, workers_started_, hash,
+          added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
+                        : server_.messageValidationContext().staticValidationVisitor(),
+          server_.options().concurrency());
     }
   }
-  // Fallback to traditional listener update. This is rare.
-  ListenerImplPtr new_listener(
-      new ListenerImpl(config, version_info, *this, name, added_via_api, workers_started_, hash,
-                       added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
-                                     : server_.messageValidationContext().staticValidationVisitor(),
-                       server_.options().concurrency()));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
@@ -566,6 +568,10 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
         // main thread to avoid locking. This makes sure that we don't destroy the listener
         // while filters might still be using its context (stats, etc.).
         server_.dispatcher().post([this, draining_it]() -> void {
+          // TODO(lambdai): Resolve race condition. The below refcount dec is too early. The active
+          // listener at worker thread could be destroyed before active connection.
+          // As a consequence, the listener at master thread and the connection at worker thread are
+          // destroyed concurrently.
           if (--draining_it->workers_pending_removal_ == 0) {
             draining_it->listener_->debugLog("draining listener removal complete");
             draining_listeners_.erase(draining_it);
@@ -628,6 +634,20 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
   });
 }
 
+void ListenerManagerImpl::addIntelligentListenerToWorker(Worker& worker,
+                                                         uint64_t overrided_listener,
+                                                         ListenerImpl& listener) {
+  worker.addIntelligentListener(overrided_listener, listener,
+                                [this, &listener](bool success) -> void {
+                                  server_.dispatcher().post([this, success, &listener]() -> void {
+                                    // TODO: I don't have a concrete case to generate the failure.
+                                    UNREFERENCED_PARAMETER(success);
+                                    UNREFERENCED_PARAMETER(listener);
+                                    stats_.listener_create_success_.inc();
+                                  });
+                                });
+}
+
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
@@ -650,6 +670,103 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   }
 
   warming_listeners_.erase(existing_warming_listener);
+  updateWarmingActiveGauges();
+}
+
+// TODO(lambdai): unify warmup
+void ListenerManagerImpl::onIntelligentListenerWarmed(ListenerImpl& listener) {
+  auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
+  auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+
+  (*existing_warming_listener)->debugLog("warm complete. updating active listener");
+  if (existing_active_listener != active_listeners_.end()) {
+    // The warmed listener should be added first so that the worker will accept new connections
+    // when it stops listening on the old listener.
+    for (const auto& worker : workers_) {
+      addIntelligentListenerToWorker(*worker, (*existing_active_listener)->listenerTag(), listener);
+    }
+    // Finish active_listeners_ transformation before calling `drainListener` as it depends on their
+    // state.
+    auto listener = std::move(*existing_active_listener);
+    *existing_active_listener = std::move(*existing_warming_listener);
+    drainFilterChains(std::move(listener), **existing_active_listener);
+  } else {
+    for (const auto& worker : workers_) {
+      addListenerToWorker(*worker, listener);
+    }
+    active_listeners_.emplace_back(std::move(*existing_warming_listener));
+  }
+
+  warming_listeners_.erase(existing_warming_listener);
+  updateWarmingActiveGauges();
+}
+
+void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
+                                            ListenerImpl& new_listener) {
+  int filter_chain_size = 0;
+  listener->diffFilterChain(new_listener,
+                            [&filter_chain_size](FilterChainImpl& filter_chain) mutable {
+                              filter_chain.setDrainClose();
+                              ++filter_chain_size;
+                            });
+  // First add the listener to the draining list.
+  std::list<DrainingFilterChains>::iterator draining_group = draining_filter_groups_.emplace(
+      draining_filter_groups_.begin(), std::move(listener), workers_.size());
+
+  // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
+  // restart. Same below inside the lambda.
+  // TODO(lambdai): Currently the number of DrainFilterChains objects are tracked:
+  // len(filter_chains). What we really need is accumulate(filter_chains, fc: len(fc))
+  stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
+
+  draining_group->draining_listener_->debugLog(absl::StrCat(
+      "draining ", filter_chain_size, " filter chains in listener ", listener->name()));
+
+  // In the intelligent path where filter chains are drained but listener is survived, the
+  // connection is not impacted: the draining filter chains are not tracked by warmed up filter
+  // chain manager.
+  // Moved
+  // for (auto& filter_chain : filter_chains) {
+  //    draining_group->draining_filter_chains_ = std::move(filter_chains);
+  //   // FilterChain drain close is not bind with the listener
+  //   // TODO(lambdai): drainListener() must set drainClose for each filter chain
+  //   // TODO(lambdai): bring the tick based drain close back.
+  //   filter_chain.setDrainClose();
+  // }
+
+  // Start the drain sequence which completes when the listener's drain manager has completed
+  // draining at whatever the server configured drain times are.
+  // TODO(lambdai): only partial functionality is adopted. Consider split functionality?
+  // 1. Filter chain doesn't query the listener's drain close decision
+  // 2. the completion callback is used to execute the resouce clean up.
+  draining_group->draining_listener_->localDrainManager().startDrainSequence(
+      [this, draining_group]() -> void {
+        draining_group->draining_listener_->debugLog(absl::StrCat(
+            "removing draining listener ", draining_group->draining_listener_->name()));
+        for (const auto& worker : workers_) {
+          // Once the drain time has completed via the drain manager's timer, we tell the workers
+          // to remove the filter chains.
+          // TODO(lambdai): Fix race condition and duplicate the efforts in drainListener.
+          // TODO(lambdai): avoid the O(workers) post lambda as most threads does no more than
+          // refcount dec.
+          worker->removeUntrackedFilterChains(
+              *draining_group->draining_listener_, [this, draining_group]() -> void {
+                // The remove listener completion is called on the worker thread. We post back to
+                // the main thread to avoid locking. This makes sure that we don't destroy the
+                // listener while filters might still be using its context (stats, etc.).
+                server_.dispatcher().post([this, draining_group]() -> void {
+                  if (--draining_group->workers_pending_removal_ == 0) {
+                    draining_group->draining_listener_->debugLog(absl::StrCat(
+                        "draining listener ", draining_group->draining_listener_->name(),
+                        " removal complete"));
+                    draining_filter_groups_.erase(draining_group);
+                    stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
+                  }
+                });
+              });
+        }
+      });
+
   updateWarmingActiveGauges();
 }
 
@@ -780,8 +897,8 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : ListenerFilterChainFactoryBuilder(listener.messageValidationVisitor(),
-                                        listener.parent_.factory_, factory_context) {}
+    : ListenerFilterChainFactoryBuilder(listener.validation_visitor_, listener.parent_.factory_,
+                                        factory_context) {}
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ProtobufMessage::ValidationVisitor& validator,
@@ -799,7 +916,8 @@ std::shared_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
 
 std::shared_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3alpha::FilterChain& filter_chain,
-    Configuration::FilterChainFactoryContext& filter_chain_factory_context) const {
+    std::unique_ptr<Configuration::FilterChainFactoryContext>&& filter_chain_factory_context)
+    const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -822,11 +940,17 @@ std::shared_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
-  return std::make_unique<FilterChainImpl>(
-      config_factory.createTransportSocketFactory(*message, factory_context_,
-                                                  std::move(server_names)),
-      listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
-                                                                 filter_chain_factory_context));
+
+  auto filter_chain_res =
+      std::make_unique<FilterChainImpl>(config_factory.createTransportSocketFactory(
+                                            *message, factory_context_, std::move(server_names)),
+                                        listener_component_factory_.createNetworkFilterFactoryList(
+                                            filter_chain.filters(), *filter_chain_factory_context));
+  // TODO(lambdai): remove this ugly downcast
+  filter_chain_res->factory_context_ = std::unique_ptr<FilterChainFactoryContextImpl>(
+      static_cast<FilterChainFactoryContextImpl*>(filter_chain_factory_context.release()));
+
+  return filter_chain_res;
 }
 
 Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFactory(
