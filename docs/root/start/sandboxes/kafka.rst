@@ -33,11 +33,11 @@ Terminal 1
   $ docker-compose up --build -d
   $ docker-compose ps
 
-         Name                     Command               State                              Ports
-  ------------------------------------------------------------------------------------------------------------------------
-  kafka_kafka_1       start-kafka.sh                   Up      0.0.0.0:31001->31001/tcp, 9092/tcp
-  kafka_proxy_1       /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:19092->19092/tcp, 0.0.0.0:8001->8001/tcp
-  kafka_zookeeper_1   /bin/sh -c /usr/sbin/sshd  ...   Up      2181/tcp, 22/tcp, 2888/tcp, 3888/tcp
+         Name                     Command            State                              Ports
+  ----------------------------------------------------------------------------------------------------------------------
+  kafka_kafka_1       start-kafka.sh                 Up      0.0.0.0:31001->31001/tcp, 9092/tcp
+  kafka_proxy_1       /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:19092->19092/tcp, 0.0.0.0:8001->8001/tcp
+  kafka_zookeeper_1   /bin/sh -c /usr/sbin/sshd  ... Up      2181/tcp, 22/tcp, 2888/tcp, 3888/tcp
 
 
 **Step 3: Produce events**
