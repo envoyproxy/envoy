@@ -212,6 +212,11 @@ config_setting(
 )
 
 config_setting(
+    name = "debug_known_issues",
+    values = {"define": "known_issues=debug"},
+)
+
+config_setting(
     name = "enable_perf_annotation",
     values = {"define": "perf_annotation=enabled"},
 )
