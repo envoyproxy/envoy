@@ -16,11 +16,11 @@
 #include "common/common/lock_guard.h"
 #include "common/common/mem_block_builder.h"
 #include "common/common/non_copyable.h"
-#include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/stats/recent_lookups.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
