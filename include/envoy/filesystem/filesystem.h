@@ -113,8 +113,7 @@ public:
 
   /**
    * @path file path to split
-   * @return PathSplitResult containing the parent directory of the input path (a la `dirname`)
-   *                         and the file name (a la `basename`)
+   * @return PathSplitResult containing the parent directory of the input path and the file name
    * @note will throw an exception if path does not contain any path separator character
    */
   virtual PathSplitResult splitPathFromFilename(absl::string_view path) PURE;
