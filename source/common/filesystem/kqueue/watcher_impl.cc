@@ -48,8 +48,8 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
       return nullptr;
     }
 
-    auto directory = api_.fileSystem().splitPathFromFilename(path).directory_;
-    watch_fd = open(std::string(directory).c_str(), 0);
+    watch_fd =
+        open(std::string(api_.fileSystem().splitPathFromFilename(path).directory_).c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;
     }

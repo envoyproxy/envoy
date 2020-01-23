@@ -50,25 +50,23 @@ WatcherImpl::~WatcherImpl() {
 }
 
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
-  PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
-  auto dir_narrow = result.directory_;
-  auto file_narrow = result.file_;
+  const PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
-  const std::wstring directory = wstring_converter_.from_bytes(std::string(dir_narrow));
-  const std::wstring file = wstring_converter_.from_bytes(std::string(file_narrow));
+  const std::wstring directory = wstring_converter_.from_bytes(std::string(result.directory_));
+  const std::wstring file = wstring_converter_.from_bytes(std::string(result.file_));
 
   const HANDLE dir_handle = CreateFileW(
       directory.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
       nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
   if (dir_handle == INVALID_HANDLE_VALUE) {
     throw EnvoyException(
-        fmt::format("unable to open directory {}: {}", dir_narrow, GetLastError()));
+        fmt::format("unable to open directory {}: {}", result.directory_, GetLastError()));
   }
   std::string fii_key(sizeof(FILE_ID_INFO), '\0');
   RELEASE_ASSERT(
       GetFileInformationByHandleEx(dir_handle, FileIdInfo, &fii_key[0], sizeof(FILE_ID_INFO)),
-      fmt::format("unable to identify directory {}: {}", dir_narrow, GetLastError()));
+      fmt::format("unable to identify directory {}: {}", result.directory_, GetLastError()));
   if (callback_map_.find(fii_key) != callback_map_.end()) {
     CloseHandle(dir_handle);
   } else {
@@ -98,11 +96,11 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
     RELEASE_ASSERT(rc == WAIT_OBJECT_0,
                    fmt::format("WaitForSingleObject failed: {}", GetLastError()));
 
-    ENVOY_LOG(debug, "created watch for directory: '{}' handle: {}", dir_narrow, dir_handle);
+    ENVOY_LOG(debug, "created watch for directory: '{}' handle: {}", result.directory_, dir_handle);
   }
 
   callback_map_[fii_key]->watches_.push_back({file, events, cb});
-  ENVOY_LOG(debug, "added watch for file '{}' in directory '{}'", file_narrow, dir_narrow);
+  ENVOY_LOG(debug, "added watch for file '{}' in directory '{}'", result.file_, result.directory_);
 }
 
 void WatcherImpl::onDirectoryEvent() {

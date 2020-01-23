@@ -34,19 +34,18 @@ WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb callback) {
   // Because of general inotify pain, we always watch the directory that the file lives in,
   // and then synthetically raise per file events.
-  PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
-  auto directory = result.directory_;
-  std::string file = std::string(result.file_);
+  const PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
 
   const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
-  int watch_fd = inotify_add_watch(inotify_fd_, std::string(directory).c_str(), watch_mask);
+  int watch_fd = inotify_add_watch(inotify_fd_, std::string(result.directory_).c_str(), watch_mask);
   if (watch_fd == -1) {
     throw EnvoyException(
         fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(errno)));
   }
 
-  ENVOY_LOG(debug, "added watch for directory: '{}' file: '{}' fd: {}", directory, file, watch_fd);
-  callback_map_[watch_fd].watches_.push_back({file, events, callback});
+  ENVOY_LOG(debug, "added watch for directory: '{}' file: '{}' fd: {}", result.directory_,
+            result.file_, watch_fd);
+  callback_map_[watch_fd].watches_.push_back({std::string(result.file_), events, callback});
 }
 
 void WatcherImpl::onInotifyEvent() {
