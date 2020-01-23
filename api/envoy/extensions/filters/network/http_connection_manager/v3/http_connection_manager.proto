@@ -592,8 +592,6 @@ message ScopedRoutes {
     }
 
     // The final scope key consists of the ordered union of these fragments.
-    // A missing fragment means the request doesn't match any scope, which
-    // results in no route got picked for the request.
     repeated FragmentBuilder fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
