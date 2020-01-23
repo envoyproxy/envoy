@@ -7,8 +7,7 @@
 namespace Envoy {
 namespace Filesystem {
 
-WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
-    WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
+WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
     : api_(api), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
   SOCKET_FD socks[2];
   Api::SysCallIntResult result = os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
@@ -56,8 +55,8 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
   auto file_narrow = result.second;
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
-  const std::wstring directory = wstring_converter_.from_bytes(dir_narrow);
-  const std::wstring file = wstring_converter_.from_bytes(file_narrow);
+  const std::wstring directory = wstring_converter_.from_bytes(std::string(dir_narrow));
+  const std::wstring file = wstring_converter_.from_bytes(std::string(file_narrow));
 
   const HANDLE dir_handle = CreateFileW(
       directory.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -67,8 +66,9 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
         fmt::format("unable to open directory {}: {}", dir_narrow, GetLastError()));
   }
   std::string fii_key(sizeof(FILE_ID_INFO), '\0');
-  RELEASE_ASSERT(GetFileInformationByHandleEx(dir_handle, FileIdInfo, &fii_key[0], sizeof(FILE_ID_INFO)),
-                 fmt::format("unable to identify directory {}: {}", dir_narrow, GetLastError());
+  RELEASE_ASSERT(
+      GetFileInformationByHandleEx(dir_handle, FileIdInfo, &fii_key[0], sizeof(FILE_ID_INFO)),
+      fmt::format("unable to identify directory {}: {}", dir_narrow, GetLastError()));
   if (callback_map_.find(fii_key) != callback_map_.end()) {
     CloseHandle(dir_handle);
   } else {

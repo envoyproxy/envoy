@@ -21,7 +21,7 @@ namespace Filesystem {
  */
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:
-  WatcherImpl(Event::Dispatcher& dispatcher);
+  WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api);
   ~WatcherImpl();
 
   // Filesystem::Watcher

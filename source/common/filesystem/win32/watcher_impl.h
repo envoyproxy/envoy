@@ -23,7 +23,7 @@ namespace Filesystem {
 
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:
-  WatcherImpl(Event::Dispatcher& dispatcher);
+  WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api);
   ~WatcherImpl();
 
   // Filesystem::Watcher
@@ -56,7 +56,7 @@ private:
   typedef std::unique_ptr<DirectoryWatch> DirectoryWatchPtr;
 
   Api::Api& api_;
-  std::unordered_map<absl::string_view, DirectoryWatchPtr> callback_map_;
+  std::unordered_map<std::string, DirectoryWatchPtr> callback_map_;
   Event::FileEventPtr directory_event_;
   SOCKET_FD event_write_;
   SOCKET_FD event_read_;
