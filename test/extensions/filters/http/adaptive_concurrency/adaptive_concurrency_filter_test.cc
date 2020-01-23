@@ -27,9 +27,9 @@ using ConcurrencyController::RequestForwardingAction;
 
 class MockConcurrencyController : public ConcurrencyController::ConcurrencyController {
 public:
-  MOCK_METHOD0(forwardingDecision, RequestForwardingAction());
-  MOCK_METHOD0(cancelLatencySample, void());
-  MOCK_METHOD1(recordLatencySample, void(std::chrono::nanoseconds));
+  MOCK_METHOD(RequestForwardingAction, forwardingDecision, ());
+  MOCK_METHOD(void, cancelLatencySample, ());
+  MOCK_METHOD(void, recordLatencySample, (std::chrono::nanoseconds));
 
   uint32_t concurrencyLimit() const override { return 0; }
 };

@@ -37,8 +37,8 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& 
                             const std::string& version_info) {
   validateUpdateSize(resources.size());
   auto secret =
-      MessageUtil::anyConvert<envoy::extensions::transport_sockets::tls::v3::Secret>(resources[0]);
-  MessageUtil::validate(secret, validation_visitor_);
+      MessageUtil::anyConvertAndValidate<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          resources[0], validation_visitor_);
 
   if (secret.name() != sds_config_name_) {
     throw EnvoyException(

@@ -38,6 +38,22 @@ TEST(GrpcContextTest, GetGrpcStatus) {
   EXPECT_EQ(1024, Common::getGrpcStatus(user_defined_trailers, true).value());
 }
 
+TEST(GrpcContextTest, GetGrpcStatusWithFallbacks) {
+  Http::TestHeaderMapImpl ok_status{{"grpc-status", "0"}};
+  Http::TestHeaderMapImpl no_status{{"foo", "bar"}};
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  EXPECT_CALL(info, responseCode()).WillRepeatedly(testing::Return(404));
+
+  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_status, no_status, info).value());
+
+  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(no_status, ok_status, info).value());
+
+  EXPECT_EQ(Status::Unimplemented, Common::getGrpcStatus(no_status, no_status, info).value());
+
+  NiceMock<StreamInfo::MockStreamInfo> info_without_code;
+  EXPECT_FALSE(Common::getGrpcStatus(no_status, no_status, info_without_code));
+}
+
 TEST(GrpcContextTest, GetGrpcMessage) {
   Http::TestHeaderMapImpl empty_trailers;
   EXPECT_EQ("", Common::getGrpcMessage(empty_trailers));

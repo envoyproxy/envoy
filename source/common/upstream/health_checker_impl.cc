@@ -19,9 +19,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
-// TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
-#include "extensions/health_checkers/well_known_names.h"
-
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 

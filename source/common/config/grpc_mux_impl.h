@@ -37,7 +37,7 @@ public:
 
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            GrpcMuxCallbacks& callbacks) override;
+                            SubscriptionCallbacks& callbacks) override;
 
   // GrpcMux
   // TODO(fredlas) PR #8478 will remove this.
@@ -75,7 +75,7 @@ private:
   void setRetryTimer();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch, RaiiListElement<GrpcMuxWatchImpl*> {
-    GrpcMuxWatchImpl(const std::set<std::string>& resources, GrpcMuxCallbacks& callbacks,
+    GrpcMuxWatchImpl(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
                      const std::string& type_url, GrpcMuxImpl& parent)
         : RaiiListElement<GrpcMuxWatchImpl*>(parent.api_state_[type_url].watches_, this),
           resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
@@ -95,7 +95,7 @@ private:
     }
 
     std::set<std::string> resources_;
-    GrpcMuxCallbacks& callbacks_;
+    SubscriptionCallbacks& callbacks_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
 
@@ -143,7 +143,7 @@ class NullGrpcMuxImpl : public GrpcMux,
 public:
   void start() override {}
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override {
+                            SubscriptionCallbacks&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
   // TODO(fredlas) PR #8478 will remove this.
