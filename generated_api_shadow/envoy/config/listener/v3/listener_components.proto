@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package envoy.config.listener.v3alpha;
+package envoy.config.listener.v3;
 
-import "envoy/config/core/v3alpha/address.proto";
-import "envoy/config/core/v3alpha/base.proto";
-import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/transport_sockets/tls/v3/cert.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -14,7 +14,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.listener.v3alpha";
+option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerComponentsProto";
 option java_multiple_files = true;
 
@@ -91,7 +91,7 @@ message FilterChainMatch {
 
   // If non-empty, an IP address and prefix length to match addresses when the
   // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
-  repeated core.v3alpha.CidrRange prefix_ranges = 3;
+  repeated core.v3.CidrRange prefix_ranges = 3;
 
   // If non-empty, an IP address and suffix length to match addresses when the
   // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
@@ -108,7 +108,7 @@ message FilterChainMatch {
   // connection is contained in at least one of the specified subnets. If the
   // parameter is not specified or the list is empty, the source IP address is
   // ignored.
-  repeated core.v3alpha.CidrRange source_prefix_ranges = 6;
+  repeated core.v3.CidrRange source_prefix_ranges = 6;
 
   // The criteria is satisfied if the source port of the downstream connection
   // is contained in at least one of the specified ports. If the parameter is
@@ -179,7 +179,7 @@ message FilterChain {
   //
   //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
   //   set, `transport_socket` takes priority.
-  envoy.extensions.transport_sockets.tls.v3alpha.DownstreamTlsContext
+  envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
       hidden_envoy_deprecated_tls_context = 2 [deprecated = true];
 
   // A list of individual network filters that make up the filter chain for
@@ -197,15 +197,14 @@ message FilterChain {
   google.protobuf.BoolValue use_proxy_proto = 4;
 
   // [#not-implemented-hide:] filter chain metadata.
-  core.v3alpha.Metadata metadata = 5;
+  core.v3.Metadata metadata = 5;
 
   // Optional custom transport socket implementation to use for downstream connections.
   // To setup TLS, set a transport socket with name `tls` and
-  // :ref:`DownstreamTlsContext
-  // <envoy_api_msg_extensions.transport_sockets.tls.v3alpha.DownstreamTlsContext>` in the
-  // `typed_config`. If no transport socket configuration is specified, new connections will be set
-  // up with plaintext.
-  core.v3alpha.TransportSocket transport_socket = 6;
+  // :ref:`DownstreamTlsContext <envoy_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the `typed_config`.
+  // If no transport socket configuration is specified, new connections
+  // will be set up with plaintext.
+  core.v3.TransportSocket transport_socket = 6;
 
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
   // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
@@ -270,6 +269,6 @@ message ListenerFilter {
   }
 
   // [#not-implemented-hide:]
-  // Decide when to enable/disable this listener filter on incoming traffic.
-  ListenerFilterChainMatchPredicate predicate = 4;
+  // Decide when to disable this listener filter on incoming traffic.
+  ListenerFilterChainMatchPredicate disable_predicate = 4;
 }

@@ -265,6 +265,6 @@ message ListenerFilter {
   }
 
   // [#not-implemented-hide:]
-  // Decide when to enable/disable this listener filter on incoming traffic.
-  ListenerFilterChainMatchPredicate predicate = 4;
+  // Decide when to disable this listener filter on incoming traffic.
+  ListenerFilterChainMatchPredicate disable_predicate = 4;
 }
