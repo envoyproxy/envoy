@@ -11,7 +11,7 @@ class VersionInfoTestPeer {
 public:
   static const std::string& buildType() { return VersionInfo::buildType(); }
   static const std::string& sslVersion() { return VersionInfo::sslVersion(); }
-  static envoy::config::core::v3alpha::BuildVersion makeBuildVersion(const char* version) {
+  static envoy::config::core::v3::BuildVersion makeBuildVersion(const char* version) {
     return VersionInfo::makeBuildVersion(version);
   }
 };
@@ -19,8 +19,8 @@ public:
 TEST(VersionTest, BuildVersion) {
   auto build_version = VersionInfo::buildVersion();
   std::string version_string =
-      absl::StrCat(build_version.version().major(), ".", build_version.version().minor(), ".",
-                   build_version.version().patch());
+      absl::StrCat(build_version.version().major_number(), ".",
+                   build_version.version().minor_number(), ".", build_version.version().patch());
 
   const auto& fields = build_version.metadata().fields();
   if (fields.find(BuildVersionMetadataKeys::get().BuildLabel) != fields.end()) {
@@ -40,8 +40,8 @@ TEST(VersionTest, BuildVersion) {
 
 TEST(VersionTest, MakeBuildVersionWithLabel) {
   auto build_version = VersionInfoTestPeer::makeBuildVersion("1.2.3-foo-bar");
-  EXPECT_EQ(1, build_version.version().major());
-  EXPECT_EQ(2, build_version.version().minor());
+  EXPECT_EQ(1, build_version.version().major_number());
+  EXPECT_EQ(2, build_version.version().minor_number());
   EXPECT_EQ(3, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
   EXPECT_GE(fields.size(), 1);
@@ -50,8 +50,8 @@ TEST(VersionTest, MakeBuildVersionWithLabel) {
 
 TEST(VersionTest, MakeBuildVersionWithoutLabel) {
   auto build_version = VersionInfoTestPeer::makeBuildVersion("1.2.3");
-  EXPECT_EQ(1, build_version.version().major());
-  EXPECT_EQ(2, build_version.version().minor());
+  EXPECT_EQ(1, build_version.version().major_number());
+  EXPECT_EQ(2, build_version.version().minor_number());
   EXPECT_EQ(3, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
   EXPECT_EQ(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
@@ -61,8 +61,8 @@ TEST(VersionTest, MakeBuildVersionWithoutLabel) {
 
 TEST(VersionTest, MakeBadBuildVersion) {
   auto build_version = VersionInfoTestPeer::makeBuildVersion("1.foo.3-bar");
-  EXPECT_EQ(0, build_version.version().major());
-  EXPECT_EQ(0, build_version.version().minor());
+  EXPECT_EQ(0, build_version.version().major_number());
+  EXPECT_EQ(0, build_version.version().minor_number());
   EXPECT_EQ(0, build_version.version().patch());
   const auto& fields = build_version.metadata().fields();
   EXPECT_EQ(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());

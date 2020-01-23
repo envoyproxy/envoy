@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -45,7 +45,7 @@ class ZipkinDriverTest : public testing::Test {
 public:
   ZipkinDriverTest() : time_source_(test_time_.timeSystem()) {}
 
-  void setup(envoy::config::trace::v3alpha::ZipkinConfig& zipkin_config, bool init_timer) {
+  void setup(envoy::config::trace::v3::ZipkinConfig& zipkin_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -67,7 +67,7 @@ public:
     collector_endpoint_version: {}
     )EOF",
                                                 version);
-    envoy::config::trace::v3alpha::ZipkinConfig zipkin_config;
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
@@ -152,7 +152,7 @@ public:
 TEST_F(ZipkinDriverTest, InitializeDriver) {
   {
     // Empty config
-    envoy::config::trace::v3alpha::ZipkinConfig zipkin_config;
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
 
     EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
   }
@@ -164,7 +164,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
     )EOF";
-    envoy::config::trace::v3alpha::ZipkinConfig zipkin_config;
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
@@ -179,7 +179,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
     )EOF";
-    envoy::config::trace::v3alpha::ZipkinConfig zipkin_config;
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);

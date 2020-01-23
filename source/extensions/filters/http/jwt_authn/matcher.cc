@@ -1,7 +1,7 @@
 #include "extensions/filters/http/jwt_authn/matcher.h"
 
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "common/common/logger.h"
 #include "common/common/regex.h"
@@ -9,8 +9,8 @@
 
 #include "absl/strings/match.h"
 
-using envoy::config::route::v3alpha::RouteMatch;
-using envoy::extensions::filters::http::jwt_authn::v3alpha::RequirementRule;
+using envoy::config::route::v3::RouteMatch;
+using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
 using Envoy::Router::ConfigUtility;
 
 namespace Envoy {
@@ -115,13 +115,13 @@ class RegexMatcherImpl : public BaseMatcherImpl {
 public:
   RegexMatcherImpl(const RequirementRule& rule) : BaseMatcherImpl(rule) {
     if (rule.match().path_specifier_case() ==
-        envoy::config::route::v3alpha::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
+        envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
       regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
           rule.match().hidden_envoy_deprecated_regex());
       regex_str_ = rule.match().hidden_envoy_deprecated_regex();
     } else {
       ASSERT(rule.match().path_specifier_case() ==
-             envoy::config::route::v3alpha::RouteMatch::PathSpecifierCase::kSafeRegex);
+             envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
       regex_ = Regex::Utility::parseRegex(rule.match().safe_regex());
       regex_str_ = rule.match().safe_regex().regex();
     }

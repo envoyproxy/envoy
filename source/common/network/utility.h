@@ -5,7 +5,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 
@@ -80,21 +80,21 @@ public:
    * @param url supplies the URL to match.
    * @return bool true if the URL matches the TCP scheme, false otherwise.
    */
-  static bool urlIsTcpScheme(const std::string& url);
+  static bool urlIsTcpScheme(absl::string_view url);
 
   /**
    * Match a URL to the UDP scheme
    * @param url supplies the URL to match.
    * @return bool true if the URL matches the UDP scheme, false otherwise.
    */
-  static bool urlIsUdpScheme(const std::string& url);
+  static bool urlIsUdpScheme(absl::string_view url);
 
   /**
    * Match a URL to the Unix scheme
    * @param url supplies the Unix to match.
    * @return bool true if the URL matches the Unix scheme, false otherwise.
    */
-  static bool urlIsUnixScheme(const std::string& url);
+  static bool urlIsUnixScheme(absl::string_view url);
 
   /**
    * Parses the host from a TCP URL
@@ -270,7 +270,7 @@ public:
   static absl::uint128 Ip6htonl(const absl::uint128& address);
 
   static Address::InstanceConstSharedPtr
-  protobufAddressToAddress(const envoy::config::core::v3alpha::Address& proto_address);
+  protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address);
 
   /**
    * Copies the address instance into the protobuf representation of an address.
@@ -278,7 +278,7 @@ public:
    * @param proto_address is the protobuf address to which the address instance is copied into.
    */
   static void addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::config::core::v3alpha::Address& proto_address);
+                                       envoy::config::core::v3::Address& proto_address);
 
   /**
    * Returns socket type corresponding to SocketAddress.protocol value of the
@@ -287,7 +287,7 @@ public:
    * @return socket type
    */
   static Address::SocketType
-  protobufAddressSocketType(const envoy::config::core::v3alpha::Address& proto_address);
+  protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address);
 
   /**
    * Send a packet via given UDP socket with specific source address.
@@ -342,7 +342,7 @@ public:
                                                TimeSource& time_source, uint32_t& packets_dropped);
 
 private:
-  static void throwWithMalformedIp(const std::string& ip_address);
+  static void throwWithMalformedIp(absl::string_view ip_address);
 
   /**
    * Takes a number and flips the order in byte chunks. The last byte of the input will be the

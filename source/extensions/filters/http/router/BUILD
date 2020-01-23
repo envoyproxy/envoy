@@ -22,6 +22,7 @@ envoy_cc_extension(
         "//source/common/router:shadow_writer_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/router/v3alpha:pkg_cc_proto",
+        "//source/extensions/filters/http/on_demand:on_demand_update_lib",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )

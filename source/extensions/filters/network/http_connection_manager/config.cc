@@ -5,20 +5,19 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.validate.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/tracing/v2/custom_tag.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/http/conn_manager_utility.h"
-#include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -26,8 +25,6 @@
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -61,9 +58,9 @@ FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryM
   return upgrade_map.end();
 }
 
-std::unique_ptr<Http::InternalAddressConfig>
-createInternalAddressConfig(const envoy::extensions::filters::network::http_connection_manager::
-                                v3alpha::HttpConnectionManager& config) {
+std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config) {
   if (config.has_internal_address_config()) {
     return std::make_unique<InternalAddressConfig>(config.internal_address_config());
   }
@@ -78,11 +75,7 @@ SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
-Network::FilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-        HttpConnectionManager& proto_config,
-    Server::Configuration::FactoryContext& context) {
+Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
@@ -104,16 +97,36 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
                 context.admin(), *route_config_provider_manager);
           });
 
-  std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
-      proto_config, context, *date_provider, *route_config_provider_manager,
-      *scoped_routes_config_provider_manager));
+  return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager};
+}
+
+std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+    Router::RouteConfigProviderManager& route_config_provider_manager,
+    Config::ConfigProviderManager& scoped_routes_config_provider_manager) {
+  return std::make_shared<HttpConnectionManagerConfig>(proto_config, context, date_provider,
+                                                       route_config_provider_manager,
+                                                       scoped_routes_config_provider_manager);
+}
+
+Network::FilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context) {
+  Utility::Singletons singletons = Utility::createSingletons(context);
+
+  auto filter_config = Utility::createConfig(proto_config, context, *singletons.date_provider_,
+                                             *singletons.route_config_provider_manager_,
+                                             *singletons.scoped_routes_config_provider_manager_);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
-          filter_config, &context](Network::FilterManager& filter_manager) -> void {
+  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -128,13 +141,13 @@ REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
                  Server::Configuration::NamedNetworkFilterConfigFactory);
 
 InternalAddressConfig::InternalAddressConfig(
-    const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-        HttpConnectionManager::InternalAddressConfig& config)
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        InternalAddressConfig& config)
     : unix_sockets_(config.unix_sockets()) {}
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
-    const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-        HttpConnectionManager& config,
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager)
@@ -199,15 +212,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::RouteSpecifierCase::kRds:
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::RouteSpecifierCase::kRouteConfig:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::kRds:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::kRouteConfig:
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
         config, context_, stats_prefix_, route_config_provider_manager_);
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::RouteSpecifierCase::kScopedRoutes:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::kScopedRoutes:
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
         config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
     break;
@@ -216,24 +229,24 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   switch (config.forward_client_cert_details()) {
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::SANITIZE:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      SANITIZE:
     forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::FORWARD_ONLY:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      FORWARD_ONLY:
     forward_client_cert_ = Http::ForwardClientCertType::ForwardOnly;
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::APPEND_FORWARD:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      APPEND_FORWARD:
     forward_client_cert_ = Http::ForwardClientCertType::AppendForward;
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::SANITIZE_SET:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      SANITIZE_SET:
     forward_client_cert_ = Http::ForwardClientCertType::SanitizeSet;
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::ALWAYS_FORWARD_ONLY:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      ALWAYS_FORWARD_ONLY:
     forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
     break;
   default:
@@ -268,14 +281,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
-    case envoy::config::core::v3alpha::UNSPECIFIED: {
+    case envoy::config::core::v3::UNSPECIFIED: {
       switch (tracing_config.hidden_envoy_deprecated_operation_name()) {
-      case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-          HttpConnectionManager::Tracing::INGRESS:
+      case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+          Tracing::INGRESS:
         tracing_operation_name = Tracing::OperationName::Ingress;
         break;
-      case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-          HttpConnectionManager::Tracing::EGRESS:
+      case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+          Tracing::EGRESS:
         tracing_operation_name = Tracing::OperationName::Egress;
         break;
       default:
@@ -283,10 +296,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       }
       break;
     }
-    case envoy::config::core::v3alpha::INBOUND:
+    case envoy::config::core::v3::INBOUND:
       tracing_operation_name = Tracing::OperationName::Ingress;
       break;
-    case envoy::config::core::v3alpha::OUTBOUND:
+    case envoy::config::core::v3::OUTBOUND:
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:
@@ -296,7 +309,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::CustomTagMap custom_tags;
     for (const std::string& header :
          tracing_config.hidden_envoy_deprecated_request_headers_for_tags()) {
-      envoy::type::tracing::v2::CustomTag::Header headerTag;
+      envoy::type::tracing::v3::CustomTag::Header headerTag;
       headerTag.set_name(header);
       custom_tags.emplace(
           header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));
@@ -305,17 +318,17 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
     }
 
-    envoy::type::v3alpha::FractionalPercent client_sampling;
+    envoy::type::v3::FractionalPercent client_sampling;
     client_sampling.set_numerator(
         tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
-    envoy::type::v3alpha::FractionalPercent random_sampling;
+    envoy::type::v3::FractionalPercent random_sampling;
     // TODO: Random sampling historically was an integer and default to out of 10,000. We should
     // deprecate that and move to a straight fractional percent config.
     uint64_t random_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
         tracing_config, random_sampling, 10000, 10000)};
     random_sampling.set_numerator(random_sampling_numerator);
-    random_sampling.set_denominator(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND);
-    envoy::type::v3alpha::FractionalPercent overall_sampling;
+    random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+    envoy::type::v3::FractionalPercent overall_sampling;
     overall_sampling.set_numerator(
         tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
 
@@ -343,20 +356,20 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   switch (config.codec_type()) {
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::AUTO:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      AUTO:
     codec_type_ = CodecType::AUTO;
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::HTTP1:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      HTTP1:
     codec_type_ = CodecType::HTTP1;
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::HTTP2:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      HTTP2:
     codec_type_ = CodecType::HTTP2;
     break;
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::HTTP3:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      HTTP3:
     codec_type_ = CodecType::HTTP3;
     break;
   default:
@@ -399,7 +412,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 }
 
 void HttpConnectionManagerConfig::processFilter(
-    const envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpFilter&
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
     int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories,
     bool& is_terminal) {
@@ -498,6 +511,44 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
+}
+
+std::function<Http::ApiListenerPtr()>
+HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks) {
+
+  Utility::Singletons singletons = Utility::createSingletons(context);
+
+  auto filter_config = Utility::createConfig(proto_config, context, *singletons.date_provider_,
+                                             *singletons.route_config_provider_manager_,
+                                             *singletons.scoped_routes_config_provider_manager_);
+
+  // This lambda captures the shared_ptrs created above, thus preserving the
+  // reference count.
+  // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
+  // as these captured objects are also global singletons.
+  return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
+    auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
+        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
+        context.runtime(), context.localInfo(), context.clusterManager(),
+        &context.overloadManager(), context.dispatcher().timeSource());
+
+    // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
+    // an L4 filter, so this factory needs to take a few actions.
+
+    // When a new connection is creating its filter chain it hydrates the factory with a filter
+    // manager which provides the ConnectionManager with its "read_callbacks".
+    conn_manager->initializeReadFilterCallbacks(read_callbacks);
+
+    // When the connection first calls onData on the ConnectionManager, the ConnectionManager
+    // creates a codec. Here we force create a codec as onData will not be called.
+    Buffer::OwnedImpl dummy;
+    conn_manager->createCodec(dummy);
+
+    return conn_manager;
+  };
 }
 
 } // namespace HttpConnectionManager

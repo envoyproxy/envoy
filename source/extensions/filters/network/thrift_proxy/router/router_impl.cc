@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/route.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
@@ -21,7 +21,7 @@ namespace ThriftProxy {
 namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
-    const envoy::extensions::filters::network::thrift_proxy::v3alpha::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       rate_limit_policy_(route.route().rate_limits()),
@@ -37,8 +37,8 @@ RouteEntryImplBase::RouteEntryImplBase(
   }
 
   if (route.route().cluster_specifier_case() ==
-      envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteAction::
-          ClusterSpecifierCase::kWeightedClusters) {
+      envoy::extensions::filters::network::thrift_proxy::v3::RouteAction::ClusterSpecifierCase::
+          kWeightedClusters) {
 
     total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
@@ -79,8 +79,9 @@ bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
 }
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
-    const RouteEntryImplBase& parent, const envoy::extensions::filters::network::thrift_proxy::
-                                          v3alpha::WeightedCluster::ClusterWeight& cluster)
+    const RouteEntryImplBase& parent,
+    const envoy::extensions::filters::network::thrift_proxy::v3::WeightedCluster::ClusterWeight&
+        cluster)
     : parent_(parent), cluster_name_(cluster.name()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {
   if (cluster.has_metadata_match()) {
@@ -99,7 +100,7 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
-    const envoy::extensions::filters::network::thrift_proxy::v3alpha::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : RouteEntryImplBase(route), method_name_(route.match().method_name()),
       invert_(route.match().invert()) {
   if (method_name_.empty() && invert_) {
@@ -122,7 +123,7 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
 }
 
 ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
-    const envoy::extensions::filters::network::thrift_proxy::v3alpha::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : RouteEntryImplBase(route), invert_(route.match().invert()) {
   const std::string service_name = route.match().service_name();
   if (service_name.empty() && invert_) {
@@ -152,8 +153,8 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 }
 
 RouteMatcher::RouteMatcher(
-    const envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration& config) {
-  using envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteMatch;
+    const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config) {
+  using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
     switch (route.match().match_specifier_case()) {

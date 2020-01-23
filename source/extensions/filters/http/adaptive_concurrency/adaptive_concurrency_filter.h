@@ -5,7 +5,7 @@
 #include <string>
 
 #include "envoy/common/time.h"
-#include "envoy/extensions/filters/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -28,7 +28,7 @@ namespace AdaptiveConcurrency {
 class AdaptiveConcurrencyFilterConfig {
 public:
   AdaptiveConcurrencyFilterConfig(
-      const envoy::extensions::filters::http::adaptive_concurrency::v3alpha::AdaptiveConcurrency&
+      const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
           proto_config,
       Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);

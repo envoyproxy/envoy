@@ -7,7 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -37,7 +37,7 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
   ASSERT(file_event_);
 
   if (!Network::Socket::applyOptions(socket_->options(), *socket_,
-                                     envoy::config::core::v3alpha::SocketOption::STATE_BOUND)) {
+                                     envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
                                               socket_->localAddress()->asString()));
   }
@@ -69,6 +69,7 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
+  cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.

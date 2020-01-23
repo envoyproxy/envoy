@@ -24,10 +24,10 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/admin/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/grpc_credential/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -49,9 +49,9 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/secret/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
     ],
 )

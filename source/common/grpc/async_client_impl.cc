@@ -1,6 +1,6 @@
 #include "common/grpc/async_client_impl.h"
 
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Grpc {
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
-                                 const envoy::config::core::v3alpha::GrpcService& config,
+                                 const envoy::config::core::v3::GrpcService& config,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       initial_metadata_(config.initial_metadata()), time_source_(time_source) {}

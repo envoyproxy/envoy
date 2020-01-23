@@ -8,6 +8,7 @@ py_binary(
         "protoxform.py",
         "utils.py",
     ],
+    data = ["//:.clang-format"],
     python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [

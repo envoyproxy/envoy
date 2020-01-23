@@ -73,7 +73,7 @@ public:
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
                                                Stats::Scope& scope) {
-    const auto final_prefix = fmt::format("udp.{}", stat_prefix);
+    const auto final_prefix = absl::StrCat("udp.", stat_prefix);
     return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                            POOL_GAUGE_PREFIX(scope, final_prefix))};
   }

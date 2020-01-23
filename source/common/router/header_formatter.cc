@@ -27,20 +27,20 @@ std::string formatUpstreamMetadataParseException(absl::string_view params,
                                                  const EnvoyException* cause = nullptr) {
   std::string reason;
   if (cause != nullptr) {
-    reason = fmt::format(", because {}", cause->what());
+    reason = absl::StrCat(", because ", cause->what());
   }
 
-  return fmt::format("Invalid header configuration. Expected format "
-                     "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                     "UPSTREAM_METADATA{}{}",
-                     params, reason);
+  return absl::StrCat("Invalid header configuration. Expected format "
+                      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+                      "UPSTREAM_METADATA",
+                      params, reason);
 }
 
 std::string formatPerRequestStateParseException(absl::string_view params) {
-  return fmt::format("Invalid header configuration. Expected format "
-                     "PER_REQUEST_STATE(<data_name>), actual format "
-                     "PER_REQUEST_STATE{}",
-                     params);
+  return absl::StrCat("Invalid header configuration. Expected format "
+                      "PER_REQUEST_STATE(<data_name>), actual format "
+                      "PER_REQUEST_STATE",
+                      params);
 }
 
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the
@@ -334,6 +334,9 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
         parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
   } else if (absl::StartsWith(field_name, "REQ")) {
     field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
+  } else if (field_name == "HOSTNAME") {
+    std::string hostname = Envoy::AccessLog::AccessLogFormatUtils::getHostname();
+    field_extractor_ = [hostname](const StreamInfo::StreamInfo&) { return hostname; };
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

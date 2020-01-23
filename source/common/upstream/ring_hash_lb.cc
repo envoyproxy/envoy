@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/common/assert.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -18,8 +18,8 @@ namespace Upstream {
 RingHashLoadBalancer::RingHashLoadBalancer(
     const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig>& config,
-    const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
+    const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>& config,
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
       scope_(scope.createScope("ring_hash_lb.")), stats_(generateStats(*scope_)),
       min_ring_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size,
@@ -79,7 +79,7 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   }
 }
 
-using HashFunction = envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig::HashFunction;
+using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_host_weights,
                                  double min_normalized_weight, uint64_t min_ring_size,
                                  uint64_t max_ring_size, HashFunction hash_function,

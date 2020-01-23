@@ -31,9 +31,9 @@ const std::string& VersionInfo::version() {
                                      revisionStatus(), buildType(), sslVersion()));
 }
 
-const envoy::config::core::v3alpha::BuildVersion& VersionInfo::buildVersion() {
+const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
   static const auto* result =
-      new envoy::config::core::v3alpha::BuildVersion(makeBuildVersion(BUILD_VERSION_NUMBER));
+      new envoy::config::core::v3::BuildVersion(makeBuildVersion(BUILD_VERSION_NUMBER));
   return *result;
 }
 
@@ -55,8 +55,8 @@ const std::string& VersionInfo::sslVersion() {
   return ssl_version;
 }
 
-envoy::config::core::v3alpha::BuildVersion VersionInfo::makeBuildVersion(const char* version) {
-  envoy::config::core::v3alpha::BuildVersion result;
+envoy::config::core::v3::BuildVersion VersionInfo::makeBuildVersion(const char* version) {
+  envoy::config::core::v3::BuildVersion result;
   // Split BUILD_VERSION_NUMBER into version and an optional build label after the '-'
   std::regex ver_regex("([\\d]+)\\.([\\d]+)\\.([\\d]+)(-(.*))?");
   // Match indexes, given the regex above
@@ -68,10 +68,10 @@ envoy::config::core::v3alpha::BuildVersion VersionInfo::makeBuildVersion(const c
   if (std::regex_match(version, match, ver_regex)) {
     int value = 0;
     if (absl::SimpleAtoi(match.str(major), &value)) {
-      result.mutable_version()->set_major(value);
+      result.mutable_version()->set_major_number(value);
     }
     if (absl::SimpleAtoi(match.str(minor), &value)) {
-      result.mutable_version()->set_minor(value);
+      result.mutable_version()->set_minor_number(value);
     }
     if (absl::SimpleAtoi(match.str(patch), &value)) {
       result.mutable_version()->set_patch(value);

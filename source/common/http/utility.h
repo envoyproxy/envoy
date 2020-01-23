@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/core/v3alpha/http_uri.pb.h"
-#include "envoy/config/core/v3alpha/protocol.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -167,13 +167,13 @@ bool isWebSocketUpgradeRequest(const HeaderMap& headers);
  * @return Http2Settings An Http2Settings populated from the
  * envoy::api::v2::core::Http2ProtocolOptions config.
  */
-Http2Settings parseHttp2Settings(const envoy::config::core::v3alpha::Http2ProtocolOptions& config);
+Http2Settings parseHttp2Settings(const envoy::config::core::v3::Http2ProtocolOptions& config);
 
 /**
  * @return Http1Settings An Http1Settings populated from the
  * envoy::api::v2::core::Http1ProtocolOptions config.
  */
-Http1Settings parseHttp1Settings(const envoy::config::core::v3alpha::Http1ProtocolOptions& config);
+Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
 /**
  * Create a locally generated response using filter callbacks.
@@ -261,7 +261,7 @@ void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& hos
 /**
  * Prepare headers for a HttpUri.
  */
-MessagePtr prepareHeaders(const envoy::config::core::v3alpha::HttpUri& http_uri);
+MessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
 
 /**
  * Serialize query-params into a string.

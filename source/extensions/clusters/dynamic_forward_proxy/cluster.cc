@@ -1,8 +1,8 @@
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
 #include "common/network/transport_socket_options_impl.h"
 
@@ -14,12 +14,12 @@ namespace Clusters {
 namespace DynamicForwardProxy {
 
 Cluster::Cluster(
-    const envoy::config::cluster::v3alpha::Cluster& cluster,
-    const envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig& config,
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Runtime::Loader& runtime,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     const LocalInfo::LocalInfo& local_info,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api),
@@ -188,10 +188,10 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
-    const envoy::config::cluster::v3alpha::Cluster& cluster,
-    const envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig& proto_config,
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context.singletonManager(), context.dispatcher(), context.tls(), context.stats());

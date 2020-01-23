@@ -1,8 +1,8 @@
 #include <string>
 
-#include "envoy/extensions/filters/network/mongo_proxy/v3alpha/mongo_proxy.pb.h"
-#include "envoy/extensions/filters/network/mongo_proxy/v3alpha/mongo_proxy.pb.validate.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "extensions/filters/network/mongo_proxy/config.h"
 
@@ -21,10 +21,9 @@ namespace MongoProxy {
 
 TEST(MongoFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(
-      MongoProxyFilterConfigFactory().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy(), context),
-      ProtoValidationException);
+  EXPECT_THROW(MongoProxyFilterConfigFactory().createFilterFactoryFromProto(
+                   envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy(), context),
+               ProtoValidationException);
 }
 
 TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
@@ -33,7 +32,7 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   access_log: path/to/access/log
   )EOF";
 
-  envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy proto_config;
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
@@ -44,7 +43,7 @@ TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
 }
 
 TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
-  envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy config;
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy config;
 
   config.set_access_log("path/to/access/log");
   config.set_stat_prefix("my_stat_prefix");
@@ -60,8 +59,8 @@ TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
 TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
-  envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy*>(
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_access_log("path/to/access/log");
   config.set_stat_prefix("my_stat_prefix");
@@ -73,7 +72,7 @@ TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
 }
 
 void handleInvalidConfiguration(const std::string& yaml_string, const std::string& error_regex) {
-  envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy config;
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml_string, config), EnvoyException,
                           error_regex);
 }
@@ -196,7 +195,7 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
     fixed_delay: 0.001s
   )EOF";
 
-  envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy proto_config;
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;
@@ -207,11 +206,11 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
 }
 
 TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
-  envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy config{};
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy config{};
   config.set_stat_prefix("my_stat_prefix");
   config.mutable_delay()->mutable_percentage()->set_numerator(50);
   config.mutable_delay()->mutable_percentage()->set_denominator(
-      envoy::type::v3alpha::FractionalPercent::HUNDRED);
+      envoy::type::v3::FractionalPercent::HUNDRED);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;

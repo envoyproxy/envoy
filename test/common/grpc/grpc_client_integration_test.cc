@@ -1,5 +1,5 @@
 #ifdef ENVOY_GOOGLE_GRPC
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "common/grpc/google_async_client_impl.h"
 
@@ -411,7 +411,7 @@ public:
     }
   }
 
-  envoy::config::core::v3alpha::GrpcService createGoogleGrpcConfig() override {
+  envoy::config::core::v3::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_credentials_factory_name(credentials_factory_name_);

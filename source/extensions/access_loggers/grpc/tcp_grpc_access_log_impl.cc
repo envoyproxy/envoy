@@ -1,7 +1,7 @@
 #include "extensions/access_loggers/grpc/tcp_grpc_access_log_impl.h"
 
-#include "envoy/data/accesslog/v3alpha/accesslog.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "common/common/assert.h"
 #include "common/network/utility.h"
@@ -19,7 +19,7 @@ TcpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(GrpcCommon::GrpcAccessLog
 
 TcpGrpcAccessLog::TcpGrpcAccessLog(
     AccessLog::FilterPtr&& filter,
-    envoy::extensions::access_loggers::grpc::v3alpha::TcpGrpcAccessLogConfig config,
+    envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config,
     ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
     : Common::ImplBase(std::move(filter)), config_(std::move(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
@@ -32,11 +32,11 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(
 void TcpGrpcAccessLog::emitLog(const Http::HeaderMap&, const Http::HeaderMap&,
                                const Http::HeaderMap&, const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
-  envoy::data::accesslog::v3alpha::TCPAccessLogEntry log_entry;
+  envoy::data::accesslog::v3::TCPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
                                                         stream_info, config_.common_config());
 
-  envoy::data::accesslog::v3alpha::ConnectionProperties& connection_properties =
+  envoy::data::accesslog::v3::ConnectionProperties& connection_properties =
       *log_entry.mutable_connection_properties();
   connection_properties.set_received_bytes(stream_info.bytesReceived());
   connection_properties.set_sent_bytes(stream_info.bytesSent());

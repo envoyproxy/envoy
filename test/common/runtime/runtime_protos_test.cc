@@ -1,8 +1,8 @@
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.validate.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/base.pb.validate.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/runtime/runtime_protos.h"
 
@@ -25,7 +25,7 @@ protected:
 };
 
 TEST_F(FeatureFlagTest, FeatureFlagBasicTest) {
-  envoy::config::core::v3alpha::RuntimeFeatureFlag feature_flag_proto;
+  envoy::config::core::v3::RuntimeFeatureFlag feature_flag_proto;
   std::string yaml(R"EOF(
 runtime_key: "foo.bar"
 default_value: true
@@ -39,7 +39,7 @@ default_value: true
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.bar", true)).WillOnce(Return(false));
   EXPECT_EQ(false, test_feature.enabled());
 
-  envoy::config::core::v3alpha::RuntimeFeatureFlag feature_flag_proto2;
+  envoy::config::core::v3::RuntimeFeatureFlag feature_flag_proto2;
   yaml = R"EOF(
 runtime_key: "bar.foo"
 default_value: false
@@ -55,7 +55,7 @@ default_value: false
 }
 
 TEST_F(FeatureFlagTest, FeatureFlagEmptyProtoTest) {
-  envoy::config::core::v3alpha::RuntimeFeatureFlag empty_proto;
+  envoy::config::core::v3::RuntimeFeatureFlag empty_proto;
   FeatureFlag test(empty_proto, runtime_);
 
   EXPECT_CALL(runtime_.snapshot_, getBoolean("", true));
@@ -63,7 +63,7 @@ TEST_F(FeatureFlagTest, FeatureFlagEmptyProtoTest) {
 }
 
 TEST_F(FeatureFlagTest, FractionalPercentBasicTest) {
-  envoy::config::core::v3alpha::RuntimeFractionalPercent runtime_fractional_percent_proto;
+  envoy::config::core::v3::RuntimeFractionalPercent runtime_fractional_percent_proto;
   std::string yaml(R"EOF(
 runtime_key: "foo.bar"
 default_value:
@@ -74,20 +74,18 @@ default_value:
   FractionalPercent test_fractional_percent(runtime_fractional_percent_proto, runtime_);
 
   EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled(
-                  "foo.bar",
-                  testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
+              featureEnabled("foo.bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(
+                                            Percent(100))))
       .WillOnce(Return(true));
   EXPECT_EQ(true, test_fractional_percent.enabled());
 
   EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled(
-                  "foo.bar",
-                  testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
+              featureEnabled("foo.bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(
+                                            Percent(100))))
       .WillOnce(Return(false));
   EXPECT_EQ(false, test_fractional_percent.enabled());
 
-  envoy::config::core::v3alpha::RuntimeFractionalPercent runtime_fractional_percent_proto2;
+  envoy::config::core::v3::RuntimeFractionalPercent runtime_fractional_percent_proto2;
   yaml = (R"EOF(
 runtime_key: "foo.bar"
 default_value:
@@ -97,17 +95,15 @@ default_value:
   TestUtility::loadFromYamlAndValidate(yaml, runtime_fractional_percent_proto2);
   FractionalPercent test_fractional_percent2(runtime_fractional_percent_proto2, runtime_);
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("foo.bar",
-                     testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(0))))
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("foo.bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(
+                                            Percent(0))))
       .WillOnce(Return(true));
   EXPECT_EQ(true, test_fractional_percent2.enabled());
 
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("foo.bar",
-                     testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(0))))
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("foo.bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(
+                                            Percent(0))))
       .WillOnce(Return(false));
   EXPECT_EQ(false, test_fractional_percent2.enabled());
 }

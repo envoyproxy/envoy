@@ -108,7 +108,7 @@ std::string PerfAnnotationContext::toString() {
             : std::to_string(
                   std::chrono::duration_cast<std::chrono::nanoseconds>(stats.total_).count() /
                   count));
-    columns[3].push_back(fmt::format("{}", stats.stddev_.computeStandardDeviation()));
+    columns[3].push_back(absl::StrCat("", stats.stddev_.computeStandardDeviation()));
     columns[4].push_back(nanoseconds_string(stats.min_));
     columns[5].push_back(nanoseconds_string(stats.max_));
     const CategoryDescription& category_description = p->first;

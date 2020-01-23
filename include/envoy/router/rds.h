@@ -2,7 +2,8 @@
 
 #include <memory>
 
-#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/http/filter.h"
 #include "envoy/router/router.h"
 
 namespace Envoy {
@@ -16,7 +17,7 @@ public:
   struct ConfigInfo {
     // A reference to the currently loaded route configuration. Do not hold this reference beyond
     // the caller of configInfo()'s scope.
-    const envoy::config::route::v3alpha::RouteConfiguration& config_;
+    const envoy::config::route::v3::RouteConfiguration& config_;
 
     // The discovery version that supplied this route. This will be set to "" in the case of
     // static clusters.
@@ -53,7 +54,18 @@ public:
    * Validate if the route configuration can be applied to the context of the route config provider.
    */
   virtual void
-  validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const PURE;
+  validateConfig(const envoy::config::route::v3::RouteConfiguration& config) const PURE;
+
+  /**
+   * Callback used to request an update to the route configuration from the management server.
+   * @param for_domain supplies the domain name that virtual hosts must match on
+   * @param thread_local_dispatcher thread-local dispatcher
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to worker threads
+   */
+  virtual void requestVirtualHostsUpdate(
+      const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
+      std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) PURE;
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;
