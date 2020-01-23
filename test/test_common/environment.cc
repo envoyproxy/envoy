@@ -80,8 +80,9 @@ char** argv_;
 } // namespace
 
 void TestEnvironment::createPath(const std::string& path) {
-  if (Filesystem::fileSystemForTest().directoryExists(path))
+  if (Filesystem::fileSystemForTest().directoryExists(path)) {
     return;
+  }
 #ifndef WIN32
   RELEASE_ASSERT(::mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IRWXO) == 0,
                  absl::StrCat("failed to create path: ", path));
@@ -105,8 +106,9 @@ void TestEnvironment::removePath(const std::string& path) {
   (void)::DeleteFile(path.c_str());
   (void)::RemoveDirectory(path.c_str());
 #endif
-  if (!Filesystem::fileSystemForTest().directoryExists(path))
+  if (!Filesystem::fileSystemForTest().directoryExists(path)) {
     return;
+  }
   Directory directory(path);
   std::string entry_name;
   entry_name.reserve(path.size() + 256);
@@ -116,7 +118,7 @@ void TestEnvironment::removePath(const std::string& path) {
   for (const DirectoryEntry& entry : directory) {
     entry_name.resize(fileidx);
     entry_name.append(entry.name_);
-    if (entry.type_ == Envoy::Filesystem::FileType::Regular)
+    if (entry.type_ == Envoy::Filesystem::FileType::Regular) {
 #ifndef WIN32
       RELEASE_ASSERT(::unlink(entry_name.c_str()) == 0,
                      absl::StrCat("failed to remove file: ", entry_name));
@@ -124,9 +126,11 @@ void TestEnvironment::removePath(const std::string& path) {
       RELEASE_ASSERT(::DeleteFile(entry_name.c_str()),
                      absl::StrCat("failed to remove file: ", entry_name));
 #endif
-    else if (entry.type_ == Envoy::Filesystem::FileType::Directory)
-      if (entry.name_ != "." && entry.name_ != "..")
+    } else if (entry.type_ == Envoy::Filesystem::FileType::Directory) {
+      if (entry.name_ != "." && entry.name_ != "..") {
         removePath(entry_name);
+      }
+    }
   }
 #ifndef WIN32
   RELEASE_ASSERT(::rmdir(path.c_str()) == 0,
