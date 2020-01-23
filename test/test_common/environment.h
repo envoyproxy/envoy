@@ -230,6 +230,9 @@ private:
 
 /**
  * A utility class for atomically updating a file using symbolic link swap.
+ * Note the file lifetime is limited to the instance of the AtomicFileUpdater
+ * which erases any existing files upon creation, used for specific test
+ * scenarios. See discussion at https://github.com/envoyproxy/envoy/pull/4298
  */
 class AtomicFileUpdater {
 public:

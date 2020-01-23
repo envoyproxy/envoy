@@ -55,10 +55,15 @@ FileType DirectoryIteratorImpl::fileType(const std::string& full_path) const {
 
   const Api::SysCallIntResult result = os_sys_calls_.stat(full_path.c_str(), &stat_buf);
   if (result.rc_ != 0) {
-    if (errno == ENOENT)
-      // Special case, a symlink is broken, target couldn't be stat'ed
-      if (::lstat(full_path.c_str(), &stat_buf) == 0 && S_ISLNK(stat_buf.st_mode))
+    if (errno == ENOENT) {
+      // Special case. This directory entity is likely to be a symlink,
+      // but the reference is broken as the target could not be stat()'ed.
+      // If we confirm this with an lstat, treat this file entity as
+      // a regular file, which may be unlink()'ed.
+      if (::lstat(full_path.c_str(), &stat_buf) == 0 && S_ISLNK(stat_buf.st_mode)) {
         return FileType::Regular;
+      }
+    }
     throw EnvoyException(fmt::format("unable to stat file: '{}' ({})", full_path, errno));
   }
 

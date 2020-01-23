@@ -116,8 +116,9 @@ InstanceImplPosix::splitPathFromFilename(absl::string_view path) {
   }
   absl::string_view name = path.substr(last_slash + 1);
   // truncate all trailing slashes, except root slash
-  if (last_slash == 0)
+  if (last_slash == 0) {
     ++last_slash;
+  }
   return std::make_pair(path.substr(0, last_slash), name);
 }
 

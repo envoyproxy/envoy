@@ -37,7 +37,7 @@ protected:
 #endif
 };
 
-TEST_F(FileSystemImplTest, fileExists) {
+TEST_F(FileSystemImplTest, FileExists) {
   EXPECT_FALSE(file_system_.fileExists("/dev/blahblahblah"));
 #ifdef WIN32
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
@@ -49,7 +49,7 @@ TEST_F(FileSystemImplTest, fileExists) {
 #endif
 }
 
-TEST_F(FileSystemImplTest, directoryExists) {
+TEST_F(FileSystemImplTest, DirectoryExists) {
   EXPECT_FALSE(file_system_.directoryExists("/dev/blahblah"));
 #ifdef WIN32
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
@@ -61,7 +61,7 @@ TEST_F(FileSystemImplTest, directoryExists) {
 #endif
 }
 
-TEST_F(FileSystemImplTest, fileSize) {
+TEST_F(FileSystemImplTest, FileSize) {
 #ifdef WIN32
   EXPECT_EQ(0, file_system_.fileSize("NUL"));
 #else
@@ -73,7 +73,7 @@ TEST_F(FileSystemImplTest, fileSize) {
   EXPECT_EQ(data.length(), file_system_.fileSize(file_path));
 }
 
-TEST_F(FileSystemImplTest, fileReadToEndSuccess) {
+TEST_F(FileSystemImplTest, FileReadToEndSuccess) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
@@ -82,7 +82,7 @@ TEST_F(FileSystemImplTest, fileReadToEndSuccess) {
 
 // Files are read into std::string; verify that all bytes (eg non-ascii characters) come back
 // unmodified
-TEST_F(FileSystemImplTest, fileReadToEndSuccessBinary) {
+TEST_F(FileSystemImplTest, FileReadToEndSuccessBinary) {
   std::string data;
   for (unsigned i = 0; i < 256; i++) {
     data.push_back(i);
@@ -97,13 +97,13 @@ TEST_F(FileSystemImplTest, fileReadToEndSuccessBinary) {
   }
 }
 
-TEST_F(FileSystemImplTest, fileReadToEndDoesNotExist) {
+TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
   unlink(TestEnvironment::temporaryPath("envoy_this_not_exist").c_str());
   EXPECT_THROW(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
                EnvoyException);
 }
 
-TEST_F(FileSystemImplTest, fileReadToEndBlacklisted) {
+TEST_F(FileSystemImplTest, FileReadToEndBlacklisted) {
   EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
   EXPECT_THROW(file_system_.fileReadToEnd("/proc/cpuinfo"), EnvoyException);
   EXPECT_THROW(file_system_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
@@ -121,7 +121,7 @@ TEST_F(FileSystemImplTest, CanonicalPathFail) {
 }
 #endif
 
-TEST_F(FileSystemImplTest, splitPathFromFilename) {
+TEST_F(FileSystemImplTest, SplitPathFromFilename) {
   std::pair<absl::string_view, absl::string_view> result;
   result = file_system_.splitPathFromFilename("/foo/bar/baz");
   EXPECT_EQ(result.first, "/foo/bar");
