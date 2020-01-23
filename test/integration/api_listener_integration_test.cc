@@ -5,7 +5,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
