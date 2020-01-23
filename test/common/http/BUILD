@@ -229,6 +229,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/runtime:uuid_util_lib",
+        "//source/extensions/request_id_utils/uuid:uuid_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",

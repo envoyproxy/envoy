@@ -14,6 +14,8 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 
+#include "extensions/request_id_utils/uuid/uuid_impl.h"
+
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -278,6 +280,10 @@ typed_config:
   path: /dev/null
   )EOF";
 
+  Runtime::RandomGeneratorImpl random;
+  stream_info_.setRequestIDUtils(std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
+      Envoy::Extensions::RequestIDUtils::UUIDUtils(random)));
+
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   // Value is taken from random generator.
@@ -319,6 +325,10 @@ typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   path: /dev/null
   )EOF";
+
+  Runtime::RandomGeneratorImpl random;
+  stream_info_.setRequestIDUtils(std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
+      Envoy::Extensions::RequestIDUtils::UUIDUtils(random)));
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
@@ -438,6 +448,9 @@ typed_config:
 
 TEST_F(AccessLogImplTest, RequestTracing) {
   Runtime::RandomGeneratorImpl random;
+  stream_info_.setRequestIDUtils(std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
+      Envoy::Extensions::RequestIDUtils::UUIDUtils(random)));
+
   std::string not_traceable_guid = random.uuid();
 
   std::string force_tracing_guid = random.uuid();

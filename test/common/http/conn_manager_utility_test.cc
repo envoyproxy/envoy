@@ -1,6 +1,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "extensions/request_id_utils/uuid/uuid_impl.h"
 #include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -116,6 +117,9 @@ public:
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
+    auto ridUtils = std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
+      Envoy::Extensions::RequestIDUtils::UUIDUtils(random_));
+    ON_CALL(config_, requestIDUtils()).WillByDefault(Return(ridUtils));
   }
 
   struct MutateRequestRet {
@@ -132,10 +136,9 @@ public:
   // the request is internal/external, given the importance of these two pieces of data.
   MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol) {
     MutateRequestRet ret;
-    ret.downstream_address_ =
-        ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
-                                                       random_, local_info_)
-            ->asString();
+    ret.downstream_address_ = ConnectionManagerUtility::mutateRequestHeaders(
+                                  headers, connection_, config_, route_config_, local_info_)
+                                  ->asString();
     ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
     ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
     return ret;
