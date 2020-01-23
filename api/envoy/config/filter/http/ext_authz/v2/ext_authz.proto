@@ -166,7 +166,11 @@ message AuthorizationRequest {
   // 1. *Host*, *Method*, *Path* and *Content-Length* are automatically included to the list.
   //
   // 2. *Content-Length* will be set to 0 and the request to the authorization service will not have
-  // a message body.
+  // a message body. However, the authorization request can include the buffered client request body
+  // (controlled by :ref:`with_request_body
+  // <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.with_request_body>` setting),
+  // consequently the value of *Content-Length* of the authorization request reflects the size of
+  // its payload size.
   //
   type.matcher.ListStringMatcher allowed_headers = 1;
 

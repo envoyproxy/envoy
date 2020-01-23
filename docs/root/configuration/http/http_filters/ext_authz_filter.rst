@@ -67,7 +67,7 @@ A sample filter configuration for a raw HTTP authorization server:
   http_filters:
     - name: envoy.ext_authz
       typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz      
+        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
         http_service:
             server_uri:
               uri: 127.0.0.1:10003
