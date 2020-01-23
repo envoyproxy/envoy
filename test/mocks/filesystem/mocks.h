@@ -52,8 +52,7 @@ public:
   MOCK_METHOD1(directoryExists, bool(const std::string&));
   MOCK_METHOD1(fileSize, ssize_t(const std::string&));
   MOCK_METHOD1(fileReadToEnd, std::string(const std::string&));
-  MOCK_METHOD1(splitPathFromFilename,
-               std::pair<absl::string_view, absl::string_view>(absl::string_view));
+  MOCK_METHOD1(splitPathFromFilename, PathSplitResult(absl::string_view));
   MOCK_METHOD1(illegalPath, bool(const std::string&));
 };
 

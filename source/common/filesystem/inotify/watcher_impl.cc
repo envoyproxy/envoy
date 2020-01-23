@@ -34,9 +34,9 @@ WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb callback) {
   // Because of general inotify pain, we always watch the directory that the file lives in,
   // and then synthetically raise per file events.
-  auto result = api_.fileSystem().splitPathFromFilename(path);
-  auto directory = result.first;
-  auto file = std::string(result.second);
+  PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
+  auto directory = result.directory_;
+  std::string file = std::string(result.file_);
 
   const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
   int watch_fd = inotify_add_watch(inotify_fd_, std::string(directory).c_str(), watch_mask);

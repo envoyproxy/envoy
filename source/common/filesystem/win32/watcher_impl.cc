@@ -50,9 +50,9 @@ WatcherImpl::~WatcherImpl() {
 }
 
 void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
-  auto result = api_.fileSystem().splitPathFromFilename(path);
-  auto dir_narrow = result.first;
-  auto file_narrow = result.second;
+  PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
+  auto dir_narrow = result.directory_;
+  auto file_narrow = result.file_;
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
   const std::wstring directory = wstring_converter_.from_bytes(std::string(dir_narrow));

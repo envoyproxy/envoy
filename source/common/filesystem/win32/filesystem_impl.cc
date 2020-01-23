@@ -104,8 +104,7 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
-std::pair<absl::string_view, absl::string_view>
-InstanceImplWin32::splitPathFromFilename(absl::string_view path) {
+PathSplitResult InstanceImplWin32::splitPathFromFilename(absl::string_view path) {
   size_t last_slash = path.find_last_of(":/\\");
   if (last_slash == std::string::npos) {
     throw EnvoyException(fmt::format("invalid file path {}", path));
@@ -116,7 +115,7 @@ InstanceImplWin32::splitPathFromFilename(absl::string_view path) {
   if (last_slash == 0 || path[last_slash] == ':' || path[last_slash - 1] == ':') {
     ++last_slash;
   }
-  return std::make_pair(path.substr(0, last_slash), name);
+  return {path.substr(0, last_slash), name};
 }
 
 // clang-format off

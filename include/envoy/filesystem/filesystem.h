@@ -66,6 +66,15 @@ public:
 using FilePtr = std::unique_ptr<File>;
 
 /**
+ * Contains the result of splitting the file name and its parent directory from
+ * a given file path.
+ */
+struct PathSplitResult {
+  absl::string_view directory_;
+  absl::string_view file_;
+};
+
+/**
  * Abstraction for some basic filesystem operations
  */
 class Instance {
@@ -103,11 +112,12 @@ public:
   virtual std::string fileReadToEnd(const std::string& path) PURE;
 
   /**
-   * @path full file path on input which is truncated to the path
-   * @name the resulting file name component from the input path
+   * @path file path to split
+   * @return PathSplitResult containing the parent directory of the input path (a la `dirname`)
+   *                         and the file name (a la `basename`)
+   * @note will throw an exception if path does not contain any path separator character
    */
-  virtual std::pair<absl::string_view, absl::string_view>
-  splitPathFromFilename(absl::string_view path) PURE;
+  virtual PathSplitResult splitPathFromFilename(absl::string_view path) PURE;
 
   /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This
