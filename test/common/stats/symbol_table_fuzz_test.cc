@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iostream>
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
@@ -39,21 +40,38 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     FUZZ_ASSERT(trimmed_fuzz_data == fake_symbol_table.toString(fake_dynamic_stat_name));
 
     // Test all combinations of joins within each symbol table.
-    std::string joined =
-        trimmed_fuzz_data.empty() ? "" : absl::StrCat(trimmed_fuzz_data, ".", trimmed_fuzz_data);
-    auto join = [](SymbolTable& table, StatName name1, StatName name2) -> std::string {
-      SymbolTable::StoragePtr storage = table.join({name1, name2});
-      StatName stat_name(storage.get());
-      return table.toString(stat_name);
-    };
-    FUZZ_ASSERT(joined == join(symbol_table, stat_name, stat_name));
-    FUZZ_ASSERT(joined == join(symbol_table, stat_name, dynamic_stat_name));
-    FUZZ_ASSERT(joined == join(symbol_table, dynamic_stat_name, dynamic_stat_name));
-    FUZZ_ASSERT(joined == join(symbol_table, dynamic_stat_name, stat_name));
-    FUZZ_ASSERT(joined == join(fake_symbol_table, fake_stat_name, fake_stat_name));
-    FUZZ_ASSERT(joined == join(fake_symbol_table, fake_stat_name, fake_dynamic_stat_name));
-    FUZZ_ASSERT(joined == join(fake_symbol_table, fake_dynamic_stat_name, fake_dynamic_stat_name));
-    FUZZ_ASSERT(joined == join(fake_symbol_table, fake_dynamic_stat_name, fake_stat_name));
+    if (!trimmed_fuzz_data.empty()) {
+      std::string joined = absl::StrCat(trimmed_fuzz_data, ".", trimmed_fuzz_data);
+      auto join = [joined](SymbolTable& table, StatName name1, StatName name2) -> bool {
+        bool ok = true;
+        SymbolTable::StoragePtr storage = table.join({name1, name2});
+        StatName stat_name(storage.get());
+        std::string name1_name2 = table.toString(stat_name);
+        if (joined.size() != name1_name2.size()) {
+          std::cerr << "lengths don't match: " << joined.size() << " != " << name1_name2.size()
+                    << std::endl;
+          ok = false;
+        } else {
+          for (uint32_t i = 0; i < joined.size(); ++i) {
+            if (joined[i] != name1_name2[i]) {
+              std::cerr << "char [" << i << "] mismatch: " << joined[i] << "("
+                        << static_cast<uint32_t>(joined[i]) << ") != " << name1_name2[i] << "("
+                        << static_cast<uint32_t>(name1_name2[i]) << ")" << std::endl;
+              ok = false;
+            }
+          }
+        }
+        return ok;
+      };
+      FUZZ_ASSERT(join(symbol_table, stat_name, stat_name));
+      FUZZ_ASSERT(join(symbol_table, stat_name, dynamic_stat_name));
+      FUZZ_ASSERT(join(symbol_table, dynamic_stat_name, dynamic_stat_name));
+      FUZZ_ASSERT(join(symbol_table, dynamic_stat_name, stat_name));
+      FUZZ_ASSERT(join(fake_symbol_table, fake_stat_name, fake_stat_name));
+      FUZZ_ASSERT(join(fake_symbol_table, fake_stat_name, fake_dynamic_stat_name));
+      FUZZ_ASSERT(join(fake_symbol_table, fake_dynamic_stat_name, fake_dynamic_stat_name));
+      FUZZ_ASSERT(join(fake_symbol_table, fake_dynamic_stat_name, fake_stat_name));
+    }
 
     // Also encode the string directly, without symbolizing it.
     TestUtil::serializeDeserializeString(next_data);
