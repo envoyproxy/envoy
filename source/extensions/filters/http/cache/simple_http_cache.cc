@@ -131,7 +131,7 @@ CacheInfo SimpleHttpCache::cacheInfo() const {
 class SimpleHttpCacheFactory : public HttpCacheFactory {
 public:
   SimpleHttpCacheFactory() : HttpCacheFactory("envoy.extensions.http.cache.simple") {}
-  HttpCache& getCache(const envoy::config::filter::http::cache::v2::CacheConfig&) override {
+  HttpCache& getCache(const envoy::config::filter::http::cache::v3::CacheConfig&) override {
     return cache_;
   }
 

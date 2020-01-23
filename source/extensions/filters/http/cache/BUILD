@@ -26,7 +26,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/config/filter/http/cache/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -44,7 +44,7 @@ envoy_cc_extension(
         "//include/envoy/stats:stats_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/http/cache/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -66,7 +66,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/cache/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/cache/v3:pkg_cc_proto",
     ],
 )
 
