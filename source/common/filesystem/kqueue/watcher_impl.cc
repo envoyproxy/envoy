@@ -17,22 +17,21 @@ namespace Envoy {
 namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
-    : api_(api), queue_(kqueue()),
-    : kqueue_event_(dispatcher.createFileEvent(
-          queue_,
-          [this](uint32_t events) -> void {
-            if (events & Event::FileReadyType::Read) {
-              onKqueueEvent();
-            }
-          },
-          Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
+    : api_(api), queue_(kqueue()), kqueue_event_(dispatcher.createFileEvent(
+                                       queue_,
+                                       [this](uint32_t events) -> void {
+                                         if (events & Event::FileReadyType::Read) {
+                                           onKqueueEvent();
+                                         }
+                                       },
+                                       Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
 
 WatcherImpl::~WatcherImpl() {
   close(queue_);
   watches_.clear();
 }
 
-void WatcherImpl::addWatch(const std::string& path, uint32_t events, Watcher::OnChangedCb cb) {
+void WatcherImpl::addWatch(absl::string_view path, uint32_t events, Watcher::OnChangedCb cb) {
   FileWatchPtr watch = addWatch(path, events, cb, false);
   if (watch == nullptr) {
     throw EnvoyException(absl::StrCat("invalid watch path ", path));
@@ -42,13 +41,14 @@ void WatcherImpl::addWatch(const std::string& path, uint32_t events, Watcher::On
 WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t events,
                                                 Watcher::OnChangedCb cb, bool path_must_exist) {
   bool watching_dir = false;
-  int watch_fd = open(path.c_str(), O_SYMLINK);
+  std::string pathname(path);
+  int watch_fd = open(pathname.c_str(), O_SYMLINK);
   if (watch_fd == -1) {
     if (path_must_exist) {
       return nullptr;
     }
 
-    auto directory = api_fileSystem().splitPathFromFilename(path).directory_;
+    auto directory = api_.fileSystem().splitPathFromFilename(path).directory_;
     watch_fd = open(std::string(directory).c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;
@@ -59,7 +59,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
 
   FileWatchPtr watch(new FileWatch());
   watch->fd_ = watch_fd;
-  watch->file_ = std::string(path);
+  watch->file_ = pathname;
   watch->events_ = events;
   watch->callback_ = cb;
   watch->watching_dir_ = watching_dir;
