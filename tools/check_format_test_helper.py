@@ -206,6 +206,9 @@ def runChecks():
       "grpc_shutdown.cc",
       "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
       "See #8282")
+  errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
+  errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
+  errors += checkUnfixableError("clang_format_double_on.cc", "clang-format nested on")
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",
       "Unable to find package name for proto file: ./api/missing_package.proto")

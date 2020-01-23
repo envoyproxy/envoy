@@ -166,14 +166,20 @@ UNOWNED_EXTENSIONS = {
 
 # Map a line transformation function across each line of a file,
 # writing the result lines as requested.
+# If there is a clang format nesting or mismatch error, return the first occurrence
 def evaluateLines(path, line_xform, write=True):
+  error_message = None
   format_flag = True
   output_lines = []
   for line_number, line in enumerate(readLines(path)):
-    if line.find("// clang-format on") != -1:
-      format_flag = True
     if line.find("// clang-format off") != -1:
+      if not format_flag and error_message is None:
+        error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested off")
       format_flag = False
+    if line.find("// clang-format on") != -1:
+      if format_flag and error_message is None:
+        error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested on")
+      format_flag = True
     if format_flag:
       output_lines.append(line_xform(line, line_number))
     else:
@@ -182,6 +188,9 @@ def evaluateLines(path, line_xform, write=True):
   # inplace mode and UTF-8 in Python 3, so doing it the manual way.
   if write:
     pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
+  if not format_flag and error_message is None:
+    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format remains off")
+  return error_message
 
 
 # Obtain all the lines in a given file.
@@ -427,7 +436,9 @@ def checkFileContents(file_path, checker):
 
     checker(line, file_path, reportError)
 
-  evaluateLines(file_path, checkFormatErrors, False)
+  evaluate_failure = evaluateLines(file_path, checkFormatErrors, False)
+  if evaluate_failure is not None:
+    error_messages.append(evaluate_failure)
 
   return error_messages
 
