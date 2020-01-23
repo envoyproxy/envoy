@@ -21,7 +21,7 @@ MetricHelper::MetricHelper(StatName name, absl::string_view tag_extracted_name,
   // and we multiply the number of tags by 2 to account for the name and value
   // of each tag.
   const uint32_t num_names = 2 + 2 * tags.size();
-  STACK_ARRAY(names, StatName, num_names);
+  absl::FixedArray<StatName> names(num_names);
   names[0] = name;
   StatNamePool pool(symbol_table);
   names[1] = pool.add(tag_extracted_name);

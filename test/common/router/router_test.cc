@@ -62,7 +62,7 @@ using testing::StartsWith;
 namespace Envoy {
 namespace Router {
 
-class TestFilter : public Filter {
+class RouterTestFilter : public Filter {
 public:
   using Filter::Filter;
   // Filter
@@ -268,7 +268,7 @@ public:
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   FilterConfig config_;
-  TestFilter router_;
+  RouterTestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
   Network::Address::InstanceConstSharedPtr host_address_{

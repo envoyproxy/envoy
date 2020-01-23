@@ -31,14 +31,19 @@ TEST(FileAccessLogConfigTest, ValidateFail) {
 TEST(FileAccessLogConfigTest, ConfigureFromProto) {
   envoy::config::accesslog::v3::AccessLog config;
 
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+                            "Provided name for static registration lookup was empty.");
+
+  config.set_name("INVALID");
+
+  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+                            "Didn't find a registered implementation for name: 'INVALID'");
+
   envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
   config.mutable_typed_config()->PackFrom(fal_config);
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
-                            "Provided name for static registration lookup was empty.");
 
   config.set_name(AccessLogNames::get().File);
 
@@ -46,11 +51,6 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
 
   EXPECT_NE(nullptr, log);
   EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
-
-  config.set_name("INVALID");
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
-                            "Didn't find a registered implementation for name: 'INVALID'");
 }
 
 TEST(FileAccessLogConfigTest, FileAccessLogTest) {
@@ -79,6 +79,15 @@ TEST(FileAccessLogConfigTest, FileAccessLogTest) {
 TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
   envoy::config::accesslog::v3::AccessLog config;
 
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+                            "Provided name for static registration lookup was empty.");
+
+  config.set_name("INVALID");
+
+  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
+                            "Didn't find a registered implementation for name: 'INVALID'");
+
   envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
@@ -93,21 +102,12 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
       envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat);
   config.mutable_typed_config()->PackFrom(fal_config);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
-                            "Provided name for static registration lookup was empty.");
-
   config.set_name(AccessLogNames::get().File);
 
   AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
 
   EXPECT_NE(nullptr, log);
   EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
-
-  config.set_name("INVALID");
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
-                            "Didn't find a registered implementation for name: 'INVALID'");
 }
 
 TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
