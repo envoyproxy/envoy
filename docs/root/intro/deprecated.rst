@@ -10,6 +10,12 @@ The following features have been DEPRECATED and will be removed in the specified
 A logged warning is expected for each deprecated item that is in deprecation window.
 Deprecated items below are listed in chronological order.
 
+Version 1.14.0 (pending)
+========================
+* The use of lowercase string matcher for headers matching in HTTP-based `ext_authz` is deprecated. The 
+  :ref:`use_lowercase_string_matcher <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.use_lowercase_string_matcher>` 
+  runtime key can be used to temporarily enable this feature once the deprecation becomes fail by default.
+
 Version 1.13.0 (pending)
 ========================
 * The `request_headers_for_tags` field in :ref:`HTTP connection manager

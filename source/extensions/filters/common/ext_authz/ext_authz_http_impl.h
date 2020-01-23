@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -62,7 +63,7 @@ private:
 class ClientConfig {
 public:
   ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-               uint32_t timeout, absl::string_view path_prefix);
+               Runtime::Loader& runtime, uint32_t timeout, absl::string_view path_prefix);
 
   /**
    * Returns the name of the authorization cluster.
@@ -109,14 +110,18 @@ public:
 
 private:
   static MatcherSharedPtr
-  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
+  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                    bool use_lowercase_string_matcher);
   static MatcherSharedPtr
-  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
+  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                   bool use_lowercase_string_matcher);
   static MatcherSharedPtr
-  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
+  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                     bool use_lowercase_string_matcher);
   static Http::LowerCaseStrPairVector
   toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>&);
 
+  Runtime::FeatureFlag use_lowercase_string_matcher_;
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;

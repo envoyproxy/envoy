@@ -147,7 +147,7 @@ message BufferSettings {
 // metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.allowed_client_headers>`
 // for details.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HttpService {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.HttpService";
@@ -165,6 +165,14 @@ message HttpService {
 
   // Settings used for controlling authorization response metadata.
   AuthorizationResponse authorization_response = 8;
+
+  // Runtime flag that controls whether to use lowercase string matcher or not for headers matching,
+  // for both patterns included in :ref:`authorization_request
+  // <envoy_api_field_extensions.filters.http.ext_authz.v3.HttpService.authorization_request>` and
+  // :ref:`authorization_response
+  // <envoy_api_field_extensions.filters.http.ext_authz.v3.HttpService.authorization_response>`. If
+  // not specified, defaults to use the lowercase string matcher.
+  config.core.v3.RuntimeFeatureFlag use_lowercase_string_matcher = 9;
 }
 
 message AuthorizationRequest {
