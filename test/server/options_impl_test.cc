@@ -74,7 +74,7 @@ TEST_F(OptionsImplTest, All) {
       "--file-flush-interval-msec 9000 "
       "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
-      "--reject-unknown-dynamic-fields");
+      "--reject-unknown-dynamic-fields --use-fake-symbol-table 0");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -95,7 +95,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_TRUE(options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
-  EXPECT_FALSE(options->fakeSymbolTableEnabled()); // TODO(#9798): EXPECT_TRUE when fixed.
+  EXPECT_TRUE(options->fakeSymbolTableEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());

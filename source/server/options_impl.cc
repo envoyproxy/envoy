@@ -163,7 +163,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   // TODO(#9768); When This bug is fixed, we can remove this hack. Until then
   // is not safe to use real symbol tables.
   //   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
-  fake_symbol_table_enabled_ = false;
+  fake_symbol_table_enabled_ = true;
   if (!use_fake_symbol_table.getValue()) {
     ENVOY_LOG(warn, "Real symbol tables are temporarily disabled due to #9768. "
                     "Using fake symbol tables");
