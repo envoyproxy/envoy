@@ -1,6 +1,6 @@
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
 #include "common/singleton/manager_impl.h"
 
@@ -28,9 +28,9 @@ class ClusterTest : public testing::Test,
                     public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
   void initialize(const std::string& yaml_config, bool uses_tls) {
-    envoy::config::cluster::v3alpha::Cluster cluster_config =
+    envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV2Yaml(yaml_config);
-    envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig config;
+    envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
@@ -100,8 +100,8 @@ public:
     return &lb_context_;
   }
 
-  MOCK_METHOD2(onMemberUpdateCb, void(const Upstream::HostVector& hosts_added,
-                                      const Upstream::HostVector& hosts_removed));
+  MOCK_METHOD(void, onMemberUpdateCb,
+              (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;

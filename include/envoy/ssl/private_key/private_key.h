@@ -5,7 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
 
 #include "openssl/ssl.h"
@@ -81,7 +81,7 @@ public:
    * no provider can be used with the context configuration.
    */
   virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProvider(
-      const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
+      const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
       Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
 };
 

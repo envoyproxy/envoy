@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/thrift_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -37,10 +37,9 @@ namespace ThriftProxy {
 
 class TestConfigImpl : public ConfigImpl {
 public:
-  TestConfigImpl(
-      envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProxy proto_config,
-      Server::Configuration::MockFactoryContext& context,
-      ThriftFilters::DecoderFilterSharedPtr decoder_filter, ThriftFilterStats& stats)
+  TestConfigImpl(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config,
+                 Server::Configuration::MockFactoryContext& context,
+                 ThriftFilters::DecoderFilterSharedPtr decoder_filter, ThriftFilterStats& stats)
       : ConfigImpl(proto_config, context), decoder_filter_(decoder_filter), stats_(stats) {}
 
   // ConfigImpl
@@ -297,7 +296,7 @@ public:
   std::shared_ptr<ThriftFilters::MockDecoderFilter> decoder_filter_;
   Stats::IsolatedStoreImpl store_;
   ThriftFilterStats stats_;
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProxy proto_config_;
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy proto_config_;
 
   std::unique_ptr<TestConfigImpl> config_;
 

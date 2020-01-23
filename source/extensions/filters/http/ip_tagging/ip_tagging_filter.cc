@@ -1,7 +1,7 @@
 #include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/extensions/filters/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -14,7 +14,7 @@ namespace HttpFilters {
 namespace IpTagging {
 
 IpTaggingFilterConfig::IpTaggingFilterConfig(
-    const envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging& config,
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
@@ -36,7 +36,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   for (const auto& ip_tag : config.ip_tags()) {
     std::vector<Network::Address::CidrRange> cidr_set;
     cidr_set.reserve(ip_tag.ip_list().size());
-    for (const envoy::config::core::v3alpha::CidrRange& entry : ip_tag.ip_list()) {
+    for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
 
       // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
       Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);
@@ -51,11 +51,17 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
   }
   trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
+  // TODO(jmarantz): save stat-names for each tag as stat_name_set builtins.
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name, absl::string_view tag) {
-  Stats::SymbolTable::StoragePtr storage =
-      scope_.symbolTable().join({stats_prefix_, stat_name_set_->getDynamic(tag), name});
+  Stats::SymbolTable::StoragePtr storage;
+  if (tag.empty()) {
+    storage = scope_.symbolTable().join({stats_prefix_, name});
+  } else {
+    Stats::StatNameDynamicStorage tag_storage(tag, scope_.symbolTable());
+    storage = scope_.symbolTable().join({stats_prefix_, tag_storage.statName(), name});
+  }
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 

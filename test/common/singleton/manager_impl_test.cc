@@ -28,7 +28,7 @@ class TestSingleton : public Instance {
 public:
   ~TestSingleton() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 TEST(SingletonManagerImplTest, Basic) {

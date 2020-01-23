@@ -1,8 +1,8 @@
 #include <memory>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/protocol.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
@@ -21,11 +21,11 @@ public:
   void setup() {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
       cluster_config.mutable_upstream_http_protocol_options()->set_auto_sni(true);
 
-      envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext tls_context;
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       auto* validation_context =
           tls_context.mutable_common_tls_context()->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
@@ -44,7 +44,7 @@ public:
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     auto* tls_cert = common_tls_context->add_tls_certificates();
     tls_cert->mutable_certificate_chain()->set_filename(

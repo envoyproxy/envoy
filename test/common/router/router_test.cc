@@ -2,9 +2,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -18,6 +18,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/router.h"
+#include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -223,15 +224,29 @@ public:
     ON_CALL(callbacks_.route_->route_entry_, internalRedirectAction())
         .WillByDefault(Return(InternalRedirectAction::Handle));
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
+    setMaxInternalRedirects(1);
+  }
+
+  void setMaxInternalRedirects(uint32_t max_internal_redirects) {
+    ON_CALL(callbacks_.route_->route_entry_, maxInternalRedirects())
+        .WillByDefault(Return(max_internal_redirects));
+  }
+
+  void setNumPreviousRedirect(uint32_t num_previous_redirects) {
+    callbacks_.streamInfo().filterState().setData(
+        "num_internal_redirects",
+        std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
+        StreamInfo::FilterState::StateType::Mutable,
+        StreamInfo::FilterState::LifeSpan::DownstreamRequest);
   }
 
   void enableHedgeOnPerTryTimeout() {
     callbacks_.route_->route_entry_.hedge_policy_.hedge_on_per_try_timeout_ = true;
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_ =
-        envoy::type::v3alpha::FractionalPercent{};
+        envoy::type::v3::FractionalPercent{};
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_numerator(0);
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_denominator(
-        envoy::type::v3alpha::FractionalPercent::HUNDRED);
+        envoy::type::v3::FractionalPercent::HUNDRED);
   }
 
   void testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name);
@@ -241,7 +256,7 @@ public:
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
-  envoy::config::core::v3alpha::Locality upstream_locality_;
+  envoy::config::core::v3::Locality upstream_locality_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -283,8 +298,7 @@ public:
 
 TEST_F(RouterTest, UpdateFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  auto dummy_option =
-      absl::make_optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>();
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(dummy_option));
@@ -3428,9 +3442,10 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedOnSecondPass) {
+TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
   enableRedirects();
-  default_request_headers_.setEnvoyOriginalUrl("http://www.foo.com");
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(3);
   sendRequest();
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -3526,6 +3541,8 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects();
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(2);
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
@@ -3538,11 +3555,17 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
   // In production, the HCM recreateStream would have called this.
   router_.onDestroy();
+  EXPECT_EQ(3, callbacks_.streamInfo()
+                   .filterState()
+                   .getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
+                   .value());
 }
 
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects();
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(1);
 
   sendRequest();
 
@@ -4481,14 +4504,13 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
   }
   // Use default value instead of runtime key.
   {
-    envoy::type::v3alpha::FractionalPercent fractional_percent;
+    envoy::type::v3::FractionalPercent fractional_percent;
     fractional_percent.set_numerator(5);
-    fractional_percent.set_denominator(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND);
+    fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
     TestShadowPolicy policy("cluster", "foo", fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(
-        runtime.snapshot_,
-        featureEnabled("foo", Matcher<const envoy::type::v3alpha::FractionalPercent&>(_), 3))
+    EXPECT_CALL(runtime.snapshot_,
+                featureEnabled("foo", Matcher<const envoy::type::v3::FractionalPercent&>(_), 3))
         .WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
   }

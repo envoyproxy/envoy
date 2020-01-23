@@ -12,7 +12,7 @@ namespace Logger {
 
 FileSinkDelegate::FileSinkDelegate(const std::string& log_path,
                                    AccessLog::AccessLogManager& log_manager,
-                                   DelegatingLogSinkPtr log_sink)
+                                   DelegatingLogSinkSharedPtr log_sink)
     : SinkDelegate(log_sink), log_file_(log_manager.createAccessLog(log_path)) {}
 
 void FileSinkDelegate::log(absl::string_view msg) {

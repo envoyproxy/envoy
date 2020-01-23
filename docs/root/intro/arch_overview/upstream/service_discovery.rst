@@ -95,7 +95,7 @@ Endpoint discovery service (EDS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The *endpoint discovery service* is a :ref:`xDS management server based on gRPC or REST-JSON API server
-<config_overview_v2_management_server>` used by Envoy to fetch cluster members. The cluster members are called
+<config_overview_management_server>` used by Envoy to fetch cluster members. The cluster members are called
 "endpoint" in Envoy terminology. For each cluster, Envoy fetch the endpoints from the discovery service. EDS is the
 preferred service discovery mechanism for a few reasons:
 

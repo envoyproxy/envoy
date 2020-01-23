@@ -15,14 +15,14 @@
 #include "envoy/api/api.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/http/codec.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -93,12 +93,12 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
-  RedisCluster(const envoy::config::cluster::v3alpha::Cluster& cluster,
+  RedisCluster(const envoy::config::cluster::v3::Cluster& cluster,
                const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
-               Server::Configuration::TransportSocketFactoryContext& factory_context,
+               Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                Stats::ScopePtr&& stats_scope, bool added_via_api,
                ClusterSlotUpdateCallBackSharedPtr factory);
 
@@ -130,12 +130,12 @@ private:
 
   void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
-  const envoy::config::endpoint::v3alpha::LocalityLbEndpoints& localityLbEndpoint() const {
+  const envoy::config::endpoint::v3::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
     return load_assignment_.endpoints()[0];
   }
 
-  const envoy::config::endpoint::v3alpha::LbEndpoint& lbEndpoint() const {
+  const envoy::config::endpoint::v3::LbEndpoint& lbEndpoint() const {
     // Always use the first endpoint.
     return localityLbEndpoint().lb_endpoints()[0];
   }
@@ -265,7 +265,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Network::DnsLookupFamily dns_lookup_family_;
-  const envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment_;
+  const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::RandomGenerator& random_;
   RedisDiscoverySession redis_discovery_session_;
@@ -291,10 +291,10 @@ private:
 
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      const envoy::config::cluster::v3alpha::Cluster& cluster,
+      const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;
 };
 } // namespace Redis

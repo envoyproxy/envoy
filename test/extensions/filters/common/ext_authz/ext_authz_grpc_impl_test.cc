@@ -1,6 +1,6 @@
 #include "envoy/service/auth/v2alpha/external_auth.pb.h" // for proto link
-#include "envoy/service/auth/v3alpha/external_auth.pb.h"
-#include "envoy/type/v3alpha/http_status.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
+#include "envoy/type/v3/http_status.pb.h"
 
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
@@ -43,7 +43,7 @@ public:
                                                use_alpha_);
   }
 
-  void expectCallSend(envoy::service::auth::v3alpha::CheckRequest& request) {
+  void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
     EXPECT_CALL(*async_client_,
                 sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
         .WillOnce(
@@ -72,13 +72,13 @@ INSTANTIATE_TEST_SUITE_P(Parameterized, ExtAuthzGrpcClientTest, Values(true, fal
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
   initialize(GetParam());
 
-  auto check_response = std::make_unique<envoy::service::auth::v3alpha::CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::OK;
 
-  envoy::service::auth::v3alpha::CheckRequest request;
+  envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -97,13 +97,12 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 
   const std::string empty_body{};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
-  auto check_response =
-      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3alpha::OK,
-                                    empty_body, expected_headers);
+  auto check_response = TestCommon::makeCheckResponse(
+      Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK, empty_body, expected_headers);
   auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
-  envoy::service::auth::v3alpha::CheckRequest request;
+  envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -120,13 +119,13 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   initialize(GetParam());
 
-  auto check_response = std::make_unique<envoy::service::auth::v3alpha::CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
 
-  envoy::service::auth::v3alpha::CheckRequest request;
+  envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -144,13 +143,13 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
   initialize(GetParam());
 
-  auto check_response = std::make_unique<envoy::service::auth::v3alpha::CheckResponse>();
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
   status->set_code(Grpc::Status::WellKnownGrpcStatus::Unknown);
   auto authz_response = Response{};
   authz_response.status = CheckStatus::Denied;
 
-  envoy::service::auth::v3alpha::CheckRequest request;
+  envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -171,13 +170,13 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   const std::string expected_body{"test"};
   const auto expected_headers =
       TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
-  auto check_response = TestCommon::makeCheckResponse(
-      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3alpha::Unauthorized,
-      expected_body, expected_headers);
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::PermissionDenied,
+                                    envoy::type::v3::Unauthorized, expected_body, expected_headers);
   auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized,
                                                       expected_body, expected_headers);
 
-  envoy::service::auth::v3alpha::CheckRequest request;
+  envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -195,7 +194,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
 TEST_P(ExtAuthzGrpcClientTest, UnknownError) {
   initialize(GetParam());
 
-  envoy::service::auth::v3alpha::CheckRequest request;
+  envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -208,7 +207,7 @@ TEST_P(ExtAuthzGrpcClientTest, UnknownError) {
 TEST_P(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
   initialize(GetParam());
 
-  envoy::service::auth::v3alpha::CheckRequest request;
+  envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -220,7 +219,7 @@ TEST_P(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationRequestTimeout) {
   initialize(GetParam());
 
-  envoy::service::auth::v3alpha::CheckRequest request;
+  envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
