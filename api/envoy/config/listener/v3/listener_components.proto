@@ -4,6 +4,7 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -242,7 +243,7 @@ message ListenerFilterChainMatchPredicate {
     bool any_match = 4 [(validate.rules).bool = {const: true}];
 
     // Match destination port. Note that the port might be before recovering address or after.
-    uint32 destination_port = 5 [(validate.rules).uint32 = {lte: 65535 gte: 0}];
+    type.v3.Int32Range destination_port_range = 5;
   }
 }
 
@@ -266,5 +267,15 @@ message ListenerFilter {
 
   // [#not-implemented-hide:]
   // Decide when to disable this listener filter on incoming traffic.
-  ListenerFilterChainMatchPredicate disable_predicate = 4;
+  // Example:
+  // 0. always enable filter
+  //    don't set `filter_disabled`
+  // 1. disable when the dport is 3306
+  //    rule.destination_port_range = Int32Range {start = 3306, end = 3307}
+  // 2. disable when the dport is 3306 or 15000
+  //    rule.or_match = MatchSet.rules [
+  //       rule.destination_port_range = Int32Range {start = 3306, end = 3307},
+  //       rule.destination_port_range = Int32Range {start = 15000, end = 15001},
+  //    ]
+  ListenerFilterChainMatchPredicate filter_disabled = 4;
 }
