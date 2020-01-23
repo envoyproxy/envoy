@@ -1,6 +1,6 @@
 #include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
-#include "envoy/extensions/filters/http/header_to_metadata/v3alpha/header_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
 #include "common/common/base64.h"
 #include "common/config/well_known_names.h"
@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3alpha::Config config) {
+Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config) {
   request_set_ = Config::configToVector(config.request_rules(), request_rules_);
   response_set_ = Config::configToVector(config.response_rules(), response_rules_);
 
@@ -97,7 +97,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
 
   std::string decodedValue = std::string(value);
-  if (encode == envoy::extensions::filters::http::header_to_metadata::v3alpha::Config::BASE64) {
+  if (encode == envoy::extensions::filters::http::header_to_metadata::v3::Config::BASE64) {
     decodedValue = Base64::decodeWithoutPadding(value);
     if (decodedValue.empty()) {
       ENVOY_LOG(debug, "Base64 decode failed");
@@ -107,10 +107,10 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 
   // Sane enough, add the key/value.
   switch (type) {
-  case envoy::extensions::filters::http::header_to_metadata::v3alpha::Config::STRING:
+  case envoy::extensions::filters::http::header_to_metadata::v3::Config::STRING:
     val.set_string_value(std::move(decodedValue));
     break;
-  case envoy::extensions::filters::http::header_to_metadata::v3alpha::Config::NUMBER: {
+  case envoy::extensions::filters::http::header_to_metadata::v3::Config::NUMBER: {
     double dval;
     if (absl::SimpleAtod(StringUtil::trim(decodedValue), &dval)) {
       val.set_number_value(dval);
@@ -120,7 +120,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     }
     break;
   }
-  case envoy::extensions::filters::http::header_to_metadata::v3alpha::Config::PROTOBUF_VALUE: {
+  case envoy::extensions::filters::http::header_to_metadata::v3::Config::PROTOBUF_VALUE: {
     if (!val.ParseFromString(decodedValue)) {
       ENVOY_LOG(debug, "parse from decoded string failed");
       return false;

@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/network/ratelimit/v3alpha/rate_limit.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/filter_manager_impl.h"
@@ -381,7 +381,7 @@ stat_prefix: name
           featureEnabled("ratelimit.tcp_filter_enforcing", 100))
       .WillByDefault(Return(true));
 
-  envoy::extensions::filters::network::ratelimit::v3alpha::RateLimit proto_config{};
+  envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config{};
   TestUtility::loadFromYaml(rl_yaml, proto_config);
 
   Extensions::NetworkFilters::RateLimitFilter::ConfigSharedPtr rl_config(
@@ -392,7 +392,7 @@ stat_prefix: name
   manager.addReadFilter(std::make_shared<Extensions::NetworkFilters::RateLimitFilter::Filter>(
       rl_config, Extensions::Filters::Common::RateLimit::ClientPtr{rl_client}));
 
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy tcp_proxy;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   tcp_proxy.set_stat_prefix("name");
   tcp_proxy.set_cluster("fake_cluster");
   TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));

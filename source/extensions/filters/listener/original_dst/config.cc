@@ -1,5 +1,7 @@
 #include <string>
 
+#include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.h"
+#include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -26,7 +28,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    return std::make_unique<envoy::extensions::filters::listener::original_dst::v3::OriginalDst>();
   }
 
   std::string name() const override { return ListenerFilterNames::get().OriginalDst; }

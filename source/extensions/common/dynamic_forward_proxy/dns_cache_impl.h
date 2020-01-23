@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -37,10 +37,9 @@ struct DnsCacheStats {
 
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  DnsCacheImpl(
-      Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-      Stats::Scope& root_scope,
-      const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config);
+  DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
+               Stats::Scope& root_scope,
+               const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
 
   // DnsCache
@@ -81,8 +80,8 @@ private:
 
     // DnsHostInfo
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
-    const std::string& resolvedHost() override { return resolved_host_; }
-    bool isIpAddress() override { return is_ip_address_; }
+    const std::string& resolvedHost() const override { return resolved_host_; }
+    bool isIpAddress() const override { return is_ip_address_; }
     void touch() override { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
 
     TimeSource& time_source_;

@@ -12,12 +12,15 @@ envoy_package()
 envoy_proto_library(
     name = "common_proto",
     srcs = ["common.proto"],
-    deps = ["@envoy_api//envoy/config/core/v3alpha:pkg"],
+    deps = ["@envoy_api//envoy/config/core/v3:pkg"],
 )
 
 envoy_cc_test_library(
     name = "main",
     srcs = ["main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
     deps = [
         ":fuzz_runner_lib",
         "//source/common/common:assert_lib",
@@ -25,7 +28,10 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["//source/common/signal:sigaction_lib"],
+    }),
 )
 
 envoy_cc_test_library(
@@ -57,6 +63,6 @@ envoy_cc_test_library(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

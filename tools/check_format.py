@@ -46,8 +46,10 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
+    "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
+    "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
 )
@@ -72,7 +74,8 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc",
                        "./tools/clang_tools/api_booster/main.cc",
-                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc")
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
+                       "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -215,7 +218,7 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 8.x.x "
+        "Command {} not found. If you have clang-format in version 9.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
@@ -235,13 +238,13 @@ def checkTools():
                               "users".format(path))
     else:
 
-      error_messages.append(
-          "Command {} not found. If you have buildifier installed, but the binary "
-          "name is different or it's not available in $GOPATH/bin, please use "
-          "{} environment variable to specify the path. Example:\n"
-          "    export {}=/opt/bin/buildifier\n"
-          "If you don't have buildifier installed, you can install it by:\n"
-          "    go get -u github.com/bazelbuild/buildtools/{}".format(path, var, var, name))
+      error_messages.append("Command {} not found. If you have {} installed, but the binary "
+                            "name is different or it's not available in $GOPATH/bin, please use "
+                            "{} environment variable to specify the path. Example:\n"
+                            "    export {}=`which {}`\n"
+                            "If you don't have {} installed, you can install it by:\n"
+                            "    go get -u github.com/bazelbuild/buildtools/{}".format(
+                                path, name, var, var, name, name, name))
 
   checkBazelTool('buildifier', BUILDIFIER_PATH, 'BUILDIFIER_BIN')
   checkBazelTool('buildozer', BUILDOZER_PATH, 'BUILDOZER_BIN')
@@ -894,8 +897,8 @@ if __name__ == "__main__":
   def ownedDirectories(error_messages):
     owned = []
     maintainers = [
-        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
-        '@dnoe', '@dio', '@jmarantz'
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
+        '@junr03', '@dio', '@jmarantz'
     ]
 
     try:

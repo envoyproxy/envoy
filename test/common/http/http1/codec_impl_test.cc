@@ -666,6 +666,25 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
   EXPECT_EQ("http1.invalid_characters", response_encoder->getStream().responseDetails());
 }
 
+TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
+  TestScopedRuntime scoped_runtime;
+
+  initialize();
+
+  Http::MockStreamDecoder decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.\"com\r\n\r\n"));
+  EXPECT_THROW_WITH_MESSAGE(
+      codec_->dispatch(buffer), CodecProtocolException,
+      "http/1.1 protocol error: request headers failed spec compliance checks");
+  EXPECT_EQ("http.invalid_authority", response_encoder->getStream().responseDetails());
+}
+
 // Regression test for http-parser allowing embedded NULs in header values,
 // verify we reject them.
 TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {

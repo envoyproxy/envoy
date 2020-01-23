@@ -237,13 +237,20 @@ public:
   Thread::ThreadSynchronizer& sync() { return sync_; }
 
 private:
-  template <class Stat> using StatMap = StatNameHashMap<Stat>;
+  template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
   struct TlsCacheEntry {
-    StatMap<CounterSharedPtr> counters_;
-    StatMap<GaugeSharedPtr> gauges_;
-    StatMap<TlsHistogramSharedPtr> histograms_;
-    StatMap<ParentHistogramSharedPtr> parent_histograms_;
+    // The counters and gauges in the TLS cache are stored by reference,
+    // depending on the CentralCache for backing store. This avoids a potential
+    // contention-storm when destructing a scope, as the counter/gauge ref-count
+    // decrement in allocator_impl.cc needs to hold the single allocator mutex.
+    StatRefMap<Counter> counters_;
+    StatRefMap<Gauge> gauges_;
+
+    // The histogram objects are not shared with the central cache, and don't
+    // require taking a lock when decrementing their ref-count.
+    StatNameHashMap<TlsHistogramSharedPtr> histograms_;
+    StatNameHashMap<ParentHistogramSharedPtr> parent_histograms_;
 
     // We keep a TLS cache of rejected stat names. This costs memory, but
     // reduces runtime overhead running the matcher. Moreover, once symbol
@@ -254,12 +261,17 @@ private:
     StatNameHashSet rejected_stats_;
   };
 
-  struct CentralCacheEntry {
-    StatMap<CounterSharedPtr> counters_;
-    StatMap<GaugeSharedPtr> gauges_;
-    StatMap<ParentHistogramImplSharedPtr> histograms_;
+  struct CentralCacheEntry : public RefcountHelper {
+    explicit CentralCacheEntry(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+    ~CentralCacheEntry();
+
+    StatNameHashMap<CounterSharedPtr> counters_;
+    StatNameHashMap<GaugeSharedPtr> gauges_;
+    StatNameHashMap<ParentHistogramImplSharedPtr> histograms_;
     StatNameStorageSet rejected_stats_;
+    SymbolTable& symbol_table_;
   };
+  using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public TlsScope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
@@ -315,10 +327,9 @@ private:
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType& safeMakeStat(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map,
+    StatType& safeMakeStat(StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
-                           MakeStatFn<StatType> make_stat,
-                           StatMap<RefcountPtr<StatType>>* tls_cache,
+                           MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     /**
@@ -332,21 +343,23 @@ private:
      */
     template <class StatType>
     absl::optional<std::reference_wrapper<const StatType>>
-    findStatLockHeld(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map) const;
+    findStatLockHeld(StatName name,
+                     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
 
-    static std::atomic<uint64_t> next_scope_id_;
-
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
-    mutable CentralCacheEntry central_cache_;
+    mutable CentralCacheEntrySharedPtr central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
+    TlsCacheEntry& insertScope(uint64_t scope_id);
+    void eraseScope(uint64_t scope_id);
+
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
     // because it's possible that the memory allocator will recycle the scope pointer immediately
@@ -358,7 +371,7 @@ private:
   };
 
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
-  void clearScopeFromCaches(uint64_t scope_id, const Event::PostCb& clean_central_cache);
+  void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
   bool rejects(StatName name) const;
@@ -398,8 +411,8 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
 
-  absl::flat_hash_set<StatNameStorageSet*> rejected_stats_purgatory_ GUARDED_BY(lock_);
   Thread::ThreadSynchronizer sync_;
+  std::atomic<uint64_t> next_scope_id_{};
 };
 
 } // namespace Stats

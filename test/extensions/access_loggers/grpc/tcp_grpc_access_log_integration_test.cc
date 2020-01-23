@@ -1,8 +1,8 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
-#include "envoy/service/accesslog/v3alpha/als.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/service/accesslog/v3/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/version.h"
@@ -20,7 +20,7 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-void clearPort(envoy::config::core::v3alpha::Address& address) {
+void clearPort(envoy::config::core::v3::Address& address) {
   address.mutable_socket_address()->clear_port_specifier();
 }
 
@@ -45,23 +45,23 @@ public:
 
   void initialize() override {
     config_helper_.renameListener("tcp_proxy");
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
       accesslog_cluster->mutable_http2_protocol_options();
     });
 
-    config_helper_.addConfigModifier([this](
-                                         envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* filter_chain = listener->mutable_filter_chains(0);
       auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
-      auto tcp_proxy_config = MessageUtil::anyConvert<
-          envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy>(*config_blob);
+      auto tcp_proxy_config =
+          MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+              *config_blob);
       auto* access_log = tcp_proxy_config.add_access_log();
       access_log->set_name("envoy.tcp_grpc_access_log");
-      envoy::extensions::access_loggers::grpc::v3alpha::TcpGrpcAccessLogConfig access_log_config;
+      envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig access_log_config;
       auto* common_config = access_log_config.mutable_common_config();
       common_config->set_log_name("foo");
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
@@ -84,7 +84,7 @@ public:
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
-    envoy::service::accesslog::v3alpha::StreamAccessLogsMessage request_msg;
+    envoy::service::accesslog::v3::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().Method()->value().getStringView());
     EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
@@ -92,7 +92,7 @@ public:
     EXPECT_EQ("application/grpc",
               access_log_request_->headers().ContentType()->value().getStringView());
 
-    envoy::service::accesslog::v3alpha::StreamAccessLogsMessage expected_request_msg;
+    envoy::service::accesslog::v3::StreamAccessLogsMessage expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
@@ -105,6 +105,11 @@ public:
     log_entry->mutable_common_properties()->clear_time_to_last_rx_byte();
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
+    if (request_msg.has_identifier()) {
+      auto* node = request_msg.mutable_identifier()->mutable_node();
+      node->clear_extensions();
+      node->clear_user_agent_build_version();
+    }
     EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
 
     return AssertionSuccess();
@@ -158,6 +163,7 @@ identifier:
     locality:
       zone: zone_name
     build_version: {}
+    user_agent_name: "envoy"
   log_name: foo
 tcp_logs:
   log_entry:

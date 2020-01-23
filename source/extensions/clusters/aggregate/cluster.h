@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -19,11 +19,11 @@ using PriorityContext = std::pair<Upstream::PrioritySetImpl,
 
 class Cluster : public Upstream::ClusterImplBase, Upstream::ClusterUpdateCallbacks {
 public:
-  Cluster(const envoy::config::cluster::v3alpha::Cluster& cluster,
-          const envoy::extensions::clusters::aggregate::v3alpha::ClusterConfig& config,
+  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+          const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Runtime::RandomGenerator& random,
-          Server::Configuration::TransportSocketFactoryContext& factory_context,
+          Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
           Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api);
 
   // Upstream::Cluster
@@ -61,7 +61,7 @@ class AggregateClusterLoadBalancer : public Upstream::LoadBalancer {
 public:
   AggregateClusterLoadBalancer(
       Upstream::ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : stats_(stats), runtime_(runtime), random_(random), common_config_(common_config) {}
 
   // Upstream::LoadBalancer
@@ -74,7 +74,7 @@ private:
   public:
     LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterStats& stats,
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                     const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
+                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
         : Upstream::LoadBalancerBase(priority_context.first, stats, runtime, random, common_config),
           priority_to_cluster_(priority_context.second) {}
 
@@ -96,7 +96,7 @@ private:
   Upstream::ClusterStats& stats_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
-  const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config_;
+  const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config_;
 
 public:
   void refresh(const PriorityContext& priority_context) {
@@ -136,7 +136,7 @@ struct AggregateThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalanc
 };
 
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                           envoy::extensions::clusters::aggregate::v3alpha::ClusterConfig> {
+                           envoy::extensions::clusters::aggregate::v3::ClusterConfig> {
 public:
   ClusterFactory()
       : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Aggregate) {}
@@ -144,10 +144,10 @@ public:
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      const envoy::config::cluster::v3alpha::Cluster& cluster,
-      const envoy::extensions::clusters::aggregate::v3alpha::ClusterConfig& proto_config,
+      const envoy::config::cluster::v3::Cluster& cluster,
+      const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;
 };
 

@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"
@@ -262,10 +262,10 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(3L, store_->gauges().front().use_count());
+  EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -531,7 +531,7 @@ TEST_F(LookupWithStatNameTest, NotFound) {
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  envoy::config::metrics::v3alpha::StatsConfig stats_config_;
+  envoy::config::metrics::v3::StatsConfig stats_config_;
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
@@ -840,7 +840,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   EXPECT_EQ("h1", store_->histograms()[0]->name());
 
   // Will effectively block all stats, and remove all the non-matching stats.
-  envoy::config::metrics::v3alpha::StatsConfig stats_config;
+  envoy::config::metrics::v3::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
@@ -895,7 +895,7 @@ protected:
     store_->addSink(sink_);
 
     // Use a tag producer that will produce tags.
-    envoy::config::metrics::v3alpha::StatsConfig stats_config;
+    envoy::config::metrics::v3::StatsConfig stats_config;
     store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
   }
 
@@ -966,9 +966,11 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->counter("c2");
   store_->gauge("g2", Gauge::ImportMode::Accumulate);
 
-  // c1, g1 should have a thread local ref, but c2, g2 should not.
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
-  EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g1").use_count());
+  // We do not keep ref-counts for counters and gauges in the TLS cache, so
+  // all these stats should have a ref-count of 2: one for the SharedPtr
+  // returned from find*(), and one for the central cache.
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g1").use_count());
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
 

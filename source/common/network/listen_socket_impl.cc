@@ -6,7 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -34,7 +34,7 @@ void ListenSocketImpl::doBind() {
 
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
   if (!Network::Socket::applyOptions(options, *this,
-                                     envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)) {
+                                     envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
     throw EnvoyException("ListenSocket: Setting socket options failed");
   }
 }

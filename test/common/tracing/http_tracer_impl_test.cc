@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/type/tracing/v2/custom_tag.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
@@ -125,7 +125,7 @@ protected:
 
   void expectSetCustomTags(const std::vector<CustomTagCase>& cases) {
     for (const CustomTagCase& cas : cases) {
-      envoy::type::tracing::v2::CustomTag custom_tag;
+      envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
       config.custom_tags_.emplace(custom_tag.tag(), HttpTracerUtility::createCustomTag(custom_tag));
       if (cas.set) {
@@ -353,8 +353,8 @@ ree:
   NiceMock<Router::MockRouteEntry> route_entry;
   EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(&route_entry));
   (*route_entry.metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
-  std::shared_ptr<envoy::config::core::v3alpha::Metadata> host_metadata =
-      std::make_shared<envoy::config::core::v3alpha::Metadata>();
+  std::shared_ptr<envoy::config::core::v3::Metadata> host_metadata =
+      std::make_shared<envoy::config::core::v3::Metadata>();
   (*host_metadata->mutable_filter_metadata())["m.host"].MergeFrom(fake_struct);
   (*stream_info.host_->cluster_.metadata_.mutable_filter_metadata())["m.cluster"].MergeFrom(
       fake_struct);
@@ -505,6 +505,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
                                           {":path", "/pb.Foo/Bar"},
                                           {":authority", "example.com:80"},
                                           {"content-type", "application/grpc"},
+                                          {"x-forwarded-proto", "http"},
                                           {"te", "trailers"}};
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"},
@@ -518,10 +519,21 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcOkStatus) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
 
-  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().DownstreamCluster), Eq("-")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+  EXPECT_CALL(span,
+              setTag(Eq(Tracing::Tags::get().HttpUrl), Eq("http://example.com:80/pb.Foo/Bar")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UserAgent), Eq("-")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().RequestSize), Eq("10")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseSize), Eq("11")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("")));
 
@@ -537,6 +549,8 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
                                           {":path", "/pb.Foo/Bar"},
                                           {":authority", "example.com:80"},
                                           {"content-type", "application/grpc"},
+                                          {"grpc-timeout", "10s"},
+                                          {"x-forwarded-proto", "http"},
                                           {"te", "trailers"}};
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"},
@@ -556,6 +570,10 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcTimeout), Eq("10s")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
 
@@ -571,6 +589,7 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
                                           {":path", "/pb.Foo/Bar"},
                                           {":authority", "example.com:80"},
                                           {"content-type", "application/grpc"},
+                                          {"x-forwarded-proto", "http"},
                                           {"te", "trailers"}};
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"},
@@ -591,6 +610,9 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpMethod), Eq("POST")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
 

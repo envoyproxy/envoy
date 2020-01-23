@@ -4,7 +4,7 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
@@ -44,23 +44,23 @@ public:
 };
 
 using TlsCertificatePtr =
-    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate>;
-using CertificateValidationContextPtr = std::unique_ptr<
-    envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext>;
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>;
+using CertificateValidationContextPtr =
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>;
 using TlsSessionTicketKeysPtr =
-    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3alpha::TlsSessionTicketKeys>;
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys>;
 
 using TlsCertificateConfigProvider =
-    SecretProvider<envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate>;
+    SecretProvider<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>;
 using TlsCertificateConfigProviderSharedPtr = std::shared_ptr<TlsCertificateConfigProvider>;
 
-using CertificateValidationContextConfigProvider = SecretProvider<
-    envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext>;
+using CertificateValidationContextConfigProvider =
+    SecretProvider<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>;
 using CertificateValidationContextConfigProviderSharedPtr =
     std::shared_ptr<CertificateValidationContextConfigProvider>;
 
 using TlsSessionTicketKeysConfigProvider =
-    SecretProvider<envoy::extensions::transport_sockets::tls::v3alpha::TlsSessionTicketKeys>;
+    SecretProvider<envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys>;
 using TlsSessionTicketKeysConfigProviderSharedPtr =
     std::shared_ptr<TlsSessionTicketKeysConfigProvider>;
 

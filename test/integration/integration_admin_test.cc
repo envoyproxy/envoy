@@ -2,13 +2,15 @@
 
 #include <string>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
+#include "common/config/api_version.h"
 #include "common/profiler/profiler.h"
 #include "common/stats/stats_matcher_impl.h"
 
@@ -45,7 +47,7 @@ TEST_P(IntegrationAdminTest, HealthCheck) {
 }
 
 TEST_P(IntegrationAdminTest, HealthCheckWithoutServerStats) {
-  envoy::config::metrics::v3alpha::StatsMatcher stats_matcher;
+  envoy::config::metrics::v3::StatsMatcher stats_matcher;
   stats_matcher.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
   initialize(stats_matcher);
 
@@ -342,13 +344,12 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("application/json", ContentType(response));
   json = Json::Factory::loadFromString(response->body());
   size_t index = 0;
-  const std::string expected_types[] = {
-      "type.googleapis.com/envoy.admin.v3alpha.BootstrapConfigDump",
-      "type.googleapis.com/envoy.admin.v3alpha.ClustersConfigDump",
-      "type.googleapis.com/envoy.admin.v3alpha.ListenersConfigDump",
-      "type.googleapis.com/envoy.admin.v3alpha.ScopedRoutesConfigDump",
-      "type.googleapis.com/envoy.admin.v3alpha.RoutesConfigDump",
-      "type.googleapis.com/envoy.admin.v3alpha.SecretsConfigDump"};
+  const std::string expected_types[] = {"type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
   for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
@@ -356,16 +357,18 @@ TEST_P(IntegrationAdminTest, Admin) {
   }
 
   // Validate we can parse as proto.
-  envoy::admin::v3alpha::ConfigDump config_dump;
+  envoy::admin::v3::ConfigDump config_dump;
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(6, config_dump.configs_size());
 
   // .. and that we can unpack one of the entries.
-  envoy::admin::v3alpha::RoutesConfigDump route_config_dump;
+  envoy::admin::v3::RoutesConfigDump route_config_dump;
   config_dump.configs(4).UnpackTo(&route_config_dump);
-  EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
+  envoy::config::route::v3::RouteConfiguration route_config;
+  EXPECT_TRUE(route_config_dump.static_route_configs(0).route_config().UnpackTo(&route_config));
+  EXPECT_EQ("route_config_0", route_config.name());
 
-  envoy::admin::v3alpha::SecretsConfigDump secret_config_dump;
+  envoy::admin::v3::SecretsConfigDump secret_config_dump;
   config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
@@ -395,12 +398,11 @@ TEST_P(IntegrationAdminTest, Admin) {
 
 // Validates that the "inboundonly" drains inbound listeners.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        inbound_listener->set_traffic_direction(envoy::config::core::v3alpha::INBOUND);
-        inbound_listener->set_name("inbound_0");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    inbound_listener->set_traffic_direction(envoy::config::core::v3::INBOUND);
+    inbound_listener->set_name("inbound_0");
+  });
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -443,11 +445,10 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
 }
 
 TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        auto* admin = bootstrap.mutable_admin();
-        admin->set_profile_path(TestEnvironment::temporaryPath("/envoy.prof"));
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* admin = bootstrap.mutable_admin();
+    admin->set_profile_path(TestEnvironment::temporaryPath("/envoy.prof"));
+  });
 
   initialize();
   BufferingStreamDecoderPtr response;
@@ -467,7 +468,7 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           auto* socket_address =
               bootstrap.mutable_admin()->mutable_address()->mutable_socket_address();
           socket_address->set_ipv4_compat(true);
@@ -507,7 +508,7 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier(
-        [this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+        [this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher_;
         });
     HttpIntegrationTest::initialize();
@@ -520,7 +521,7 @@ public:
   }
 
   BufferingStreamDecoderPtr response_;
-  envoy::config::metrics::v3alpha::StatsMatcher stats_matcher_;
+  envoy::config::metrics::v3::StatsMatcher stats_matcher_;
 };
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsMatcherIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

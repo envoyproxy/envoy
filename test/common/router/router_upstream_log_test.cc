@@ -1,9 +1,9 @@
 #include <ctime>
 #include <regex>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
-#include "envoy/extensions/filters/http/router/v3alpha/router.pb.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 
 #include "common/network/utility.h"
 #include "common/router/router.h"
@@ -35,7 +35,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<envoy::config::filter::accesslog::v3alpha::AccessLog> testUpstreamLog() {
+absl::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string yaml = R"EOF(
 name: envoy.file_access_log
@@ -47,10 +47,10 @@ typed_config:
   path: "/dev/null"
   )EOF";
 
-  envoy::config::filter::accesslog::v3alpha::AccessLog upstream_log;
+  envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  return absl::optional<envoy::config::filter::accesslog::v3alpha::AccessLog>(upstream_log);
+  return absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log);
 }
 
 } // namespace
@@ -78,15 +78,15 @@ public:
 
 class RouterUpstreamLogTest : public testing::Test {
 public:
-  void init(absl::optional<envoy::config::filter::accesslog::v3alpha::AccessLog> upstream_log) {
-    envoy::extensions::filters::http::router::v3alpha::Router router_proto;
+  void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log) {
+    envoy::extensions::filters::http::router::v3::Router router_proto;
 
     if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
               Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
 
-      envoy::config::filter::accesslog::v3alpha::AccessLog* current_upstream_log =
+      envoy::config::accesslog::v3::AccessLog* current_upstream_log =
           router_proto.add_upstream_log();
       current_upstream_log->CopyFrom(upstream_log.value());
     }
@@ -219,7 +219,7 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 
-  envoy::config::core::v3alpha::Locality upstream_locality_;
+  envoy::config::core::v3::Locality upstream_locality_;
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
   Network::Address::InstanceConstSharedPtr upstream_local_address1_{
@@ -288,10 +288,10 @@ typed_config:
   path: "/dev/null"
   )EOF";
 
-  envoy::config::filter::accesslog::v3alpha::AccessLog upstream_log;
+  envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  init(absl::optional<envoy::config::filter::accesslog::v3alpha::AccessLog>(upstream_log));
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
   run(200, {{"x-envoy-original-path", "/foo"}}, {}, {});
 
   EXPECT_EQ(output_.size(), 1U);

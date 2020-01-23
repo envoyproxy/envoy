@@ -1,5 +1,10 @@
 #include "server/active_raw_udp_listener_config.h"
 
+#include <memory>
+#include <string>
+
+#include "envoy/api/v2/listener/listener.pb.h"
+
 #include "server/connection_handler_impl.h"
 #include "server/well_known_names.h"
 
@@ -14,7 +19,7 @@ ActiveRawUdpListenerFactory::createActiveUdpListener(Network::ConnectionHandler&
 }
 
 ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<ProtobufWkt::Empty>();
+  return std::make_unique<envoy::config::listener::v3::ActiveRawUdpListenerConfig>();
 }
 
 Network::ActiveUdpListenerFactoryPtr

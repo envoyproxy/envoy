@@ -65,7 +65,7 @@ public:
   virtual std::unique_ptr<const TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& data) const PURE;
 
-  std::string category() const override { return "typed_metadata"; }
+  std::string category() const override { return "envoy.typed_metadata"; }
 };
 
 } // namespace Config

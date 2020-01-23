@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.grpc_stats.v2alpha
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.grpc_stats.v3alpha";
+    "envoy.extensions.filters.http.grpc_stats.v3";
 
 // [#protodoc-title: gRPC statistics] gRPC statistics filter
 // :ref:`configuration overview <config_http_filters_grpc_stats>`.

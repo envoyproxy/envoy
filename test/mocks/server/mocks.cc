@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/admin/v3alpha/server_info.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/admin/v3/server_info.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/singleton/manager_impl.h"
 
@@ -44,7 +44,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, cpusetThreadsEnabled()).WillByDefault(ReturnPointee(&cpuset_threads_enabled_));
   ON_CALL(*this, disabledExtensions()).WillByDefault(ReturnRef(disabled_extensions_));
   ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {
-    return std::make_unique<envoy::admin::v3alpha::CommandLineOptions>();
+    return std::make_unique<envoy::admin::v3::CommandLineOptions>();
   }));
 }
 MockOptions::~MockOptions() = default;
@@ -95,16 +95,16 @@ MockOverloadManager::~MockOverloadManager() = default;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
-      .WillByDefault(
-          Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-                     const Network::Socket::OptionsSharedPtr& options,
-                     const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
-            if (!Network::Socket::applyOptions(
-                    options, *socket_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)) {
-              throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
-            }
-            return socket_;
-          }));
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
+                                Network::Address::SocketType,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
+        if (!Network::Socket::applyOptions(options, *socket_,
+                                           envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+          throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+        }
+        return socket_;
+      }));
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
@@ -148,7 +148,9 @@ MockInstance::MockInstance()
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       server_factory_context_(
-          std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()) {
+          std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
+      transport_socket_factory_context_(
+          std::make_shared<NiceMock<Configuration::MockTransportSocketFactoryContext>>()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, grpcContext()).WillByDefault(ReturnRef(grpc_context_));
@@ -174,6 +176,8 @@ MockInstance::MockInstance()
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
+  ON_CALL(*this, transportSocketFactoryContext())
+      .WillByDefault(ReturnRef(*transport_socket_factory_context_));
 }
 
 MockInstance::~MockInstance() = default;
@@ -264,6 +268,8 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
+MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
+MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

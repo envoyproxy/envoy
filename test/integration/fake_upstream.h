@@ -6,7 +6,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -677,8 +677,8 @@ private:
       return udp_listener_factory_.get();
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
-    envoy::config::core::v3alpha::TrafficDirection direction() const override {
-      return envoy::config::core::v3alpha::UNSPECIFIED;
+    envoy::config::core::v3::TrafficDirection direction() const override {
+      return envoy::config::core::v3::UNSPECIFIED;
     }
 
     FakeUpstream& parent_;

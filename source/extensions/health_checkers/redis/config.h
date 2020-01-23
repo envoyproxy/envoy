@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/health_check.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/server/health_checker_config.h"
 
 #include "extensions/health_checkers/redis/redis.h"
@@ -19,7 +19,7 @@ namespace RedisHealthChecker {
 class RedisHealthCheckerFactory : public Server::Configuration::CustomHealthCheckerFactory {
 public:
   Upstream::HealthCheckerSharedPtr
-  createCustomHealthChecker(const envoy::config::core::v3alpha::HealthCheck& config,
+  createCustomHealthChecker(const envoy::config::core::v3::HealthCheck& config,
                             Server::Configuration::HealthCheckerFactoryContext& context) override;
 
   std::string name() const override { return HealthCheckerNames::get().RedisHealthChecker; }

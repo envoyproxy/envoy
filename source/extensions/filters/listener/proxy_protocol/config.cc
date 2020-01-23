@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
+#include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -25,7 +27,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    return std::make_unique<
+        envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol>();
   }
 
   std::string name() const override { return ListenerFilterNames::get().ProxyProtocol; }

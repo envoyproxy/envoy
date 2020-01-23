@@ -1,13 +1,21 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/network/drain_decision.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/init/manager_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
+
+#include "server/filter_chain_factory_context_callback.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -18,25 +26,123 @@ class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const envoy::config::listener::v3alpha::FilterChain& filter_chain) const PURE;
+  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
+                   FilterChainFactoryContextCreator& context_creator) const PURE;
+};
+
+// FilterChainFactoryContextImpl is supposed to be used by network filter chain.
+// Its lifetime must cover the created network filter chain.
+// Its lifetime should be covered by the owned listeners so as to support replacing the active
+// filter chains in the listener.
+class FilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
+                                      public Network::DrainDecision {
+public:
+  explicit FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context);
+
+  // DrainDecision
+  bool drainClose() const override;
+
+  // Configuration::FactoryContext
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Network::DrainDecision& drainDecision() override;
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::SlotAllocator& threadLocal() override;
+  Admin& admin() override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  OptProcessContextRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  Stats::Scope& listenerScope() override;
+
+private:
+  Configuration::FactoryContext& parent_context_;
+};
+
+/**
+ * Implementation of FactoryContext wrapping a Server::Instance and some listener components.
+ */
+class FactoryContextImpl : public Configuration::FactoryContext {
+public:
+  FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
+                     Network::DrainDecision& drain_decision, Stats::Scope& global_scope,
+                     Stats::Scope& listener_scope);
+
+  // Configuration::FactoryContext
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::SlotAllocator& threadLocal() override;
+  Admin& admin() override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  OptProcessContextRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  Network::DrainDecision& drainDecision() override;
+  Stats::Scope& listenerScope() override;
+
+private:
+  Server::Instance& server_;
+  const envoy::config::listener::v3::Listener& config_;
+  Network::DrainDecision& drain_decision_;
+  Stats::Scope& global_scope_;
+  Stats::Scope& listener_scope_;
 };
 
 /**
  * Implementation of FilterChainManager.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
+                               public FilterChainFactoryContextCreator,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  explicit FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address)
-      : address_(address) {}
+  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+                         Configuration::FactoryContext& factory_context)
+      : address_(address), parent_context_(factory_context) {}
+
+  // FilterChainFactoryContextCreator
+  Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
 
   void addFilterChain(
-      absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
-      FilterChainFactoryBuilder& b);
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
+      FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
   static bool isWildcardServerName(const std::string& name);
 
 private:
@@ -66,7 +172,7 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
@@ -75,7 +181,7 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
@@ -84,20 +190,20 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForSourceTypes(
       SourceTypesArray& source_types_array,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
@@ -132,6 +238,8 @@ private:
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
   const Network::Address::InstanceConstSharedPtr address_;
+  Configuration::FactoryContext& parent_context_;
+  std::list<std::unique_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

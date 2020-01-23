@@ -7,11 +7,11 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/admin/v3alpha/server_info.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/admin/v3/server_info.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -43,8 +43,8 @@ namespace Envoy {
 namespace Server {
 
 namespace Utility {
-envoy::admin::v3alpha::ServerInfo::State serverState(Init::Manager::State state,
-                                                     bool health_check_failed);
+envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
+                                                bool health_check_failed);
 } // namespace Utility
 
 class AdminInternalAddressConfig : public Http::InternalAddressConfig {
@@ -109,9 +109,9 @@ public:
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
+  std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
-  bool generateRequestId() override { return false; }
+  bool generateRequestId() const override { return false; }
   bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return false; }
@@ -127,20 +127,21 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;
   }
-  const std::string& serverName() override { return Http::DefaultServerString::get(); }
-  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+  const std::string& serverName() const override { return Http::DefaultServerString::get(); }
+  HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const override {
     return HttpConnectionManagerProto::OVERWRITE;
   }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
-  bool useRemoteAddress() override { return true; }
+  bool useRemoteAddress() const override { return true; }
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return internal_address_config_;
   }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
-  Http::ForwardClientCertType forwardClientCert() override {
+  Http::ForwardClientCertType forwardClientCert() const override {
     return Http::ForwardClientCertType::Sanitize;
   }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
@@ -183,7 +184,11 @@ private:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    void validateConfig(const envoy::config::route::v3alpha::RouteConfiguration&) const override {}
+    void validateConfig(const envoy::config::route::v3::RouteConfiguration&) const override {}
+    void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
+                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;
@@ -240,7 +245,7 @@ private:
   /**
    * Helper methods for the /config_dump url handler.
    */
-  void addAllConfigToDump(envoy::admin::v3alpha::ConfigDump& dump,
+  void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
                           const absl::optional<std::string>& mask) const;
   /**
    * Add the config matching the passed resource to the passed config dump.
@@ -248,8 +253,8 @@ private:
    * to the admin response.
    */
   absl::optional<std::pair<Http::Code, std::string>>
-  addResourceToDump(envoy::admin::v3alpha::ConfigDump& dump,
-                    const absl::optional<std::string>& mask, const std::string& resource) const;
+  addResourceToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+                    const std::string& resource) const;
 
   template <class StatType>
   static bool shouldShowMetric(const StatType& metric, const bool used_only,
@@ -264,7 +269,7 @@ private:
                                  bool pretty_print = false);
 
   std::vector<const UrlHandler*> sortedHandlers() const;
-  envoy::admin::v3alpha::ServerInfo::State serverState();
+  envoy::admin::v3::ServerInfo::State serverState();
   /**
    * URL handlers.
    */
@@ -391,8 +396,8 @@ private:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    envoy::config::core::v3alpha::TrafficDirection direction() const override {
-      return envoy::config::core::v3alpha::UNSPECIFIED;
+    envoy::config::core::v3::TrafficDirection direction() const override {
+      return envoy::config::core::v3::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 

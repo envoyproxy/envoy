@@ -1,7 +1,7 @@
 #include "common/upstream/transport_socket_match_impl.h"
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/config/utility.h"
@@ -10,8 +10,8 @@ namespace Envoy {
 namespace Upstream {
 
 TransportSocketMatcherImpl::TransportSocketMatcherImpl(
-    const Protobuf::RepeatedPtrField<
-        envoy::config::cluster::v3alpha::Cluster::TransportSocketMatch>& socket_matches,
+    const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+        socket_matches,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope)
     : stats_scope_(stats_scope),
@@ -24,7 +24,7 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
         socket_config, factory_context.messageValidationVisitor(), config_factory);
     FactoryMatch factory_match(
         socket_match.name(), config_factory.createTransportSocketFactory(*message, factory_context),
-        generateStats(socket_match.name() + "."));
+        generateStats(absl::StrCat(socket_match.name(), ".")));
     for (const auto& kv : socket_match.match().fields()) {
       factory_match.label_set.emplace_back(kv.first, kv.second);
     }
@@ -37,7 +37,7 @@ TransportSocketMatchStats TransportSocketMatcherImpl::generateStats(const std::s
 }
 
 TransportSocketMatcher::MatchData
-TransportSocketMatcherImpl::resolve(const envoy::config::core::v3alpha::Metadata& metadata) const {
+TransportSocketMatcherImpl::resolve(const envoy::config::core::v3::Metadata& metadata) const {
   for (const auto& match : matches_) {
     if (Config::Metadata::metadataLabelMatch(
             match.label_set, metadata,

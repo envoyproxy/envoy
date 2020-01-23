@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/listener/v3alpha/quic_config.pb.h"
+#include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
 
@@ -19,6 +19,9 @@ class ActiveQuicListener : public Network::UdpListenerCallbacks,
                            public Server::ConnectionHandlerImpl::ActiveListenerImplBase,
                            Logger::Loggable<Logger::Id::quic> {
 public:
+  // TODO(bencebeky): Tune this value.
+  static const size_t kNumSessionsToCreatePerLoop = 16;
+
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
 
@@ -33,6 +36,7 @@ public:
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
+  void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode /*error_code*/) override {
     // No-op. Quic can't do anything upon listener error.
@@ -59,7 +63,7 @@ using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 // A factory to create ActiveQuicListener based on given config.
 class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
-  ActiveQuicListenerFactory(const envoy::config::listener::v3alpha::QuicProtocolOptions& config) {
+  ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config) {
     uint64_t idle_network_timeout_ms =
         config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                   : 300000;

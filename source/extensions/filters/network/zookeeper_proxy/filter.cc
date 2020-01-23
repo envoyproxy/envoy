@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -98,7 +98,7 @@ void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::stri
 }
 
 void ZooKeeperFilter::clearDynamicMetadata() {
-  envoy::config::core::v3alpha::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   auto& metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy];
@@ -107,7 +107,7 @@ void ZooKeeperFilter::clearDynamicMetadata() {
 
 void ZooKeeperFilter::setDynamicMetadata(
     const std::vector<std::pair<const std::string, const std::string>>& data) {
-  envoy::config::core::v3alpha::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   ProtobufWkt::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy]);

@@ -5,6 +5,8 @@
 #include "common/config/protobuf_link_hacks.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -33,7 +35,7 @@ void validateProtoDescriptors() {
 
   for (const auto& method : methods) {
     RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,
-                   fmt::format("Unable to find method descriptor for {}", method));
+                   absl::StrCat("Unable to find method descriptor for ", method));
   }
 
   const auto types = {

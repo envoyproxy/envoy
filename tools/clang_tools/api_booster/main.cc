@@ -225,7 +225,7 @@ private:
       return;
     }
     // We need to map from envoy::type::matcher::StringMatcher::kRegex to
-    // envoy::type::matcher::v3alpha::StringMatcher::kHiddenEnvoyDeprecatedRegex.
+    // envoy::type::matcher::v3::StringMatcher::kHiddenEnvoyDeprecatedRegex.
     const auto constant_rename =
         ProtoCxxUtils::renameConstant(decl_name, latest_type_info->renames_);
     if (constant_rename) {
@@ -485,6 +485,7 @@ private:
       return result;
     } else if (!absl::StartsWith(proto_type_name, "envoy.HotRestart") &&
                !absl::StartsWith(proto_type_name, "envoy.RouterCheckToolSchema") &&
+               !absl::StartsWith(proto_type_name, "envoy.annotations") &&
                !absl::StartsWith(proto_type_name, "envoy.test") &&
                !absl::StartsWith(proto_type_name, "envoy.tracers.xray.daemon")) {
       // Die hard if we don't have a useful proto type for something that looks

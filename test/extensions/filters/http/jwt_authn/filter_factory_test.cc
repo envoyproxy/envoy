@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.validate.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
 
 #include "extensions/filters/http/jwt_authn/filter_factory.h"
 
@@ -9,7 +9,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using testing::_;
 
 namespace Envoy {

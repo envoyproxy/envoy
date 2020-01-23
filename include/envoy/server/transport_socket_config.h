@@ -41,7 +41,7 @@ public:
   /**
    * @return Stats::Scope& the transport socket's stats scope.
    */
-  virtual Stats::Scope& statsScope() const PURE;
+  virtual Stats::Scope& scope() PURE;
 
   /**
    * Return the instance of secret manager.
@@ -56,7 +56,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher.
@@ -72,12 +72,6 @@ public:
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;
-
-  /**
-   * Pass an init manager to register dynamic secret provider.
-   * @param init_manager instance of init manager.
-   */
-  virtual void setInitManager(Init::Manager& init_manager) PURE;
 
   /**
    * @return a pointer pointing to the instance of an init manager, or nullptr
@@ -133,7 +127,7 @@ public:
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
 
-  std::string category() const override { return "transport_sockets.upstream"; }
+  std::string category() const override { return "envoy.transport_sockets.upstream"; }
 };
 
 /**
@@ -160,7 +154,7 @@ public:
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;
 
-  std::string category() const override { return "transport_sockets.downstream"; }
+  std::string category() const override { return "envoy.transport_sockets.downstream"; }
 };
 
 } // namespace Configuration

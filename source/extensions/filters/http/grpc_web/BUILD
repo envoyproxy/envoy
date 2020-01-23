@@ -37,7 +37,8 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
-        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/grpc_web/v3:pkg_cc_proto",
     ],
 )

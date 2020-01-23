@@ -9,6 +9,7 @@
 #include "common/common/assert.h"
 
 #include "extensions/common/wasm/null/null_vm_plugin.h"
+#include "extensions/common/wasm/wasm_vm_base.h"
 #include "extensions/common/wasm/well_known_names.h"
 
 namespace Envoy {
@@ -20,13 +21,14 @@ namespace Null {
 // The NullVm wraps a C++ WASM plugin which has been compiled with the WASM API
 // and linked directly into the Envoy process. This is useful for development
 // in that it permits the debugger to set breakpoints in both Envoy and the plugin.
-struct NullVm : public WasmVm {
-  NullVm() = default;
-  NullVm(const NullVm& other) : plugin_name_(other.plugin_name_) {}
+struct NullVm : public WasmVmBase {
+  NullVm(const Stats::ScopeSharedPtr& scope) : WasmVmBase(scope, WasmRuntimeNames::get().Null) {}
+  NullVm(const NullVm& other)
+      : WasmVmBase(other.scope_, WasmRuntimeNames::get().Null), plugin_name_(other.plugin_name_) {}
 
   // WasmVm
   absl::string_view runtime() override { return WasmRuntimeNames::get().Null; }
-  bool cloneable() override { return true; };
+  Cloneable cloneable() override { return Cloneable::InstantiatedModule; };
   WasmVmPtr clone() override;
   bool load(const std::string& code, bool allow_precompiled) override;
   void link(absl::string_view debug_name) override;

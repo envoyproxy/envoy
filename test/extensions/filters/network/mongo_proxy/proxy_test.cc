@@ -3,9 +3,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/common/fault/v3alpha/fault.pb.h"
+#include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
 #include "envoy/stats/stats.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
@@ -39,12 +39,12 @@ namespace MongoProxy {
 
 class MockDecoder : public Decoder {
 public:
-  MOCK_METHOD1(onData, void(Buffer::Instance& data));
+  MOCK_METHOD(void, onData, (Buffer::Instance & data));
 };
 
 class TestStatStore : public Stats::IsolatedStoreImpl {
 public:
-  MOCK_METHOD2(deliverHistogramToSinks, void(const Stats::Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, deliverHistogramToSinks, (const Stats::Histogram& histogram, uint64_t value));
 };
 
 class TestProxyFilter : public ProxyFilter {
@@ -95,17 +95,16 @@ public:
   }
 
   void setupDelayFault(bool enable_fault) {
-    envoy::extensions::filters::common::fault::v3alpha::FaultDelay fault;
+    envoy::extensions::filters::common::fault::v3::FaultDelay fault;
     fault.mutable_percentage()->set_numerator(50);
-    fault.mutable_percentage()->set_denominator(envoy::type::v3alpha::FractionalPercent::HUNDRED);
+    fault.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
     fault_config_.reset(new Filters::Common::Fault::FaultDelayConfig(fault));
 
-    EXPECT_CALL(
-        runtime_.snapshot_,
-        featureEnabled("mongo.fault.fixed_delay.percent",
-                       Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(50))))
+    EXPECT_CALL(runtime_.snapshot_,
+                featureEnabled("mongo.fault.fixed_delay.percent",
+                               Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {
