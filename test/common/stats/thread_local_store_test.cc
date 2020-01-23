@@ -209,7 +209,8 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(0, found_gauge->get().value());
 
   Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
-  EXPECT_EQ(&h1, &store_->histogram("h1", Stats::Histogram::Unit::Unspecified));
+  Histogram& h12 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
+  EXPECT_EQ(&h1, &h12);
   StatNameManagedStorage h1_name("h1", *symbol_table_);
   auto found_histogram = store_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());

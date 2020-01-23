@@ -104,18 +104,12 @@ public:
   void incRefCount(const StatName&) override {}
   StoragePtr encode(absl::string_view name) override { return encodeHelper(name); }
   SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
-    return join(names, StatNameList());
-  }
-
-  SymbolTable::StoragePtr join(const std::vector<StatName>& names, const StatNameList& name_list) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {
       if (!name.empty()) {
         strings.push_back(toStringView(name));
       }
     }
-
-    name_list.iterate([&strings, this](StatName name) -> bool { strings.push_back(toStringView(name)); return true; });
 
     return encodeHelper(absl::StrJoin(strings, "."));
   }

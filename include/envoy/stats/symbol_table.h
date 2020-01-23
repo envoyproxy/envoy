@@ -112,19 +112,6 @@ public:
   virtual StoragePtr join(const StatNameVec& stat_names) const PURE;
 
   /**
-   * Joins two or more StatNames with a list of StatNames.
-   *
-   * Note that this method does not bump reference counts on the referenced
-   * Symbols in the SymbolTable, so it's only valid as long for the lifetime of
-   * the joined StatNames.
-   *
-   * @param stat_names the names to join.
-   * @param stat_name_list additional list of names to join with.
-   * @return Storage allocated for the joined name.
-   */
-  virtual StoragePtr join(const StatNameVec& stat_names, const StatNameList& stat_name_list) const PURE;
-
-  /**
    * Populates a StatNameList from a list of encodings. This is not done at
    * construction time to enable StatNameList to be instantiated directly in
    * a class that doesn't have a live SymbolTable when it is constructed.

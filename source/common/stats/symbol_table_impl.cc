@@ -479,22 +479,15 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
 }
 
 SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) const {
-  return join(stat_names, StatNameList());
-}
-
-SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names, const StatNameList& stat_name_list) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  stat_name_list.iterate([&num_bytes](StatName name) -> bool { num_bytes += name.dataSize(); return true; });
-
   MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
   for (StatName stat_name : stat_names) {
     stat_name.appendDataToMemBlock(mem_block);
   }
-  stat_name_list.iterate([&mem_block](StatName name) -> bool { name.appendDataToMemBlock(mem_block); return true; });
   return mem_block.release();
 }
 

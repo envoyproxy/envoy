@@ -470,8 +470,17 @@ StatName ThreadLocalStoreImpl::ScopeImpl::finalStatName(StatName name,
   StatNameList dynamic_names;
   symbolTable().populateList(tag_names_and_values.data(), tag_names_and_values.size(), dynamic_names);
 
-  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name}, dynamic_names);
+  std::vector<StatName> stat_names;
+  stat_names.reserve(2 + tag_names_and_values.size());
+  stat_names.emplace_back(prefix_.statName());
+  stat_names.emplace_back(name);
+
+  dynamic_names.iterate([&stat_names](StatName stat_name) -> bool { stat_names.emplace_back(stat_name); return true; });
+
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join(stat_names);
   auto sname = StatName(final_name.get());
+  dynamic_names.clear(symbolTable());
+
   std::cout << symbolTable().toString(sname) << std::endl;
   return sname;
 }
