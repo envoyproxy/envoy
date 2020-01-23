@@ -3,6 +3,7 @@ Version history
 
 1.14.0 (Pending)
 ================
+* config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 
 1.13.0 (January 20, 2020)

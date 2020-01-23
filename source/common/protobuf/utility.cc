@@ -137,7 +137,7 @@ public:
 // vN/v(N+1) mechanical transforms.
 void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   const Protobuf::Descriptor* earlier_version_desc =
-      Config::ApiTypeOracle::getEarlierVersionDescriptor(message);
+      Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   // If there is no earlier version of a message, just apply f directly.
   if (earlier_version_desc == nullptr) {
     f(message, MessageVersion::LATEST_VERSION);
@@ -528,7 +528,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
       TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
   if (any_full_name != message.GetDescriptor()->full_name()) {
     const Protobuf::Descriptor* earlier_version_desc =
-        Config::ApiTypeOracle::getEarlierVersionDescriptor(message);
+        Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
     // If the earlier version matches, unpack and upgrade.
     if (earlier_version_desc != nullptr && any_full_name == earlier_version_desc->full_name()) {
       Protobuf::DynamicMessageFactory dmf;
