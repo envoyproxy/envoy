@@ -13,6 +13,7 @@
 #include "common/config/version_converter.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/visitor.h"
 #include "common/protobuf/well_known.h"
 
 #include "absl/strings/match.h"
@@ -375,42 +376,25 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
   }
 }
 
-void checkForUnexpectedFields(const Protobuf::Message& message,
-                              ProtobufMessage::ValidationVisitor& validation_visitor,
-                              Runtime::Loader* runtime) {
-  // Reject unknown fields.
-  const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
-  if (!unknown_fields.empty()) {
-    std::string error_msg;
-    for (int n = 0; n < unknown_fields.field_count(); ++n) {
-      if (unknown_fields.field(n).number() == ProtobufWellKnown::OriginalTypeFieldNumber) {
-        continue;
-      }
-      error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
-    }
-    // We use the validation visitor but have hard coded behavior below for deprecated fields.
-    // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
-    // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
-    if (!error_msg.empty()) {
-      validation_visitor.onUnknownField("type " + message.GetTypeName() +
-                                        " with unknown field set {" + error_msg + "}");
-    }
-  }
+class UnexpectedFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
+public:
+  UnexpectedFieldProtoVisitor(ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Runtime::Loader* runtime)
+      : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
-  const Protobuf::Descriptor* descriptor = message.GetDescriptor();
-  const Protobuf::Reflection* reflection = message.GetReflection();
-  for (int i = 0; i < descriptor->field_count(); ++i) {
-    const Protobuf::FieldDescriptor* field = descriptor->field(i);
-    absl::string_view filename = filenameFromPath(field->file()->name());
+  const void* onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
+                      const void*) override {
+    const Protobuf::Reflection* reflection = message.GetReflection();
+    absl::string_view filename = filenameFromPath(field.file()->name());
 
     // Before we check to see if the field is in use, see if there's a
     // deprecated default enum value.
-    checkForDeprecatedNonRepeatedEnumValue(message, filename, field, reflection, runtime);
+    checkForDeprecatedNonRepeatedEnumValue(message, filename, &field, reflection, runtime_);
 
     // If this field is not in use, continue.
-    if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
-        (!field->is_repeated() && !reflection->HasField(message, field))) {
-      continue;
+    if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
+        (!field.is_repeated() && !reflection->HasField(message, &field))) {
+      return nullptr;
     }
 
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
@@ -421,22 +405,22 @@ void checkForUnexpectedFields(const Protobuf::Message& message,
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
     // standalone config validation utilities)
-    if (runtime && field->options().deprecated()) {
+    if (runtime_ && field.options().deprecated()) {
       // This is set here, rather than above, so that in the absence of a
       // registry (i.e. test) the default for if a feature is allowed or not is
       // based on ENVOY_DISABLE_DEPRECATED_FEATURES.
-      warn_only &= !field->options().GetExtension(envoy::annotations::disallowed_by_default);
-      warn_only = runtime->snapshot().deprecatedFeatureEnabled(
-          absl::StrCat("envoy.deprecated_features:", field->full_name()), warn_only);
+      warn_only &= !field.options().GetExtension(envoy::annotations::disallowed_by_default);
+      warn_only = runtime_->snapshot().deprecatedFeatureEnabled(
+          absl::StrCat("envoy.deprecated_features:", field.full_name()), warn_only);
     }
 
     // If this field is deprecated, warn or throw an error.
-    if (field->options().deprecated()) {
+    if (field.options().deprecated()) {
       std::string err = fmt::format(
           "Using deprecated option '{}' from file {}. This configuration will be removed from "
           "Envoy soon. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
           "for details.",
-          field->full_name(), filename);
+          field.full_name(), filename);
       if (warn_only) {
         ENVOY_LOG_MISC(warn, "{}", err);
       } else {
@@ -448,29 +432,43 @@ void checkForUnexpectedFields(const Protobuf::Message& message,
         throw ProtoValidationException(err + fatal_error, message);
       }
     }
+    return nullptr;
+  }
 
-    // If this is a message, recurse to check for deprecated fields in the sub-message.
-    if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
-      if (field->is_repeated()) {
-        const int size = reflection->FieldSize(message, field);
-        for (int j = 0; j < size; ++j) {
-          checkForUnexpectedFields(reflection->GetRepeatedMessage(message, field, j),
-                                   validation_visitor, runtime);
+  void onMessage(const Protobuf::Message& message, const void*) override {
+    // Reject unknown fields.
+    const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
+    if (!unknown_fields.empty()) {
+      std::string error_msg;
+      for (int n = 0; n < unknown_fields.field_count(); ++n) {
+        if (unknown_fields.field(n).number() == ProtobufWellKnown::OriginalTypeFieldNumber) {
+          continue;
         }
-      } else {
-        checkForUnexpectedFields(reflection->GetMessage(message, field), validation_visitor,
-                                 runtime);
+        error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
+      }
+      // We use the validation visitor but have hard coded behavior below for deprecated fields.
+      // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
+      // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
+      if (!error_msg.empty()) {
+        validation_visitor_.onUnknownField("type " + message.GetTypeName() +
+                                           " with unknown field set {" + error_msg + "}");
       }
     }
   }
-}
+
+private:
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Runtime::Loader* runtime_;
+};
 
 } // namespace
 
 void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
                                            ProtobufMessage::ValidationVisitor& validation_visitor,
                                            Runtime::Loader* runtime) {
-  ::Envoy::checkForUnexpectedFields(API_RECOVER_ORIGINAL(message), validation_visitor, runtime);
+  UnexpectedFieldProtoVisitor unexpected_field_visitor(validation_visitor, runtime);
+  ProtobufMessage::traverseMessage(unexpected_field_visitor, API_RECOVER_ORIGINAL(message),
+                                   nullptr);
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
