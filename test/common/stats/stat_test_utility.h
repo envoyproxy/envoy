@@ -88,7 +88,7 @@ public:
   uint64_t counterValue(absl::string_view name);
 
   /**
-   * Parses 'in' into dynamic and symbolic segments. The dynamic segments
+   * Parses 'name' into dynamic and symbolic segments. The dynamic segments
    * are delimited by backquotes. For example, "hello.`world`" joins a
    * a StatName where the "hello" is symbolic, created via a StatNamePool,
    * and the "world" is dynamic -- created via a StatNameDynamicPool.
