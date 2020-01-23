@@ -262,12 +262,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (dyn_resources.has_ads_config()) {
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-      auto& api_config_source = dyn_resources.has_ads_config()
-                                    ? dyn_resources.ads_config()
-                                    : dyn_resources.cds_config().api_config_source();
       ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, api_config_source,
-                                                         stats)
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                         dyn_resources.ads_config(), stats)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(

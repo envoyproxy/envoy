@@ -17,8 +17,8 @@ public:
   MockTransportSocketMatcher();
   MockTransportSocketMatcher(Network::TransportSocketFactoryPtr default_factory);
   ~MockTransportSocketMatcher() override;
-  MOCK_CONST_METHOD1(resolve,
-                     TransportSocketMatcher::MatchData(const envoy::config::core::v3::Metadata&));
+  MOCK_METHOD(TransportSocketMatcher::MatchData, resolve,
+              (const envoy::config::core::v3::Metadata&), (const));
 
 private:
   Network::TransportSocketFactoryPtr socket_factory_;

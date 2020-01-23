@@ -142,7 +142,7 @@ While stats are usually composed of tokens that are known at compile-time, there
 are scenarios where the names are newly discovered from data in requests. To
 avoid taking locks in this case, tokens can be formed dynamically using
 `StatNameDynamicStorage` or `StatNameDynamicPool`. In this case we lose
-substring sharing but we avoid taking locks. Dynamically generaeted tokens can
+substring sharing but we avoid taking locks. Dynamically generated tokens can
 be combined with symbolized tokens from `StatNameSet` or `StatNamePool` using
 `SymbolTable::join()`.
 
