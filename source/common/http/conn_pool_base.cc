@@ -28,11 +28,21 @@ void ConnPoolImplBase::destructAllConnections() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-void ConnPoolImplBase::createNewConnection() {
-  ENVOY_LOG(debug, "creating a new connection");
-  ActiveClientPtr client = instantiateActiveClient();
-  ASSERT(client->state_ == ActiveClient::State::CONNECTING);
-  client->moveIntoList(std::move(client), owningList(client->state_));
+void ConnPoolImplBase::tryCreateNewConnection() {
+  const bool can_create_connection =
+      host_->cluster().resourceManager(priority_).connections().canCreate();
+  if (!can_create_connection) {
+    host_->cluster().stats().upstream_cx_overflow_.inc();
+  }
+  // If we are at the connection circuit-breaker limit due to other upstreams having
+  // too many open connections, and this upstream has no connections, always create one, to
+  // prevent pending requests being queued to this upstream with no way to be processed.
+  if (can_create_connection || (ready_clients_.empty() && busy_clients_.empty())) {
+    ENVOY_LOG(debug, "creating a new connection");
+    ActiveClientPtr client = instantiateActiveClient();
+    ASSERT(client->state_ == ActiveClient::State::CONNECTING);
+    client->moveIntoList(std::move(client), owningList(client->state_));
+  }
 }
 
 void ConnPoolImplBase::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
@@ -101,18 +111,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(Http::StreamDecoder& re
   }
 
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
-    const bool can_create_connection =
-        host_->cluster().resourceManager(priority_).connections().canCreate();
-    if (!can_create_connection) {
-      host_->cluster().stats().upstream_cx_overflow_.inc();
-    }
-
-    // If we are at the connection circuit-breaker limit due to other upstreams having
-    // too many open connections, and this upstream has no connections, always create one, to
-    // prevent pending requests being queued to this upstream with no way to be processed.
-    if ((ready_clients_.empty() && busy_clients_.empty()) || can_create_connection) {
-      createNewConnection();
-    }
+    tryCreateNewConnection();
 
     return newPendingRequest(response_decoder, callbacks);
   } else {
@@ -268,10 +267,8 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
     client.state_ = ActiveClient::State::CLOSED;
 
     // If we have pending requests and we just lost a connection we should make a new one.
-    if (!pending_requests_.empty() &&
-        host_->cluster().resourceManager(priority_).requests().canCreate() &&
-        host_->cluster().resourceManager(priority_).connections().canCreate()) {
-      createNewConnection();
+    if (!pending_requests_.empty()) {
+      tryCreateNewConnection();
     }
   } else if (event == Network::ConnectionEvent::Connected) {
     client.conn_connect_ms_->complete();

@@ -64,7 +64,14 @@ protected:
     virtual bool closingWithIncompleteRequest() const PURE;
     virtual StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) PURE;
 
-    enum class State { CONNECTING, READY, BUSY, DRAINING, CLOSED };
+    enum class State {
+      CONNECTING, // Connection is not yet established.
+      READY,      // Additional requests may be immediately dispatched to this connection.
+      BUSY,       // Connection is at its concurrent request limit.
+      DRAINING,   // No more requests can be dispatched to this connection, and it will be closed
+                  // when all requests complete.
+      CLOSED      // Connection is closed and object is queued for destruction.
+    };
 
     ConnPoolImplBase& parent_;
     uint64_t remaining_requests_;
@@ -129,7 +136,10 @@ protected:
   void onUpstreamReady();
   void attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                              ConnectionPool::Callbacks& callbacks);
-  void createNewConnection();
+
+  // Creates a new connection if allowed by resourceManager, or if created to avoid
+  // starving this pool.
+  void tryCreateNewConnection();
 
 public:
   const Upstream::HostConstSharedPtr host_;
