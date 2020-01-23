@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/grpc/status.h"
 #include "common/http/headers.h"
 
 #include "eval/public/cel_value.h"
@@ -38,6 +39,7 @@ constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
+constexpr absl::string_view GrpcStatus = "grpc_status";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
@@ -79,6 +81,7 @@ public:
 
 private:
   friend class RequestWrapper;
+  friend class ResponseWrapper;
   const Http::HeaderMap* value_;
 };
 

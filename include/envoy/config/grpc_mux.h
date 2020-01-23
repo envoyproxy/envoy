@@ -25,38 +25,6 @@ struct ControlPlaneStats {
   ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-// TODO(fredlas) redundant to SubscriptionCallbacks; remove this one.
-class GrpcMuxCallbacks {
-public:
-  virtual ~GrpcMuxCallbacks() = default;
-
-  /**
-   * Called when a configuration update is received.
-   * @param resources vector of fetched resources corresponding to the configuration update.
-   * @param version_info update version.
-   * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
-   *        is accepted. Accepted configurations have their version_info reflected in subsequent
-   *        requests.
-   */
-  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                              const std::string& version_info) PURE;
-
-  /**
-   * Called when either the subscription is unable to fetch a config update or when onConfigUpdate
-   * invokes an exception.
-   * @param reason supplies the update failure reason.
-   * @param e supplies any exception data on why the fetch failed. May be nullptr.
-   */
-  virtual void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
-                                    const EnvoyException* e) PURE;
-
-  /**
-   * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
-   * a RouteConfiguration, based on the underlying resource type.
-   */
-  virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
-};
-
 /**
  * Handle on an muxed gRPC subscription. The subscription is canceled on destruction.
  */
@@ -95,7 +63,7 @@ public:
    */
   virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
                                     const std::set<std::string>& resources,
-                                    GrpcMuxCallbacks& callbacks) PURE;
+                                    SubscriptionCallbacks& callbacks) PURE;
 
   /**
    * Pause discovery requests for a given API type. This is useful when we're processing an update
