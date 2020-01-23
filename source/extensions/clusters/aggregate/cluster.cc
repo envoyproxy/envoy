@@ -13,7 +13,7 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
                  Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
                  Runtime::RandomGenerator& random,
-                 Server::Configuration::TransportSocketFactoryContext& factory_context,
+                 Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api)
     : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
                                 added_via_api),
@@ -137,7 +137,7 @@ ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   auto new_cluster = std::make_shared<Cluster>(
       cluster, proto_config, context.clusterManager(), context.runtime(), context.random(),

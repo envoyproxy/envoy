@@ -12,6 +12,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/config/api_type_oracle.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/base/attributes.h"
@@ -189,6 +190,55 @@ public:
   }
 
   /**
+   * Lazily constructs a mapping from the configuration message type to a factory,
+   * including the deprecated configuration message types.
+   * Must be invoked after factory registration is completed.
+   */
+  static absl::flat_hash_map<std::string, Base*>& factoriesByType() {
+    static absl::flat_hash_map<std::string, Base*>* factories_by_type =
+        [] {
+          auto mapping = std::make_unique<absl::flat_hash_map<std::string, Base*>>();
+
+          for (const auto& factory : factories()) {
+            if (factory.second == nullptr) {
+              continue;
+            }
+
+            // Skip untyped factories.
+            std::string config_type = factory.second->configType();
+            if (config_type.empty()) {
+              continue;
+            }
+
+            // Register config types in the mapping and traverse the deprecated message type chain.
+            while (true) {
+              auto it = mapping->find(config_type);
+              if (it != mapping->end() && it->second != factory.second) {
+                // Mark double-registered types with a nullptr.
+                // See issue https://github.com/envoyproxy/envoy/issues/9643.
+                ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
+                          factory.second->name(), it->second ? it->second->name() : "");
+                it->second = nullptr;
+              } else {
+                mapping->emplace(std::make_pair(config_type, factory.second));
+              }
+
+              const Protobuf::Descriptor* previous =
+                  Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
+              if (previous == nullptr) {
+                break;
+              }
+              config_type = previous->full_name();
+            }
+          }
+          return mapping;
+        }()
+            .release();
+
+    return *factories_by_type;
+  }
+
+  /**
    * instead_value are used when passed name was deprecated.
    */
   static void registerFactory(Base& factory, absl::string_view name,
@@ -262,6 +312,14 @@ public:
     return it->second;
   }
 
+  static Base* getFactoryByType(absl::string_view type) {
+    auto it = factoriesByType().find(type);
+    if (it == factoriesByType().end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
   /**
    * @return the canonical name of the factory. If the given name is a
    * deprecated factory name, the canonical name is returned instead.
@@ -320,6 +378,12 @@ private:
     factories().emplace(factory.name(), &factory);
     RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
 
+    auto config_type = factory.configType();
+    Base* prev = getFactoryByType(config_type);
+    if (prev != nullptr) {
+      factoriesByType().emplace(config_type, &factory);
+    }
+
     return displaced;
   }
 
@@ -327,9 +391,14 @@ private:
    * Remove a factory by name. This method should only be used for testing purposes.
    * @param name is the name of the factory to remove.
    */
-  static void removeFactoryForTest(absl::string_view name) {
+  static void removeFactoryForTest(absl::string_view name, absl::string_view config_type) {
     auto result = factories().erase(name);
     RELEASE_ASSERT(result == 1, "");
+
+    Base* prev = getFactoryByType(config_type);
+    if (prev != nullptr) {
+      factoriesByType().erase(config_type);
+    }
   }
 };
 

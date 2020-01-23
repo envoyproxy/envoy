@@ -12,7 +12,6 @@ import argparse
 import logging
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 
@@ -123,6 +122,10 @@ def checkToolNotFoundError():
   oldPath = os.environ["PATH"]
   os.environ["PATH"] = "/sbin:/usr/sbin"
   clang_format = os.getenv("CLANG_FORMAT", "clang-format-9")
+  # If CLANG_FORMAT points directly to the binary, skip this test.
+  if os.path.isfile(clang_format) and os.access(clang_format, os.X_OK):
+    os.environ["PATH"] = oldPath
+    return 0
   errors = checkFileExpectingError("no_namespace_envoy.cc", "Command %s not found." % clang_format)
   os.environ["PATH"] = oldPath
   return errors

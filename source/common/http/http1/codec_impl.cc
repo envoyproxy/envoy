@@ -10,7 +10,6 @@
 #include "envoy/network/connection.h"
 
 #include "common/common/enum_to_int.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
@@ -18,6 +17,8 @@
 #include "common/http/http1/header_formatter.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_impl.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Http {
@@ -451,7 +452,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   data.getRawSlices(slices.begin(), num_slices);
   for (const Buffer::RawSlice& slice : slices) {
     total_parsed += slice.len_;
@@ -475,7 +476,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
     uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
     data.getRawSlices(slices.begin(), num_slices);
     for (const Buffer::RawSlice& slice : slices) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);

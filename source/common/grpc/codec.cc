@@ -6,7 +6,8 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/stack_array.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -59,7 +60,7 @@ void Decoder::frameDataEnd() {
 
 uint64_t FrameInspector::inspect(const Buffer::Instance& data) {
   uint64_t count = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, count);
+  absl::FixedArray<Buffer::RawSlice> slices(count);
   data.getRawSlices(slices.begin(), count);
   uint64_t delta = 0;
   for (const Buffer::RawSlice& slice : slices) {

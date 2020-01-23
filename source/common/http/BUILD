@@ -275,7 +275,6 @@ envoy_cc_library(
         "//include/envoy/http:message_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:non_copyable",
-        "//source/common/common:stack_array",
     ],
 )
 
