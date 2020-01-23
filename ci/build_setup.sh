@@ -65,7 +65,7 @@ export USER=bazel
 export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
 export PATH=/opt/llvm/bin:$PATH
-export CLANG_FORMAT=clang-format
+export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS+="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1"
@@ -114,8 +114,8 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
 
-export BUILDIFIER_BIN="/usr/local/bin/buildifier"
-export BUILDOZER_BIN="/usr/local/bin/buildozer"
+export BUILDIFIER_BIN="${BUILDIFIER_BIN:-/usr/local/bin/buildifier}"
+export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
 
 # We set up an Envoy consuming project for test builds only if '-nofetch'
 # is not set AND this is an Envoy build. For derivative builds where Envoy
