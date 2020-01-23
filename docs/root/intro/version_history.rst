@@ -5,6 +5,7 @@ Version history
 ================
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
+* upstream: combined http/1 and http/2 connection pool code. This means that circuit breaker limits for both requests and connections apply to both pool types. Also, http/2 now has the option to limit concurrent requests on a connection, and allow multiple draining connections.
 
 1.13.0 (January 20, 2020)
 =========================

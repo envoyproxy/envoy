@@ -3,6 +3,14 @@
 Circuit breaking
 ================
 
+.. warning::
+
+Circuit breaking behavior changed in version 1.14. If the previous behavior (documented :ref:`here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`
+is needed, disable runtime feature "envoy.reloadable_features.new_http1_connection_pool_behavior" or
+"envoy.reloadable_features.new_http2_connection_pool_behavior" and then re-configure your clusters or
+restart Envoy. Note that this behavior is deprecated and will be removed according to the deprecation
+policy.
+
 Circuit breaking is a critical component of distributed systems. It’s nearly always better to fail
 quickly and apply back pressure downstream as soon as possible. One of the main benefits of an Envoy
 mesh is that Envoy enforces circuit breaking limits at the network level as opposed to having to
@@ -12,23 +20,21 @@ configure and code each application independently. Envoy supports various types 
 .. _arch_overview_circuit_break_cluster_maximum_connections:
 
 * **Cluster maximum connections**: The maximum number of connections that Envoy will establish to
-  all hosts in an upstream cluster. In practice this is only applicable to HTTP/1.1 clusters since
-  HTTP/2 uses a single connection to each host. If this circuit breaker overflows the :ref:`upstream_cx_overflow
+  all hosts in an upstream cluster. If this circuit breaker overflows the :ref:`upstream_cx_overflow
   <config_cluster_manager_cluster_stats>` counter for the cluster will increment.
 * **Cluster maximum pending requests**: The maximum number of requests that will be queued while
-  waiting for a ready connection pool connection. Since HTTP/2 requests are sent over a single
+  waiting for a ready connection pool connection. Since HTTP/2 allows many requests concurrently over a single
   connection, this circuit breaker only comes into play as the initial connection is created,
-  as requests will be multiplexed immediately afterwards. For HTTP/1.1, requests are added to the list
+  as requests will be multiplexed immediately afterwards (unless :ref:`max concurrent streams <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>`
+  is configured). For HTTP/1.1, requests are added to the list
   of pending requests whenever there aren't enough upstream connections available to immediately dispatch
   the request, so this circuit breaker will remain in play for the lifetime of the process.
   If this circuit breaker overflows the
   :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
   increment.
 * **Cluster maximum requests**: The maximum number of requests that can be outstanding to all hosts
-  in a cluster at any given time. In practice this is applicable to HTTP/2 clusters since HTTP/1.1
-  clusters are governed by the maximum connections circuit breaker. If this circuit breaker
-  overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter
-  for the cluster will increment.
+  in a cluster at any given time. If this circuit breaker overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
+  counter for the cluster will increment.
 * **Cluster maximum active retries**: The maximum number of retries that can be outstanding to all
   hosts in a cluster at any given time. In general we recommend using :ref:`retry budgets <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>`; however, if static circuit breaking is preferred it should aggressively circuit break
   retries. This is so that retries for sporadic failures are allowed, but the overall retry volume cannot
