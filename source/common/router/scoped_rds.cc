@@ -98,7 +98,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
-      factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
+      scoped_rds_(scoped_rds), factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
@@ -107,7 +107,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(),
-          loadTypeUrl(rds_config_source_.resource_api_version()), *scope_, *this);
+          loadTypeUrl(rds_config_source_.resource_api_version()), *scope_, *this, cluster_index_);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
@@ -129,6 +129,15 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
         // Subscribe to RDS update.
         parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
       })) {}
+
+void ScopedRdsConfigSUbscription::updateCluster() {
+  ++cluster_index_;
+  subscription_ =
+      factory_context_.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          scoped_rds_.scoped_rds_config_source(),
+          loadTypeUrl(rds_config_source_.resource_api_version()), *scope_, *this, cluster_index_);
+  subscription_->start({})
+}
 
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(
     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& resources,

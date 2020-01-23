@@ -70,6 +70,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::route::v3alpha::VirtualHost>(resource).name();
   }
+  void updateCluster() override;
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   RouteConfigUpdatePtr& config_update_info_;
@@ -78,6 +79,9 @@ private:
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   Init::TargetImpl init_target_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
+  size_t cluster_index_ = 0;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  envoy::config::core::v3alpha::ApiVersion resource_api_version_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

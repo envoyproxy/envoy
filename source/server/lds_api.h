@@ -46,6 +46,7 @@ private:
     return MessageUtil::anyConvert<envoy::config::listener::v3alpha::Listener>(resource).name();
   }
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
+  void updateCluster() override;
 
   std::unique_ptr<Config::Subscription> subscription_;
   std::string system_version_info_;
@@ -54,6 +55,8 @@ private:
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  size_t cluster_index_ = 0;
+  const envoy::config::core::v3alpha::ConfigSource& lds_config_;
 };
 
 } // namespace Server

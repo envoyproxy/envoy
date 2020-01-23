@@ -16,11 +16,11 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          const Protobuf::MethodDescriptor& service_method,
                          envoy::config::core::v3alpha::ApiVersion transport_api_version,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
-                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
+                         const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node, Config::SubscriptionCallbacks& callbacks)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      first_stream_request_(true), transport_api_version_(transport_api_version) {
+      first_stream_request_(true), transport_api_version_(transport_api_version), callbacks_(callbacks) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -229,10 +229,15 @@ void GrpcMuxImpl::onStreamEstablished() {
 }
 
 void GrpcMuxImpl::onEstablishmentFailure() {
-  for (const auto& api_state : api_state_) {
-    for (auto watch : api_state.second.watches_) {
-      watch->callbacks_.onConfigUpdateFailed(
-          Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
+  // Try to connect all of subscribed clusters which are included on grpc_service. If all of attemptions were failed, It may cause EnvoyException and notify all watches that connection can't be established.
+  try {
+    callbacks_.updateCluster();
+  } catch (EnvoyException&) {
+    for (const auto& api_state : api_state_) {
+      for (auto watch : api_state.second.watches_) {
+        watch->callbacks_.onConfigUpdateFailed(
+            Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
+      }
     }
   }
 }

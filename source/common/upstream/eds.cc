@@ -21,11 +21,11 @@ EdsClusterImpl::EdsClusterImpl(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
-      local_info_(factory_context.localInfo()),
+      local_info_(factory_context.localInfo()), cluster_(cluster),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
-      validation_visitor_(factory_context.messageValidationVisitor()) {
+      validation_visitor_(factory_context.messageValidationVisitor()), factory_context_(factory_context) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -38,10 +38,20 @@ EdsClusterImpl::EdsClusterImpl(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, loadTypeUrl(cluster.eds_cluster_config().eds_config().resource_api_version()),
-          info_->statsScope(), *this);
+          info_->statsScope(), *this, cluster_index_);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
+
+void EdsClusterImpl::updateCluster() {
+  ++cluster_index_;
+  const auto& eds_config = cluster_.eds_cluster_config().eds_config();
+  subscription_ =
+      factory_context_.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          eds_config, loadTypeUrl(cluster_.eds_cluster_config().eds_config().resource_api_version()),
+          info_->statsScope(), *this, cluster_index_);
+  startPreInit();
+}
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   std::unordered_map<std::string, HostSharedPtr> updated_hosts;

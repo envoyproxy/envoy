@@ -67,7 +67,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
+    : rds_(rds), route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       validator_(validator), init_manager_(init_manager),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({route_config_name_}); }),
@@ -79,7 +79,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           rds.config_source(), loadTypeUrl(rds.config_source().resource_api_version()), *scope_,
-          *this);
+          *this, cluster_index_);
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator);
 }
@@ -93,6 +93,15 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
   // RdsRouteConfigProviders. Therefore, the map entry for the RdsRouteConfigProvider has to get
   // cleaned by the RdsRouteConfigProvider's destructor.
   route_config_provider_manager_.dynamic_route_config_providers_.erase(manager_identifier_);
+}
+
+void RdsRouteConfigSubscription::updateCluster() {
+  ++cluster_index_;
+  subscription_ =
+      factory_context_.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          rds_.config_source(), loadTypeUrl(rds_.config_source().resource_api_version()), *scope_,
+          *this, cluster_index_);
+  subscription_->start({route_config_name_});
 }
 
 void RdsRouteConfigSubscription::onConfigUpdate(

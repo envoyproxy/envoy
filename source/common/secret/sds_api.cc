@@ -86,8 +86,13 @@ void SdsApi::validateUpdateSize(int num_resources) {
 
 void SdsApi::initialize() {
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, loadTypeUrl(sds_config_.resource_api_version()), stats_, *this);
+      sds_config_, loadTypeUrl(sds_config_.resource_api_version()), stats_, *this, cluster_index_);
   subscription_->start({sds_config_name_});
+}
+
+void SdsApi::updateCluster() {
+  ++cluster_index_;
+  initialize();
 }
 
 std::string SdsApi::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {

@@ -52,6 +52,7 @@ private:
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
   CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_config, ClusterManager& cm,
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
+  void updateCluster() override;
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;
@@ -60,6 +61,8 @@ private:
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  size_t cluster_index_ = 0;
+  const envoy::config::core::v3alpha::ConfigSource cds_config_;
 };
 
 } // namespace Upstream

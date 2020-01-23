@@ -33,7 +33,7 @@ public:
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               envoy::config::core::v3alpha::ApiVersion transport_api_version,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
+              const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node, Config::SubscriptionCallbacks& callbacks);
   ~GrpcMuxImpl() override;
 
   void start() override;
@@ -137,6 +137,7 @@ private:
   // This string is a type URL.
   std::queue<std::string> request_queue_;
   const envoy::config::core::v3alpha::ApiVersion transport_api_version_;
+  Config::SubscriptionCallbacks& callbacks_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux,

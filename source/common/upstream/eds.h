@@ -55,6 +55,7 @@ private:
                               PriorityStateManager& priority_state_manager,
                               std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
   bool validateUpdateSize(int num_resources);
+  void updateCluster() override;
 
   // ClusterImplBase
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
@@ -84,6 +85,9 @@ private:
   Event::TimerPtr assignment_timeout_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   InitializePhase initialize_phase_;
+  size_t cluster_index_ = 0;
+  Server::Configuration::TransportSocketFactoryContext& factory_context_;
+  const envoy::config::cluster::v3alpha::Cluster& cluster_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

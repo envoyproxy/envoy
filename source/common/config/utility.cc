@@ -218,7 +218,7 @@ Utility::createStatsMatcher(const envoy::config::bootstrap::v3alpha::Bootstrap& 
 
 Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
-    const envoy::config::core::v3alpha::ApiConfigSource& api_config_source, Stats::Scope& scope) {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope, int service_index) {
   Utility::checkApiConfigSourceNames(api_config_source);
 
   if (api_config_source.api_type() != envoy::config::core::v3alpha::ApiConfigSource::GRPC &&
@@ -227,8 +227,12 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
                                      api_config_source.DebugString()));
   }
 
-  envoy::config::core::v3alpha::GrpcService grpc_service;
-  grpc_service.MergeFrom(api_config_source.grpc_services(0));
+  envoy::config::core::v3::GrpcService grpc_service;
+
+  if (api_config_source.grpc_services_size() >= service_index) {
+    throw EnvoyException(fmt::format("specified service index was exceeded the number of size of grpc_services: {}", service_index));
+  }
+  grpc_service.MergeFrom(api_config_source.grpc_services(service_index));
 
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }

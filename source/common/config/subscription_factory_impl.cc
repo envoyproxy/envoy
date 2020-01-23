@@ -24,7 +24,7 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3alpha::ConfigSource& config, absl::string_view type_url,
-    Stats::Scope& scope, SubscriptionCallbacks& callbacks) {
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks, size_t cluster_index) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
@@ -58,7 +58,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       result = std::make_unique<GrpcSubscriptionImpl>(
           local_info_,
           Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                         api_config_source, scope)
+                                                         api_config_source, scope, cluster_index)
               ->create(),
           dispatcher_, random_, sotwGrpcMethod(type_url), type_url,
           api_config_source.transport_api_version(), callbacks, stats, scope,
@@ -71,7 +71,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       result = std::make_unique<DeltaSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                             api_config_source, scope)
+                                                             api_config_source, scope, cluster_index)
                   ->create(),
               dispatcher_, deltaGrpcMethod(type_url), api_config_source.transport_api_version(),
               random_, scope, Utility::parseRateLimitSettings(api_config_source), local_info_),

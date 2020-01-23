@@ -223,6 +223,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
+  void updateCluster() override;
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   LoaderImpl& parent_;
@@ -233,6 +234,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
   Init::TargetImpl init_target_;
   ProtobufWkt::Struct proto_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  size_t cluster_index_ = 0;
 };
 
 using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;

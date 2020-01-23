@@ -25,13 +25,13 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    const std::string& stat_prefix,
                                    std::unordered_set<RouteConfigProvider*>& route_config_providers,
                                    envoy::config::core::v3alpha::ApiVersion resource_api_version)
-    : config_update_info_(config_update_info),
+    : config_update_info_(config_update_info), factory_context_(factory_context),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
                    [this]() { subscription_->start({}); }),
-      route_config_providers_(route_config_providers) {
+      route_config_providers_(route_config_providers), resource_api_version_(resource_api_version) {
   const auto& config_source = config_update_info_->routeConfiguration()
                                   .vhds()
                                   .config_source()
@@ -73,6 +73,15 @@ void VhdsSubscription::onConfigUpdate(
   }
 
   init_target_.ready();
+}
+
+void VhdsSubscription::updateCluster() {
+  ++cluster_index_;
+  subscription_ =
+      factory_context_.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          config_update_info_->routeConfiguration().vhds().config_source(),
+          loadTypeUrl(resource_api_version_), *scope_, *this, cluster_index_);
+  subscription_->start({});
 }
 
 std::string

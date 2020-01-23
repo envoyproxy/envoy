@@ -135,6 +135,7 @@ private:
                  const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
+  void updateCluster() override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::route::v3alpha::RouteConfiguration>(resource)
         .name();
@@ -177,6 +178,8 @@ private:
   friend class RouteConfigProviderManagerImpl;
   // Access to addUpdateCallback
   friend class ScopedRdsConfigSubscription;
+  size_t cluster_index_ = 0;
+  const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds_;
 };
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;

@@ -26,12 +26,19 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& lds_con
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
-    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
+    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm), lds_config_(lds_config),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-      lds_config, loadTypeUrl(lds_config.resource_api_version()), *scope_, *this);
+      lds_config, loadTypeUrl(lds_config.resource_api_version()), *scope_, *this, cluster_index_);
   init_manager.add(init_target_);
+}
+
+void LdsApiImpl::updateCluster() {
+  ++cluster_index_;
+  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+      lds_config_, loadTypeUrl(lds_config_.resource_api_version()), *scope_, *this, cluster_index_);
+  subscription_->start();
 }
 
 void LdsApiImpl::onConfigUpdate(

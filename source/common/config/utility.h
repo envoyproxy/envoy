@@ -267,11 +267,13 @@ public:
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::api::v2::core::ApiConfigSource. Must have config type GRPC.
+   * @param service_index used for specifying index of grpc_services.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
-  static Grpc::AsyncClientFactoryPtr factoryForGrpcApiConfigSource(
-      Grpc::AsyncClientManager& async_client_manager,
-      const envoy::config::core::v3alpha::ApiConfigSource& api_config_source, Stats::Scope& scope);
+  static Grpc::AsyncClientFactoryPtr
+  factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                                const envoy::config::core::v3::ApiConfigSource& api_config_source,
+                                Stats::Scope& scope, int service_index = 0);
 
   /**
    * Translate a set of cluster's hosts into a load assignment configuration.

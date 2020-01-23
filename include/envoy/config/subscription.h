@@ -68,6 +68,11 @@ public:
    * a RouteConfiguration, based on the underlying resource type.
    */
   virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
+
+  /**
+   * Update cluster of management server.
+   */
+  virtual void updateCluster() PURE;
 };
 
 /**

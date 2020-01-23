@@ -593,8 +593,13 @@ void RtdsSubscription::start() {
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, loadTypeUrl(config_source_.resource_api_version()), store_, *this);
+      config_source_, loadTypeUrl(config_source_.resource_api_version()), store_, *this, cluster_index_);
   subscription_->start({resource_name_});
+}
+
+void RtdsSubscription::updateCluster() {
+  ++cluster_index_;
+  start();
 }
 
 void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {

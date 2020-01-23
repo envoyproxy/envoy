@@ -166,6 +166,7 @@ private:
                resource)
         .name();
   }
+  void updateCluster() override;
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,
@@ -190,6 +191,8 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
+  size_t cluster_index_ = 0;
+  const envoy::extensions::filters::network::http_connection_manager::v3alpha::ScopedRds& scoped_rds_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;

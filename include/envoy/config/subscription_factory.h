@@ -19,12 +19,13 @@ public:
    * @param scope stats scope for any stats tracked by the subscription.
    * @param callbacks the callbacks needed by all Subscription objects, to deliver config updates.
    *                  The callbacks must not result in the deletion of the Subscription object.
+   * @param cluster_index used to specify index of management server.
    * @return SubscriptionPtr subscription object corresponding for config and type_url.
    */
   virtual SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3alpha::ConfigSource& config,
                                absl::string_view type_url, Stats::Scope& scope,
-                               SubscriptionCallbacks& callbacks) PURE;
+                               SubscriptionCallbacks& callbacks, size_t cluster_index = 0) PURE;
 };
 
 } // namespace Config

@@ -66,6 +66,7 @@ protected:
                resource)
         .name();
   }
+  void updateCluster() override;
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
 private:
@@ -84,6 +85,7 @@ private:
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;
   SecretData secret_data_;
+  size_t cluster_index_ = 0;
 };
 
 class TlsCertificateSdsApi;

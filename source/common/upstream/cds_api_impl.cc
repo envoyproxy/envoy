@@ -31,10 +31,17 @@ CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3alpha::ConfigSource& c
 CdsApiImpl::CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_config,
                        ClusterManager& cm, Stats::Scope& scope,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
-    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
+    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")), cds_config_(cds_config),
       validation_visitor_(validation_visitor) {
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, loadTypeUrl(cds_config.resource_api_version()), *scope_, *this);
+      cds_config, loadTypeUrl(cds_config.resource_api_version()), *scope_, *this, cluster_index_);
+}
+
+void CdsApiImpl::updateCluster() {
+  ++cluster_index_;
+  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+      cds_config_, loadTypeUrl(cds_config_.resource_api_version()), *scope_, *this, cluster_index_);
+  subscription_->start();
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
