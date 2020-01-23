@@ -20,6 +20,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -812,6 +813,30 @@ TEST(NoRuntime, DefaultIntValues) {
   EXPECT_EQ(0x1230000ABCDULL,
             getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL));
   EXPECT_EQ(0, getInteger("envoy.reloadable_features.test_int_feature_zero", 0));
+}
+
+TEST_F(DiskLoaderImplTest, DeprecatedFeatureEnabled) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Setting removed deprecated feature "
+      "envoy.reloadable_features.buffer_filter_populate_content_length to true.",
+      loader_->mergeValues(
+          {{"envoy.reloadable_features.buffer_filter_populate_content_length", "true"}}));
+}
+
+TEST_F(DiskLoaderImplTest, DeprecatedFeatureDisabled) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_LOG_CONTAINS(
+      "error",
+      "Setting removed deprecated feature "
+      "envoy.reloadable_features.buffer_filter_populate_content_length to false.",
+      loader_->mergeValues(
+          {{"envoy.reloadable_features.buffer_filter_populate_content_length", "false"}}));
 }
 
 // Test RTDS layer(s).

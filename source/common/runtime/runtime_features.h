@@ -21,12 +21,16 @@ public:
   bool existsButDisabled(absl::string_view feature) const {
     return disabled_features_.find(feature) != disabled_features_.end();
   }
+  bool existedButRemoved(absl::string_view feature) const {
+    return removed_features_.find(feature) != removed_features_.end();
+  }
 
 private:
   friend class RuntimeFeaturesPeer;
 
   absl::flat_hash_set<std::string> enabled_features_;
   absl::flat_hash_set<std::string> disabled_features_;
+  absl::flat_hash_set<std::string> removed_features_;
 };
 
 using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
