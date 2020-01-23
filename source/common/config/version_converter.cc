@@ -170,7 +170,8 @@ DynamicMessagePtr VersionConverter::recoverOriginal(const Protobuf::Message& upg
 }
 
 DynamicMessagePtr VersionConverter::downgrade(const Protobuf::Message& message) {
-  const Protobuf::Descriptor* prev_desc = ApiTypeOracle::getEarlierVersionDescriptor(message);
+  const Protobuf::Descriptor* prev_desc =
+      ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   return createForDescriptorWithCast(message, prev_desc);
 }
 

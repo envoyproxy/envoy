@@ -137,7 +137,7 @@ public:
 // vN/v(N+1) mechanical transforms.
 void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   const Protobuf::Descriptor* earlier_version_desc =
-      Config::ApiTypeOracle::getEarlierVersionDescriptor(message);
+      Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   // If there is no earlier version of a message, just apply f directly.
   if (earlier_version_desc == nullptr) {
     f(message, MessageVersion::LATEST_VERSION);
@@ -528,7 +528,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
       TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
   if (any_full_name != message.GetDescriptor()->full_name()) {
     const Protobuf::Descriptor* earlier_version_desc =
-        Config::ApiTypeOracle::getEarlierVersionDescriptor(message);
+        Config::ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
     // If the earlier version matches, unpack and upgrade.
     if (earlier_version_desc != nullptr && any_full_name == earlier_version_desc->full_name()) {
       Protobuf::DynamicMessageFactory dmf;
@@ -588,47 +588,8 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std:
   return struct_obj;
 }
 
-// TODO(alyssawilk) see if we can get proto's CodeEnumToString made accessible
-// to avoid copying it. Otherwise change this to absl::string_view.
 std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
-  switch (code) {
-  case ProtobufUtil::error::OK:
-    return "OK";
-  case ProtobufUtil::error::CANCELLED:
-    return "CANCELLED";
-  case ProtobufUtil::error::UNKNOWN:
-    return "UNKNOWN";
-  case ProtobufUtil::error::INVALID_ARGUMENT:
-    return "INVALID_ARGUMENT";
-  case ProtobufUtil::error::DEADLINE_EXCEEDED:
-    return "DEADLINE_EXCEEDED";
-  case ProtobufUtil::error::NOT_FOUND:
-    return "NOT_FOUND";
-  case ProtobufUtil::error::ALREADY_EXISTS:
-    return "ALREADY_EXISTS";
-  case ProtobufUtil::error::PERMISSION_DENIED:
-    return "PERMISSION_DENIED";
-  case ProtobufUtil::error::UNAUTHENTICATED:
-    return "UNAUTHENTICATED";
-  case ProtobufUtil::error::RESOURCE_EXHAUSTED:
-    return "RESOURCE_EXHAUSTED";
-  case ProtobufUtil::error::FAILED_PRECONDITION:
-    return "FAILED_PRECONDITION";
-  case ProtobufUtil::error::ABORTED:
-    return "ABORTED";
-  case ProtobufUtil::error::OUT_OF_RANGE:
-    return "OUT_OF_RANGE";
-  case ProtobufUtil::error::UNIMPLEMENTED:
-    return "UNIMPLEMENTED";
-  case ProtobufUtil::error::INTERNAL:
-    return "INTERNAL";
-  case ProtobufUtil::error::UNAVAILABLE:
-    return "UNAVAILABLE";
-  case ProtobufUtil::error::DATA_LOSS:
-    return "DATA_LOSS";
-  default:
-    return "";
-  }
+  return ProtobufUtil::Status(code, "").ToString();
 }
 
 namespace {
