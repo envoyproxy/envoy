@@ -26,9 +26,9 @@ configure and code each application independently. Envoy supports various types 
   waiting for a ready connection pool connection. Requests are added to the list
   of pending requests whenever there aren't enough upstream connections available to immediately dispatch
   the request. For HTTP/2 connections, if :ref:`max concurrent streams <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>`
-  is not configured, all requests will be multiplexed over the same connection so this circuit breaker
-  will only be hit when no connection is already established.
-  If this circuit breaker overflows the
+  and :ref:`max requests per connection <envoy_api_field_Cluster.max_requests_per_connection>` are not
+  configured, all requests will be multiplexed over the same connection so this circuit breaker
+  will only be hit when no connection is already established. If this circuit breaker overflows the
   :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
   increment.
 * **Cluster maximum requests**: The maximum number of requests that can be outstanding to all hosts
