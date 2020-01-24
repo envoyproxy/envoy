@@ -30,7 +30,7 @@ void FilesystemSubscriptionImpl::start(const std::set<std::string>&) {
 }
 
 void FilesystemSubscriptionImpl::updateResourceInterest(const std::set<std::string>&) {
-  // Bump stats for consistence behavior with other xDS.
+  // Bump stats for consistent behavior with other xDS.
   stats_.update_attempt_.inc();
 }
 

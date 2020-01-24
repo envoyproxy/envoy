@@ -13,8 +13,8 @@ overview of the options currently available.
 
 * Top level configuration :ref:`reference <config>`.
 * :ref:`Reference configurations <install_ref_configs>`.
-* Envoy :ref:`v2 API overview <config_overview_v2>`.
-* :ref:`xDS API endpoints <config_overview_v2_management_server>`.
+* Envoy :ref:`v2 API overview <config_overview>`.
+* :ref:`xDS API endpoints <config_overview_management_server>`.
 
 Fully static
 ------------
@@ -118,7 +118,7 @@ EDS, CDS, etc. are each separate services, with different REST/gRPC service name
 StreamListeners, StreamSecrets. For users looking to enforce the order in which resources of
 different types reach Envoy, there is aggregated xDS, a single gRPC service that carries all
 resource types in a single gRPC stream. (ADS is only supported by gRPC).
-:ref:`More details about ADS <config_overview_v2_ads>`.
+:ref:`More details about ADS <config_overview_ads>`.
 
 .. _arch_overview_dynamic_config_delta:
 
@@ -129,4 +129,4 @@ Standard xDS is "state-of-the-world": every update must contain every resource, 
 a resource from an update implying that the resource is gone. Envoy supports a "delta" variant of
 xDS (including ADS), where updates only contain resources added/changed/removed. Delta xDS is a
 new protocol, with request/response APIs different from SotW.
-:ref:`More details about delta <config_overview_v2_delta>`.
+:ref:`More details about delta <config_overview_delta>`.

@@ -16,12 +16,12 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
@@ -500,7 +500,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::I
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
   const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
   return writeToSocket(handle, slices.begin(), num_slices, local_ip, peer_address);
 }

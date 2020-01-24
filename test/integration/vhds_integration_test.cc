@@ -70,7 +70,7 @@ static_resources:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-          - name: envoy.on_demand
+          - name: envoy.filters.http.on_demand
           - name: envoy.router
           codec_type: HTTP2
           rds:

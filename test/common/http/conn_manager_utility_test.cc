@@ -35,7 +35,7 @@ namespace Http {
 
 class MockInternalAddressConfig : public Http::InternalAddressConfig {
 public:
-  MOCK_CONST_METHOD1(isInternalAddress, bool(const Network::Address::Instance&));
+  MOCK_METHOD(bool, isInternalAddress, (const Network::Address::Instance&), (const));
 };
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
@@ -52,48 +52,48 @@ public:
     return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
   }
 
-  MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstanceSharedPtr>&());
-  MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
-                                               ServerConnectionCallbacks&));
-  MOCK_METHOD0(dateProvider, DateProvider&());
-  MOCK_CONST_METHOD0(drainTimeout, std::chrono::milliseconds());
-  MOCK_METHOD0(filterFactory, FilterChainFactory&());
-  MOCK_CONST_METHOD0(generateRequestId, bool());
-  MOCK_CONST_METHOD0(preserveExternalRequestId, bool());
-  MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
-  MOCK_CONST_METHOD0(maxRequestHeadersCount, uint32_t());
-  MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
-  MOCK_CONST_METHOD0(isRoutable, bool());
-  MOCK_CONST_METHOD0(maxConnectionDuration, absl::optional<std::chrono::milliseconds>());
-  MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
-  MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider*());
-  MOCK_METHOD0(scopedRouteConfigProvider, Config::ConfigProvider*());
-  MOCK_CONST_METHOD0(serverName, const std::string&());
-  MOCK_CONST_METHOD0(serverHeaderTransformation,
-                     HttpConnectionManagerProto::ServerHeaderTransformation());
-  MOCK_METHOD0(stats, ConnectionManagerStats&());
-  MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
-  MOCK_CONST_METHOD0(useRemoteAddress, bool());
+  MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
+  MOCK_METHOD(ServerConnection*, createCodec_,
+              (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));
+  MOCK_METHOD(DateProvider&, dateProvider, ());
+  MOCK_METHOD(std::chrono::milliseconds, drainTimeout, (), (const));
+  MOCK_METHOD(FilterChainFactory&, filterFactory, ());
+  MOCK_METHOD(bool, generateRequestId, (), (const));
+  MOCK_METHOD(bool, preserveExternalRequestId, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(bool, isRoutable, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, requestTimeout, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
+  MOCK_METHOD(Router::RouteConfigProvider*, routeConfigProvider, ());
+  MOCK_METHOD(Config::ConfigProvider*, scopedRouteConfigProvider, ());
+  MOCK_METHOD(const std::string&, serverName, (), (const));
+  MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
+              (), (const));
+  MOCK_METHOD(ConnectionManagerStats&, stats, ());
+  MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
+  MOCK_METHOD(bool, useRemoteAddress, (), (const));
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return *internal_address_config_;
   }
-  MOCK_METHOD0(unixSocketInternal, bool());
-  MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
-  MOCK_CONST_METHOD0(skipXffAppend, bool());
-  MOCK_CONST_METHOD0(via, const std::string&());
-  MOCK_CONST_METHOD0(forwardClientCert, Http::ForwardClientCertType());
-  MOCK_CONST_METHOD0(setCurrentClientCertDetails,
-                     const std::vector<Http::ClientCertDetailsType>&());
-  MOCK_METHOD0(localAddress, const Network::Address::Instance&());
-  MOCK_METHOD0(userAgent, const absl::optional<std::string>&());
-  MOCK_METHOD0(tracingConfig, const Http::TracingConnectionManagerConfig*());
-  MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
-  MOCK_CONST_METHOD0(proxy100Continue, bool());
-  MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
-  MOCK_CONST_METHOD0(shouldNormalizePath, bool());
-  MOCK_CONST_METHOD0(shouldMergeSlashes, bool());
+  MOCK_METHOD(bool, unixSocketInternal, ());
+  MOCK_METHOD(uint32_t, xffNumTrustedHops, (), (const));
+  MOCK_METHOD(bool, skipXffAppend, (), (const));
+  MOCK_METHOD(const std::string&, via, (), (const));
+  MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, (), (const));
+  MOCK_METHOD(const std::vector<Http::ClientCertDetailsType>&, setCurrentClientCertDetails, (),
+              (const));
+  MOCK_METHOD(const Network::Address::Instance&, localAddress, ());
+  MOCK_METHOD(const absl::optional<std::string>&, userAgent, ());
+  MOCK_METHOD(const Http::TracingConnectionManagerConfig*, tracingConfig, ());
+  MOCK_METHOD(ConnectionManagerListenerStats&, listenerStats, ());
+  MOCK_METHOD(bool, proxy100Continue, (), (const));
+  MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
+  MOCK_METHOD(bool, shouldNormalizePath, (), (const));
+  MOCK_METHOD(bool, shouldMergeSlashes, (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();

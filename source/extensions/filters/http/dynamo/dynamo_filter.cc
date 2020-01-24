@@ -8,7 +8,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/utility.h"
@@ -16,6 +15,8 @@
 
 #include "extensions/filters/http/dynamo/dynamo_request_parser.h"
 #include "extensions/filters/http/dynamo/dynamo_stats.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -137,7 +138,7 @@ std::string DynamoFilter::buildBody(const Buffer::Instance* buffered,
   std::string body;
   if (buffered) {
     uint64_t num_slices = buffered->getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
     buffered->getRawSlices(slices.begin(), num_slices);
     for (const Buffer::RawSlice& slice : slices) {
       body.append(static_cast<const char*>(slice.mem_), slice.len_);
@@ -145,7 +146,7 @@ std::string DynamoFilter::buildBody(const Buffer::Instance* buffered,
   }
 
   uint64_t num_slices = last.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   last.getRawSlices(slices.begin(), num_slices);
   for (const Buffer::RawSlice& slice : slices) {
     body.append(static_cast<const char*>(slice.mem_), slice.len_);
@@ -176,11 +177,16 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
       time_source_.monotonicTime() - start_decode_);
 
   size_t group_index = DynamoStats::groupIndex(status);
+  Stats::StatNameDynamicPool dynamic(stats_->symbolTable());
+
   const Stats::StatName entity_type_name =
       stats_->getBuiltin(entity_type, stats_->unknown_entity_type_);
-  const Stats::StatName entity_name = stats_->getDynamic(entity);
-  const Stats::StatName total_name = stats_->getDynamic(absl::StrCat("upstream_rq_total_", status));
-  const Stats::StatName time_name = stats_->getDynamic(absl::StrCat("upstream_rq_time_", status));
+  const Stats::StatName entity_name = dynamic.add(entity);
+
+  // TODO(jmarantz): Consider using a similar mechanism to common/http/codes.cc
+  // to avoid creating dynamic stat-names for common statuses.
+  const Stats::StatName total_name = dynamic.add(absl::StrCat("upstream_rq_total_", status));
+  const Stats::StatName time_name = dynamic.add(absl::StrCat("upstream_rq_time_", status));
 
   stats_->counter({entity_type_name, entity_name, stats_->upstream_rq_total_}).inc();
   const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
@@ -205,9 +211,8 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   // complete apart of the batch operation. Only the table names will be logged for errors.
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
-    stats_
-        ->counter({stats_->error_, stats_->getDynamic(unprocessed_table),
-                   stats_->batch_failure_unprocessed_keys_})
+    Stats::StatNameDynamicStorage storage(unprocessed_table, stats_->symbolTable());
+    stats_->counter({stats_->error_, storage.statName(), stats_->batch_failure_unprocessed_keys_})
         .inc();
   }
 }
@@ -216,12 +221,13 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
   std::string error_type = RequestParser::parseErrorType(json_body);
 
   if (!error_type.empty()) {
+    Stats::StatNameDynamicPool dynamic(stats_->symbolTable());
     if (table_descriptor_.table_name.empty()) {
-      stats_->counter({stats_->error_, stats_->no_table_, stats_->getDynamic(error_type)}).inc();
+      stats_->counter({stats_->error_, stats_->no_table_, dynamic.add(error_type)}).inc();
     } else {
       stats_
-          ->counter({stats_->error_, stats_->getDynamic(table_descriptor_.table_name),
-                     stats_->getDynamic(error_type)})
+          ->counter(
+              {stats_->error_, dynamic.add(table_descriptor_.table_name), dynamic.add(error_type)})
           .inc();
     }
   } else {

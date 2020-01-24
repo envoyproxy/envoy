@@ -97,7 +97,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
-  NiceMock<MockGrpcMuxCallbacks> callbacks_;
+  NiceMock<MockSubscriptionCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
@@ -204,8 +204,7 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   setup();
 
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> invalid_response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto invalid_response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   InSequence s;
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
 
@@ -214,8 +213,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-        new envoy::service::discovery::v3::DiscoveryResponse());
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url("bar");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
@@ -251,8 +249,7 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-        new envoy::service::discovery::v3::DiscoveryResponse());
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
@@ -278,9 +275,9 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   setup();
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
+  NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
-  NiceMock<MockGrpcMuxCallbacks> bar_callbacks;
+  NiceMock<MockSubscriptionCallbacks> bar_callbacks;
   auto bar_sub = grpc_mux_->subscribe(type_url, {"y", "z"}, bar_callbacks);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Should dedupe the "x" resource.
@@ -288,8 +285,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-        new envoy::service::discovery::v3::DiscoveryResponse());
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("1");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
@@ -311,8 +307,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   }
 
   {
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-        new envoy::service::discovery::v3::DiscoveryResponse());
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_version_info("2");
     envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_x;
@@ -365,15 +360,14 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   setup();
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
+  NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x", "y"}, "", true);
   grpc_mux_->start();
 
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_version_info("1");
 
@@ -388,15 +382,14 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
 TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   setup();
   const std::string& type_url = Config::TypeUrl::get().Cluster;
-  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
+  NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = grpc_mux_->subscribe(type_url, {}, foo_callbacks);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "", true);
   grpc_mux_->start();
 
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_version_info("1");
   // Validate that onConfigUpdate is called with empty resources.
@@ -436,8 +429,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-          new envoy::service::discovery::v3::DiscoveryResponse());
+      auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -489,8 +481,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-          new envoy::service::discovery::v3::DiscoveryResponse());
+      auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -545,8 +536,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-          new envoy::service::discovery::v3::DiscoveryResponse());
+      auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -596,8 +586,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   }
 
   // simulate the server sending empty CLA message to notify envoy that the CLA was removed.
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_nonce("bar");
   response->set_version_info("1");
   response->set_type_url(type_url);
@@ -632,8 +621,7 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
 
   // simulate the server sending CLA message to notify envoy that the CLA was added,
   // even though envoy doesn't expect it. Envoy should reject this update.
-  std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
-      new envoy::service::discovery::v3::DiscoveryResponse());
+  auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   response->set_nonce("bar");
   response->set_version_info("1");
   response->set_type_url(type_url);

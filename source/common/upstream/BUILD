@@ -149,8 +149,6 @@ envoy_cc_library(
         "//source/common/grpc:codec_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/upstream:host_utility_lib",
-        # TODO(dio): Remove dependency to health checkers extension when redis_health_check is removed.
-        "//source/extensions/health_checkers:well_known_names",
     ],
 )
 
@@ -172,7 +170,6 @@ envoy_cc_library(
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:stack_array",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],

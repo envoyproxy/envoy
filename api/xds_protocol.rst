@@ -14,6 +14,41 @@ proto payload. Resources are delivered in a
 proto payload in all methods. We discuss each type of subscription
 below.
 
+Resource Types
+--------------
+
+Every configuration resource in the xDS API has a type associated with it. Resource types follow a
+:repo:`versioning scheme <api/API_VERSIONING.md>`. Resource types are versioned independent of the
+transports described below.
+
+The following v2 xDS resource types are supported:
+
+-  :ref:`envoy.api.v2.Listener <envoy_api_msg_Listener>`
+-  :ref:`envoy.api.v2.RouteConfiguration <envoy_api_msg_RouteConfiguration>`
+-  :ref:`envoy.api.v2.ScopedRouteConfiguration <envoy_api_msg_ScopedRouteConfiguration>`
+-  :ref:`envoy.api.v2.route.VirtualHost <envoy_api_msg_route.VirtualHost>`
+-  :ref:`envoy.api.v2.Cluster <envoy_api_msg_Cluster>`
+-  :ref:`envoy.api.v2.ClusterLoadAssignment <envoy_api_msg_ClusterLoadAssignment>`
+-  :ref:`envoy.api.v2.Auth.Secret <envoy_api_msg_Auth.Secret>`
+-  :ref:`envoy.service.discovery.v2.Runtime <envoy_api_msg_service.discovery.v2.Runtime>`
+
+The following v3 xdS resource types are supported:
+
+-  :ref:`envoy.config.listener.v3.Listener <envoy_v3_api_msg_config.listener.v3.Listener>`
+-  :ref:`envoy.config.route.v3.RouteConfiguration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
+-  :ref:`envoy.config.route.v3.ScopedRouteConfiguration <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>`
+-  :ref:`envoy.config.route.v3.VirtualHost <envoy_v3_api_msg_config.route.v3.VirtualHost>`
+-  :ref:`envoy.config.cluster.v3.Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
+-  :ref:`envoy.config.endpoint.v3.ClusterLoadAssignment <envoy_v3_api_msg_config.endpoint.v3.ClusterLoadAssignment>`
+-  :ref:`envoy.extensions.transport_sockets.tls.v3.Secret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.Secret>`
+-  :ref:`envoy.service.runtime.v3.Runtime <envoy_v3_api_msg_service.runtime.v3.Runtime>`
+
+The concept of `type URLs <https://developers.google.com/protocol-buffers/docs/proto3#any>`_
+appears below, and takes the form `type.googleapis.com/<resource type>` -- e.g.,
+`type.googleapis.com/envoy.api.v2.Cluster` for a `Cluster` resource. In various requests from
+Envoy and responses by the management server, the resource type URL is stated.
+
+
 Filesystem subscriptions
 ------------------------
 
@@ -35,26 +70,6 @@ occurs.
 
 Streaming gRPC subscriptions
 ----------------------------
-
-Resource Types
-~~~~~~~~~~~~~~
-
-Every configuration resource in the xDS API has a type associated with it. The following types are
-supported:
-
--  :ref:`envoy.api.v2.Listener <envoy_api_msg_Listener>`
--  :ref:`envoy.api.v2.RouteConfiguration <envoy_api_msg_RouteConfiguration>`
--  :ref:`envoy.api.v2.ScopedRouteConfiguration <envoy_api_msg_ScopedRouteConfiguration>`
--  :ref:`envoy.api.v2.route.VirtualHost <envoy_api_msg_route.VirtualHost>`
--  :ref:`envoy.api.v2.Cluster <envoy_api_msg_Cluster>`
--  :ref:`envoy.api.v2.ClusterLoadAssignment <envoy_api_msg_ClusterLoadAssignment>`
--  :ref:`envoy.api.v2.Auth.Secret <envoy_api_msg_Auth.Secret>`
--  :ref:`envoy.service.discovery.v2.Runtime <envoy_api_msg_service.discovery.v2.Runtime>`
-
-The concept of `type URLs <https://developers.google.com/protocol-buffers/docs/proto3#any>`_
-appears below, and takes the form `type.googleapis.com/<resource type>` -- e.g.,
-`type.googleapis.com/envoy.api.v2.Cluster` for a `Cluster` resource. In various requests from
-Envoy and responses by the management server, the resource type URL is stated.
 
 API flow
 ~~~~~~~~
@@ -202,16 +217,30 @@ the ADS server, which will be used for all resources. The :ref:`ConfigSource
 :ref:`Cluster <envoy_api_msg_Cluster>` resources must contain :ref:`AggregatedConfigSource
 <envoy_api_msg_core.AggregatedConfigSource>` messages.
 
-The xDS Protocol
-~~~~~~~~~~~~~~~~
+The xDS transport Protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-ACK/NACK and versioning
-^^^^^^^^^^^^^^^^^^^^^^^
+Transport API version
+^^^^^^^^^^^^^^^^^^^^^
+
+In addition the resource type version described above, the xDS wire protocol has a
+transport version associated with it. This provides type versioning for messages such as
+:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` and :ref:`DiscoveryResponse
+<envoy_api_msg_DiscoveryResponse>`.
+
+ACK/NACK and resource instance versioning
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Each xDS stream begins with a
 :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` from the client, specifying
 the list of resources to subscribe to, the type URL corresponding to the
 subscribed resources, the node identifier and an empty :ref:`version_info <envoy_api_field_DiscoveryRequest.version_info>`.
+
+In addition to resource and transport type versioning schemes above, which operate at the type
+level, Envoy has a resource instance version. Unlike the resource/transport types, this is not a
+property of the API but is instead a reflection of the specific revision of a named resource
+delivered over xDS.
+
 An example EDS request might be:
 
 .. code:: yaml

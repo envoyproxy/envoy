@@ -558,15 +558,12 @@ message Cluster {
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` clusters.
-  // This field supersedes :ref:`hosts<envoy_api_field_Cluster.hosts>` field.
-  // [#comment:TODO(dio): Deprecate the hosts field and add it to :ref:`deprecated log<deprecated>`
-  // once load_assignment is implemented.]
+  // This field supersedes the *hosts* field in the v2 API.
   //
   // .. attention::
   //
   //   Setting this allows non-EDS cluster types to contain embedded EDS equivalent
   //   :ref:`endpoint assignments<envoy_api_msg_ClusterLoadAssignment>`.
-  //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
   //
   ClusterLoadAssignment load_assignment = 33;
 
