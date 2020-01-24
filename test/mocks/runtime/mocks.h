@@ -18,8 +18,8 @@ public:
   MockRandomGenerator();
   ~MockRandomGenerator() override;
 
-  MOCK_METHOD0(random, uint64_t());
-  MOCK_METHOD0(uuid, std::string());
+  MOCK_METHOD(uint64_t, random, ());
+  MOCK_METHOD(std::string, uuid, ());
 
   const std::string uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
 };
@@ -41,24 +41,29 @@ public:
     }
   }
 
-  MOCK_CONST_METHOD2(deprecatedFeatureEnabled, bool(const std::string& key, bool default_value));
-  MOCK_CONST_METHOD1(runtimeFeatureEnabled, bool(absl::string_view key));
-  MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key, uint64_t default_value));
-  MOCK_CONST_METHOD3(featureEnabled,
-                     bool(const std::string& key, uint64_t default_value, uint64_t random_value));
-  MOCK_CONST_METHOD4(featureEnabled, bool(const std::string& key, uint64_t default_value,
-                                          uint64_t random_value, uint64_t num_buckets));
-  MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key,
-                                          const envoy::type::v3::FractionalPercent& default_value));
-  MOCK_CONST_METHOD3(featureEnabled, bool(const std::string& key,
-                                          const envoy::type::v3::FractionalPercent& default_value,
-                                          uint64_t random_value));
-  MOCK_CONST_METHOD1(get, const std::string&(const std::string& key));
-  MOCK_CONST_METHOD1(exists, bool(const std::string& key));
-  MOCK_CONST_METHOD2(getInteger, uint64_t(const std::string& key, uint64_t default_value));
-  MOCK_CONST_METHOD2(getDouble, double(const std::string& key, double default_value));
-  MOCK_CONST_METHOD2(getBoolean, bool(absl::string_view key, bool default_value));
-  MOCK_CONST_METHOD0(getLayers, const std::vector<OverrideLayerConstPtr>&());
+  MOCK_METHOD(bool, deprecatedFeatureEnabled, (const std::string& key, bool default_enabled),
+              (const));
+  MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
+  MOCK_METHOD(bool, featureEnabled, (const std::string& key, uint64_t default_value), (const));
+  MOCK_METHOD(bool, featureEnabled,
+              (const std::string& key, uint64_t default_value, uint64_t random_value), (const));
+  MOCK_METHOD(bool, featureEnabled,
+              (const std::string& key, uint64_t default_value, uint64_t random_value,
+               uint64_t num_buckets),
+              (const));
+  MOCK_METHOD(bool, featureEnabled,
+              (const std::string& key, const envoy::type::v3::FractionalPercent& default_value),
+              (const));
+  MOCK_METHOD(bool, featureEnabled,
+              (const std::string& key, const envoy::type::v3::FractionalPercent& default_value,
+               uint64_t random_value),
+              (const));
+  MOCK_METHOD(const std::string&, get, (const std::string& key), (const));
+  MOCK_METHOD(bool, exists, (const std::string& key), (const));
+  MOCK_METHOD(uint64_t, getInteger, (const std::string& key, uint64_t default_value), (const));
+  MOCK_METHOD(double, getDouble, (const std::string& key, double default_value), (const));
+  MOCK_METHOD(bool, getBoolean, (absl::string_view key, bool default_value), (const));
+  MOCK_METHOD(const std::vector<OverrideLayerConstPtr>&, getLayers, (), (const));
 };
 
 class MockLoader : public Loader {
@@ -66,10 +71,10 @@ public:
   MockLoader();
   ~MockLoader() override;
 
-  MOCK_METHOD1(initialize, void(Upstream::ClusterManager& cm));
-  MOCK_METHOD0(snapshot, const Snapshot&());
-  MOCK_METHOD0(threadsafeSnapshot, std::shared_ptr<const Snapshot>());
-  MOCK_METHOD1(mergeValues, void(const std::unordered_map<std::string, std::string>&));
+  MOCK_METHOD(void, initialize, (Upstream::ClusterManager & cm));
+  MOCK_METHOD(const Snapshot&, snapshot, ());
+  MOCK_METHOD(std::shared_ptr<const Snapshot>, threadsafeSnapshot, ());
+  MOCK_METHOD(void, mergeValues, ((const std::unordered_map<std::string, std::string>&)));
 
   testing::NiceMock<MockSnapshot> snapshot_;
 };
@@ -79,8 +84,8 @@ public:
   MockOverrideLayer();
   ~MockOverrideLayer() override;
 
-  MOCK_CONST_METHOD0(name, const std::string&());
-  MOCK_CONST_METHOD0(values, const Snapshot::EntryMap&());
+  MOCK_METHOD(const std::string&, name, (), (const));
+  MOCK_METHOD(const Snapshot::EntryMap&, values, (), (const));
 };
 
 } // namespace Runtime

@@ -17,6 +17,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/process_context.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -119,6 +120,11 @@ public:
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
   virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+
+  /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.
