@@ -31,12 +31,12 @@
  * proxy_get_configuration during the lifetime of this call.
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
-enum class OnVmStartResult : uint32_t {
+enum class WasmOnVmStartResult : uint32_t {
   Ok = 0,
   BadConfiguration = 1,
 };
-extern "C" OnVmStartResult proxy_on_vm_start(uint32_t root_context_id,
-                                             uint32_t vm_configuration_size);
+extern "C" WasmOnVmStartResult proxy_on_vm_start(uint32_t root_context_id,
+                                                 uint32_t vm_configuration_size);
 
 /**
  * Can be called to validate a configuration (e.g. from bootstrap or xDS) both before
@@ -47,12 +47,12 @@ extern "C" OnVmStartResult proxy_on_vm_start(uint32_t root_context_id,
  * proxy_get_configuration().
  * @return non-zero on success and zero on failure (i.e. bad configuration).
  */
-enum class OnValidateConfigurationResult : uint32_t {
+enum class WasmOnValidateConfigurationResult : uint32_t {
   Ok = 0,
   BadConfiguration = 1,
 };
-extern "C" OnValidateConfigurationResult proxy_validate_configuration(uint32_t root_context_id,
-                                                                      uint32_t configuration_size);
+extern "C" WasmOnValidateConfigurationResult
+proxy_validate_configuration(uint32_t root_context_id, uint32_t configuration_size);
 /**
  * Called when a plugin loads or when plugin configuration changes dynamically.
  * @param root_context_id is an identifier for one or more related plugins.
@@ -60,11 +60,11 @@ extern "C" OnValidateConfigurationResult proxy_validate_configuration(uint32_t r
  * proxy_get_configuration().
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
-enum class OnConfigureResult : uint32_t {
+enum class WasmOnConfigureResult : uint32_t {
   Ok = 0,
   BadConfiguration = 1,
 }
-extern "C" OnConfigureResult proxy_on_configure(uint32_t root_context_id,
+extern "C" WasmOnConfigureResult proxy_on_configure(uint32_t root_context_id,
                                                 uint32_t plugin_configuration_size);
 
 // Stream calls.
@@ -88,11 +88,11 @@ extern "C" void proxy_on_context_create(uint32_t context_id, uint32_t root_conte
  * Root contexts may return zero to defer the VM shutdown and the proxy_on_delete call until after a
  * future proxy_done() call by the root context.
  */
-enum class OnDoneResult : uint32_t {
+enum class WasmOnDoneResult : uint32_t {
   Done = 0,
   NotDone = 1,
 }
-extern "C" OnDoneResult proxy_on_done(uint32_t context_id);
+extern "C" WasmOnDoneResult proxy_on_done(uint32_t context_id);
 
 /**
  * Called when the context is being deleted and will no longer receive any more calls.
@@ -137,10 +137,10 @@ extern "C" WasmResult proxy_get_configuration((uint32_t start, uint32_t length,
  * terminated.
  * @return a WasmResult: OK, InvalidMemoryAccess.
  */
-enum class LogLevel : uint32_t {
+enum class WasmLogLevel : uint32_t {
   Trace = 0, Debug = 1, Info = 2, Warning = 3, Error = 4, Critical = 5,
 }
-extern "C" WasmResult proxy_log(LogLevel level, const char* log_message, size_t log_message_size);
+extern "C" WasmResult proxy_log(WasmLogLevel level, const char* log_message, size_t log_message_size);
 
 // System
 
