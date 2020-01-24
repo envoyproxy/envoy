@@ -37,11 +37,11 @@ bool CacheFilter::isCacheableResponse(Http::HeaderMap& headers) {
 }
 
 HttpCache&
-CacheFilter::getCache(const envoy::config::filter::http::cache::v3::CacheConfig& config) {
+CacheFilter::getCache(const envoy::config::filter::http::cache::v2::CacheConfig& config) {
   return Config::Utility::getAndCheckFactory<HttpCacheFactory>(config).getCache(config);
 }
 
-CacheFilter::CacheFilter(const envoy::config::filter::http::cache::v3::CacheConfig& config,
+CacheFilter::CacheFilter(const envoy::config::filter::http::cache::v2::CacheConfig& config,
                          const std::string&, Stats::Scope&, TimeSource& time_source)
     : time_source_(time_source), cache_(getCache(config)) {}
 

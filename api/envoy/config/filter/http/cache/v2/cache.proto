@@ -1,16 +1,14 @@
 syntax = "proto3";
 
-package envoy.config.filter.http.cache.v3;
+package envoy.config.filter.http.cache.v2;
 
 import "envoy/api/v2/route/route_components.proto";
 import "envoy/type/matcher/string.proto";
 
-import "google/protobuf/any.proto";
-
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v3";
+option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v2";
 option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.cache.v3";
@@ -19,7 +17,6 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filte
 // HTTP Cache Filter :ref:`overview <config_http_filters_cache>`.
 // [#extension: envoy.filters.http.cache]
 
-// [#next-free-field: 6]
 message CacheConfig {
   // [#not-implemented-hide:]
   // Modifies cache key creation by restricting which parts of the URL are included.
