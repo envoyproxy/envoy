@@ -1,7 +1,7 @@
 .. _factory_categories:
 
-Registered Factory Categories
-=============================
+Factory Categories
+==================
 
 Envoy comes with a variety of extensions that add or provide alternative implementation of Envoy's
 subsystems. The list of available extensions is configurable at the build time. Extensions are 
