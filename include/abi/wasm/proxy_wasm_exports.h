@@ -99,4 +99,3 @@ extern "C" WasmOnDoneResult proxy_on_done(uint32_t context_id);
  * @param context_id is an identifier the context.
  */
 extern "C" void proxy_on_delete(uint32_t context_id);
-
