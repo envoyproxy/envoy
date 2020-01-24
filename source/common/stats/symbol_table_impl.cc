@@ -40,6 +40,9 @@ uint64_t StatName::dataSize() const {
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
+  // TODO(jmarantz): capture this functionality (always prints regardless of
+  // loglevel) in an ENVOY_LOG macro variant or similar, perhaps
+  // ENVOY_LOG_MISC(stderr, ...);
   if (size_and_data_ == nullptr) {
     std::cerr << "Null StatName" << std::endl;
   } else {
