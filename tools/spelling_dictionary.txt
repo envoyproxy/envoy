@@ -669,6 +669,7 @@ lenenc
 lexically
 libc
 libevent
+libprotobuf
 libtool
 libstdc
 libtooling
