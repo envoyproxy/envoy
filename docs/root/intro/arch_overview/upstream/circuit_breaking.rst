@@ -5,7 +5,7 @@ Circuit breaking
 
 .. attention::
 
-  Circuit breaking behavior changed in version 1.14. If the previous behavior (documented `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`
+  Circuit breaking behavior changed in version 1.14. If the previous behavior (documented `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_
   is needed, disable runtime feature "envoy.reloadable_features.new_http1_connection_pool_behavior" or
   "envoy.reloadable_features.new_http2_connection_pool_behavior" and then re-configure your clusters or
   restart Envoy. Note that the old behavior is deprecated and will be removed according to the deprecation
