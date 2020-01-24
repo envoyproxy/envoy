@@ -15,10 +15,6 @@ static_resources:
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: kafka_tcp
           cluster: localkafka
-          access_log:
-          - name: envoy.file_access_log
-            config:
-              path: /dev/stdout
   clusters:
   - name: localkafka
     connect_timeout: 1s
