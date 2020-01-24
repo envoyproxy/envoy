@@ -1,21 +1,11 @@
 #pragma once
 
-#include <cstdint>
-#include <list>
-#include <memory>
-
-#include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
-#include "envoy/http/conn_pool.h"
-#include "envoy/network/connection.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/linked_object.h"
 #include "common/http/codec_wrappers.h"
 #include "common/http/conn_pool_base.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {

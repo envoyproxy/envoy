@@ -1,15 +1,10 @@
 #pragma once
 
 #include <cstdint>
-#include <list>
-#include <memory>
 
-#include "envoy/event/timer.h"
-#include "envoy/http/conn_pool.h"
-#include "envoy/network/connection.h"
-#include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/http/codec_client.h"
 #include "common/http/conn_pool_base.h"
 
 namespace Envoy {

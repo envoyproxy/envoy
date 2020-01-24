@@ -82,15 +82,9 @@ envoy_cc_library(
     deps = [
         ":conn_pool_legacy_lib",
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/stats:timespan_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/http:codec_client_lib",
         "//source/common/http:conn_pool_base_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:upstream_lib",
     ],
 )
 

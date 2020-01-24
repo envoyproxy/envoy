@@ -10,12 +10,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/utility.h"
 #include "common/http/codec_client.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/http1/conn_pool_legacy.h"
-#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/match.h"
