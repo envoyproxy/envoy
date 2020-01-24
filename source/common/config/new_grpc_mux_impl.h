@@ -58,7 +58,7 @@ public:
 
   // TODO(fredlas) remove these two from the GrpcMux interface.
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override;
+                            SubscriptionCallbacks&) override;
   void start() override;
 
   struct SubscriptionStuff {

@@ -124,6 +124,11 @@ FilterChainFactoryContextImpl::getServerFactoryContext() const {
   return parent_context_.getServerFactoryContext();
 }
 
+Configuration::TransportSocketFactoryContext&
+FilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
+  return parent_context_.getTransportSocketFactoryContext();
+}
+
 Stats::Scope& FilterChainFactoryContextImpl::listenerScope() {
   return parent_context_.listenerScope();
 }
@@ -612,6 +617,10 @@ ServerLifecycleNotifier& FactoryContextImpl::lifecycleNotifier() {
 OptProcessContextRef FactoryContextImpl::processContext() { return server_.processContext(); }
 Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
+}
+Configuration::TransportSocketFactoryContext&
+FactoryContextImpl::getTransportSocketFactoryContext() const {
+  return server_.transportSocketFactoryContext();
 }
 const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
   return config_.metadata();

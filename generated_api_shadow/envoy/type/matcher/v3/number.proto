@@ -12,7 +12,7 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "NumberProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: NumberMatcher]
+// [#protodoc-title: Number matcher]
 
 // Specifies the way to match a double value.
 message DoubleMatcher {
