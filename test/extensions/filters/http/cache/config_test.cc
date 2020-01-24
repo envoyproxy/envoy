@@ -14,14 +14,14 @@ namespace {
 
 class CacheFilterFactoryTest : public ::testing::Test {
 protected:
-  envoy::config::filter::http::cache::v3::CacheConfig config_;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   CacheFilterFactory factory_;
   Http::MockFilterChainFactoryCallbacks filter_callback_;
 };
 
 TEST_F(CacheFilterFactoryTest, Basic) {
-  config_.set_name("envoy.extensions.http.cache.simple");
+  config_.set_name("envoy.extensions.filters.http.cache.simple");
   Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
   Http::StreamFilterSharedPtr filter;
   EXPECT_CALL(filter_callback_, addStreamFilter(_)).WillOnce(::testing::SaveArg<0>(&filter));

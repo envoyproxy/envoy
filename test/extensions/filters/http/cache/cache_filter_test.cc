@@ -14,7 +14,7 @@ namespace {
 
 class CacheFilterTest : public ::testing::Test {
 protected:
-  envoy::config::filter::http::cache::v3::CacheConfig config_;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
@@ -43,7 +43,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
   // Create filter for request 1
-  config_.set_name("envoy.extensions.http.cache.simple");
+  config_.set_name("envoy.extensions.filters.http.cache.simple");
   CacheFilterSharedPtr filter = makeFilter();
   ASSERT_TRUE(filter);
 
@@ -78,7 +78,7 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
   // Create filter for request 1
-  config_.set_name("envoy.extensions.http.cache.simple");
+  config_.set_name("envoy.extensions.filters.http.cache.simple");
   CacheFilterSharedPtr filter = makeFilter();
   ASSERT_TRUE(filter);
 

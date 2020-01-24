@@ -28,8 +28,8 @@ public:
   const std::string default_config{R"EOF(
     name: envoy.filters.http.cache
     typed_config:
-        "@type": type.googleapis.com/envoy.config.filter.http.cache.v3.CacheConfig
-        name: envoy.extensions.http.cache.simple
+        "@type": type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig
+        name: envoy.extensions.filters.http.cache.simple
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
 };
