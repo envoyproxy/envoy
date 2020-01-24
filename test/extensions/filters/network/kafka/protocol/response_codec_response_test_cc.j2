@@ -62,6 +62,7 @@ TEST_F(ResponseCodecResponseTest, shouldHandle{{ message_type.name }}Messages) {
   // then
   const std::vector<AbstractResponseSharedPtr>& received = callback->getCapturedMessages();
   ASSERT_EQ(received.size(), sent.size());
+  ASSERT_EQ(received.size(), correlation_id);
 
   for (size_t i = 0; i < received.size(); ++i) {
     const std::shared_ptr<ResponseUnderTest> response =

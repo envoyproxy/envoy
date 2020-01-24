@@ -64,6 +64,7 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ message_type.name }}Messages) {
   // then
   const std::vector<AbstractRequestSharedPtr>& received = callback->getCapturedMessages();
   ASSERT_EQ(received.size(), sent.size());
+  ASSERT_EQ(received.size(), correlation);
 
   for (size_t i = 0; i < received.size(); ++i) {
     const std::shared_ptr<RequestUnderTest> request =

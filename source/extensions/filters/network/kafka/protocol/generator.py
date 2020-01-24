@@ -140,7 +140,16 @@ class StatefulProcessor:
     named fields, compared to sub-structures in a message.
     """
     self.currently_processed_message_type = spec['name']
+
+    # Figure out all versions of this message type.
     versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
+
+    # Figure out the flexible versions.
+    flexible_versions_string = spec.get('flexibleVersions', 'none')
+    if 'none' != flexible_versions_string:
+      flexible_versions = Statics.parse_version_string(flexible_versions_string, versions[-1])
+    else:
+      flexible_versions = []
 
     try:
       # In 2.4 some types are declared at top level, and only referenced inside.
@@ -155,7 +164,14 @@ class StatefulProcessor:
                                                    common_struct_versions)
           self.common_structs[parsed_complex.name] = parsed_complex
 
+      # Parse the type itself.
       complex_type = self.parse_complex_type(self.currently_processed_message_type, spec, versions)
+
+      # 2.4 support:
+      # To prevent parsers from breaking, we are going to support ONLY non-flexible versions.
+      # This will be replaced in further commits when proper support for 2.4 is added.
+      complex_type.versions = [x for x in complex_type.versions if x not in flexible_versions]
+
       # Request / response types need to carry api key version.
       result = complex_type.with_extra('api_key', spec['apiKey'])
       return result
