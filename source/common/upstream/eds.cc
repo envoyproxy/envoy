@@ -2,22 +2,23 @@
 
 #include "envoy/api/v2/endpoint.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.validate.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
+#include "common/config/version_converter.h"
 
 namespace Envoy {
 namespace Upstream {
 
 EdsClusterImpl::EdsClusterImpl(
-    const envoy::config::cluster::v3alpha::Cluster& cluster, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
@@ -30,7 +31,7 @@ EdsClusterImpl::EdsClusterImpl(
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   if (eds_config.config_source_specifier_case() ==
-      envoy::config::core::v3alpha::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+      envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
     initialize_phase_ = InitializePhase::Primary;
   } else {
     initialize_phase_ = InitializePhase::Secondary;
@@ -114,13 +115,15 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
     return;
   }
   auto cluster_load_assignment =
-      MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
-          resources[0]);
-  MessageUtil::validate(cluster_load_assignment, validation_visitor_);
+      MessageUtil::anyConvertAndValidate<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          resources[0], validation_visitor_);
   if (cluster_load_assignment.cluster_name() != cluster_name_) {
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }
+  // Scrub original type information; we don't config dump endpoints today and
+  // this is significant memory overhead.
+  Config::VersionConverter::eraseOriginalTypeInformation(cluster_load_assignment);
 
   // Disable timer (if enabled) as we have received new assignment.
   if (assignment_timeout_->enabled()) {
@@ -140,7 +143,7 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
 }
 
 void EdsClusterImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
     const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   if (!validateUpdateSize(resources.size())) {
     return;
@@ -170,7 +173,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // need to instead change the health status to indicate the assignments are
   // stale.
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment resource;
+  envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name(cluster_name_);
   resources.Add()->PackFrom(resource);
   onConfigUpdate(resources, "");
@@ -224,17 +227,16 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
   }
 }
 
-std::string
-EdsClusterImpl::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+std::string EdsClusterImpl::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
   switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2:
+  case envoy::config::core::v3::ApiVersion::AUTO:
+  case envoy::config::core::v3::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
+  case envoy::config::core::v3::ApiVersion::V3:
     return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::config::endpoint::v3alpha::ClusterLoadAssignment().GetDescriptor()->full_name()));
+        envoy::config::endpoint::v3::ClusterLoadAssignment().GetDescriptor()->full_name()));
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -289,8 +291,8 @@ void EdsClusterImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReas
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 EdsClusterFactory::createClusterImpl(
-    const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   if (!cluster.has_eds_cluster_config()) {
     throw EnvoyException("cannot create an EDS cluster without an EDS config");

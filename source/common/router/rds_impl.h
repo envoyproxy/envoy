@@ -2,15 +2,16 @@
 
 #include <cstdint>
 #include <functional>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/subscription.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -18,7 +19,7 @@
 #include "envoy/router/route_config_update_receiver.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -49,11 +50,11 @@ public:
    * @return RouteConfigProviderSharedPtr a new route configuration provider based on the supplied
    * proto configuration. Notes the provider object could be shared among multiple listeners.
    */
-  static RouteConfigProviderSharedPtr
-  create(const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& config,
-         Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-         RouteConfigProviderManager& route_config_provider_manager);
+  static RouteConfigProviderSharedPtr create(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          config,
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      RouteConfigProviderManager& route_config_provider_manager);
 };
 
 class RouteConfigProviderManagerImpl;
@@ -63,7 +64,7 @@ class RouteConfigProviderManagerImpl;
  */
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
-  StaticRouteConfigProviderImpl(const envoy::config::route::v3alpha::RouteConfiguration& config,
+  StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                 Server::Configuration::FactoryContext& factory_context,
                                 RouteConfigProviderManagerImpl& route_config_provider_manager);
   ~StaticRouteConfigProviderImpl() override;
@@ -75,11 +76,15 @@ public:
   }
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
-  void validateConfig(const envoy::config::route::v3alpha::RouteConfiguration&) const override {}
+  void validateConfig(const envoy::config::route::v3::RouteConfiguration&) const override {}
+  void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
+                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
 private:
   ConfigConstSharedPtr config_;
-  envoy::config::route::v3alpha::RouteConfiguration route_config_proto_;
+  envoy::config::route::v3::RouteConfiguration route_config_proto_;
   SystemTime last_updated_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
 };
@@ -114,6 +119,7 @@ public:
     return route_config_providers_;
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
+  void updateOnDemand(const std::string& aliases);
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
                               std::unique_ptr<Cleanup>& resume_rds);
@@ -122,16 +128,14 @@ private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void
-  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-                     added_resources,
-                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                 const std::string&) override;
+  void onConfigUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::config::route::v3alpha::RouteConfiguration>(resource)
-        .name();
+    return MessageUtil::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
   }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
@@ -139,7 +143,7 @@ private:
   }
 
   RdsRouteConfigSubscription(
-      const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
+      const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context,
       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
@@ -147,7 +151,7 @@ private:
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
-  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
+  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
 
   Init::Manager& getRdsConfigInitManager() { return init_manager_; }
 
@@ -175,6 +179,12 @@ private:
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
 
+struct UpdateOnDemandCallback {
+  const std::string alias_;
+  Event::Dispatcher& thread_local_dispatcher_;
+  std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
+};
+
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
  * the subscription.
@@ -193,8 +203,10 @@ public:
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
-  void
-  validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const override;
+  void requestVirtualHostsUpdate(
+      const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
+      std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
+  void validateConfig(const envoy::config::route::v3::RouteConfiguration& config) const override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -210,6 +222,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
+  std::list<UpdateOnDemandCallback> config_update_callbacks_;
 
   friend class RouteConfigProviderManagerImpl;
 };
@@ -219,17 +232,17 @@ class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
 
-  std::unique_ptr<envoy::admin::v3alpha::RoutesConfigDump> dumpRouteConfigs() const;
+  std::unique_ptr<envoy::admin::v3::RoutesConfigDump> dumpRouteConfigs() const;
 
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
-      const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
+      const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 
-  RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const envoy::config::route::v3alpha::RouteConfiguration& route_config,
-      Server::Configuration::FactoryContext& factory_context) override;
+  RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
+                                  Server::Configuration::FactoryContext& factory_context) override;
 
 private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map

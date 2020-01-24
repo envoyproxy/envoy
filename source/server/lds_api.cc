@@ -2,12 +2,12 @@
 
 #include <unordered_map>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/api/v2/listener.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.validate.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener.pb.validate.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -22,7 +22,7 @@
 namespace Envoy {
 namespace Server {
 
-LdsApiImpl::LdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& lds_config,
+LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Init::Manager& init_manager,
                        Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -35,7 +35,7 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& lds_con
 }
 
 void LdsApiImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
@@ -61,11 +61,10 @@ void LdsApiImpl::onConfigUpdate(
   std::unordered_set<std::string> listener_names;
   std::string message;
   for (const auto& resource : added_resources) {
-    envoy::config::listener::v3alpha::Listener listener;
+    envoy::config::listener::v3::Listener listener;
     try {
-      listener =
-          MessageUtil::anyConvert<envoy::config::listener::v3alpha::Listener>(resource.resource());
-      MessageUtil::validate(listener, validation_visitor_);
+      listener = MessageUtil::anyConvertAndValidate<envoy::config::listener::v3::Listener>(
+          resource.resource(), validation_visitor_);
       if (!listener_names.insert(listener.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
         throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
@@ -77,7 +76,7 @@ void LdsApiImpl::onConfigUpdate(
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener.name());
       }
     } catch (const EnvoyException& e) {
-      failure_state.push_back(std::make_unique<envoy::admin::v3alpha::UpdateFailureState>());
+      failure_state.push_back(std::make_unique<envoy::admin::v3::UpdateFailureState>());
       auto& state = failure_state.back();
       state->set_details(e.what());
       state->mutable_failed_configuration()->PackFrom(resource);
@@ -104,12 +103,13 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
     listeners_to_remove.insert(listener.get().name());
   }
 
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> to_add_repeated;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> to_add_repeated;
   for (const auto& listener_blob : resources) {
     // Add this resource to our delta added/updated pile...
-    envoy::service::discovery::v3alpha::Resource* to_add = to_add_repeated.Add();
+    envoy::service::discovery::v3::Resource* to_add = to_add_repeated.Add();
+    // No validation needed here the overloaded call to onConfigUpdate validates.
     const std::string listener_name =
-        MessageUtil::anyConvert<envoy::config::listener::v3alpha::Listener>(listener_blob).name();
+        MessageUtil::anyConvert<envoy::config::listener::v3::Listener>(listener_blob).name();
     to_add->set_name(listener_name);
     to_add->set_version(version_info);
     to_add->mutable_resource()->MergeFrom(listener_blob);
@@ -133,16 +133,16 @@ void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason r
   init_target_.ready();
 }
 
-std::string LdsApiImpl::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+std::string LdsApiImpl::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
   switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2:
+  case envoy::config::core::v3::ApiVersion::AUTO:
+  case envoy::config::core::v3::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::Listener().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
+  case envoy::config::core::v3::ApiVersion::V3:
     return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::config::listener::v3alpha::Listener().GetDescriptor()->full_name()));
+        API_NO_BOOST(envoy::config::listener::v3::Listener().GetDescriptor()->full_name()));
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

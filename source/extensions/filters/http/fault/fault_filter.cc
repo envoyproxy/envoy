@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/event/timer.h"
-#include "envoy/extensions/filters/http/fault/v3alpha/fault.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
@@ -33,8 +33,7 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-FaultSettings::FaultSettings(
-    const envoy::extensions::filters::http::fault::v3alpha::HTTPFault& fault)
+FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault)
     : fault_filter_headers_(Http::HeaderUtility::buildHeaderDataVector(fault.headers())),
       delay_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
                                                             RuntimeKeys::get().DelayPercentKey)),
@@ -77,9 +76,8 @@ FaultSettings::FaultSettings(
 }
 
 FaultFilterConfig::FaultFilterConfig(
-    const envoy::extensions::filters::http::fault::v3alpha::HTTPFault& fault,
-    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
-    TimeSource& time_source)
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& fault, Runtime::Loader& runtime,
+    const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source)
     : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
       scope_(scope), time_source_(time_source),
       stat_name_set_(scope.symbolTable().makeSet("Fault")),
@@ -87,10 +85,9 @@ FaultFilterConfig::FaultFilterConfig(
       delays_injected_(stat_name_set_->add("delays_injected")),
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
-void FaultFilterConfig::incCounter(absl::string_view downstream_cluster,
-                                   Stats::StatName stat_name) {
-  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join(
-      {stats_prefix_, stat_name_set_->getDynamic(downstream_cluster), stat_name});
+void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
+  Stats::SymbolTable::StoragePtr storage =
+      scope_.symbolTable().join({stats_prefix_, downstream_cluster, stat_name});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
@@ -140,6 +137,10 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   if (headers.EnvoyDownstreamServiceCluster()) {
     downstream_cluster_ =
         std::string(headers.EnvoyDownstreamServiceCluster()->value().getStringView());
+    if (!downstream_cluster_.empty()) {
+      downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
+          downstream_cluster_, config_->scope().symbolTable());
+    }
 
     downstream_cluster_delay_percent_key_ =
         fmt::format("fault.http.{}.delay.fixed_delay_percent", downstream_cluster_);
@@ -225,23 +226,21 @@ bool FaultFilter::isDelayEnabled() {
     return false;
   }
 
-  bool enabled = config_->runtime().snapshot().featureEnabled(
-      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(
+    return config_->runtime().snapshot().featureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
   }
-  return enabled;
+  return config_->runtime().snapshot().featureEnabled(
+      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
 }
 
 bool FaultFilter::isAbortEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(
-      fault_settings_->abortPercentRuntime(), fault_settings_->abortPercentage());
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                            fault_settings_->abortPercentage());
+    return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
+                                                        fault_settings_->abortPercentage());
   }
-  return enabled;
+  return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
+                                                      fault_settings_->abortPercentage());
 }
 
 absl::optional<std::chrono::milliseconds>
@@ -292,7 +291,7 @@ uint64_t FaultFilter::abortHttpStatus() {
 void FaultFilter::recordDelaysInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    config_->incDelays(downstream_cluster_);
+    config_->incDelays(downstream_cluster_storage_->statName());
   }
 
   // General stats. All injected faults are considered a single aggregate active fault.
@@ -303,7 +302,7 @@ void FaultFilter::recordDelaysInjectedStats() {
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    config_->incAborts(downstream_cluster_);
+    config_->incAborts(downstream_cluster_storage_->statName());
   }
 
   // General stats. All injected faults are considered a single aggregate active fault.

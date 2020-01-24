@@ -24,7 +24,8 @@ public:
       auto injected = Registry::FactoryRegistry<Base>::replaceFactoryForTest(*displaced_);
       EXPECT_EQ(injected, &instance_);
     } else {
-      Registry::FactoryRegistry<Base>::removeFactoryForTest(instance_.name());
+      Registry::FactoryRegistry<Base>::removeFactoryForTest(instance_.name(),
+                                                            instance_.configType());
     }
   }
 

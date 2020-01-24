@@ -1,4 +1,4 @@
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/api/api_impl.h"
@@ -25,9 +25,9 @@ namespace {
 
 class MockGenericStub : public GoogleStub {
 public:
-  MOCK_METHOD3(PrepareCall_, grpc::GenericClientAsyncReaderWriter*(grpc::ClientContext* context,
-                                                                   const grpc::string& method,
-                                                                   grpc::CompletionQueue* cq));
+  MOCK_METHOD(grpc::GenericClientAsyncReaderWriter*, PrepareCall_,
+              (grpc::ClientContext * context, const grpc::string& method,
+               grpc::CompletionQueue* cq));
 
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
   PrepareCall(grpc::ClientContext* context, const grpc::string& method,
@@ -52,7 +52,7 @@ public:
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
         dispatcher_(api_->allocateDispatcher()), scope_(stats_store_),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
-    envoy::config::core::v3alpha::GrpcService config;
+    envoy::config::core::v3::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");

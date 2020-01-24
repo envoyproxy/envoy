@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/http_uri.pb.h"
-#include "envoy/config/core/v3alpha/protocol.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -241,7 +241,7 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
 }
 
 Http2Settings
-Utility::parseHttp2Settings(const envoy::config::core::v3alpha::Http2ProtocolOptions& config) {
+Utility::parseHttp2Settings(const envoy::config::core::v3::Http2ProtocolOptions& config) {
   Http2Settings ret;
   ret.hpack_table_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       config, hpack_table_size, Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
@@ -273,7 +273,7 @@ Utility::parseHttp2Settings(const envoy::config::core::v3alpha::Http2ProtocolOpt
 }
 
 Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3alpha::Http1ProtocolOptions& config) {
+Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config) {
   Http1Settings ret;
   ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
   ret.accept_http_10_ = config.accept_http_10();
@@ -360,7 +360,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   static const std::string separator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
-    std::string::size_type last_comma = xff_string.rfind(separator);
+    const std::string::size_type last_comma = xff_string.rfind(separator);
     if (last_comma == std::string::npos) {
       return {nullptr, false};
     }
@@ -368,7 +368,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
   // The text after the last remaining comma, or the entirety of the string if there
   // is no comma, is the requested IP address.
-  std::string::size_type last_comma = xff_string.rfind(separator);
+  const std::string::size_type last_comma = xff_string.rfind(separator);
   if (last_comma != std::string::npos && last_comma + separator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + separator.size());
   }
@@ -555,7 +555,7 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
-MessagePtr Utility::prepareHeaders(const envoy::config::core::v3alpha::HttpUri& http_uri) {
+MessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
   absl::string_view host, path;
   extractHostPathFromUri(http_uri.uri(), host, path);
 

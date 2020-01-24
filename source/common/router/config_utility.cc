@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/type/matcher/v3alpha/string.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/regex.h"
@@ -15,24 +15,24 @@ namespace Router {
 namespace {
 
 absl::optional<Matchers::StringMatcherImpl>
-maybeCreateStringMatcher(const envoy::config::route::v3alpha::QueryParameterMatcher& config) {
+maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config) {
   switch (config.query_parameter_match_specifier_case()) {
-  case envoy::config::route::v3alpha::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
+  case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kStringMatch: {
     return Matchers::StringMatcherImpl(config.string_match());
   }
-  case envoy::config::route::v3alpha::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
+  case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       kPresentMatch: {
     return absl::nullopt;
   }
-  case envoy::config::route::v3alpha::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
+  case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET: {
     if (config.hidden_envoy_deprecated_value().empty()) {
       // Present match.
       return absl::nullopt;
     }
 
-    envoy::type::matcher::v3alpha::StringMatcher matcher_config;
+    envoy::type::matcher::v3::StringMatcher matcher_config;
     if (config.has_hidden_envoy_deprecated_regex() ? config.hidden_envoy_deprecated_regex().value()
                                                    : false) {
       matcher_config.set_hidden_envoy_deprecated_regex(config.hidden_envoy_deprecated_value());
@@ -49,7 +49,7 @@ maybeCreateStringMatcher(const envoy::config::route::v3alpha::QueryParameterMatc
 } // namespace
 
 ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
-    const envoy::config::route::v3alpha::QueryParameterMatcher& config)
+    const envoy::config::route::v3::QueryParameterMatcher& config)
     : name_(config.name()), matcher_(maybeCreateStringMatcher(config)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
@@ -66,11 +66,11 @@ bool ConfigUtility::QueryParameterMatcher::matches(
 }
 
 Upstream::ResourcePriority
-ConfigUtility::parsePriority(const envoy::config::core::v3alpha::RoutingPriority& priority) {
+ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& priority) {
   switch (priority) {
-  case envoy::config::core::v3alpha::DEFAULT:
+  case envoy::config::core::v3::DEFAULT:
     return Upstream::ResourcePriority::Default;
-  case envoy::config::core::v3alpha::HIGH:
+  case envoy::config::core::v3::HIGH:
     return Upstream::ResourcePriority::High;
   default:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -90,17 +90,17 @@ bool ConfigUtility::matchQueryParams(
 }
 
 Http::Code ConfigUtility::parseRedirectResponseCode(
-    const envoy::config::route::v3alpha::RedirectAction::RedirectResponseCode& code) {
+    const envoy::config::route::v3::RedirectAction::RedirectResponseCode& code) {
   switch (code) {
-  case envoy::config::route::v3alpha::RedirectAction::MOVED_PERMANENTLY:
+  case envoy::config::route::v3::RedirectAction::MOVED_PERMANENTLY:
     return Http::Code::MovedPermanently;
-  case envoy::config::route::v3alpha::RedirectAction::FOUND:
+  case envoy::config::route::v3::RedirectAction::FOUND:
     return Http::Code::Found;
-  case envoy::config::route::v3alpha::RedirectAction::SEE_OTHER:
+  case envoy::config::route::v3::RedirectAction::SEE_OTHER:
     return Http::Code::SeeOther;
-  case envoy::config::route::v3alpha::RedirectAction::TEMPORARY_REDIRECT:
+  case envoy::config::route::v3::RedirectAction::TEMPORARY_REDIRECT:
     return Http::Code::TemporaryRedirect;
-  case envoy::config::route::v3alpha::RedirectAction::PERMANENT_REDIRECT:
+  case envoy::config::route::v3::RedirectAction::PERMANENT_REDIRECT:
     return Http::Code::PermanentRedirect;
   default:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -108,7 +108,7 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
 }
 
 absl::optional<Http::Code>
-ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3alpha::Route& route) {
+ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& route) {
   if (route.has_redirect()) {
     return parseRedirectResponseCode(route.redirect().response_code());
   } else if (route.has_direct_response()) {
@@ -117,9 +117,8 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3alpha::Rout
   return {};
 }
 
-std::string
-ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3alpha::Route& route,
-                                       Api::Api& api) {
+std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
+                                                   Api::Api& api) {
   static const ssize_t MaxBodySize = 4096;
   if (!route.has_direct_response() || !route.direct_response().has_body()) {
     return EMPTY_STRING;
@@ -132,7 +131,7 @@ ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3alpha::Rout
     }
     const ssize_t size = api.fileSystem().fileSize(filename);
     if (size < 0) {
-      throw EnvoyException(fmt::format("cannot determine size of response body file {}", filename));
+      throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
     }
     if (size > MaxBodySize) {
       throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
@@ -150,11 +149,11 @@ ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3alpha::Rout
 }
 
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
-    const envoy::config::route::v3alpha::RouteAction::ClusterNotFoundResponseCode& code) {
+    const envoy::config::route::v3::RouteAction::ClusterNotFoundResponseCode& code) {
   switch (code) {
-  case envoy::config::route::v3alpha::RouteAction::SERVICE_UNAVAILABLE:
+  case envoy::config::route::v3::RouteAction::SERVICE_UNAVAILABLE:
     return Http::Code::ServiceUnavailable;
-  case envoy::config::route::v3alpha::RouteAction::NOT_FOUND:
+  case envoy::config::route::v3::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
   default:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;

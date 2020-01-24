@@ -110,7 +110,7 @@ private:
 };
 
 class DelegatingLogSink;
-using DelegatingLogSinkPtr = std::shared_ptr<DelegatingLogSink>;
+using DelegatingLogSinkSharedPtr = std::shared_ptr<DelegatingLogSink>;
 
 /**
  * Captures a logging sink that can be delegated to for a bounded amount of time.
@@ -119,7 +119,7 @@ using DelegatingLogSinkPtr = std::shared_ptr<DelegatingLogSink>;
  */
 class SinkDelegate : NonCopyable {
 public:
-  explicit SinkDelegate(DelegatingLogSinkPtr log_sink);
+  explicit SinkDelegate(DelegatingLogSinkSharedPtr log_sink);
   virtual ~SinkDelegate();
 
   virtual void log(absl::string_view msg) PURE;
@@ -130,7 +130,7 @@ protected:
 
 private:
   SinkDelegate* previous_delegate_;
-  DelegatingLogSinkPtr log_sink_;
+  DelegatingLogSinkSharedPtr log_sink_;
 };
 
 /**
@@ -138,7 +138,7 @@ private:
  */
 class StderrSinkDelegate : public SinkDelegate {
 public:
-  explicit StderrSinkDelegate(DelegatingLogSinkPtr log_sink);
+  explicit StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink);
 
   // SinkDelegate
   void log(absl::string_view msg) override;
@@ -183,10 +183,10 @@ public:
    * A shared_ptr is required for sinks used
    * in spdlog::logger; it would not otherwise be required in Envoy. This method
    * must own the construction process because StderrSinkDelegate needs access to
-   * the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
+   * the DelegatingLogSinkSharedPtr, not just the DelegatingLogSink*, and that is only
    * available after construction.
    */
-  static DelegatingLogSinkPtr init();
+  static DelegatingLogSinkSharedPtr init();
 
   /**
    * Give a log line with trailing whitespace, this will escape all c-style
@@ -255,8 +255,8 @@ public:
   /**
    * @return the singleton sink to use for all loggers.
    */
-  static DelegatingLogSinkPtr getSink() {
-    static DelegatingLogSinkPtr sink = DelegatingLogSink::init();
+  static DelegatingLogSinkSharedPtr getSink() {
+    static DelegatingLogSinkSharedPtr sink = DelegatingLogSink::init();
     return sink;
   }
 

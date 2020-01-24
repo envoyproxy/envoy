@@ -7,11 +7,12 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/config/api_type_oracle.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/base/attributes.h"
@@ -35,7 +36,7 @@ public:
   virtual std::vector<absl::string_view> registeredNames() const PURE;
   // Return all registered factory names, including disabled factories.
   virtual std::vector<absl::string_view> allRegisteredNames() const PURE;
-  virtual absl::optional<envoy::config::core::v3alpha::BuildVersion>
+  virtual absl::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) const PURE;
   virtual bool disableFactory(absl::string_view) PURE;
   virtual bool isFactoryDisabled(absl::string_view) const PURE;
@@ -53,7 +54,7 @@ public:
     return FactoryRegistry::registeredNames(true);
   }
 
-  absl::optional<envoy::config::core::v3alpha::BuildVersion>
+  absl::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) const override {
     return FactoryRegistry::getFactoryVersion(name);
   }
@@ -176,16 +177,65 @@ public:
   /**
    * Gets the current map of vendor specific factory versions.
    */
-  static absl::flat_hash_map<std::string, envoy::config::core::v3alpha::BuildVersion>&
+  static absl::flat_hash_map<std::string, envoy::config::core::v3::BuildVersion>&
   versioned_factories() {
     using VersionedFactoryMap =
-        absl::flat_hash_map<std::string, envoy::config::core::v3alpha::BuildVersion>;
+        absl::flat_hash_map<std::string, envoy::config::core::v3::BuildVersion>;
     MUTABLE_CONSTRUCT_ON_FIRST_USE(VersionedFactoryMap);
   }
 
   static absl::flat_hash_map<std::string, std::string>& deprecatedFactoryNames() {
     static auto* deprecated_factory_names = new absl::flat_hash_map<std::string, std::string>;
     return *deprecated_factory_names;
+  }
+
+  /**
+   * Lazily constructs a mapping from the configuration message type to a factory,
+   * including the deprecated configuration message types.
+   * Must be invoked after factory registration is completed.
+   */
+  static absl::flat_hash_map<std::string, Base*>& factoriesByType() {
+    static absl::flat_hash_map<std::string, Base*>* factories_by_type =
+        [] {
+          auto mapping = std::make_unique<absl::flat_hash_map<std::string, Base*>>();
+
+          for (const auto& factory : factories()) {
+            if (factory.second == nullptr) {
+              continue;
+            }
+
+            // Skip untyped factories.
+            std::string config_type = factory.second->configType();
+            if (config_type.empty()) {
+              continue;
+            }
+
+            // Register config types in the mapping and traverse the deprecated message type chain.
+            while (true) {
+              auto it = mapping->find(config_type);
+              if (it != mapping->end() && it->second != factory.second) {
+                // Mark double-registered types with a nullptr.
+                // See issue https://github.com/envoyproxy/envoy/issues/9643.
+                ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
+                          factory.second->name(), it->second ? it->second->name() : "");
+                it->second = nullptr;
+              } else {
+                mapping->emplace(std::make_pair(config_type, factory.second));
+              }
+
+              const Protobuf::Descriptor* previous =
+                  Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
+              if (previous == nullptr) {
+                break;
+              }
+              config_type = previous->full_name();
+            }
+          }
+          return mapping;
+        }()
+            .release();
+
+    return *factories_by_type;
   }
 
   /**
@@ -208,7 +258,7 @@ public:
    * independently of Envoy.
    */
   static void registerFactory(Base& factory, absl::string_view name,
-                              const envoy::config::core::v3alpha::BuildVersion& version,
+                              const envoy::config::core::v3::BuildVersion& version,
                               absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
@@ -262,6 +312,14 @@ public:
     return it->second;
   }
 
+  static Base* getFactoryByType(absl::string_view type) {
+    auto it = factoriesByType().find(type);
+    if (it == factoriesByType().end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
   /**
    * @return the canonical name of the factory. If the given name is a
    * deprecated factory name, the canonical name is returned instead.
@@ -291,7 +349,7 @@ public:
   /**
    * @return vendor specific version of a factory.
    */
-  static absl::optional<envoy::config::core::v3alpha::BuildVersion>
+  static absl::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) {
     auto it = versioned_factories().find(name);
     if (it == versioned_factories().end()) {
@@ -320,6 +378,12 @@ private:
     factories().emplace(factory.name(), &factory);
     RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
 
+    auto config_type = factory.configType();
+    Base* prev = getFactoryByType(config_type);
+    if (prev != nullptr) {
+      factoriesByType().emplace(config_type, &factory);
+    }
+
     return displaced;
   }
 
@@ -327,9 +391,14 @@ private:
    * Remove a factory by name. This method should only be used for testing purposes.
    * @param name is the name of the factory to remove.
    */
-  static void removeFactoryForTest(absl::string_view name) {
+  static void removeFactoryForTest(absl::string_view name, absl::string_view config_type) {
     auto result = factories().erase(name);
     RELEASE_ASSERT(result == 1, "");
+
+    Base* prev = getFactoryByType(config_type);
+    if (prev != nullptr) {
+      factoriesByType().erase(config_type);
+    }
   }
 };
 
@@ -422,12 +491,12 @@ public:
   }
 
 private:
-  static envoy::config::core::v3alpha::BuildVersion
+  static envoy::config::core::v3::BuildVersion
   makeBuildVersion(uint32_t major, uint32_t minor, uint32_t patch,
                    const std::map<std::string, std::string>& metadata) {
-    envoy::config::core::v3alpha::BuildVersion version;
-    version.mutable_version()->set_major(major);
-    version.mutable_version()->set_minor(minor);
+    envoy::config::core::v3::BuildVersion version;
+    version.mutable_version()->set_major_number(major);
+    version.mutable_version()->set_minor_number(minor);
     version.mutable_version()->set_patch(patch);
     *version.mutable_metadata() = MessageUtil::keyValueStruct(metadata);
     return version;

@@ -19,7 +19,7 @@ namespace {
 
 class MockFilterConfig : public FilterConfig {
 public:
-  MOCK_METHOD0(currentConfig, HttpTapConfigSharedPtr());
+  MOCK_METHOD(HttpTapConfigSharedPtr, currentConfig, ());
   FilterStats& stats() override { return stats_; }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -28,13 +28,13 @@ public:
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
 public:
-  MOCK_METHOD1(onRequestHeaders, void(const Http::HeaderMap& headers));
-  MOCK_METHOD1(onRequestBody, void(const Buffer::Instance& data));
-  MOCK_METHOD1(onRequestTrailers, void(const Http::HeaderMap& headers));
-  MOCK_METHOD1(onResponseHeaders, void(const Http::HeaderMap& headers));
-  MOCK_METHOD1(onResponseBody, void(const Buffer::Instance& data));
-  MOCK_METHOD1(onResponseTrailers, void(const Http::HeaderMap& headers));
-  MOCK_METHOD0(onDestroyLog, bool());
+  MOCK_METHOD(void, onRequestHeaders, (const Http::HeaderMap& headers));
+  MOCK_METHOD(void, onRequestBody, (const Buffer::Instance& data));
+  MOCK_METHOD(void, onRequestTrailers, (const Http::HeaderMap& headers));
+  MOCK_METHOD(void, onResponseHeaders, (const Http::HeaderMap& headers));
+  MOCK_METHOD(void, onResponseBody, (const Buffer::Instance& data));
+  MOCK_METHOD(void, onResponseTrailers, (const Http::HeaderMap& headers));
+  MOCK_METHOD(bool, onDestroyLog, ());
 };
 
 class TapFilterTest : public testing::Test {

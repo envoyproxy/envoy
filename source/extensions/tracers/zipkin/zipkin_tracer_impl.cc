@@ -1,6 +1,6 @@
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -65,7 +65,7 @@ Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
 
-Driver::Driver(const envoy::config::trace::v3alpha::ZipkinConfig& zipkin_config,
+Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator,
@@ -177,7 +177,7 @@ void ReporterImpl::flushSpans() {
     message->headers().setPath(collector_.endpoint_);
     message->headers().setHost(driver_.cluster()->name());
     message->headers().setReferenceContentType(
-        collector_.version_ == envoy::config::trace::v3alpha::ZipkinConfig::HTTP_PROTO
+        collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
 

@@ -129,8 +129,8 @@ TEST(RegistryTest, VersionedFactory) {
   auto version =
       factories.find("testing.published")->second->getFactoryVersion("testing.published.versioned");
   EXPECT_TRUE(version.has_value());
-  EXPECT_EQ(2, version.value().version().major());
-  EXPECT_EQ(5, version.value().version().minor());
+  EXPECT_EQ(2, version.value().version().major_number());
+  EXPECT_EQ(5, version.value().version().minor_number());
   EXPECT_EQ(39, version.value().version().patch());
   EXPECT_EQ(1, version.value().metadata().fields().size());
   EXPECT_EQ("alpha", version.value().metadata().fields().at("build.label").string_value());
@@ -162,8 +162,8 @@ TEST(RegistryTest, VersionedWithDeprecatednamesFactory) {
   auto version = factories.find("testing.published")
                      ->second->getFactoryVersion("testing.published.versioned.instead_name");
   EXPECT_TRUE(version.has_value());
-  EXPECT_EQ(0, version.value().version().major());
-  EXPECT_EQ(0, version.value().version().minor());
+  EXPECT_EQ(0, version.value().version().major_number());
+  EXPECT_EQ(0, version.value().version().minor_number());
   EXPECT_EQ(1, version.value().version().patch());
   EXPECT_EQ(1, version.value().metadata().fields().size());
   EXPECT_EQ("private", version.value().metadata().fields().at("build.kind").string_value());

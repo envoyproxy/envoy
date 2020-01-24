@@ -6,7 +6,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -135,7 +135,7 @@ public:
   /**
    * @return traffic direction of the listener.
    */
-  virtual envoy::config::core::v3alpha::TrafficDirection direction() const PURE;
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @return the connection balancer for this listener. All listeners have a connection balancer,
@@ -205,10 +205,21 @@ public:
 
   /**
    * Called whenever data is received by the underlying udp socket.
+   * TODO(danzh2010): Consider returning a value to indicate if more work is to
+   * be done in the next event loop due to a limit on how much processing is
+   * allowed in each event loop.
    *
    * @param data UdpRecvData from the underlying socket.
    */
   virtual void onData(UdpRecvData& data) PURE;
+
+  /**
+   * Called when the underlying socket is ready for read, before onData() is
+   * called. Called only once per event loop, even if followed by multiple
+   * onData() calls.
+   *
+   */
+  virtual void onReadReady() PURE;
 
   /**
    * Called when the underlying socket is ready for write.

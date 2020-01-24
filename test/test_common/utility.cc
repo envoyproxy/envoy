@@ -12,19 +12,18 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/codec.h"
-#include "envoy/service/runtime/v3alpha/rtds.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
-#include "common/common/stack_array.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/resources.h"
@@ -38,6 +37,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
@@ -100,9 +100,9 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
   // containing 10 bytes while rhs has ten slices containing one byte each.
   uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
   uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
-  STACK_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
+  absl::FixedArray<Buffer::RawSlice> lhs_slices(lhs_num_slices);
   lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
-  STACK_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
+  absl::FixedArray<Buffer::RawSlice> rhs_slices(rhs_num_slices);
   rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
   size_t rhs_slice = 0;
   size_t rhs_offset = 0;
@@ -202,28 +202,26 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
 
 std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return TestUtility::anyConvert<envoy::config::listener::v3alpha::Listener>(resource).name();
+    return TestUtility::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return TestUtility::anyConvert<envoy::config::route::v3alpha::RouteConfiguration>(resource)
-        .name();
+    return TestUtility::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return TestUtility::anyConvert<envoy::config::cluster::v3alpha::Cluster>(resource).name();
+    return TestUtility::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return TestUtility::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
-               resource)
+    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
         .cluster_name();
   }
   if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
-    return TestUtility::anyConvert<envoy::config::route::v3alpha::VirtualHost>(resource).name();
+    return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Runtime) {
-    return TestUtility::anyConvert<envoy::service::runtime::v3alpha::Runtime>(resource).name();
+    return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
   }
   throw EnvoyException(
-      fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
+      absl::StrCat("xdsResourceName does not know about type URL ", resource.type_url()));
 }
 
 std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {

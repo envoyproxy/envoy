@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
@@ -57,14 +57,11 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
-      retriable_headers_(route_policy.retriableHeaders()),
-      retriable_request_headers_(route_policy.retriableRequestHeaders()) {
-
-  retry_on_ = route_policy.retryOn();
-  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
+      retriable_headers_(route_policy.retriableHeaders()) {
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
@@ -92,16 +89,20 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
         parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
   }
 
-  if (!retriable_request_headers_.empty()) {
+  const auto& retriable_request_headers = route_policy.retriableRequestHeaders();
+  if (!retriable_request_headers.empty()) {
     // If this route limits retries by request headers, make sure there is a match.
-    uint32_t request_header_match = 0;
-    for (const auto& retriable_header : retriable_request_headers_) {
+    bool request_header_match = false;
+    for (const auto& retriable_header : retriable_request_headers) {
       if (retriable_header->matchesHeaders(request_headers)) {
-        request_header_match = 1;
+        request_header_match = true;
         break;
       }
     }
-    retry_on_ &= request_header_match;
+
+    if (!request_header_match) {
+      retry_on_ = 0;
+    }
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     uint64_t temp;
@@ -129,7 +130,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     // header. Anything more sophisticated needs to be provided via config.
     for (const auto header_name : StringUtil::splitToken(
              request_headers.EnvoyRetriableHeaderNames()->value().getStringView(), ",")) {
-      envoy::config::route::v3alpha::HeaderMatcher header_matcher;
+      envoy::config::route::v3::HeaderMatcher header_matcher;
       header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
       retriable_headers_.emplace_back(
           std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher));

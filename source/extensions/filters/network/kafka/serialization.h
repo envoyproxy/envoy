@@ -14,6 +14,7 @@
 
 #include "extensions/filters/network/kafka/kafka_types.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -322,7 +323,7 @@ public:
       if (required_ >= 0) {
         children_ = std::vector<DeserializerType>(required_);
       } else {
-        throw EnvoyException(fmt::format("invalid ARRAY length: {}", required_));
+        throw EnvoyException(absl::StrCat("invalid ARRAY length: ", required_));
       }
       length_consumed_ = true;
     }

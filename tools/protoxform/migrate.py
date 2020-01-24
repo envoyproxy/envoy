@@ -12,7 +12,9 @@ from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 from google.api import annotations_pb2
 
-ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile('<envoy_api_(msg|enum_value|field|enum)_([\w\.]+)>')
+ENVOY_API_TYPE_REGEX_STR = 'envoy_api_(msg|enum_value|field|enum)_([\w\.]+)'
+ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile('<%s>|:ref:`%s`' %
+                                           (ENVOY_API_TYPE_REGEX_STR, ENVOY_API_TYPE_REGEX_STR))
 
 
 class UpgradeVisitor(visitor.Visitor):
@@ -32,7 +34,14 @@ class UpgradeVisitor(visitor.Visitor):
       # stylized and match the output format of tools/protodoc. We need to do
       # some special handling of field/enum values, and also the normalization
       # that was performed in v2 for envoy.api.v2 types.
-      ref_type, normalized_type_name = match.groups()
+      label_ref_type, label_normalized_type_name, section_ref_type, section_normalized_type_name = match.groups(
+      )
+      if label_ref_type is not None:
+        ref_type = label_ref_type
+        normalized_type_name = label_normalized_type_name
+      else:
+        ref_type = section_ref_type
+        normalized_type_name = section_normalized_type_name
       if ref_type == 'field' or ref_type == 'enum_value':
         normalized_type_name, residual = normalized_type_name.rsplit('.', 1)
       else:
@@ -47,12 +56,25 @@ class UpgradeVisitor(visitor.Visitor):
         type_desc = self._typedb.types[api_v2_type_name]
       repl_type = type_desc.next_version_type_name[len(
           'envoy.'):] if type_desc.next_version_type_name else normalized_type_name
-      return '<envoy_api_%s_%s%s>' % (ref_type, repl_type, '.' + residual if residual else '')
+      # TODO(htuch): this should really either go through the type database or
+      # via the descriptor pool and annotations, but there are only two of these
+      # we need for the initial v2 -> v3 docs cut, so hard coding for now.
+      # Tracked at https://github.com/envoyproxy/envoy/issues/9734.
+      if repl_type == 'config.route.v3.RouteAction':
+        if residual == 'host_rewrite':
+          residual = 'host_rewrite_literal'
+        elif residual == 'auto_host_rewrite_header':
+          residual = 'auto_host_rewrite'
+      new_ref = 'envoy_api_%s_%s%s' % (ref_type, repl_type, '.' + residual if residual else '')
+      if label_ref_type is not None:
+        return '<%s>' % new_ref
+      else:
+        return ':ref:`%s`' % new_ref
 
     return re.sub(ENVOY_COMMENT_WITH_TYPE_REGEX, UpgradeType, c)
 
   def _UpgradedPostMethod(self, m):
-    return re.sub(r'^/v2/', '/v3alpha/', m)
+    return re.sub(r'^/v2/', '/v3/', m)
 
   # Upgraded type using canonical type naming, e.g. foo.bar.
   def _UpgradedTypeCanonical(self, t):
@@ -210,7 +232,7 @@ class UpgradeVisitor(visitor.Visitor):
 
 
 def V3MigrationXform(envoy_internal_shadow, file_proto):
-  """Transform a FileDescriptorProto from v2[alpha\d] to v3alpha.
+  """Transform a FileDescriptorProto from v2[alpha\d] to v3.
 
   Args:
     envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.

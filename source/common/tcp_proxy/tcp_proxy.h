@@ -8,7 +8,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/event/timer.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -99,7 +99,7 @@ public:
    */
   class SharedConfig {
   public:
-    SharedConfig(const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy& config,
+    SharedConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
@@ -117,7 +117,7 @@ public:
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
 
-  Config(const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy& config,
+  Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
          Server::Configuration::FactoryContext& context);
 
   /**
@@ -146,8 +146,10 @@ public:
 
 private:
   struct RouteImpl : public Route {
-    RouteImpl(const Config& parent, const envoy::extensions::filters::network::tcp_proxy::v3alpha::
-                                        TcpProxy::DeprecatedV1::TCPRoute& config);
+    RouteImpl(
+        const Config& parent,
+        const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
+            config);
 
     // Route
     bool matches(Network::Connection& connection) const override;
@@ -167,7 +169,7 @@ private:
   class WeightedClusterEntry : public Route {
   public:
     WeightedClusterEntry(const Config& parent,
-                         const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy::
+                         const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::
                              WeightedCluster::ClusterWeight& config);
 
     uint64_t clusterWeight() const { return cluster_weight_; }

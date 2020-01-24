@@ -75,12 +75,11 @@ public:
     MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
     mem_block.appendOne(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
-      auto& name = names[i];
-      size_t sz = name.size();
+      absl::string_view name = names[i];
+      const size_t sz = name.size();
       SymbolTableImpl::Encoding::appendEncoding(sz, mem_block);
       if (!name.empty()) {
-        mem_block.appendData(
-            absl::MakeConstSpan(reinterpret_cast<const uint8_t*>(name.data()), sz));
+        mem_block.appendData(absl::MakeSpan(reinterpret_cast<const uint8_t*>(name.data()), sz));
       }
     }
 
@@ -102,6 +101,7 @@ public:
   void free(const StatName&) override {}
   void incRefCount(const StatName&) override {}
   StoragePtr encode(absl::string_view name) override { return encodeHelper(name); }
+  StoragePtr makeDynamicStorage(absl::string_view name) override { return encodeHelper(name); }
   SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {
@@ -125,7 +125,6 @@ public:
     // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
     return StatNameSetPtr(new StatNameSet(*this, name));
   }
-  void forgetSet(StatNameSet&) override {}
   uint64_t getRecentLookups(const RecentLookupsFn&) const override { return 0; }
   void clearRecentLookups() override {}
   void setRecentLookupCapacity(uint64_t) override {}
@@ -142,7 +141,8 @@ private:
     MemBlockBuilder<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
     SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
     mem_block.appendData(
-        absl::MakeConstSpan(reinterpret_cast<const uint8_t*>(name.data()), name.size()));
+        absl::MakeSpan(reinterpret_cast<const uint8_t*>(name.data()), name.size()));
+    ASSERT(mem_block.capacityRemaining() == 0);
     return mem_block.release();
   }
 };

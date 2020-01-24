@@ -1,6 +1,6 @@
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3alpha/rate_limit.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3alpha/rate_limit.pb.validate.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.validate.h"
 
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/config.h"
 
@@ -18,10 +18,9 @@ namespace ThriftFilters {
 namespace RateLimitFilter {
 namespace {
 
-envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3alpha::RateLimit
+envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit
 parseRateLimitFromV2Yaml(const std::string& yaml) {
-  envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3alpha::RateLimit
-      rate_limit;
+  envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit rate_limit;
   TestUtility::loadFromYaml(yaml, rate_limit);
   return rate_limit;
 }
@@ -30,11 +29,11 @@ parseRateLimitFromV2Yaml(const std::string& yaml) {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3alpha::
-                       RateLimit(),
-                   "stats", context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      RateLimitFilterConfig().createFilterFactoryFromProto(
+          envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit(),
+          "stats", context),
+      ProtoValidationException);
 }
 
 TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
@@ -52,7 +51,7 @@ rate_limit_service:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3alpha::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 

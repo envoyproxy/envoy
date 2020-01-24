@@ -4,6 +4,7 @@ package envoy.api.v2.core;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/http.proto";
+import "envoy/type/matcher/string.proto";
 import "envoy/type/range.proto";
 
 import "google/protobuf/any.proto";
@@ -11,13 +12,14 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "HealthCheckProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 
 // [#protodoc-title: Health check]
 // * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
@@ -50,7 +52,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message HealthCheck {
   // Describes the encoding of the payload bytes in the payload.
   message Payload {
@@ -65,7 +67,7 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
@@ -85,7 +87,12 @@ message HealthCheck {
     // An optional service name parameter which is used to validate the identity of
     // the health checked cluster. See the :ref:`architecture overview
     // <arch_overview_health_checking_identity>` for more information.
-    string service_name = 5;
+    //
+    // .. attention::
+    //
+    //   This field has been deprecated in favor of `service_name_matcher` for better flexibility
+    //   over matching with service-cluster name.
+    string service_name = 5 [deprecated = true];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster. For more information, including details on header value syntax, see
@@ -101,7 +108,7 @@ message HealthCheck {
     // If set, health checks will be made using http/2.
     // Deprecated, use :ref:`codec_client_type
     // <envoy_api_field_core.HealthCheck.HttpHealthCheck.codec_client_type>` instead.
-    bool use_http2 = 7 [deprecated = true];
+    bool use_http2 = 7 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
@@ -109,11 +116,14 @@ message HealthCheck {
     // range are required. Only statuses in the range [100, 600) are allowed.
     repeated type.Int64Range expected_statuses = 9;
 
-    // Use specified application protocol for health checks. This is to replace
-    // :ref:`use_http2
-    // <envoy_api_field_core.HealthCheck.HttpHealthCheck.use_http2>` in light of
-    // HTTP3.
+    // Use specified application protocol for health checks.
     type.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
+
+    // An optional service name parameter which is used to validate the identity of
+    // the health checked cluster using a :ref:`StringMatcher
+    // <envoy_api_msg_type.matcher.StringMatcher>`. See the :ref:`architecture overview
+    // <arch_overview_health_checking_identity>` for more information.
+    type.matcher.StringMatcher service_name_matcher = 11;
   }
 
   message TcpHealthCheck {
@@ -164,6 +174,18 @@ message HealthCheck {
 
       google.protobuf.Any typed_config = 3;
     }
+  }
+
+  // Health checks occur over the transport socket specified for the cluster. This implies that if a
+  // cluster is using a TLS-enabled transport socket, the health check will also occur over TLS.
+  //
+  // This allows overriding the cluster TLS settings, just for health check connections.
+  message TlsOptions {
+    // Specifies the ALPN protocols for health check connections. This is useful if the
+    // corresponding upstream is using ALPN-based :ref:`FilterChainMatch
+    // <envoy_api_msg_listener.FilterChainMatch>` along with different protocols for health checks
+    // versus data connections. If empty, no ALPN protocols will be set on health check connections.
+    repeated string alpn_protocols = 1;
   }
 
   reserved 10;
@@ -270,4 +292,7 @@ message HealthCheck {
   // initial health check failure event will be logged.
   // The default value is false.
   bool always_log_health_check_failures = 19;
+
+  // This allows overriding the cluster TLS settings, just for health check connections.
+  TlsOptions tls_options = 21;
 }

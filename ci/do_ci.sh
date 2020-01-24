@@ -11,9 +11,10 @@ if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositor
   build_setup_args="-nofetch"
 fi
 
+SRCDIR="${PWD}"
 . "$(dirname "$0")"/setup_cache.sh
 . "$(dirname "$0")"/build_setup.sh $build_setup_args
-cd "${ENVOY_SRCDIR}"
+cd "${SRCDIR}"
 
 echo "building using ${NUM_CPUS} CPUs"
 
@@ -41,8 +42,9 @@ function bazel_with_collection() {
 
 function cp_binary_for_outside_access() {
   DELIVERY_LOCATION="$1"
+  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
   cp -f \
-    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
+    bazel-bin/"${ENVOY_BIN}" \
     "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
 }
 
@@ -74,10 +76,10 @@ function bazel_binary_build() {
   fi
 
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" //source/exe:envoy-static ${CONFIG_ARGS}
+  bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" "${ENVOY_BUILD_TARGET}" ${CONFIG_ARGS}
   collect_build_profile "${BINARY_TYPE}"_build
 
-  # Copy the envoy-static binary somewhere that we can access outside of the
+  # Copy the built envoy binary somewhere that we can access outside of the
   # container.
   cp_binary_for_outside_access envoy
 
@@ -149,11 +151,12 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
-  echo "Building and testing envoy-filter-example tests..."
-  pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
-    //:echo2_integration_test //http-filter-example:http_filter_integration_test //:envoy_binary_test
-  popd
+  if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
+    echo "Building and testing envoy-filter-example tests..."
+    pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+    bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${ENVOY_FILTER_EXAMPLE_TESTS}
+    popd
+  fi
   # Also validate that integration test traffic tapping (useful when debugging etc.)
   # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
@@ -175,10 +178,12 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan --build_tests_only ${TEST_TARGETS}
-  echo "Building and testing envoy-filter-example tests..."
-  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan \
-    //:echo2_integration_test //http-filter-example:http_filter_integration_test //:envoy_binary_test
+  if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
+    echo "Building and testing envoy-filter-example tests..."
+    pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+    bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan ${ENVOY_FILTER_EXAMPLE_TESTS}
+    popd
+  fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
   ENVOY_STDLIB=libc++
@@ -272,7 +277,7 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   echo "bazel Coverity Scan build"
   echo "Building..."
   /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel build --action_env=LD_PRELOAD ${BAZEL_BUILD_OPTIONS} \
-    -c opt //source/exe:envoy-static
+    -c opt "${ENVOY_BUILD_TARGET}"
   # tar up the coverity results
   tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
   # Copy the Coverity results somewhere that we can access outside of the container.

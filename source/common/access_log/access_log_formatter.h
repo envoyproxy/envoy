@@ -7,7 +7,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/utility.h"
@@ -74,6 +74,7 @@ class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
   static const std::string& protocolToString(const absl::optional<Http::Protocol>& protocol);
+  static const std::string getHostname();
 
 private:
   AccessLogFormatUtils();
@@ -243,9 +244,8 @@ public:
                     absl::optional<size_t> max_length);
 
 protected:
-  std::string formatMetadata(const envoy::config::core::v3alpha::Metadata& metadata) const;
-  ProtobufWkt::Value
-  formatMetadataValue(const envoy::config::core::v3alpha::Metadata& metadata) const;
+  std::string formatMetadata(const envoy::config::core::v3::Metadata& metadata) const;
+  ProtobufWkt::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
 
 private:
   std::string filter_namespace_;

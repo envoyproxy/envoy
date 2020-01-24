@@ -23,8 +23,8 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_verifier_lib",
         "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//test/integration:http_integration_lib",
-        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

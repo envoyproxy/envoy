@@ -8,19 +8,18 @@
 #include <string>
 #include <vector>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/config/api_version.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
@@ -37,6 +36,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
@@ -322,7 +322,7 @@ void BaseIntegrationTest::createEnvoy() {
     // Before finalization, set up a real lds path, replacing the default /dev/null
     std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     config_helper_.addConfigModifier(
-        [lds_path](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+        [lds_path](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
         });
   }
@@ -332,7 +332,7 @@ void BaseIntegrationTest::createEnvoy() {
   // config, you will need to do so *after* initialize() (which calls this function) is done.
   config_helper_.finalize(ports);
 
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap = config_helper_.bootstrap();
+  envoy::config::bootstrap::v3::Bootstrap bootstrap = config_helper_.bootstrap();
   if (use_lds_) {
     // After the config has been finalized, write the final listener config to the lds file.
     const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
@@ -368,7 +368,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   upstream_protocol_ = protocol;
   if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
           auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
           cluster->mutable_http2_protocol_options();
@@ -399,7 +399,7 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
 }
 
 void BaseIntegrationTest::setUpstreamAddress(
-    uint32_t upstream_index, envoy::config::endpoint::v3alpha::LbEndpoint& endpoint) const {
+    uint32_t upstream_index, envoy::config::endpoint::v3::LbEndpoint& endpoint) const {
   auto* socket_address = endpoint.mutable_endpoint()->mutable_address()->mutable_socket_address();
   socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
@@ -425,7 +425,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 std::string getListenerDetails(Envoy::Server::Instance& server) {
   const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")();
-  auto listener_info = Protobuf::down_cast<envoy::admin::v3alpha::ListenersConfigDump>(*details);
+  auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 }
 
@@ -528,7 +528,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     fake_upstreams_.emplace_back(
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   } else {
-    envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     common_tls_context->add_alpn_protocols("h2");
     auto* tls_cert = common_tls_context->add_tls_certificates();

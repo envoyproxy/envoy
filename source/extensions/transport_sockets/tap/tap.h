@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/event/timer.h"
-#include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.h"
+#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/network/transport_socket.h"
 
 #include "extensions/common/tap/extension_config_base.h"
@@ -36,7 +36,7 @@ private:
 class TapSocketFactory : public Network::TransportSocketFactory,
                          public Common::Tap::ExtensionConfigBase {
 public:
-  TapSocketFactory(const envoy::extensions::transport_sockets::tap::v3alpha::Tap& proto_config,
+  TapSocketFactory(const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
                    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
                    Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                    Event::Dispatcher& main_thread_dispatcher,

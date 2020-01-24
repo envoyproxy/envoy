@@ -19,8 +19,8 @@ V2_ONLY_PATHS = [
 
 # These are trees that allow v3+ protos, but only a strict whitelist.
 V3_RESTRICTED_PATHS = {
-    'config/accesslog/v3alpha': ['accesslog.proto'],
-    'service/discovery/v3alpha': ['ads.proto', 'discovery.proto'],
+    'config/accesslog/v3': ['accesslog.proto'],
+    'service/discovery/v3': ['ads.proto', 'discovery.proto'],
 }
 
 # These are the only legacy trees that we permit not to terminate with a versioned suffix.

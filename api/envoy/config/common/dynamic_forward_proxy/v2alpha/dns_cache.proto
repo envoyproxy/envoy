@@ -14,7 +14,7 @@ option java_package = "io.envoyproxy.envoy.config.common.dynamic_forward_proxy.v
 option java_outer_classname = "DnsCacheProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.common.dynamic_forward_proxy.v3alpha";
+    "envoy.extensions.common.dynamic_forward_proxy.v3";
 
 // [#protodoc-title: Dynamic forward proxy common configuration]
 

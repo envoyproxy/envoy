@@ -1,6 +1,6 @@
 #include "common/config/watch_map.h"
 
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -95,15 +95,40 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   }
 }
 
+// For responses to on-demand requests, replace the original watch for an alias
+// with one for the resource's name
+AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
+    const envoy::service::discovery::v3::Resource& resource) {
+  absl::flat_hash_set<Watch*> watches_to_update;
+  for (const auto& alias : resource.aliases()) {
+    const auto interested_watches = watch_interest_.find(alias);
+    if (interested_watches != watch_interest_.end()) {
+      for (const auto& interested_watch : interested_watches->second) {
+        watches_to_update.insert(interested_watch);
+      }
+    }
+  }
+
+  auto ret = AddedRemoved({}, {});
+  for (const auto& watch : watches_to_update) {
+    const auto& converted_watches = updateWatchInterest(watch, {resource.name()});
+    std::copy(converted_watches.added_.begin(), converted_watches.added_.end(),
+              std::inserter(ret.added_, ret.added_.end()));
+    std::copy(converted_watches.removed_.begin(), converted_watches.removed_.end(),
+              std::inserter(ret.removed_, ret.removed_.end()));
+  }
+
+  return ret;
+}
+
 void WatchMap::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
-  absl::flat_hash_map<Watch*,
-                      Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>>
+  absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>>
       per_watch_added;
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());

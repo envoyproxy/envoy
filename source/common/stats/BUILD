@@ -161,7 +161,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:mem_block_builder_lib",
-        "//source/common/common:stack_array",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],
@@ -205,7 +204,7 @@ envoy_cc_library(
         "//source/common/common:perf_annotation_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/metrics/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -217,7 +216,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:matchers_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/metrics/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
