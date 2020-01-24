@@ -11,7 +11,8 @@ static_resources:
           "@type": type.googleapis.com/envoy.config.filter.network.kafka_broker.v2alpha1.KafkaBroker
           stat_prefix: kafka_custom_prefix
       - name: envoy.tcp_proxy
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: kafka_tcp
           cluster: localkafka
           access_log:
