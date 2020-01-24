@@ -74,7 +74,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_context_(*this) {
+      server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {

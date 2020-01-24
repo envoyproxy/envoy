@@ -147,13 +147,7 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
   lb = lb_->factory()->create();
   {
     TestLoadBalancerContext context(0);
-    if (GetParam() == 1) {
-      EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
-    } else {
-      // When all hosts are unhealthy, the default behavior of the load balancer is to send
-      // traffic to P=0. In this case, P=0 has no backends so it returns nullptr.
-      EXPECT_EQ(nullptr, lb->chooseHost(&context));
-    }
+    EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
   }
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }

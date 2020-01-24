@@ -116,17 +116,17 @@ public:
   const FaultSettings* settings() { return &settings_; }
   TimeSource& timeSource() { return time_source_; }
 
-  void incDelays(absl::string_view downstream_cluster) {
+  void incDelays(Stats::StatName downstream_cluster) {
     incCounter(downstream_cluster, delays_injected_);
   }
 
-  void incAborts(absl::string_view downstream_cluster) {
+  void incAborts(Stats::StatName downstream_cluster) {
     incCounter(downstream_cluster, aborts_injected_);
   }
 
 private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
-  void incCounter(absl::string_view downstream_cluster, Stats::StatName stat_name);
+  void incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name);
 
   const FaultSettings settings_;
   Runtime::Loader& runtime_;
@@ -258,6 +258,7 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
+  std::unique_ptr<Stats::StatNameDynamicStorage> downstream_cluster_storage_;
   const FaultSettings* fault_settings_;
   bool fault_active_{};
   std::unique_ptr<StreamRateLimiter> response_limiter_;

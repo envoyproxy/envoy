@@ -14,8 +14,22 @@
 namespace Envoy {
 namespace Stats {
 
-static const uint32_t SpilloverMask = 0x80;
-static const uint32_t Low7Bits = 0x7f;
+// Masks used for variable-length encoding of arbitrary-sized integers into a
+// uint8-array. The integers are typically small, so we try to store them in as
+// few bytes as possible. The bottom 7 bits hold values, and the top bit is used
+// to determine whether another byte is needed for more data.
+static constexpr uint32_t SpilloverMask = 0x80;
+static constexpr uint32_t Low7Bits = 0x7f;
+
+// When storing Symbol arrays, we disallow Symbol 0, which is the only Symbol
+// that will decode into uint8_t array starting (and ending) with {0}. Thus we
+// can use a leading 0 in the first byte to indicate that what follows is
+// literal char data, rather than symbol-table entries. Literal char data is
+// used for dynamically discovered stat-name tokens where you don't want to take
+// a symbol table lock, and would rather pay extra memory overhead to store the
+// tokens as fully elaborated strings.
+static constexpr Symbol FirstValidSymbol = 1;
+static constexpr uint8_t LiteralStringIndicator = 0;
 
 uint64_t StatName::dataSize() const {
   if (size_and_data_ == nullptr) {
@@ -104,13 +118,50 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage ar
                                                    uint64_t size) {
   SymbolVec symbol_vec;
   symbol_vec.reserve(size);
-  while (size > 0) {
-    std::pair<uint64_t, uint64_t> symbol_consumed = decodeNumber(array);
-    symbol_vec.push_back(symbol_consumed.first);
-    size -= symbol_consumed.second;
-    array += symbol_consumed.second;
-  }
+  decodeTokens(
+      array, size, [&symbol_vec](Symbol symbol) { symbol_vec.push_back(symbol); },
+      [](absl::string_view) {});
   return symbol_vec;
+}
+
+void SymbolTableImpl::Encoding::decodeTokens(
+    const SymbolTable::Storage array, uint64_t size,
+    const std::function<void(Symbol)>& symbolTokenFn,
+    const std::function<void(absl::string_view)>& stringViewTokenFn) {
+  while (size > 0) {
+    if (*array == LiteralStringIndicator) {
+      // To avoid scanning memory to find the literal size during decode, we
+      // var-length encode the size of the literal string prior to the data.
+      ASSERT(size > 1);
+      ++array;
+      --size;
+      std::pair<uint64_t, uint64_t> length_consumed = decodeNumber(array);
+      uint64_t length = length_consumed.first;
+      array += length_consumed.second;
+      size -= length_consumed.second;
+      ASSERT(size >= length);
+      stringViewTokenFn(absl::string_view(reinterpret_cast<const char*>(array), length));
+      size -= length;
+      array += length;
+    } else {
+      std::pair<uint64_t, uint64_t> symbol_consumed = decodeNumber(array);
+      symbolTokenFn(symbol_consumed.first);
+      size -= symbol_consumed.second;
+      array += symbol_consumed.second;
+    }
+  }
+}
+
+std::vector<absl::string_view> SymbolTableImpl::decodeStrings(const SymbolTable::Storage array,
+                                                              uint64_t size) const {
+  std::vector<absl::string_view> strings;
+  Thread::LockGuard lock(lock_);
+  Encoding::decodeTokens(
+      array, size,
+      [this, &strings](Symbol symbol)
+          NO_THREAD_SAFETY_ANALYSIS { strings.push_back(fromSymbol(symbol)); },
+      [&strings](absl::string_view str) { strings.push_back(str); });
+  return strings;
 }
 
 void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) {
@@ -121,7 +172,7 @@ void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_blo
 
 SymbolTableImpl::SymbolTableImpl()
     // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
-    : next_symbol_(0), monotonic_counter_(0) {}
+    : next_symbol_(FirstValidSymbol), monotonic_counter_(FirstValidSymbol) {}
 
 SymbolTableImpl::~SymbolTableImpl() {
   // To avoid leaks into the symbol table, we expect all StatNames to be freed.
@@ -151,6 +202,10 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
     Thread::LockGuard lock(lock_);
     recent_lookups_.lookup(name);
     for (auto& token : tokens) {
+      // TODO(jmarantz): consider using StatNameDynamicStorage for tokens with
+      // length below some threshold, say 4 bytes. It might be preferable not to
+      // reserve Symbols for every 3 digit number found (for example) in ipv4
+      // addresses.
       symbols.push_back(toSymbol(token));
     }
   }
@@ -166,25 +221,12 @@ uint64_t SymbolTableImpl::numSymbols() const {
 }
 
 std::string SymbolTableImpl::toString(const StatName& stat_name) const {
-  return decodeSymbolVec(Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+  return absl::StrJoin(decodeStrings(stat_name.data(), stat_name.dataSize()), ".");
 }
 
 void SymbolTableImpl::callWithStringView(StatName stat_name,
                                          const std::function<void(absl::string_view)>& fn) const {
   fn(toString(stat_name));
-}
-
-std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
-  std::vector<absl::string_view> name_tokens;
-  name_tokens.reserve(symbols.size());
-  {
-    // Hold the lock only while decoding symbols.
-    Thread::LockGuard lock(lock_);
-    for (Symbol symbol : symbols) {
-      name_tokens.push_back(fromSymbol(symbol));
-    }
-  }
-  return absl::StrJoin(name_tokens, ".");
 }
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
@@ -233,20 +275,8 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
   uint64_t total = 0;
   absl::flat_hash_map<std::string, uint64_t> name_count_map;
 
-  // We don't want to hold stat_name_set_mutex while calling the iterator, so
-  // buffer lookup_data.
-  {
-    Thread::LockGuard lock(stat_name_set_mutex_);
-    for (StatNameSet* stat_name_set : stat_name_sets_) {
-      total +=
-          stat_name_set->getRecentLookups([&name_count_map](absl::string_view str, uint64_t count) {
-            name_count_map[std::string(str)] += count;
-          });
-    }
-  }
-
-  // We also don't want to hold lock_ while calling the iterator, but we need it
-  // to access recent_lookups_.
+  // We don't want to hold lock_ while calling the iterator, but we need it to
+  // access recent_lookups_, so we buffer in name_count_map.
   {
     Thread::LockGuard lock(lock_);
     recent_lookups_.forEach(
@@ -272,30 +302,13 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
 }
 
 void SymbolTableImpl::setRecentLookupCapacity(uint64_t capacity) {
-  {
-    Thread::LockGuard lock(stat_name_set_mutex_);
-    for (StatNameSet* stat_name_set : stat_name_sets_) {
-      stat_name_set->setRecentLookupCapacity(capacity);
-    }
-  }
-
-  {
-    Thread::LockGuard lock(lock_);
-    recent_lookups_.setCapacity(capacity);
-  }
+  Thread::LockGuard lock(lock_);
+  recent_lookups_.setCapacity(capacity);
 }
 
 void SymbolTableImpl::clearRecentLookups() {
-  {
-    Thread::LockGuard lock(stat_name_set_mutex_);
-    for (StatNameSet* stat_name_set : stat_name_sets_) {
-      stat_name_set->clearRecentLookups();
-    }
-  }
-  {
-    Thread::LockGuard lock(lock_);
-    recent_lookups_.clear();
-  }
+  Thread::LockGuard lock(lock_);
+  recent_lookups_.clear();
 }
 
 uint64_t SymbolTableImpl::recentLookupCapacity() const {
@@ -304,20 +317,9 @@ uint64_t SymbolTableImpl::recentLookupCapacity() const {
 }
 
 StatNameSetPtr SymbolTableImpl::makeSet(absl::string_view name) {
-  const uint64_t capacity = recentLookupCapacity();
   // make_unique does not work with private ctor, even though SymbolTableImpl is a friend.
   StatNameSetPtr stat_name_set(new StatNameSet(*this, name));
-  stat_name_set->setRecentLookupCapacity(capacity);
-  {
-    Thread::LockGuard lock(stat_name_set_mutex_);
-    stat_name_sets_.insert(stat_name_set.get());
-  }
   return stat_name_set;
-}
-
-void SymbolTableImpl::forgetSet(StatNameSet& stat_name_set) {
-  Thread::LockGuard lock(stat_name_set_mutex_);
-  stat_name_sets_.erase(&stat_name_set);
 }
 
 Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
@@ -367,17 +369,14 @@ void SymbolTableImpl::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
 bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
   // Constructing two temp vectors during lessThan is not strictly necessary.
   // If this becomes a performance bottleneck (e.g. during sorting), we could
-  // provide an iterator-like interface for incrementally decoding the symbols
+  // provide an iterator-like interface for incrementally comparing the tokens
   // without allocating memory.
-  const SymbolVec av = Encoding::decodeSymbols(a.data(), a.dataSize());
-  const SymbolVec bv = Encoding::decodeSymbols(b.data(), b.dataSize());
+  const std::vector<absl::string_view> av = decodeStrings(a.data(), a.dataSize());
+  const std::vector<absl::string_view> bv = decodeStrings(b.data(), b.dataSize());
 
-  // Calling fromSymbol requires holding the lock, as it needs read-access to
-  // the maps that are written when adding new symbols.
-  Thread::LockGuard lock(lock_);
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
-      bool ret = fromSymbol(av[i]) < fromSymbol(bv[i]);
+      const bool ret = av[i] < bv[i];
       return ret;
     }
   }
@@ -410,14 +409,43 @@ SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
 }
 
 StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
-    : bytes_(table.encode(name)) {}
+    : StatNameStorageBase(table.encode(name)) {}
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   const uint64_t size = src.size();
   MemBlockBuilder<uint8_t> storage(size);
   src.copyToMemBlock(storage);
-  bytes_ = storage.release();
+  setBytes(storage.release());
   table.incRefCount(statName());
+}
+
+SymbolTable::StoragePtr SymbolTableImpl::makeDynamicStorage(absl::string_view name) {
+  name = StringUtil::removeTrailingCharacters(name, '.');
+
+  // For all StatName objects, we first have the total number of bytes in the
+  // representation. But for inlined dynamic string StatName variants, we must
+  // store the length of the payload separately, so that if this token gets
+  // joined with others, we'll know much space it consumes until the next token.
+  // So the layout is
+  //   [ length-of-whole-StatName, LiteralStringIndicator, length-of-name, name ]
+  // So we need to figure out how many bytes we need to represent length-of-name
+  // and name.
+
+  // payload_bytes is the total number of bytes needed to represent the
+  // characters in name, plus their encoded size, plus the literal indicator.
+  const uint64_t payload_bytes = SymbolTableImpl::Encoding::totalSizeBytes(name.size()) + 1;
+
+  // total_bytes includes the payload_bytes, plus the LiteralStringIndicator, and
+  // the length of those.
+  const uint64_t total_bytes = SymbolTableImpl::Encoding::totalSizeBytes(payload_bytes);
+  MemBlockBuilder<uint8_t> mem_block(total_bytes);
+
+  SymbolTableImpl::Encoding::appendEncoding(payload_bytes, mem_block);
+  mem_block.appendOne(LiteralStringIndicator);
+  SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
+  mem_block.appendData(absl::MakeSpan(reinterpret_cast<const uint8_t*>(name.data()), name.size()));
+  ASSERT(mem_block.capacityRemaining() == 0);
+  return mem_block.release();
 }
 
 StatNameStorage::~StatNameStorage() {
@@ -425,12 +453,12 @@ StatNameStorage::~StatNameStorage() {
   // decrement the reference counts held by the SymbolTable on behalf of
   // this StatName. This saves 8 bytes of storage per stat, relative to
   // holding a SymbolTable& in each StatNameStorage object.
-  ASSERT(bytes_ == nullptr);
+  ASSERT(bytes() == nullptr);
 }
 
 void StatNameStorage::free(SymbolTable& table) {
   table.free(statName());
-  bytes_.reset();
+  clear();
 }
 
 void StatNamePool::clear() {
@@ -440,12 +468,17 @@ void StatNamePool::clear() {
   storage_vector_.clear();
 }
 
-uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
+const uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
   storage_vector_.push_back(Stats::StatNameStorage(str, symbol_table_));
   return storage_vector_.back().bytes();
 }
 
 StatName StatNamePool::add(absl::string_view str) { return StatName(addReturningStorage(str)); }
+
+StatName StatNameDynamicPool::add(absl::string_view str) {
+  storage_vector_.push_back(Stats::StatNameDynamicStorage(str, symbol_table_));
+  return StatName(storage_vector_.back().bytes());
+}
 
 StatNameStorageSet::~StatNameStorageSet() {
   // free() must be called before destructing StatNameStorageSet to decrement
@@ -487,6 +520,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   for (StatName stat_name : stat_names) {
     stat_name.appendDataToMemBlock(mem_block);
   }
+  ASSERT(mem_block.capacityRemaining() == 0);
   return mem_block.release();
 }
 
@@ -497,7 +531,7 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
   // First encode all the names.
   size_t total_size_bytes = 1; /* one byte for holding the number of names */
 
-  STACK_ARRAY(encodings, Encoding, num_names);
+  absl::FixedArray<Encoding> encodings(num_names);
   for (uint32_t i = 0; i < num_names; ++i) {
     Encoding& encoding = encodings[i];
     addTokensToEncoding(names[i], encoding);
@@ -547,8 +581,6 @@ StatNameSet::StatNameSet(SymbolTable& symbol_table, absl::string_view name)
   builtin_stat_names_[""] = StatName();
 }
 
-StatNameSet::~StatNameSet() { symbol_table_.forgetSet(*this); }
-
 void StatNameSet::rememberBuiltin(absl::string_view str) {
   StatName stat_name;
   {
@@ -566,42 +598,6 @@ StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
     return iter->second;
   }
   return fallback;
-}
-
-StatName StatNameSet::getDynamic(absl::string_view token) {
-  // We duplicate most of the getBuiltin implementation so that we can detect
-  // the difference between "not found" and "found empty stat name".
-  const auto iter = builtin_stat_names_.find(token);
-  if (iter != builtin_stat_names_.end()) {
-    return iter->second;
-  }
-
-  {
-    // Other tokens require holding a lock for our local cache.
-    absl::MutexLock lock(&mutex_);
-    Stats::StatName& stat_name_ref = dynamic_stat_names_[token];
-    if (stat_name_ref.empty()) { // Note that builtin_stat_names_ already has one for "".
-      stat_name_ref = pool_.add(token);
-      recent_lookups_.lookup(token);
-    }
-    return stat_name_ref;
-  }
-}
-
-uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) const {
-  absl::MutexLock lock(&mutex_);
-  recent_lookups_.forEach(iter);
-  return recent_lookups_.total();
-}
-
-void StatNameSet::clearRecentLookups() {
-  absl::MutexLock lock(&mutex_);
-  recent_lookups_.clear();
-}
-
-void StatNameSet::setRecentLookupCapacity(uint64_t capacity) {
-  absl::MutexLock lock(&mutex_);
-  recent_lookups_.setCapacity(capacity);
 }
 
 } // namespace Stats

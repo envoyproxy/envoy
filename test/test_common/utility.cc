@@ -24,7 +24,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
-#include "common/common/stack_array.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/resources.h"
@@ -38,6 +37,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
@@ -100,9 +100,9 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
   // containing 10 bytes while rhs has ten slices containing one byte each.
   uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
   uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
-  STACK_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
+  absl::FixedArray<Buffer::RawSlice> lhs_slices(lhs_num_slices);
   lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
-  STACK_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
+  absl::FixedArray<Buffer::RawSlice> rhs_slices(rhs_num_slices);
   rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
   size_t rhs_slice = 0;
   size_t rhs_offset = 0;

@@ -353,6 +353,10 @@ ProcessContextOptRef ListenerImpl::processContext() { return parent_.server_.pro
 Configuration::ServerFactoryContext& ListenerImpl::getServerFactoryContext() const {
   return parent_.server_.serverFactoryContext();
 }
+Configuration::TransportSocketFactoryContext&
+ListenerImpl::getTransportSocketFactoryContext() const {
+  return parent_.server_.transportSocketFactoryContext();
+}
 
 bool ListenerImpl::createNetworkFilterChain(
     Network::Connection& connection,

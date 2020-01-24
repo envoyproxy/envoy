@@ -3,8 +3,8 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/type/metadata/v2/metadata.pb.h"
-#include "envoy/type/tracing/v2/custom_tag.pb.h"
+#include "envoy/type/metadata/v3/metadata.pb.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
@@ -248,15 +248,15 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::HeaderMap* respons
 }
 
 CustomTagConstSharedPtr
-HttpTracerUtility::createCustomTag(const envoy::type::tracing::v2::CustomTag& tag) {
+HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag) {
   switch (tag.type_case()) {
-  case envoy::type::tracing::v2::CustomTag::TypeCase::kLiteral:
+  case envoy::type::tracing::v3::CustomTag::TypeCase::kLiteral:
     return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
-  case envoy::type::tracing::v2::CustomTag::TypeCase::kEnvironment:
+  case envoy::type::tracing::v3::CustomTag::TypeCase::kEnvironment:
     return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
-  case envoy::type::tracing::v2::CustomTag::TypeCase::kRequestHeader:
+  case envoy::type::tracing::v3::CustomTag::TypeCase::kRequestHeader:
     return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
-  case envoy::type::tracing::v2::CustomTag::TypeCase::kMetadata:
+  case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -296,14 +296,14 @@ void CustomTagBase::apply(Span& span, const CustomTagContext& ctx) const {
 }
 
 EnvironmentCustomTag::EnvironmentCustomTag(
-    const std::string& tag, const envoy::type::tracing::v2::CustomTag::Environment& environment)
+    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Environment& environment)
     : CustomTagBase(tag), name_(environment.name()), default_value_(environment.default_value()) {
   const char* env = std::getenv(name_.data());
   final_value_ = env ? env : default_value_;
 }
 
 RequestHeaderCustomTag::RequestHeaderCustomTag(
-    const std::string& tag, const envoy::type::tracing::v2::CustomTag::Header& request_header)
+    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Header& request_header)
     : CustomTagBase(tag), name_(Http::LowerCaseString(request_header.name())),
       default_value_(request_header.default_value()) {}
 
@@ -316,7 +316,7 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,
-                                     const envoy::type::tracing::v2::CustomTag::Metadata& metadata)
+                                     const envoy::type::tracing::v3::CustomTag::Metadata& metadata)
     : CustomTagBase(tag), kind_(metadata.kind().kind_case()),
       metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 
@@ -357,17 +357,17 @@ const envoy::config::core::v3::Metadata*
 MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   const StreamInfo::StreamInfo& info = ctx.stream_info;
   switch (kind_) {
-  case envoy::type::metadata::v2::MetadataKind::KindCase::kRequest:
+  case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
     return &info.dynamicMetadata();
-  case envoy::type::metadata::v2::MetadataKind::KindCase::kRoute: {
+  case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
     const Router::RouteEntry* route_entry = info.routeEntry();
     return route_entry ? &route_entry->metadata() : nullptr;
   }
-  case envoy::type::metadata::v2::MetadataKind::KindCase::kCluster: {
+  case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
     const auto& hostPtr = info.upstreamHost();
     return hostPtr ? &hostPtr->cluster().metadata() : nullptr;
   }
-  case envoy::type::metadata::v2::MetadataKind::KindCase::kHost: {
+  case envoy::type::metadata::v3::MetadataKind::KindCase::kHost: {
     const auto& hostPtr = info.upstreamHost();
     return hostPtr ? hostPtr->metadata().get() : nullptr;
   }

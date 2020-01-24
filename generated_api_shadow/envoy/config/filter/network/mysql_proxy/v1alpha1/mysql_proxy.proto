@@ -14,6 +14,7 @@ option (udpa.annotations.file_migrate).move_to_package =
 // [#protodoc-title: MySQL proxy]
 // MySQL Proxy :ref:`configuration overview <config_network_filters_mysql_proxy>`.
 // [#extension: envoy.filters.network.mysql_proxy]
+
 message MySQLProxy {
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_mysql_proxy_stats>`.

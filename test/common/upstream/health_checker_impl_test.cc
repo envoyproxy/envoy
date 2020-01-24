@@ -104,7 +104,7 @@ public:
   };
 
   // HttpHealthCheckerImpl
-  MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
@@ -695,7 +695,7 @@ public:
               cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
   }
 
-  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
+  MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -3362,7 +3362,7 @@ public:
   };
 
   // GrpcHealthCheckerImpl
-  MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 };
 
 class GrpcHealthCheckerImplTestBase {
@@ -3709,7 +3709,7 @@ public:
     expectHostHealthy(true);
   }
 
-  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
+  MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
