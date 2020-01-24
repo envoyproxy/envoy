@@ -102,7 +102,7 @@ protected:
 
   using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
-  // Create a new CodecClient
+  // Create a new CodecClient.
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
   // Returns a new instance of ActiveClient.

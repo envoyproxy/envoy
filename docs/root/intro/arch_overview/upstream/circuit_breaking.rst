@@ -23,12 +23,11 @@ configure and code each application independently. Envoy supports various types 
   all hosts in an upstream cluster. If this circuit breaker overflows the :ref:`upstream_cx_overflow
   <config_cluster_manager_cluster_stats>` counter for the cluster will increment.
 * **Cluster maximum pending requests**: The maximum number of requests that will be queued while
-  waiting for a ready connection pool connection. Since HTTP/2 allows many requests concurrently over a single
-  connection, this circuit breaker only comes into play as the initial connection is created,
-  as requests will be multiplexed immediately afterwards (unless :ref:`max concurrent streams <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>`
-  is configured). For HTTP/1.1, requests are added to the list
+  waiting for a ready connection pool connection. Requests are added to the list
   of pending requests whenever there aren't enough upstream connections available to immediately dispatch
-  the request, so this circuit breaker will remain in play for the lifetime of the process.
+  the request. For HTTP/2 connections, if :ref:`max concurrent streams <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>`
+  is not configured, all requests will be multiplexed over the same connection so this circuit breaker
+  will only be hit when no connection is already established.
   If this circuit breaker overflows the
   :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
   increment.

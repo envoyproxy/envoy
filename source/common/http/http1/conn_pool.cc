@@ -70,13 +70,6 @@ ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, Acti
       StreamDecoderWrapper(response_decoder), parent_(parent) {
 
   StreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
-
-  // TODO (tonya11en): At the time of writing, there is no way to mix different versions of HTTP
-  // traffic in the same cluster, so incrementing the request count in the per-cluster resource
-  // manager will not affect circuit breaking in any unexpected ways. Ideally, outstanding requests
-  // counts would be tracked the same way in all HTTP versions.
-  //
-  // See: https://github.com/envoyproxy/envoy/issues/9215
 }
 
 ConnPoolImpl::StreamWrapper::~StreamWrapper() {
@@ -117,7 +110,7 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : ConnPoolImplBase::ActiveClient(
           parent, parent.host_->cluster().maxRequestsPerConnection(),
-          1 // HTTP1 always has a concurrent-request-limit of 1 per connection
+          1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
       ) {
   parent.host_->cluster().stats().upstream_cx_http1_total_.inc();
 }

@@ -66,7 +66,6 @@ protected:
 
   struct ActiveClient : public ConnPoolImplBase::ActiveClient {
     ActiveClient(ConnPoolImpl& parent);
-    ~ActiveClient() override = default;
 
     ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 

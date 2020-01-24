@@ -302,27 +302,27 @@ TEST_F(Http2ConnPoolImplTest, MaxConcurrentRequestsPerStream) {
   InSequence s;
 
   {
-    // Create request and complete it
+    // Create request and complete it.
     expectClientCreate();
     ActiveTestRequest r(*this, 0, false);
     expectClientConnect(0, r);
     completeRequest(r);
   }
 
-  // Previous request completed, so this one will re-use the connection
+  // Previous request completed, so this one will re-use the connection.
   {
     ActiveTestRequest r(*this, 0, true);
     completeRequest(r);
   }
 
-  // Two concurrent requests causes one additional connection to be created
+  // Two concurrent requests causes one additional connection to be created.
   {
     ActiveTestRequest r1(*this, 0, true);
     expectClientCreate();
     ActiveTestRequest r2(*this, 1, false);
     expectClientConnect(1, r2);
 
-    // Complete one of them, and create another, and it will re-use the connection
+    // Complete one of them, and create another, and it will re-use the connection.
     completeRequest(r2);
     ActiveTestRequest r3(*this, 1, true);
 
@@ -330,7 +330,7 @@ TEST_F(Http2ConnPoolImplTest, MaxConcurrentRequestsPerStream) {
     completeRequest(r3);
   }
 
-  // Create two more requests; both should use existing connections
+  // Create two more requests; both should use existing connections.
   {
     ActiveTestRequest r1(*this, 1, true);
     ActiveTestRequest r2(*this, 0, true);
