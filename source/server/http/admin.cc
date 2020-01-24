@@ -915,9 +915,9 @@ Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::H
 
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
-  const auto current_time = std::chrono::system_clock::to_time_t(server_.timeSource().systemTime());
-  const auto uptime_current_epoch = current_time - server_.startTimeCurrentEpoch();
-  const auto uptime_all_epochs = current_time - server_.startTimeFirstEpoch();
+  const std::time_t current_time = std::chrono::system_clock::to_time_t(server_.timeSource().systemTime());
+  const std::time_t uptime_current_epoch = current_time - server_.startTimeCurrentEpoch();
+  const std::time_t uptime_all_epochs = current_time - server_.startTimeFirstEpoch();
 
   ASSERT(uptime_current_epoch >= 0);
   ASSERT(uptime_all_epochs >= 0);
