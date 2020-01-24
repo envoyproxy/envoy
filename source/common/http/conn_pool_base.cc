@@ -29,6 +29,12 @@ void ConnPoolImplBase::destructAllConnections() {
 }
 
 void ConnPoolImplBase::tryCreateNewConnection() {
+  if (pending_requests_.size() <= connecting_request_capacity_) {
+    // There are already enough CONNECTING connections for the number
+    // of queued requests.
+    return;
+  }
+
   const bool can_create_connection =
       host_->cluster().resourceManager(priority_).connections().canCreate();
   if (!can_create_connection) {
@@ -41,6 +47,9 @@ void ConnPoolImplBase::tryCreateNewConnection() {
     ENVOY_LOG(debug, "creating a new connection");
     ActiveClientPtr client = instantiateActiveClient();
     ASSERT(client->state_ == ActiveClient::State::CONNECTING);
+    ASSERT(std::numeric_limits<uint64_t>::max() - connecting_request_capacity_ >=
+           client->effectiveConcurrentRequestLimit());
+    connecting_request_capacity_ += client->effectiveConcurrentRequestLimit();
     client->moveIntoList(std::move(client), owningList(client->state_));
   }
 }
@@ -111,9 +120,13 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(Http::StreamDecoder& re
   }
 
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
+    ConnectionPool::Cancellable* pending = newPendingRequest(response_decoder, callbacks);
+
+    // This must come after newPendingRequest() because this function uses the
+    // length of pending_requests_ to determine if a new connection is needed.
     tryCreateNewConnection();
 
-    return newPendingRequest(response_decoder, callbacks);
+    return pending;
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");
     callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
@@ -180,9 +193,14 @@ void ConnPoolImplBase::closeIdleConnections() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
 
-  // Possibly-idle connections are always in the ready_clients_ list
   for (auto& client : ready_clients_) {
     if (!client->hasActiveRequests()) {
+      to_close.push_back(client.get());
+    }
+  }
+
+  for (auto& client : busy_clients_) {
+    if (client->state_ == ActiveClient::State::CONNECTING) {
       to_close.push_back(client.get());
     }
   }
@@ -227,6 +245,11 @@ void ConnPoolImplBase::checkForDrained() {
 
 void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
                                          Network::ConnectionEvent event) {
+  if (client.state_ == ActiveClient::State::CONNECTING) {
+    ASSERT(connecting_request_capacity_ >= client.effectiveConcurrentRequestLimit());
+    connecting_request_capacity_ -= client.effectiveConcurrentRequestLimit();
+  }
+
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     // The client died.

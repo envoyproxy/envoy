@@ -60,6 +60,12 @@ protected:
     void onConnectTimeout();
     void close() { codec_client_->close(); }
 
+    // Returns the concurrent request limit, accounting for if the total request limit
+    // is less than the concurrent request limit.
+    uint64_t effectiveConcurrentRequestLimit() const {
+      return std::min(remaining_requests_, concurrent_request_limit_);
+    }
+
     virtual bool hasActiveRequests() const PURE;
     virtual bool closingWithIncompleteRequest() const PURE;
     virtual StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) PURE;
@@ -165,6 +171,10 @@ protected:
 
   // The number of requests currently attached to clients.
   uint64_t num_active_requests_{0};
+
+  // The number of requests that can be immediately dispatched
+  // if all CONNECTING connections become connected.
+  uint64_t connecting_request_capacity_{0};
 };
 } // namespace Http
 } // namespace Envoy

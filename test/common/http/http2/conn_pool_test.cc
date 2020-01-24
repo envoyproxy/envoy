@@ -60,7 +60,11 @@ public:
 
   Http2ConnPoolImplTest()
       : api_(Api::createApiForTest(stats_store_)),
-        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr) {}
+        pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr) {
+    // Default connections to 1024 because the tests shouldn't be relying on the
+    // connection resource limit for most tests.
+    cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
+  }
 
   ~Http2ConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -254,6 +258,17 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionBusy) {
   r.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
 }
 
+TEST_F(Http2ConnPoolImplTest, DrainConnectionConnecting) {
+  InSequence s;
+
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+
+  expectStreamReset(r);
+  EXPECT_CALL(*this, onClientDestroy());
+  pool_.drainConnections();
+}
+
 /**
  * Verify that connections are drained when requested.
  */
@@ -381,6 +396,78 @@ TEST_F(Http2ConnPoolImplTest, PendingRequests) {
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
+}
+
+// Verifies that the correct number of CONNECTING connections are created for
+// the pending requests, when the total requests per connection is limited
+TEST_F(Http2ConnPoolImplTest, PendingRequestsNumberConnectingTotalRequestsPerConnection) {
+  cluster_->max_requests_per_connection_ = 2;
+  InSequence s;
+
+  // Create three requests. The 3rd should create a 2nd connection due to the limit
+  // of 2 requests per connection.
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  ActiveTestRequest r2(*this, 0, false);
+  expectClientCreate();
+  ActiveTestRequest r3(*this, 1, false);
+
+  // The connection now becomes ready. This should cause all the queued requests to be sent.
+  expectStreamConnect(0, r1);
+  expectClientConnect(0, r2);
+  expectClientConnect(1, r3);
+
+  // Send a request through each stream.
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  r2.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true));
+  r3.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  // Clean up everything.
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy()).Times(2);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// Verifies that the correct number of CONNECTING connections are created for
+// the pending requests, when the concurrent requests per connection is limited
+TEST_F(Http2ConnPoolImplTest, PendingRequestsNumberConnectingConcurrentRequestsPerConnection) {
+  cluster_->http2_settings_.max_concurrent_streams_ = 2;
+  InSequence s;
+
+  // Create three requests. The 3rd should create a 2nd connection due to the limit
+  // of 2 requests per connection.
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  ActiveTestRequest r2(*this, 0, false);
+  expectClientCreate();
+  ActiveTestRequest r3(*this, 1, false);
+
+  // The connection now becomes ready. This should cause all the queued requests to be sent.
+  expectStreamConnect(0, r1);
+  expectClientConnect(0, r2);
+  expectClientConnect(1, r3);
+
+  // Send a request through each stream.
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  r2.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true));
+  r3.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  // Clean up everything.
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy()).Times(2);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 // Verifies that requests are queued up in the conn pool and fail when the connection
