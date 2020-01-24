@@ -5,10 +5,10 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.validate.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"
@@ -55,14 +55,14 @@ using ::Envoy::Network::UpstreamServerName;
 namespace {
 Config constructConfigFromYaml(const std::string& yaml,
                                Server::Configuration::FactoryContext& context) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy tcp_proxy;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
   return Config(tcp_proxy, context);
 }
 
 Config constructConfigFromV2Yaml(const std::string& yaml,
                                  Server::Configuration::FactoryContext& context) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy tcp_proxy;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
   return Config(tcp_proxy, context);
 }
@@ -798,11 +798,11 @@ TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
 }
 
 TEST(ConfigTest, AccessLogConfig) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config;
-  envoy::config::filter::accesslog::v3alpha::AccessLog* log = config.mutable_access_log()->Add();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+  envoy::config::accesslog::v3::AccessLog* log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
   {
-    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
     file_access_log.set_format("the format specifier");
     log->mutable_typed_config()->PackFrom(file_access_log);
@@ -811,7 +811,7 @@ TEST(ConfigTest, AccessLogConfig) {
   log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
   {
-    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
     log->mutable_typed_config()->PackFrom(file_access_log);
   }
@@ -835,12 +835,12 @@ public:
     }
   }
 
-  void configure(const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy& config) {
+  void configure(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
     config_.reset(new Config(config, factory_context_));
   }
 
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy defaultConfig() {
-    envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultConfig() {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
     config.set_stat_prefix("name");
     auto* route = config.mutable_hidden_envoy_deprecated_deprecated_v1()->mutable_routes()->Add();
     route->set_cluster("fake_cluster");
@@ -849,13 +849,12 @@ public:
   }
 
   // Return the default config, plus one file access log with the specified format
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy
   accessLogConfig(const std::string& access_log_format) {
-    envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
-    envoy::config::filter::accesslog::v3alpha::AccessLog* access_log =
-        config.mutable_access_log()->Add();
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+    envoy::config::accesslog::v3::AccessLog* access_log = config.mutable_access_log()->Add();
     access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
-    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
     access_log->mutable_typed_config()->PackFrom(file_access_log);
@@ -863,7 +862,7 @@ public:
   }
 
   void setup(uint32_t connections,
-             const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy& config) {
+             const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
     configure(config);
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
@@ -961,9 +960,9 @@ public:
 };
 
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DefaultRoutes)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
 
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy::WeightedCluster::ClusterWeight*
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::WeightedCluster::ClusterWeight*
       ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
   ignored_cluster->set_name("ignored_cluster");
   ignored_cluster->set_weight(10);
@@ -1033,7 +1032,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamRemoteDisconnect)) {
 
 // Test that reconnect is attempted after a local connect failure
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFail)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
 
   setup(2, config);
@@ -1049,7 +1048,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFail)) 
 
 // Test that reconnect is attempted after a remote connect failure
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamRemoteFail)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
@@ -1064,7 +1063,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamRemoteFail))
 
 // Test that reconnect is attempted after a connect timeout
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamTimeout)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
@@ -1078,7 +1077,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamTimeout)) {
 
 // Test that only the configured number of connect attempts occur
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsLimit)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config =
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
       accessLogConfig("%RESPONSE_FLAGS%");
   config.mutable_max_connect_attempts()->set_value(3);
   setup(3, config);
@@ -1105,7 +1104,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsLimit)) {
 
 // Test that the tcp proxy sends the correct notifications to the outlier detector
 TEST_F(TcpProxyTest, OutlierDetection) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(3);
   setup(3, config);
 
@@ -1213,7 +1212,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(RouteWithMetadataMatch)) {
     mutable_fields->insert({criterion.name(), criterion.value().value()});
   }
 
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_metadata_match()->mutable_filter_metadata()->insert(
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
@@ -1372,7 +1371,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamConnectionLimit)) {
 // Tests that the idle timer closes both connections, and gets updated when either
 // connection has activity.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -1402,7 +1401,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
 
 // Tests that the idle timer is disabled when the downstream connection is closed.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimerDisabledDownstreamClose)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -1416,7 +1415,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimerDisabledDownstreamClose)) 
 
 // Tests that the idle timer is disabled when the upstream connection is closed.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimerDisabledUpstreamClose)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -1430,7 +1429,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimerDisabledUpstreamClose)) {
 
 // Tests that flushing data during an idle timeout doesn't cause problems.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(IdleTimeoutWithOutstandingDataFlushed)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -1615,7 +1614,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushNoTimeout)) {
 // Tests that upstream flush works with an idle timeout configured, but the connection
 // finishes draining before the timer expires.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushTimeoutConfigured)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 
@@ -1647,7 +1646,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushTimeoutConfigured)) {
 
 // Tests that upstream flush closes the connection when the idle timeout fires.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushTimeoutExpired)) {
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   setup(1, config);
 

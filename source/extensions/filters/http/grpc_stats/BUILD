@@ -26,6 +26,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/grpc_stats/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/grpc_stats/v3:pkg_cc_proto",
     ],
 )

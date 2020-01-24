@@ -2,8 +2,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -12,10 +13,12 @@
 #include "common/http/context_impl.h"
 #include "common/network/application_protocol.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/upstream_server_name.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/router.h"
+#include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -49,6 +52,7 @@ using testing::Invoke;
 using testing::Matcher;
 using testing::MockFunction;
 using testing::NiceMock;
+using testing::Property;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -57,7 +61,7 @@ using testing::StartsWith;
 namespace Envoy {
 namespace Router {
 
-class TestFilter : public Filter {
+class RouterTestFilter : public Filter {
 public:
   using Filter::Filter;
   // Filter
@@ -220,15 +224,29 @@ public:
     ON_CALL(callbacks_.route_->route_entry_, internalRedirectAction())
         .WillByDefault(Return(InternalRedirectAction::Handle));
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
+    setMaxInternalRedirects(1);
+  }
+
+  void setMaxInternalRedirects(uint32_t max_internal_redirects) {
+    ON_CALL(callbacks_.route_->route_entry_, maxInternalRedirects())
+        .WillByDefault(Return(max_internal_redirects));
+  }
+
+  void setNumPreviousRedirect(uint32_t num_previous_redirects) {
+    callbacks_.streamInfo().filterState().setData(
+        "num_internal_redirects",
+        std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
+        StreamInfo::FilterState::StateType::Mutable,
+        StreamInfo::FilterState::LifeSpan::DownstreamRequest);
   }
 
   void enableHedgeOnPerTryTimeout() {
     callbacks_.route_->route_entry_.hedge_policy_.hedge_on_per_try_timeout_ = true;
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_ =
-        envoy::type::v3alpha::FractionalPercent{};
+        envoy::type::v3::FractionalPercent{};
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_numerator(0);
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_denominator(
-        envoy::type::v3alpha::FractionalPercent::HUNDRED);
+        envoy::type::v3::FractionalPercent::HUNDRED);
   }
 
   void testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name);
@@ -238,7 +256,7 @@ public:
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
-  envoy::config::core::v3alpha::Locality upstream_locality_;
+  envoy::config::core::v3::Locality upstream_locality_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -249,7 +267,7 @@ public:
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   FilterConfig config_;
-  TestFilter router_;
+  RouterTestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
   Network::Address::InstanceConstSharedPtr host_address_{
@@ -278,6 +296,33 @@ public:
       : RouterTestBase(false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
+TEST_F(RouterTest, UpdateFilterState) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
+      .WillByDefault(ReturnRef(dummy_option));
+  ON_CALL(callbacks_.stream_info_, filterState())
+      .WillByDefault(ReturnRef(stream_info.filterState()));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  stream_info.filterState().setData(Network::UpstreamServerName::key(),
+                                    std::make_unique<Network::UpstreamServerName>("dummy"),
+                                    StreamInfo::FilterState::StateType::Mutable);
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_EQ("host",
+            stream_info.filterState()
+                .getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
+                .value());
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
 TEST_F(RouterTest, RouteNotFound) {
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
 
@@ -297,7 +342,6 @@ TEST_F(RouterTest, ClusterNotFound) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
-
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1UL, stats_store_.counter("test.no_cluster").value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
@@ -308,7 +352,6 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   ON_CALL(callbacks_.route_->route_entry_, priority())
       .WillByDefault(Return(Upstream::ResourcePriority::High));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, _, &router_));
-
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
@@ -1120,6 +1163,296 @@ TEST_F(RouterTest, UpstreamTimeout) {
                 .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Verify the timeout budget histograms are filled out correctly when using a
+// global and per-try timeout in a successful request.
+TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "400"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "200"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Global timeout budget used.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 20ull));
+  // Per-try budget used.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
+                  40ull));
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  test_time_.sleep(std::chrono::milliseconds(80));
+  response_decoder->decodeData(data, true);
+}
+
+// Verify the timeout budget histograms are filled out correctly when using a
+// global and per-try timeout in a failed request.
+TEST_F(RouterTest, TimeoutBudgetHistogramStatFailure) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "400"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "200"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Global timeout budget used.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 20ull));
+  // Per-try budget used.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
+                  40ull));
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "500"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  test_time_.sleep(std::chrono::milliseconds(80));
+  response_decoder->decodeData(data, true);
+}
+
+// Verify the timeout budget histograms are filled out correctly when only using a global timeout.
+TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "200"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Global timeout budget used.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 40ull));
+  // Per-try budget used is zero out of an infinite timeout.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"), 0ull));
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  test_time_.sleep(std::chrono::milliseconds(80));
+  response_decoder->decodeData(data, true);
+}
+
+// Verify the timeout budget histograms are filled out correctly across retries.
+TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder1 = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
+                                  {"x-envoy-upstream-rq-timeout-ms", "400"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "100"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Per-try budget used on the first request.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
+                  100ull));
+  // Global timeout histogram does not fire on the first request.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), _))
+      .Times(0);
+
+  // Per-try timeout.
+  test_time_.sleep(std::chrono::milliseconds(100));
+  router_.retry_state_->expectHeadersRetry();
+  Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "504"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  response_decoder1->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // We expect the 5xx response to kick off a new request.
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Http::StreamDecoder* response_decoder2 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder2 = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+
+  // Per-try budget exhausted on the second try.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
+                  100ull));
+  // Global timeout percentage used across both tries.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 50ull));
+
+  // Trigger second request failure.
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder2.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  test_time_.sleep(std::chrono::milliseconds(100));
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(1);
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  per_try_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
+  EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+}
+
+// Verify the timeout budget histograms are filled out correctly when the global timeout occurs
+// during a retry.
+TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder1 = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
+                                  {"x-envoy-upstream-rq-timeout-ms", "400"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "320"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Per-try budget used on the first request.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
+                  50ull));
+  // Global timeout histogram does not fire on the first request.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), _))
+      .Times(0);
+
+  // 5xx response.
+  router_.retry_state_->expectHeadersRetry();
+  Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  test_time_.sleep(std::chrono::milliseconds(160));
+  response_decoder1->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // We expect the 5xx response to kick off a new request.
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Http::StreamDecoder* response_decoder2 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder2 = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+
+  // Global timeout was hit, fires 100.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 100ull));
+  // Per-try budget used on the second request won't fire because the global timeout was hit.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"), _))
+      .Times(0);
+
+  // Trigger global timeout.
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder2.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  test_time_.sleep(std::chrono::milliseconds(240));
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
 }
 
 // Validate gRPC OK response stats are sane when response is trailers only.
@@ -3109,9 +3442,10 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedOnSecondPass) {
+TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
   enableRedirects();
-  default_request_headers_.setEnvoyOriginalUrl("http://www.foo.com");
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(3);
   sendRequest();
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -3207,6 +3541,8 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects();
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(2);
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
@@ -3219,11 +3555,17 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
   // In production, the HCM recreateStream would have called this.
   router_.onDestroy();
+  EXPECT_EQ(3, callbacks_.streamInfo()
+                   .filterState()
+                   .getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
+                   .value());
 }
 
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects();
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(1);
 
   sendRequest();
 
@@ -4162,14 +4504,13 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
   }
   // Use default value instead of runtime key.
   {
-    envoy::type::v3alpha::FractionalPercent fractional_percent;
+    envoy::type::v3::FractionalPercent fractional_percent;
     fractional_percent.set_numerator(5);
-    fractional_percent.set_denominator(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND);
+    fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
     TestShadowPolicy policy("cluster", "foo", fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(
-        runtime.snapshot_,
-        featureEnabled("foo", Matcher<const envoy::type::v3alpha::FractionalPercent&>(_), 3))
+    EXPECT_CALL(runtime.snapshot_,
+                featureEnabled("foo", Matcher<const envoy::type::v3::FractionalPercent&>(_), 3))
         .WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
   }

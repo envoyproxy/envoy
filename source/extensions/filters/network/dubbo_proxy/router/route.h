@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/route.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/server/filter_config.h"
 
@@ -21,7 +21,7 @@ namespace DubboProxy {
 namespace Router {
 
 using RouteConfigurations = Protobuf::RepeatedPtrField<
-    envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration>;
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration>;
 
 enum class RouteMatcherType : uint8_t {
   Default,

@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"
@@ -110,14 +110,12 @@ private:
   /**
    * Set UUID as the name for each route for detecting missing tests during the coverage check.
    */
-  static void
-  assignUniqueRouteNames(envoy::config::route::v3alpha::RouteConfiguration& route_config);
+  static void assignUniqueRouteNames(envoy::config::route::v3::RouteConfiguration& route_config);
   /**
    * For each route with runtime fraction 0%, set the numerator to a nonzero value so the
    * route can be tested as enabled or disabled.
    */
-  static void
-  assignRuntimeFraction(envoy::config::route::v3alpha::RouteConfiguration& route_config);
+  static void assignRuntimeFraction(envoy::config::route::v3::RouteConfiguration& route_config);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
@@ -157,8 +155,7 @@ private:
 
   void printResults();
 
-  bool runtimeMock(const std::string& key,
-                   const envoy::type::v3alpha::FractionalPercent& default_value,
+  bool runtimeMock(const std::string& key, const envoy::type::v3::FractionalPercent& default_value,
                    uint64_t random_value);
 
   bool headers_finalized_{false};

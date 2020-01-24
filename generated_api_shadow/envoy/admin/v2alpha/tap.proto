@@ -10,6 +10,8 @@ option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 option java_outer_classname = "TapProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: Tap]
+
 // The /tap admin request body that is used to configure an active tap session.
 message TapRequest {
   // The opaque configuration ID used to match the configuration to a loaded extension.

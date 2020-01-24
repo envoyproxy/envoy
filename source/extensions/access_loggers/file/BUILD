@@ -33,6 +33,6 @@ envoy_cc_extension(
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/protobuf",
         "//source/extensions/access_loggers:well_known_names",
-        "@envoy_api//envoy/extensions/access_loggers/grpc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],
 )

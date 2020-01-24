@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -86,7 +86,7 @@ public:
 
     config_helper_.addFilter(ConfigHelper::DEFAULT_SQUASH_FILTER);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* squash_cluster = bootstrap.mutable_static_resources()->add_clusters();
       squash_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       squash_cluster->set_name("squash");

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/service/auth/v3alpha/external_auth.pb.h"
-#include "envoy/type/v3alpha/http_status.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
+#include "envoy/type/v3/http_status.pb.h"
 
 #include "common/http/headers.h"
 
@@ -23,8 +23,8 @@ struct KeyValueOption {
 };
 
 using KeyValueOptionVector = std::vector<KeyValueOption>;
-using HeaderValueOptionVector = std::vector<envoy::config::core::v3alpha::HeaderValueOption>;
-using CheckResponsePtr = std::unique_ptr<envoy::service::auth::v3alpha::CheckResponse>;
+using HeaderValueOptionVector = std::vector<envoy::config::core::v3::HeaderValueOption>;
+using CheckResponsePtr = std::unique_ptr<envoy::service::auth::v3::CheckResponse>;
 
 class TestCommon {
 public:
@@ -33,7 +33,7 @@ public:
 
   static CheckResponsePtr makeCheckResponse(
       Grpc::Status::GrpcStatus response_status = Grpc::Status::WellKnownGrpcStatus::Ok,
-      envoy::type::v3alpha::StatusCode http_status_code = envoy::type::v3alpha::OK,
+      envoy::type::v3::StatusCode http_status_code = envoy::type::v3::OK,
       const std::string& body = std::string{},
       const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
 

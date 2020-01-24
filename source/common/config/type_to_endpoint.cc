@@ -4,6 +4,8 @@
 
 #include "common/grpc/common.h"
 
+// API_NO_BOOST_FILE
+
 namespace Envoy {
 namespace Config {
 
@@ -27,21 +29,21 @@ TypeUrlToServiceMap* buildTypeUrlToServiceMap() {
   // https://www.mail-archive.com/protobuf@googlegroups.com/msg04540.html.
   for (const std::string& service_name : {
            "envoy.api.v2.RouteDiscoveryService",
-           "envoy.service.route.v3alpha.RouteDiscoveryService",
+           "envoy.service.route.v3.RouteDiscoveryService",
            "envoy.api.v2.ScopedRoutesDiscoveryService",
-           "envoy.service.route.v3alpha.ScopedRoutesDiscoveryService",
+           "envoy.service.route.v3.ScopedRoutesDiscoveryService",
            "envoy.api.v2.VirtualHostDiscoveryService",
-           "envoy.service.route.v3alpha.VirtualHostDiscoveryService",
+           "envoy.service.route.v3.VirtualHostDiscoveryService",
            "envoy.service.discovery.v2.SecretDiscoveryService",
-           "envoy.service.secret.v3alpha.SecretDiscoveryService",
+           "envoy.service.secret.v3.SecretDiscoveryService",
            "envoy.api.v2.ClusterDiscoveryService",
-           "envoy.service.cluster.v3alpha.ClusterDiscoveryService",
+           "envoy.service.cluster.v3.ClusterDiscoveryService",
            "envoy.api.v2.EndpointDiscoveryService",
-           "envoy.service.endpoint.v3alpha.EndpointDiscoveryService",
+           "envoy.service.endpoint.v3.EndpointDiscoveryService",
            "envoy.api.v2.ListenerDiscoveryService",
-           "envoy.service.listener.v3alpha.ListenerDiscoveryService",
+           "envoy.service.listener.v3.ListenerDiscoveryService",
            "envoy.service.discovery.v2.RuntimeDiscoveryService",
-           "envoy.service.runtime.v3alpha.RuntimeDiscoveryService",
+           "envoy.service.runtime.v3.RuntimeDiscoveryService",
        }) {
     const auto* service_desc =
         Protobuf::DescriptorPool::generated_pool()->FindServiceByName(service_name);

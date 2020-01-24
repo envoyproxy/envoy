@@ -8,7 +8,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -16,13 +16,14 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
@@ -40,48 +41,48 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
   } else {
-    throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
+    throw EnvoyException(absl::StrCat("unknown protocol scheme: ", url));
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) { return absl::StartsWith(url, TCP_SCHEME); }
+bool Utility::urlIsTcpScheme(absl::string_view url) { return absl::StartsWith(url, TCP_SCHEME); }
 
-bool Utility::urlIsUdpScheme(const std::string& url) { return absl::StartsWith(url, UDP_SCHEME); }
+bool Utility::urlIsUdpScheme(absl::string_view url) { return absl::StartsWith(url, UDP_SCHEME); }
 
-bool Utility::urlIsUnixScheme(const std::string& url) { return absl::StartsWith(url, UNIX_SCHEME); }
+bool Utility::urlIsUnixScheme(absl::string_view url) { return absl::StartsWith(url, UNIX_SCHEME); }
 
 namespace {
 
-std::string hostFromUrl(const std::string& url, const std::string& scheme,
-                        const std::string& scheme_name) {
+std::string hostFromUrl(const std::string& url, absl::string_view scheme,
+                        absl::string_view scheme_name) {
   if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', scheme.size());
+  const size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
   return url.substr(scheme.size(), colon_index - scheme.size());
 }
 
-uint32_t portFromUrl(const std::string& url, const std::string& scheme,
-                     const std::string& scheme_name) {
+uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
+                     absl::string_view scheme_name) {
   if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', scheme.size());
+  const size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
-  size_t rcolon_index = url.rfind(':');
+  const size_t rcolon_index = url.rfind(':');
   if (colon_index != rcolon_index) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
   try {
@@ -183,8 +184,8 @@ Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Addres
   return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
 }
 
-void Utility::throwWithMalformedIp(const std::string& ip_address) {
-  throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
+void Utility::throwWithMalformedIp(absl::string_view ip_address) {
+  throw EnvoyException(absl::StrCat("malformed IP address: ", ip_address));
 }
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between
@@ -196,7 +197,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   struct ifaddrs* ifa;
   Address::InstanceConstSharedPtr ret;
 
-  int rc = getifaddrs(&ifaddr);
+  const int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc, "");
 
   // man getifaddrs(3)
@@ -448,13 +449,13 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
 }
 
 Address::InstanceConstSharedPtr
-Utility::protobufAddressToAddress(const envoy::config::core::v3alpha::Address& proto_address) {
+Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
-  case envoy::config::core::v3alpha::Address::AddressCase::kSocketAddress:
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return Utility::parseInternetAddress(proto_address.socket_address().address(),
                                          proto_address.socket_address().port_value(),
                                          !proto_address.socket_address().ipv4_compat());
-  case envoy::config::core::v3alpha::Address::AddressCase::kPipe:
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
                                                    proto_address.pipe().mode());
   default:
@@ -463,7 +464,7 @@ Utility::protobufAddressToAddress(const envoy::config::core::v3alpha::Address& p
 }
 
 void Utility::addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::config::core::v3alpha::Address& proto_address) {
+                                       envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
   } else {
@@ -475,20 +476,20 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
 }
 
 Address::SocketType
-Utility::protobufAddressSocketType(const envoy::config::core::v3alpha::Address& proto_address) {
+Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
-  case envoy::config::core::v3alpha::Address::AddressCase::kSocketAddress: {
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress: {
     const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
-    case envoy::config::core::v3alpha::SocketAddress::TCP:
+    case envoy::config::core::v3::SocketAddress::TCP:
       return Address::SocketType::Stream;
-    case envoy::config::core::v3alpha::SocketAddress::UDP:
+    case envoy::config::core::v3::SocketAddress::UDP:
       return Address::SocketType::Datagram;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
-  case envoy::config::core::v3alpha::Address::AddressCase::kPipe:
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
     return Address::SocketType::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -499,7 +500,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::I
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
   const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
   return writeToSocket(handle, slices.begin(), num_slices, local_ip, peer_address);
 }

@@ -181,16 +181,6 @@ void IntegrationTestServer::threadRoutine(
                           lock, *this, std::move(random_generator), process_object);
 }
 
-void IntegrationTestServer::onRuntimeCreated() {
-  // Override runtime values to by default allow all disallowed features.
-  //
-  // Per #6288 we explicitly want to allow end to end testing of disallowed features until the code
-  // is removed from Envoy.
-  //
-  // This will revert as the runtime is torn down with the test Envoy server.
-  Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed();
-}
-
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,

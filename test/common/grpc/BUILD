@@ -21,7 +21,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_time_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -35,7 +35,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -133,7 +133,7 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -153,8 +153,8 @@ envoy_cc_test_library(
         "//test/test_common:global_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -175,6 +175,6 @@ envoy_cc_test_library(
     data = ["//test/config/integration/certs"],
     deps = [
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

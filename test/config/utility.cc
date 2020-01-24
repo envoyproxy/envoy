@@ -1,18 +1,18 @@
 #include "test/config/utility.h"
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/config/tap/v3alpha/common.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
-#include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/http/codec.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/config/resources.h"
@@ -51,10 +51,15 @@ static_resources:
         inline_string: "DUMMY_INLINE_BYTES"
   clusters:
     name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   listeners:
     name: listener_0
     address:
@@ -73,10 +78,15 @@ admin:
 static_resources:
   clusters:
     name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   listeners:
     name: listener_0
     address:
@@ -231,10 +241,15 @@ static_resources:
   clusters:
   - name: my_cds_cluster
     http2_protocol_options: {{}}
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: my_cds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   listeners:
     name: http
     address:
@@ -286,10 +301,15 @@ static_resources:
     connect_timeout:
       seconds: 5
     type: STATIC
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {{}}
 admin:
@@ -302,10 +322,9 @@ admin:
       api_type);
 }
 
-envoy::config::cluster::v3alpha::Cluster
-ConfigHelper::buildCluster(const std::string& name, int port, const std::string& ip_version) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3alpha::Cluster>(
-      fmt::format(R"EOF(
+envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name, int port,
+                                                               const std::string& ip_version) {
+  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
       type: STATIC
@@ -321,7 +340,14 @@ ConfigHelper::buildCluster(const std::string& name, int port, const std::string&
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {{}}
     )EOF",
-                  name, name, ip_version, port));
+                                                                                 name, name,
+                                                                                 ip_version, port));
+}
+
+envoy::config::endpoint::v3::Endpoint ConfigHelper::buildEndpoint(const std::string& address) {
+  envoy::config::endpoint::v3::Endpoint endpoint;
+  endpoint.mutable_address()->mutable_socket_address()->set_address(address);
+  return endpoint;
 }
 
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
@@ -348,18 +374,13 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    if (!cluster->hosts().empty()) {
-      for (int j = 0; j < cluster->hosts().size(); j++) {
-        if (cluster->mutable_hosts(j)->has_socket_address()) {
-          auto host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-          host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
-        }
-      }
-    }
+    RELEASE_ASSERT(
+        cluster->hidden_envoy_deprecated_hosts().empty(),
+        "Hosts should be specified via load_assignment() in the integration test framework.");
     for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
-      auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
+      auto* locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
-        auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+        auto* lb_endpoint = locality_lb->mutable_lb_endpoints(k);
         if (lb_endpoint->endpoint().address().has_socket_address()) {
           lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
               Network::Test::getLoopbackAddressString(version));
@@ -374,6 +395,20 @@ void ConfigHelper::applyConfigModifiers() {
     config_modifier(bootstrap_);
   }
   config_modifiers_.clear();
+}
+
+void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
+  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
+    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    static_layer->set_name("static_layer");
+    static_layer->mutable_static_layer();
+    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    admin_layer->set_name("admin");
+    admin_layer->mutable_admin_layer();
+  }
+  auto* static_layer =
+      bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
+  (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
 }
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
@@ -410,22 +445,17 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   }
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    if (cluster->type() == envoy::config::cluster::v3alpha::Cluster::EDS) {
+    if (cluster->type() == envoy::config::cluster::v3::Cluster::EDS) {
       eds_hosts = true;
-    } else if (cluster->type() == envoy::config::cluster::v3alpha::Cluster::ORIGINAL_DST) {
+    } else if (cluster->type() == envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
       original_dst_cluster = true;
     } else if (cluster->has_cluster_type()) {
       custom_cluster = true;
     } else {
-      for (int j = 0; j < cluster->hosts_size(); ++j) {
-        if (cluster->mutable_hosts(j)->has_socket_address()) {
-          auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-          RELEASE_ASSERT(ports.size() > port_idx, "");
-          host_socket_addr->set_port_value(ports[port_idx++]);
-        }
-      }
-
       // Assign ports to statically defined load_assignment hosts.
+      RELEASE_ASSERT(
+          cluster->hidden_envoy_deprecated_hosts().empty(),
+          "Hosts should be specified via load_assignment() in the integration test framework.");
       for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -448,7 +478,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         tls_config = &cluster->hidden_envoy_deprecated_tls_context();
         cluster->clear_hidden_envoy_deprecated_tls_context();
       }
-      setTapTransportSocket(tap_path.value(), fmt::format("cluster_{}", i),
+      setTapTransportSocket(tap_path.value(), absl::StrCat("cluster_", i),
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
@@ -469,12 +499,11 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   finalized_ = true;
 }
 
-void ConfigHelper::setTapTransportSocket(
-    const std::string& tap_path, const std::string& type,
-    envoy::config::core::v3alpha::TransportSocket& transport_socket,
-    const Protobuf::Message* tls_config) {
+void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std::string& type,
+                                         envoy::config::core::v3::TransportSocket& transport_socket,
+                                         const Protobuf::Message* tls_config) {
   // Determine inner transport socket.
-  envoy::config::core::v3alpha::TransportSocket inner_transport_socket;
+  envoy::config::core::v3::TransportSocket inner_transport_socket;
   if (!transport_socket.name().empty()) {
     RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
@@ -486,7 +515,7 @@ void ConfigHelper::setTapTransportSocket(
   }
   // Configure outer tap transport socket.
   transport_socket.set_name("envoy.transport_sockets.tap");
-  envoy::extensions::transport_sockets::tap::v3alpha::Tap tap_config;
+  envoy::extensions::transport_sockets::tap::v3::Tap tap_config;
   tap_config.mutable_common_config()
       ->mutable_static_config()
       ->mutable_match_config()
@@ -496,7 +525,7 @@ void ConfigHelper::setTapTransportSocket(
                           ->mutable_output_config()
                           ->mutable_sinks()
                           ->Add();
-  output_sink->set_format(envoy::config::tap::v3alpha::OutputSink::PROTO_TEXT);
+  output_sink->set_format(envoy::config::tap::v3::OutputSink::PROTO_TEXT);
   const ::testing::TestInfo* const test_info =
       ::testing::UnitTest::GetInstance()->current_test_info();
   const std::string test_id =
@@ -522,7 +551,7 @@ void ConfigHelper::setSourceAddress(const std::string& address_string) {
 
 void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std::string& prefix) {
   RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
 
@@ -548,11 +577,11 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
 
   auto filter = getFilterFromListener("envoy.http_connection_manager");
   if (filter) {
-    envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         hcm_config;
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
-                                       v3alpha::HttpConnectionManager::HTTP2) {
+                                       v3::HttpConnectionManager::HTTP2) {
       const uint32_t size =
           std::max(downstream_buffer_limit, Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
       auto* options = hcm_config.mutable_http2_protocol_options();
@@ -563,19 +592,23 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
 }
 
 void ConfigHelper::setDownstreamHttpIdleTimeout(std::chrono::milliseconds timeout) {
-  addConfigModifier([timeout](envoy::extensions::filters::network::http_connection_manager::
-                                  v3alpha::HttpConnectionManager& hcm) {
-    hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
-  });
+  addConfigModifier(
+      [timeout](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->MergeFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
+      });
 }
 
 void ConfigHelper::setDownstreamMaxConnectionDuration(std::chrono::milliseconds timeout) {
-  addConfigModifier([timeout](envoy::extensions::filters::network::http_connection_manager::
-                                  v3alpha::HttpConnectionManager& hcm) {
-    hcm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
-  });
+  addConfigModifier(
+      [timeout](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
+      });
 }
 
 void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
@@ -590,9 +623,9 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
-envoy::config::route::v3alpha::VirtualHost
+envoy::config::route::v3::VirtualHost
 ConfigHelper::createVirtualHost(const char* domain, const char* prefix, const char* cluster) {
-  envoy::config::route::v3alpha::VirtualHost virtual_host;
+  envoy::config::route::v3::VirtualHost virtual_host;
   virtual_host.set_name(domain);
   virtual_host.add_domains(domain);
   virtual_host.add_routes()->mutable_match()->set_prefix(prefix);
@@ -601,9 +634,9 @@ ConfigHelper::createVirtualHost(const char* domain, const char* prefix, const ch
   return virtual_host;
 }
 
-void ConfigHelper::addVirtualHost(const envoy::config::route::v3alpha::VirtualHost& vhost) {
+void ConfigHelper::addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost) {
   RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
   auto route_config = hcm_config.mutable_route_config();
@@ -614,7 +647,7 @@ void ConfigHelper::addVirtualHost(const envoy::config::route::v3alpha::VirtualHo
 
 void ConfigHelper::addFilter(const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
 
@@ -628,10 +661,10 @@ void ConfigHelper::addFilter(const std::string& config) {
   storeHttpConnectionManager(hcm_config);
 }
 
-void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_connection_manager::
-                                      v3alpha::HttpConnectionManager::CodecType type) {
+void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
+                                      HttpConnectionManager::CodecType type) {
   RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       hcm_config;
   if (loadHttpConnectionManager(hcm_config)) {
     hcm_config.set_codec_type(type);
@@ -644,7 +677,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   initializeTls(options, *tls_context.mutable_common_tls_context());
   filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
@@ -655,10 +688,10 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
     return false;
   }
   // Replace /dev/null with a real path for the file access log.
-  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
-  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog access_log_config;
+  envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
   if (!format.empty()) {
     access_log_config.set_format(std::string(format));
   }
@@ -670,7 +703,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
 
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
-    envoy::extensions::transport_sockets::tls::v3alpha::CommonTlsContext& common_tls_context) {
+    envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
   common_tls_context.add_alpn_protocols("h2");
   common_tls_context.add_alpn_protocols("http/1.1");
 
@@ -683,9 +716,8 @@ void ConfigHelper::initializeTls(
   // We'll negotiate up to TLSv1.3 for the tests that care, but it really
   // depends on what the client sets.
   common_tls_context.mutable_tls_params()->set_tls_maximum_protocol_version(
-      options.tlsv1_3_
-          ? envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3
-          : envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_2);
+      options.tlsv1_3_ ? envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3
+                       : envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   if (options.rsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(
@@ -709,8 +741,7 @@ void ConfigHelper::renameListener(const std::string& name) {
   }
 }
 
-envoy::config::listener::v3alpha::Filter*
-ConfigHelper::getFilterFromListener(const std::string& name) {
+envoy::config::listener::v3::Filter* ConfigHelper::getFilterFromListener(const std::string& name) {
   RELEASE_ASSERT(!finalized_, "");
   if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
     return nullptr;
@@ -742,22 +773,22 @@ void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
 }
 
 bool ConfigHelper::loadHttpConnectionManager(
-    envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager&
-        hcm) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_, "");
   auto* hcm_filter = getFilterFromListener("envoy.http_connection_manager");
   if (hcm_filter) {
     auto* config = hcm_filter->mutable_typed_config();
-    hcm = MessageUtil::anyConvert<envoy::extensions::filters::network::http_connection_manager::
-                                      v3alpha::HttpConnectionManager>(*config);
+    hcm = MessageUtil::anyConvert<
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+        *config);
     return true;
   }
   return false;
 }
 
 void ConfigHelper::storeHttpConnectionManager(
-    const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-        HttpConnectionManager& hcm) {
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        hcm) {
   RELEASE_ASSERT(!finalized_, "");
   auto* hcm_config_any =
       getFilterFromListener("envoy.http_connection_manager")->mutable_typed_config();
@@ -771,8 +802,8 @@ void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
 }
 
 void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
-  addConfigModifier([function, this](envoy::config::bootstrap::v3alpha::Bootstrap&) -> void {
-    envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+  addConfigModifier([function, this](envoy::config::bootstrap::v3::Bootstrap&) -> void {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         hcm_config;
     loadHttpConnectionManager(hcm_config);
     function(hcm_config);
@@ -783,7 +814,7 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
 void ConfigHelper::setLds(absl::string_view version_info) {
   applyConfigModifiers();
 
-  envoy::service::discovery::v3alpha::DiscoveryResponse lds;
+  envoy::service::discovery::v3::DiscoveryResponse lds;
   lds.set_version_info(std::string(version_info));
   for (auto& listener : bootstrap_.static_resources().listeners()) {
     ProtobufWkt::Any* resource = lds.add_resources();
@@ -799,11 +830,11 @@ void ConfigHelper::setLds(absl::string_view version_info) {
 void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames) {
   auto filter = getFilterFromListener("envoy.http_connection_manager");
   if (filter) {
-    envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         hcm_config;
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
-                                       v3alpha::HttpConnectionManager::HTTP2) {
+                                       v3::HttpConnectionManager::HTTP2) {
       auto* options = hcm_config.mutable_http2_protocol_options();
       options->mutable_max_outbound_frames()->set_value(max_all_frames);
       options->mutable_max_outbound_control_frames()->set_value(max_control_frames);
@@ -814,9 +845,9 @@ void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}
 
-void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3alpha::Cluster>& clusters) {
+void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& clusters) {
   // Write to file the DiscoveryResponse and trigger inotify watch.
-  envoy::service::discovery::v3alpha::DiscoveryResponse cds_response;
+  envoy::service::discovery::v3::DiscoveryResponse cds_response;
   cds_response.set_version_info(std::to_string(cds_version_++));
   cds_response.set_type_url(Config::TypeUrl::get().Cluster);
   for (const auto& cluster : clusters) {
@@ -835,10 +866,10 @@ EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("ed
   ++update_successes_;
 }
 
-void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>&
+void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>&
                            cluster_load_assignments) {
   // Write to file the DiscoveryResponse and trigger inotify watch.
-  envoy::service::discovery::v3alpha::DiscoveryResponse eds_response;
+  envoy::service::discovery::v3::DiscoveryResponse eds_response;
   eds_response.set_version_info(std::to_string(eds_version_++));
   eds_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
   for (const auto& cluster_load_assignment : cluster_load_assignments) {
@@ -852,8 +883,7 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3alpha::Clust
 }
 
 void EdsHelper::setEdsAndWait(
-    const std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>&
-        cluster_load_assignments,
+    const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
   setEds(cluster_load_assignments);
   // Make sure Envoy has consumed the update now that it is running.

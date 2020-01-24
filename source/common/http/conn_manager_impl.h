@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -48,7 +49,8 @@ namespace Http {
 class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public Network::ReadFilter,
                               public ServerConnectionCallbacks,
-                              public Network::ConnectionCallbacks {
+                              public Network::ConnectionCallbacks,
+                              public Http::ApiListener {
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Http::Context& http_context,
@@ -65,6 +67,15 @@ public:
   static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
                                                               Stats::Scope& scope);
   static const HeaderMapImpl& continueHeader();
+
+  // Currently the ConnectionManager creates a codec lazily when either:
+  //   a) onConnection for H3.
+  //   b) onData for H1 and H2.
+  // With the introduction of ApiListeners, neither event occurs. This function allows consumer code
+  // to manually create a codec.
+  // TODO(junr03): consider passing a synthetic codec instead of creating once. The codec in the
+  // ApiListener case is solely used to determine the protocol version.
+  void createCodec(Buffer::Instance& data);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -143,7 +154,7 @@ private:
     Router::RouteConstSharedPtr route() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
-    uint64_t streamId() override;
+    uint64_t streamId() const override;
     StreamInfo::StreamInfo& streamInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
@@ -312,6 +323,10 @@ private:
     void requestDataTooLarge();
     void requestDataDrained();
 
+    void requestRouteConfigUpdate(
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
+
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
   };
@@ -385,6 +400,36 @@ private:
   };
 
   using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
+
+  // Used to abstract making of RouteConfig update request.
+  // RdsRouteConfigUpdateRequester is used when an RdsRouteConfigProvider is configured,
+  // NullRouteConfigUpdateRequester is used in all other cases (specifically when
+  // ScopedRdsConfigProvider/InlineScopedRoutesConfigProvider is configured)
+  class RouteConfigUpdateRequester {
+  public:
+    virtual ~RouteConfigUpdateRequester() = default;
+    virtual void requestRouteConfigUpdate(const std::string, Event::Dispatcher&,
+                                          Http::RouteConfigUpdatedCallbackSharedPtr) {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    };
+  };
+
+  class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
+  public:
+    RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
+        : route_config_provider_(route_config_provider) {}
+    void requestRouteConfigUpdate(
+        const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+
+  private:
+    Router::RouteConfigProvider* route_config_provider_;
+  };
+
+  class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
+  public:
+    NullRouteConfigUpdateRequester() = default;
+  };
 
   /**
    * Wraps a single active stream on the connection. These are either full request/response pairs
@@ -505,6 +550,10 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
+    void
+    requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
+                             Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
     void refreshCachedTracingCustomTags();
 
@@ -644,6 +693,7 @@ private:
     // response.
     bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
+    std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
   };
 

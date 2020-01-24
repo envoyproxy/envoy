@@ -1,8 +1,8 @@
 #include "extensions/filters/network/rbac/config.h"
 
-#include "envoy/config/rbac/v3alpha/rbac.pb.h"
-#include "envoy/extensions/filters/network/rbac/v3alpha/rbac.pb.h"
-#include "envoy/extensions/filters/network/rbac/v3alpha/rbac.pb.validate.h"
+#include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -20,7 +20,7 @@ static void validateFail(const std::string& header) {
                                    header));
 }
 
-static void validatePermission(const envoy::config::rbac::v3alpha::Permission& permission) {
+static void validatePermission(const envoy::config::rbac::v3::Permission& permission) {
   if (permission.has_header()) {
     validateFail(permission.header().DebugString());
   }
@@ -39,7 +39,7 @@ static void validatePermission(const envoy::config::rbac::v3alpha::Permission& p
   }
 }
 
-static void validatePrincipal(const envoy::config::rbac::v3alpha::Principal& principal) {
+static void validatePrincipal(const envoy::config::rbac::v3::Principal& principal) {
   if (principal.has_header()) {
     validateFail(principal.header().DebugString());
   }
@@ -61,7 +61,7 @@ static void validatePrincipal(const envoy::config::rbac::v3alpha::Principal& pri
 /**
  * Validate the RBAC rules doesn't include any header or metadata rule.
  */
-static void validateRbacRules(const envoy::config::rbac::v3alpha::RBAC& rules) {
+static void validateRbacRules(const envoy::config::rbac::v3::RBAC& rules) {
   for (const auto& policy : rules.policies()) {
     for (const auto& permission : policy.second.permissions()) {
       validatePermission(permission);
@@ -74,7 +74,7 @@ static void validateRbacRules(const envoy::config::rbac::v3alpha::RBAC& rules) {
 
 Network::FilterFactoryCb
 RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::rbac::v3alpha::RBAC& proto_config,
+    const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config,
     Server::Configuration::FactoryContext& context) {
   validateRbacRules(proto_config.rules());
   validateRbacRules(proto_config.shadow_rules());

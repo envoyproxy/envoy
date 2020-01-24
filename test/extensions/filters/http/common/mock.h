@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/http_uri.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
@@ -15,9 +15,10 @@ namespace Common {
 
 class MockJwksFetcher : public JwksFetcher {
 public:
-  MOCK_METHOD0(cancel, void());
-  MOCK_METHOD3(fetch, void(const envoy::config::core::v3alpha::HttpUri& uri,
-                           Tracing::Span& parent_span, JwksReceiver& receiver));
+  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, fetch,
+              (const envoy::config::core::v3::HttpUri& uri, Tracing::Span& parent_span,
+               JwksReceiver& receiver));
 };
 
 // A mock HTTP upstream.
@@ -53,8 +54,8 @@ public:
     ASSERT(jwks);
     onJwksSuccessImpl(*jwks.get());
   }
-  MOCK_METHOD1(onJwksSuccessImpl, void(const google::jwt_verify::Jwks& jwks));
-  MOCK_METHOD1(onJwksError, void(JwksFetcher::JwksReceiver::Failure reason));
+  MOCK_METHOD(void, onJwksSuccessImpl, (const google::jwt_verify::Jwks& jwks));
+  MOCK_METHOD(void, onJwksError, (JwksFetcher::JwksReceiver::Failure reason));
 };
 
 } // namespace Common

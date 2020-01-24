@@ -1,8 +1,10 @@
 #include "common/http/hash_policy.h"
 
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 
 #include "common/http/utility.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Http {
@@ -111,17 +113,16 @@ private:
 };
 
 HashPolicyImpl::HashPolicyImpl(
-    absl::Span<const envoy::config::route::v3alpha::RouteAction::HashPolicy* const> hash_policies) {
-  // TODO(htuch): Add support for cookie hash policies, #1295
-  hash_impls_.reserve(hash_policies.size());
+    absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policies) {
 
+  hash_impls_.reserve(hash_policies.size());
   for (auto* hash_policy : hash_policies) {
     switch (hash_policy->policy_specifier_case()) {
-    case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::kHeader:
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kHeader:
       hash_impls_.emplace_back(
           new HeaderHashMethod(hash_policy->header().header_name(), hash_policy->terminal()));
       break;
-    case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::kCookie: {
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kCookie: {
       absl::optional<std::chrono::seconds> ttl;
       if (hash_policy->cookie().has_ttl()) {
         ttl = std::chrono::seconds(hash_policy->cookie().ttl().seconds());
@@ -131,20 +132,19 @@ HashPolicyImpl::HashPolicyImpl(
                                                     hash_policy->terminal()));
       break;
     }
-    case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
         kConnectionProperties:
       if (hash_policy->connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod(hash_policy->terminal()));
       }
       break;
-    case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::
-        kQueryParameter:
+    case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kQueryParameter:
       hash_impls_.emplace_back(new QueryParameterHashMethod(hash_policy->query_parameter().name(),
                                                             hash_policy->terminal()));
       break;
     default:
       throw EnvoyException(
-          fmt::format("Unsupported hash policy {}", hash_policy->policy_specifier_case()));
+          absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
     }
   }
 }

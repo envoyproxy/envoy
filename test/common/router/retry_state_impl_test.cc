@@ -1,6 +1,6 @@
 #include <chrono>
 
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
@@ -461,7 +461,7 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodesHeader) {
 TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicySetViaRequestHeader) {
   policy_.retry_on_ = RetryPolicy::RETRY_ON_5XX;
 
-  Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher> matchers;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
   auto* matcher = matchers.Add();
   matcher->set_name("X-Upstream-Pushback");
 
@@ -494,7 +494,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicySetViaRequestHeader) {
 TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicyViaRetryPolicyConfiguration) {
   policy_.retry_on_ = RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
 
-  Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher> matchers;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
 
   auto* matcher1 = matchers.Add();
   matcher1->set_name("X-Upstream-Pushback");
@@ -639,7 +639,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
 TEST_F(RouterRetryStateImplTest, RetriableHeadersMergedConfigAndRequestHeaders) {
   policy_.retry_on_ = RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
 
-  Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher> matchers;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
 
   // Config says: retry if response is not 200.
   auto* matcher = matchers.Add();
@@ -687,7 +687,7 @@ TEST_F(RouterRetryStateImplTest, PolicyResetRemoteReset) {
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
-  Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher> matchers;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher> matchers;
   auto* matcher = matchers.Add();
   matcher->set_name(":method");
   matcher->set_exact_match("GET");
@@ -705,15 +705,41 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
   }
 
   {
+    Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                            {"x-envoy-retry-on", "retriable-4xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+    Http::TestHeaderMapImpl response_headers{{":status", "409"}};
+    expectTimerCreateAndEnable();
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+  }
+
+  {
     Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {"x-envoy-retry-on", "5xx"}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
+    Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+    expectTimerCreateAndEnable();
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
   }
 
   {
     Http::TestHeaderMapImpl request_headers{{":method", "HEAD"}, {"x-envoy-retry-on", "5xx"}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
+    Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+    expectTimerCreateAndEnable();
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+  }
+
+  // Sanity check that we're only enabling retries for the configured retry-on.
+  {
+    Http::TestHeaderMapImpl request_headers{{":method", "HEAD"},
+                                            {"x-envoy-retry-on", "retriable-4xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+    Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+    EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(response_headers, callback_));
   }
 
   {
@@ -721,6 +747,16 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
     setup(request_headers);
     EXPECT_FALSE(state_->enabled());
   }
+}
+
+TEST_F(RouterRetryStateImplTest, RouteConfigNoRetriesAllowed) {
+  policy_.num_retries_ = 0;
+  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  setup();
+
+  EXPECT_TRUE(state_->enabled());
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+            state_->shouldRetryReset(connect_failure_, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {

@@ -33,8 +33,8 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/filter/accesslog/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/grpc/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )

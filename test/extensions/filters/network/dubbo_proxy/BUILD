@@ -91,7 +91,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",
         "//test/mocks/server:server_mocks",
         "//test/test_common:registry_lib",
-        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -113,7 +113,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -157,7 +157,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy/filters:well_known_names",
         "//source/extensions/filters/network/dubbo_proxy/router:config",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/router/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/router/v3:pkg_cc_proto",
     ],
 )
 
@@ -185,6 +185,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy:dubbo_hessian2_serializer_impl_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )

@@ -8,7 +8,9 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 
 [ -z "${NUM_CPUS}" ] && NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
+[ -z "${ENVOY_BUILD_TARGET}" ] && export ENVOY_BUILD_TARGET=//source/exe:envoy-static
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
+echo "ENVOY_BUILD_TARGET=${ENVOY_BUILD_TARGET}"
 
 function setup_gcc_toolchain() {
   if [[ ! -z "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
@@ -57,14 +59,13 @@ then
   echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
   mkdir -p "${BUILD_DIR}"
 fi
-export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
 # Environment setup.
 export USER=bazel
 export TEST_TMPDIR=${BUILD_DIR}/tmp
 export BAZEL="bazel"
 export PATH=/opt/llvm/bin:$PATH
-export CLANG_FORMAT=clang-format
+export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS+="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1"
@@ -79,8 +80,8 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-export LLVM_ROOT=/opt/llvm
-bazel/setup_clang.sh "${LLVM_ROOT}"
+export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
+"$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
 
@@ -92,18 +93,6 @@ export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOM
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
-
-if [ "$1" != "-nofetch" ]; then
-  # Setup Envoy consuming project.
-  if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
-    rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  fi
-
-  # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 25eac570dd2bf3256dff01a04a9ce2a308e61f60)
-  sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
-fi
 
 # Also setup some space for building Envoy standalone.
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
@@ -125,10 +114,17 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
 
-mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
-cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-cp -f "${ENVOY_SRCDIR}"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+export BUILDIFIER_BIN="${BUILDIFIER_BIN:-/usr/local/bin/buildifier}"
+export BUILDOZER_BIN="${BUILDOZER_BIN:-/usr/local/bin/buildozer}"
 
-export BUILDIFIER_BIN="/usr/local/bin/buildifier"
-export BUILDOZER_BIN="/usr/local/bin/buildozer"
+# We set up an Envoy consuming project for test builds only if '-nofetch'
+# is not set AND this is an Envoy build. For derivative builds where Envoy
+# source tree is different than the current workspace, the setup step is
+# skipped.
+if [[ "$1" != "-nofetch" && "${ENVOY_SRCDIR}" == "$(bazel info workspace)" ]]; then
+  . "$(dirname "$0")"/filter_example_setup.sh
+else
+  echo "Skip setting up Envoy Filter Example."
+fi
+
+export ENVOY_BUILD_FILTER_EXAMPLE="${FILTER_WORKSPACE_SET:-0}"

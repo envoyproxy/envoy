@@ -14,11 +14,12 @@
 #include "common/common/cleanup.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Http {
@@ -404,7 +405,7 @@ ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   data.getRawSlices(slices.begin(), num_slices);
   for (const Buffer::RawSlice& slice : slices) {
     dispatching_ = true;
@@ -825,7 +826,7 @@ void ConnectionImpl::sendPendingFrames() {
     return;
   }
 
-  int rc = nghttp2_session_send(session_);
+  const int rc = nghttp2_session_send(session_);
   if (rc != 0) {
     ASSERT(rc == NGHTTP2_ERR_CALLBACK_FAILURE);
     // For errors caused by the pending outbound frame flood the FrameFloodException has
@@ -837,7 +838,7 @@ void ConnectionImpl::sendPendingFrames() {
       throw FrameFloodException("Too many frames in the outbound queue.");
     }
 
-    throw CodecProtocolException(fmt::format("{}", nghttp2_strerror(rc)));
+    throw CodecProtocolException(std::string(nghttp2_strerror(rc)));
   }
 
   // See ConnectionImpl::StreamImpl::resetStream() for why we do this. This is an uncommon event,

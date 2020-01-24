@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -50,7 +50,8 @@ ValidationInstance::ValidationInstance(
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system), server_context_(*this) {
+      http_context_(stats_store_.symbolTable()), time_system_(time_system),
+      server_contexts_(*this) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -74,13 +75,13 @@ void ValidationInstance::initialize(const Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
   Config::Utility::createTagProducer(bootstrap);
 
-  bootstrap.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap.node(), local_address, options.serviceZone(), options.serviceClusterName(),

@@ -1,6 +1,6 @@
 #include "extensions/filters/common/fault/fault_config.h"
 
-#include "envoy/extensions/filters/common/fault/v3alpha/fault.pb.h"
+#include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -11,19 +11,19 @@ namespace Common {
 namespace Fault {
 
 FaultDelayConfig::FaultDelayConfig(
-    const envoy::extensions::filters::common::fault::v3alpha::FaultDelay& delay_config)
+    const envoy::extensions::filters::common::fault::v3::FaultDelay& delay_config)
     : percentage_(delay_config.percentage()) {
   switch (delay_config.fault_delay_secifier_case()) {
-  case envoy::extensions::filters::common::fault::v3alpha::FaultDelay::FaultDelaySecifierCase::
+  case envoy::extensions::filters::common::fault::v3::FaultDelay::FaultDelaySecifierCase::
       kFixedDelay:
     provider_ = std::make_unique<FixedDelayProvider>(
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(delay_config, fixed_delay)));
     break;
-  case envoy::extensions::filters::common::fault::v3alpha::FaultDelay::FaultDelaySecifierCase::
+  case envoy::extensions::filters::common::fault::v3::FaultDelay::FaultDelaySecifierCase::
       kHeaderDelay:
     provider_ = std::make_unique<HeaderDelayProvider>();
     break;
-  case envoy::extensions::filters::common::fault::v3alpha::FaultDelay::FaultDelaySecifierCase::
+  case envoy::extensions::filters::common::fault::v3::FaultDelay::FaultDelaySecifierCase::
       FAULT_DELAY_SECIFIER_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -44,19 +44,17 @@ FaultDelayConfig::HeaderDelayProvider::duration(const Http::HeaderEntry* header)
 }
 
 FaultRateLimitConfig::FaultRateLimitConfig(
-    const envoy::extensions::filters::common::fault::v3alpha::FaultRateLimit& rate_limit_config)
+    const envoy::extensions::filters::common::fault::v3::FaultRateLimit& rate_limit_config)
     : percentage_(rate_limit_config.percentage()) {
   switch (rate_limit_config.limit_type_case()) {
-  case envoy::extensions::filters::common::fault::v3alpha::FaultRateLimit::LimitTypeCase::
-      kFixedLimit:
+  case envoy::extensions::filters::common::fault::v3::FaultRateLimit::LimitTypeCase::kFixedLimit:
     provider_ =
         std::make_unique<FixedRateLimitProvider>(rate_limit_config.fixed_limit().limit_kbps());
     break;
-  case envoy::extensions::filters::common::fault::v3alpha::FaultRateLimit::LimitTypeCase::
-      kHeaderLimit:
+  case envoy::extensions::filters::common::fault::v3::FaultRateLimit::LimitTypeCase::kHeaderLimit:
     provider_ = std::make_unique<HeaderRateLimitProvider>();
     break;
-  case envoy::extensions::filters::common::fault::v3alpha::FaultRateLimit::LimitTypeCase::
+  case envoy::extensions::filters::common::fault::v3::FaultRateLimit::LimitTypeCase::
       LIMIT_TYPE_NOT_SET:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
