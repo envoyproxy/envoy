@@ -242,7 +242,7 @@ message ListenerFilterChainMatchPredicate {
     // The match configuration will always match.
     bool any_match = 4 [(validate.rules).bool = {const: true}];
 
-    // Match destination port. Particularly, the match evaluator must use the recovered local port if
+    // Match destination port. Particularly, the match evaluation must use the recovered local port if
     // the owning listener filter is after :ref:`an original_dst listener filter <config_listener_filters_original_dst>`.
     type.v3.Int32Range destination_port_range = 5;
   }
