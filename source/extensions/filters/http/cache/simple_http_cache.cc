@@ -124,14 +124,14 @@ InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_co
 
 CacheInfo SimpleHttpCache::cacheInfo() const {
   CacheInfo cache_info;
-  cache_info.name_ = "envoy.extensions.filters.http.cache.simple";
+  cache_info.name_ = "envoy.extensions.http.cache.simple";
   return cache_info;
 }
 
 class SimpleHttpCacheFactory : public HttpCacheFactory {
 public:
-  SimpleHttpCacheFactory() : HttpCacheFactory("envoy.extensions.filters.http.cache.simple") {}
-  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&) override {
+  SimpleHttpCacheFactory() : HttpCacheFactory("envoy.extensions.http.cache.simple") {}
+  HttpCache& getCache(const envoy::config::filter::http::cache::v3::CacheConfig&) override {
     return cache_;
   }
 

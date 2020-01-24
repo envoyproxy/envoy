@@ -1,19 +1,19 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.cache.v3;
+package envoy.config.filter.http.cache.v3;
 
 import "envoy/api/v2/route/route_components.proto";
-import "envoy/type/matcher/v3alpha/string.proto";
+import "envoy/type/matcher/string.proto";
 
 import "google/protobuf/any.proto";
 
-import "udpa/annotations/versioning.proto";
-
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.cache.v3";
+option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v3";
 option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.cache.v3";
 
 // [#protodoc-title: HTTP Cache Filter]
 // HTTP Cache Filter :ref:`overview <config_http_filters_cache>`.
@@ -21,15 +21,9 @@ option java_multiple_files = true;
 
 // [#next-free-field: 6]
 message CacheConfig {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.cache.v3.CacheConfig";
-
   // [#not-implemented-hide:]
   // Modifies cache key creation by restricting which parts of the URL are included.
   message KeyCreatorParams {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.http.cache.v3.CacheConfig.KeyCreatorParams";
-
     // If true, exclude the URL scheme from the cache key. Set to true if your origins always
     // produce the same response for http and https requests.
     bool exclude_scheme = 1;
@@ -41,12 +35,12 @@ message CacheConfig {
     // If *query_parameters_included* is nonempty, only query parameters matched
     // by one or more of its matchers are included in the cache key. Any other
     // query params will not affect cache lookup.
-    repeated envoy.api.v2.route.QueryParameterMatcher query_parameters_included = 3;
+    repeated api.v2.route.QueryParameterMatcher query_parameters_included = 3;
 
     // If *query_parameters_excluded* is nonempty, query parameters matched by one
     // or more of its matchers are excluded from the cache key (even if also
     // matched by *query_parameters_included*), and will not affect cache lookup.
-    repeated envoy.api.v2.route.QueryParameterMatcher query_parameters_excluded = 4;
+    repeated api.v2.route.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
   // Config specific to the cache storage implementation.
@@ -71,7 +65,7 @@ message CacheConfig {
   //
   // During lookup, *allowed_vary_headers* controls what request headers will be
   // sent to the cache storage implementation.
-  repeated type.matcher.v3alpha.StringMatcher allowed_vary_headers = 3;
+  repeated type.matcher.StringMatcher allowed_vary_headers = 3;
 
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement key customization>

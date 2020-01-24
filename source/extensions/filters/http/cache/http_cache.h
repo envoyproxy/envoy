@@ -6,7 +6,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
-#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
+#include "envoy/config/filter/http/cache/v3/cache.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
@@ -167,7 +167,7 @@ public:
   Key& key() { return key_; }
 
   // Returns the subset of this request's headers that are listed in
-  // envoy::extensions::filters::http::cache::v3::CacheConfig::allowed_vary_headers.  If a cache storage
+  // envoy::config::filter::http::cache::v3::CacheConfig::allowed_vary_headers.  If a cache storage
   // implementation forwards lookup requests to a remote cache server that supports *vary* headers,
   // that server may need to see these headers. For local implementations, it may be simpler to
   // instead call makeLookupResult with each potential response.
@@ -310,7 +310,7 @@ public:
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
   virtual HttpCache&
-  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config) PURE;
+  getCache(const envoy::config::filter::http::cache::v3::CacheConfig& config) PURE;
   virtual ~HttpCacheFactory() = default;
 
 private:
