@@ -10,6 +10,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
@@ -51,6 +52,11 @@ AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigShare
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&, bool) {
+  deferred_sample_task_ =
+    std::make_unique<Cleanup>([this](){
+      config_->getController().recordFailure();
+        });
+
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -71,8 +77,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::HeaderMap&
     const uint64_t status_code = Http::Utility::getResponseStatus(headers);
     if (status_code < 500) {
       config_->getController().recordSuccess();
-    } else {
-      config_->getController().recordFailure();
+      deferred_sample_task_->cancel();
     }
   }
   return Http::FilterHeadersStatus::Continue;
