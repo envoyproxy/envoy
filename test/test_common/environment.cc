@@ -83,6 +83,11 @@ void TestEnvironment::createPath(const std::string& path) {
   if (Filesystem::fileSystemForTest().directoryExists(path)) {
     return;
   }
+  const Filesystem::PathSplitResult parent =
+      Filesystem::fileSystemForTest().splitPathFromFilename(path);
+  if (parent.file_.length() > 0) {
+    TestEnvironment::createPath(std::string(parent.directory_));
+  }
 #ifndef WIN32
   RELEASE_ASSERT(::mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IRWXO) == 0,
                  absl::StrCat("failed to create path: ", path));
