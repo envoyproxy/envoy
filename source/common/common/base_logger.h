@@ -42,7 +42,7 @@ protected:
 
 private:
   std::shared_ptr<spdlog::logger> logger_; // Use shared_ptr here to allow static construction
-                                           // of constant vector below.
+                                           // of vector in Registry::allLoggers().
   // TODO(junr03): expand Logger's public API to delete this friendship.
   friend class Registry;
 };

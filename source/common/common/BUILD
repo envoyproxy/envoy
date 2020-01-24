@@ -153,6 +153,7 @@ envoy_cc_library(
     name = "logger_impl_lib_standard",
     hdrs = ["standard/logger_impl.h"],
     strip_include_prefix = "standard",
+    deps = [":base_logger_lib"],
 )
 
 envoy_cc_library(

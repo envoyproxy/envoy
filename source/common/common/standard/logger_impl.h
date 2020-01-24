@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/common/base_logger.h"
+
 namespace Envoy {
 namespace Logger {
 
