@@ -217,7 +217,18 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
-  for (int i = 0; i < 100; ++i) {
+  // Choose the first cluster as the second one is unavailable.
+  for (int i = 0; i < 50; ++i) {
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    EXPECT_EQ(host.get(), target.get());
+  }
+
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
+
+  // Choose the second cluster as the first one is unavailable.
+  for (int i = 50; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
     EXPECT_EQ(host.get(), target.get());
