@@ -59,18 +59,11 @@ message CacheConfig {
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement *vary* headers>
   //
-  // List of allowed *Vary* headers.
-  //
-  // The *vary* response header holds a list of header names that affect the
-  // contents of a response, as described by
-  // https://httpwg.org/specs/rfc7234.html#caching.negotiated.responses.
-  //
-  // During insertion, *allowed_vary_headers* acts as a whitelist: if a
-  // response's *vary* header mentions any header names that aren't in
-  // *allowed_vary_headers*, that response will not be cached.
-  //
-  // During lookup, *allowed_vary_headers* controls what request headers will be
-  // sent to the cache storage implementation.
+  // List of allowed *Vary* headers. Headers matched by allowed_vary_headers will
+  // be provided to caches in lookups, and the cache filter will only insert
+  // responses whose *Vary* headers (if any) are matched by a matcher in this
+  // list. If allowed_vary_headers is empty, responses with *vary* headers will
+  // not be cached.
   repeated type.matcher.v3alpha.StringMatcher allowed_vary_headers = 3;
 
   // [#not-implemented-hide:]
