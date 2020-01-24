@@ -131,6 +131,9 @@ CacheInfo SimpleHttpCache::cacheInfo() const {
 class SimpleHttpCacheFactory : public HttpCacheFactory {
 public:
   SimpleHttpCacheFactory() : HttpCacheFactory("envoy.extensions.http.cache.simple") {}
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+  }
   HttpCache& getCache(const envoy::config::filter::http::cache::v2::CacheConfig&) override {
     return cache_;
   }

@@ -62,6 +62,7 @@ envoy_cc_library(
         ":key_cc_proto",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/common:time_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/http:header_map_interface",
         "//source/common/common:assert_lib",
         "//source/common/http:headers_lib",

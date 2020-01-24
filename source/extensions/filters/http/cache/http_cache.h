@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/config/filter/http/cache/v2/cache.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
@@ -167,10 +168,10 @@ public:
   Key& key() { return key_; }
 
   // Returns the subset of this request's headers that are listed in
-  // envoy::config::filter::http::cache::v2alpha::CacheConfig::allowed_vary_headers.  If a cache storage
-  // implementation forwards lookup requests to a remote cache server that supports *vary* headers,
-  // that server may need to see these headers. For local implementations, it may be simpler to
-  // instead call makeLookupResult with each potential response.
+  // envoy::config::filter::http::cache::v2alpha::CacheConfig::allowed_vary_headers. If a cache
+  // storage implementation forwards lookup requests to a remote cache server that supports *vary*
+  // headers, that server may need to see these headers. For local implementations, it may be
+  // simpler to instead call makeLookupResult with each potential response.
   HeaderVector& vary_headers() { return vary_headers_; }
   const HeaderVector& vary_headers() const { return vary_headers_; }
 
@@ -300,12 +301,12 @@ public:
 };
 
 // Factory interface for cache implementations to implement and register.
-class HttpCacheFactory {
+class HttpCacheFactory : public Config::TypedFactory {
 public:
   // name should be in reverse DNS format, though this is not enforced.
   explicit HttpCacheFactory(std::string name) : name_(std::move(name)) {}
-  const std::string& name() const { return name_; }
-  static std::string category() { return "http_cache_factory"; }
+  std::string name() const override { return name_; }
+  std::string category() const override { return "http_cache_factory"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
