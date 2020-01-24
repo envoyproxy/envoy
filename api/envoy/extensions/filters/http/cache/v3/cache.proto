@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.cache.v3;
 
-import "envoy/config/route/v3alpha/route_components.proto";
+import "envoy/api/v2/route/route_components.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/protobuf/any.proto";
@@ -35,12 +35,12 @@ message CacheConfig {
     // If *query_parameters_included* is nonempty, only query parameters matched
     // by one or more of its matchers are included in the cache key. Any other
     // query params will not affect cache lookup.
-    repeated config.route.v3alpha.QueryParameterMatcher query_parameters_included = 3;
+    repeated envoy.api.v2.route.QueryParameterMatcher query_parameters_included = 3;
 
     // If *query_parameters_excluded* is nonempty, query parameters matched by one
     // or more of its matchers are excluded from the cache key (even if also
     // matched by *query_parameters_included*), and will not affect cache lookup.
-    repeated config.route.v3alpha.QueryParameterMatcher query_parameters_excluded = 4;
+    repeated envoy.api.v2.route.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
   // Config specific to the cache storage implementation.
