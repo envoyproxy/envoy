@@ -33,11 +33,12 @@ from google.protobuf import text_format
 # Note: we have to include those proto definitions to make FormatOptions work,
 # this also serves as whitelist of extended options.
 from google.api import annotations_pb2 as _
-from udpa.annotations import sensitive_pb2 as _
 from validate import validate_pb2 as _
 from envoy.annotations import deprecation_pb2 as _
 from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
+from udpa.annotations import sensitive_pb2 as _
+from udpa.annotations import status_pb2
 
 NEXT_FREE_FIELD_MIN = 5
 
@@ -223,6 +224,10 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options.Extensions[migrate_pb2.file_migrate].CopyFrom(
         file_proto.options.Extensions[migrate_pb2.file_migrate])
 
+  if file_proto.options.HasExtension(status_pb2.file_status):
+    options.Extensions[status_pb2.file_status].CopyFrom(
+        file_proto.options.Extensions[status_pb2.file_status])
+
   options_block = FormatOptions(options)
 
   requires_versioning_import = any(
@@ -239,8 +244,10 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       public_imports.append(d)
       continue
     elif d in [
-        'envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
-        'udpa/annotations/migrate.proto'
+        'envoy/annotations/resource.proto',
+        'envoy/annotations/deprecation.proto',
+        'udpa/annotations/migrate.proto',
+        'udpa/annotations/status.proto',
     ]:
       infra_imports.append(d)
     elif d.startswith('envoy/'):
