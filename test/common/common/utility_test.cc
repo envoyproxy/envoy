@@ -223,6 +223,22 @@ TEST(StringUtil, StringViewRtrim) {
   EXPECT_EQ("", StringUtil::rtrim(""));
 }
 
+TEST(StringUtil, StringViewLtrimPunctuation) {
+  static const char Punctuation[] = ".:,;";
+  EXPECT_EQ("", StringUtil::ltrim(".....", Punctuation));
+  EXPECT_EQ("hello:;", StringUtil::ltrim(",.hello:;", Punctuation));
+  EXPECT_EQ("", StringUtil::ltrim(".;.;,,,:", Punctuation));
+  EXPECT_EQ("", StringUtil::ltrim("", Punctuation));
+}
+
+TEST(StringUtil, StringViewRtrimPunctuation) {
+  static const char Punctuation[] = ".:,;";
+  EXPECT_EQ("", StringUtil::rtrim(".....", Punctuation));
+  EXPECT_EQ(",.hello", StringUtil::rtrim(",.hello:;", Punctuation));
+  EXPECT_EQ("", StringUtil::rtrim(".;.;,,,:", Punctuation));
+  EXPECT_EQ("", StringUtil::rtrim("", Punctuation));
+}
+
 TEST(StringUtil, RemoveTrailingCharacters) {
   EXPECT_EQ("", StringUtil::removeTrailingCharacters("......", '.'));
   EXPECT_EQ("\t\f\v\n\rhello ", StringUtil::removeTrailingCharacters("\t\f\v\n\rhello ", '.'));

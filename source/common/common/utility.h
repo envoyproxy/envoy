@@ -203,23 +203,29 @@ public:
   /**
    * Trim leading whitespace from a string view.
    * @param source supplies the string view to be trimmed.
+   * @param delims the set of characters to trim.
    * @return trimmed string view.
    */
-  static absl::string_view ltrim(absl::string_view source);
+  static absl::string_view ltrim(absl::string_view source,
+                                 absl::string_view delims = WhitespaceChars);
 
   /**
    * Trim trailing whitespaces from a string view.
    * @param source supplies the string view to be trimmed.
+   * @param delims the set of characters to trim.
    * @return trimmed string view.
    */
-  static absl::string_view rtrim(absl::string_view source);
+  static absl::string_view rtrim(absl::string_view source,
+                                 absl::string_view delims = WhitespaceChars);
 
   /**
    * Trim leading and trailing whitespaces from a string view.
    * @param source supplies the string view to be trimmed.
+   * @param delims the set of characters to trim.
    * @return trimmed string view.
    */
-  static absl::string_view trim(absl::string_view source);
+  static absl::string_view trim(absl::string_view source,
+                                absl::string_view delims = WhitespaceChars);
 
   /**
    * Removes any specific trailing characters from the end of a string_view.

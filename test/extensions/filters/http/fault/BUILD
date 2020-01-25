@@ -26,6 +26,7 @@ envoy_extension_cc_test(
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http/fault:fault_filter_lib",
         "//test/common/http:common_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",

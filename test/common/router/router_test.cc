@@ -23,6 +23,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -3671,15 +3672,11 @@ TEST_F(RouterTest, AltStatName) {
   EXPECT_EQ(1U,
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
                 .value());
-  EXPECT_EQ(
-      1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("alt_stat.upstream_rq_200")
-              .value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
-                    .value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
-                    .value());
+
+  Stats::TestUtil::MixedStatNames stat_names(
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_);
+  EXPECT_EQ(1U, stat_names.counterValue("`alt_stat`.upstream_rq_200"));
+  EXPECT_EQ(1U, stat_names.counterValue("`alt_stat`.zone.zone_name.to_az.upstream_rq_200"));
 }
 
 TEST_F(RouterTest, Redirect) {
