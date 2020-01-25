@@ -90,7 +90,7 @@ message ExtAuthz {
 
   // Specifies if the filter is enabled.
   //
-  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // If :ref:`runtime_key <envoy_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is specified,
   // Envoy will lookup the runtime key to get the percentage of requests to filter.
   //
   // If this field is not specified, the filter will be enabled for all requests.
@@ -169,8 +169,8 @@ message AuthorizationRequest {
       "envoy.config.filter.http.ext_authz.v2.AuthorizationRequest";
 
   // Authorization request will include the client request headers that have a correspondent match
-  // in the :ref:`list <envoy_api_msg_type.matcher.v3.ListStringMatcher>`. Note that in addition to
-  // the user's supplied matchers:
+  // in the :ref:`list <envoy_api_msg_type.matcher.v3.ListStringMatcher>`. Note that in addition to the
+  // user's supplied matchers:
   //
   // 1. *Host*, *Method*, *Path* and *Content-Length* are automatically included to the list.
   //

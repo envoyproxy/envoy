@@ -100,8 +100,8 @@ public:
     return &lb_context_;
   }
 
-  MOCK_METHOD2(onMemberUpdateCb, void(const Upstream::HostVector& hosts_added,
-                                      const Upstream::HostVector& hosts_removed));
+  MOCK_METHOD(void, onMemberUpdateCb,
+              (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;

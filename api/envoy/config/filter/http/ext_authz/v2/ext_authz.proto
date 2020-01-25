@@ -90,7 +90,7 @@ message ExtAuthz {
 
   // Specifies if the filter is enabled.
   //
-  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // If :ref:`runtime_key <envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` is specified,
   // Envoy will lookup the runtime key to get the percentage of requests to filter.
   //
   // If this field is not specified, the filter will be enabled for all requests.

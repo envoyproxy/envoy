@@ -139,5 +139,5 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
 Runtime
 -------
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_api_field_core.runtimefractionalpercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
 <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.filter_enabled>` field.

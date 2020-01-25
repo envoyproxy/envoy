@@ -71,7 +71,7 @@ public:
         create_(host->address()->asString())};
   }
 
-  MOCK_METHOD1(create_, Extensions::NetworkFilters::Common::Redis::Client::Client*(std::string));
+  MOCK_METHOD(Extensions::NetworkFilters::Common::Redis::Client::Client*, create_, (std::string));
 
 protected:
   RedisClusterTest() : api_(Api::createApiForTest(stats_store_)) {}

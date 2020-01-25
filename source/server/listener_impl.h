@@ -178,6 +178,7 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override;
   OptProcessContextRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
   void ensureSocketOptions() {
     if (!listen_socket_options_) {

@@ -20,7 +20,7 @@ public:
       const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& r)
       : RoleBasedAccessControlRouteSpecificFilterConfig(r){};
 
-  MOCK_CONST_METHOD0(engine, Filters::Common::RBAC::RoleBasedAccessControlEngineImpl&());
+  MOCK_METHOD(Filters::Common::RBAC::RoleBasedAccessControlEngineImpl&, engine, (), (const));
 };
 
 } // namespace

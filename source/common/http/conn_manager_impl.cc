@@ -286,18 +286,31 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
 }
 
+void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
+  ASSERT(!codec_);
+  codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
+
+  switch (codec_->protocol()) {
+  case Protocol::Http3:
+    stats_.named_.downstream_cx_http3_total_.inc();
+    stats_.named_.downstream_cx_http3_active_.inc();
+    break;
+  case Protocol::Http2:
+    stats_.named_.downstream_cx_http2_total_.inc();
+    stats_.named_.downstream_cx_http2_active_.inc();
+    break;
+  case Protocol::Http11:
+  case Protocol::Http10:
+    stats_.named_.downstream_cx_http1_total_.inc();
+    stats_.named_.downstream_cx_http1_active_.inc();
+    break;
+  }
+}
+
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
     // Http3 codec should have been instantiated by now.
-    codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
-    if (codec_->protocol() == Protocol::Http2) {
-      stats_.named_.downstream_cx_http2_total_.inc();
-      stats_.named_.downstream_cx_http2_active_.inc();
-    } else {
-      ASSERT(codec_->protocol() != Protocol::Http3);
-      stats_.named_.downstream_cx_http1_total_.inc();
-      stats_.named_.downstream_cx_http1_active_.inc();
-    }
+    createCodec(data);
   }
 
   bool redispatch;
@@ -357,10 +370,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   }
   // Only QUIC connection's stream_info_ specifies protocol.
   Buffer::OwnedImpl dummy;
-  codec_ = config_.createCodec(read_callbacks_->connection(), dummy, *this);
+  createCodec(dummy);
   ASSERT(codec_->protocol() == Protocol::Http3);
-  stats_.named_.downstream_cx_http3_total_.inc();
-  stats_.named_.downstream_cx_http3_active_.inc();
   // Stop iterating through each filters for QUIC. Currently a QUIC connection
   // only supports one filter, HCM, and bypasses the onData() interface. Because
   // QUICHE already handles de-multiplexing.

@@ -17,6 +17,19 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "api_listener_test",
+    srcs = ["api_listener_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/server:api_listener_lib",
+        "//source/server:listener_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
     tags = ["backtrace"],
@@ -128,8 +141,11 @@ envoy_cc_test(
     srcs = ["options_impl_test.cc"],
     deps = [
         "//include/envoy/config:typed_config_interface",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/ip_tagging:config",
         "//source/server:options_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:environment_lib",
@@ -138,6 +154,8 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
     ],
 )
 
@@ -183,6 +201,7 @@ envoy_cc_test_library(
     hdrs = ["listener_manager_impl_test.h"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
+        "//source/server:api_listener_lib",
         "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
@@ -259,6 +278,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:api_listener_lib",
         "//source/server:filter_chain_manager_lib",
         "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",

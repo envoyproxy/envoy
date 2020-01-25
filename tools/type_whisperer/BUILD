@@ -1,6 +1,7 @@
 licenses(["notice"])  # Apache 2
 
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_proto_library")
+load("//tools/type_whisperer:api_build_file.bzl", "api_build_file")
 load("//tools/type_whisperer:file_descriptor_set_text.bzl", "file_descriptor_set_text")
 load("//tools/type_whisperer:type_database.bzl", "type_database")
 load("//tools/type_whisperer:proto_cc_source.bzl", "proto_cc_source")
@@ -69,7 +70,7 @@ type_database(
 
 file_descriptor_set_text(
     name = "all_protos_pb_text",
-    deps = ["@envoy_api_canonical//:protos"],
+    deps = ["@envoy_api_canonical//:all_protos"],
 )
 
 proto_cc_source(
@@ -103,4 +104,17 @@ envoy_proto_library(
     name = "api_type_db_proto",
     srcs = ["api_type_db.proto"],
     deps = ["//tools/type_whisperer:types"],
+)
+
+py_binary(
+    name = "proto_build_targets_gen",
+    srcs = ["proto_build_targets_gen.py"],
+    deps = [
+        ":api_type_db_proto_py_proto",
+    ],
+)
+
+api_build_file(
+    name = "api_build_file",
+    typedb = "//tools/type_whisperer:api_type_db",
 )
