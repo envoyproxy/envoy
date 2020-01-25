@@ -19,7 +19,7 @@ services:
       - "8001:8001"
 
   zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
+    image: zookeeper:3.5.6
     networks:
       envoymesh:
         aliases:
@@ -29,7 +29,7 @@ services:
     - "2181"
 
   kafka:
-    image: wurstmeister/kafka:2.11-2.0.0
+    image: wurstmeister/kafka:2.12-2.3.1
     depends_on:
     - zookeeper
     networks:
