@@ -38,6 +38,8 @@ public:
    *
    * @param prev_message previous version message input.
    * @param next_message next version message to generate.
+   *
+   * @throw EnvoyException if a Protobuf (de)serialization error occurs.
    */
   static void upgrade(const Protobuf::Message& prev_message, Protobuf::Message& next_message);
 
@@ -53,6 +55,8 @@ public:
    * @param message message input.
    * @return DynamicMessagePtr with the downgraded message (and associated
    *         factory state).
+   *
+   * @throw EnvoyException if a Protobuf (de)serialization error occurs.
    */
   static DynamicMessagePtr downgrade(const Protobuf::Message& message);
 
@@ -94,6 +98,8 @@ public:
    * @param upgraded_message upgraded message input.
    *
    * @return DynamicMessagePtr original message (as a dynamic message).
+   *
+   * @throw EnvoyException if a Protobuf (de)serialization error occurs.
    */
   static DynamicMessagePtr recoverOriginal(const Protobuf::Message& upgraded_message);
 
