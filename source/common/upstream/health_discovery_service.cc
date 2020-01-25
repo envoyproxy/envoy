@@ -206,7 +206,7 @@ void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
 }
 
 void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
+  ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
   hds_stream_response_timer_->disableTimer();
   stream_ = nullptr;
   server_response_ms_ = 0;
