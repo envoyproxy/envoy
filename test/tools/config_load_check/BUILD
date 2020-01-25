@@ -12,7 +12,10 @@ envoy_package()
 envoy_cc_test_library(
     name = "config_load_check_lib",
     srcs = ["config_load_check.cc"],
-    deps = ["//test/config_test:config_test_lib"],
+    deps = [
+        "//source/common/config:protobuf_link_hacks",
+        "//test/config_test:config_test_lib",
+    ],
 )
 
 envoy_cc_test_binary(
