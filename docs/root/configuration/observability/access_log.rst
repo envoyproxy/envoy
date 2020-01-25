@@ -219,7 +219,7 @@ The following command operators are supported:
 %REQUEST_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the last byte of
-    the request is received from the downstream.
+    the request received from the downstream.
 
   TCP
     Not implemented ("-").
