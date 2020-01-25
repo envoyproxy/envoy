@@ -19,11 +19,15 @@ static_resources:
   - name: localkafka
     connect_timeout: 1s
     type: strict_dns
-    lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: kafka # Kafka broker's host.
-        port_value: 9092   # Kafka broker's port.
+    load_assignment:
+      cluster_name: localkafka
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: kafka
+                port_value: 9092
 
 admin:
   access_log_path: "/dev/null"
