@@ -550,12 +550,12 @@ std::string ContextImpl::generalNameAsString(const GENERAL_NAME* general_name) {
   switch (general_name->type) {
   case GEN_DNS: {
     ASN1_STRING* str = general_name->d.dNSName;
-    san = reinterpret_cast<const char*>(ASN1_STRING_data(str));
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
   }
   case GEN_URI: {
     ASN1_STRING* str = general_name->d.uniformResourceIdentifier;
-    san = reinterpret_cast<const char*>(ASN1_STRING_data(str));
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
   }
   case GEN_IPADD: {
