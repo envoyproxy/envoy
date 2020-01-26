@@ -88,6 +88,7 @@ envoy_cc_test_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:symbol_table_creator_lib",
     ],
 )

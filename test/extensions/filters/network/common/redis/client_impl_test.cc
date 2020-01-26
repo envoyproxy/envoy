@@ -1,3 +1,4 @@
+#include "test/common/stats/stat_test_utility.h"
 #include <vector>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"

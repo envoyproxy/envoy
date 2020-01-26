@@ -1,3 +1,4 @@
+#include "test/common/stats/stat_test_utility.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/common/matchers.h"

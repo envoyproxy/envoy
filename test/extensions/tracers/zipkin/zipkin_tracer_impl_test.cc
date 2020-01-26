@@ -16,6 +16,7 @@
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -54,8 +55,8 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
     }
 
-    driver_ = std::make_unique<Driver>(zipkin_config, cm_, stats_, tls_, runtime_, local_info_,
-                                       random_, time_source_);
+    driver_ = std::make_unique<Driver>(zipkin_config, cm_, stats_.store(), tls_, runtime_,
+                                       local_info_, random_, time_source_);
   }
 
   void setupValidDriver(const std::string& version) {
@@ -138,7 +139,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::StatNameLookupContext stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

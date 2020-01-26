@@ -142,7 +142,7 @@ public:
                                 const Router::RouteSpecificFilterConfig* vhost_fault);
 
   Stats::IsolatedStoreImpl stats_;
-  Stats::TestUtil::MixedStatNames mixed_stat_names_;
+  StatNameLookupContext stats_lookup_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;

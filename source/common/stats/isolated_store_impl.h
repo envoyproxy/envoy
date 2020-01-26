@@ -76,6 +76,8 @@ public:
     return vec;
   }
 
+  uint64_t size() const { return stats_.size(); }
+
 private:
   friend class IsolatedStoreImpl;
 
@@ -119,6 +121,7 @@ public:
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
+  uint64_t numCounters() const override { return counters_.size(); }
   std::vector<GaugeSharedPtr> gauges() const override {
     // TODO(jmarantz): should we filter out gauges where
     // gauge.importMode() != Gauge::ImportMode::Uninitialized ?
@@ -127,9 +130,11 @@ public:
     // never be transmitted that way.
     return gauges_.toVector();
   }
+  uint64_t numGauges() const override { return gauges_.size(); }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     return std::vector<ParentHistogramSharedPtr>{};
   }
+  uint64_t numHistograms() const override { return histograms_.size(); }
 
   Counter& counter(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());

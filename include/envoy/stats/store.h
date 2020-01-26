@@ -34,14 +34,29 @@ public:
   virtual std::vector<CounterSharedPtr> counters() const PURE;
 
   /**
+   * @return the number of counters.
+   */
+  virtual uint64_t numCounters() const PURE;
+
+  /**
    * @return a list of all known gauges.
    */
   virtual std::vector<GaugeSharedPtr> gauges() const PURE;
 
   /**
+   * @return the number of gauges.
+   */
+  virtual uint64_t numGauges() const PURE;
+
+  /**
    * @return a list of all known histograms.
    */
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
+
+  /**
+   * @return the number of histograms.
+   */
+  virtual uint64_t numHistograms() const PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

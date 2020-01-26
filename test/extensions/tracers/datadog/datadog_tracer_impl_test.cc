@@ -1,3 +1,4 @@
+#include "test/common/stats/stat_test_utility.h"
 #include <chrono>
 #include <memory>
 #include <sstream>

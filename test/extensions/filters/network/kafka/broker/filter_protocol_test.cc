@@ -1,3 +1,4 @@
+#include "test/common/stats/stat_test_utility.h"
 /**
  * Tests in this file verify whether Kafka broker filter instance is capable of processing protocol
  * messages properly.

@@ -1,3 +1,4 @@
+#include "test/common/stats/stat_test_utility.h"
 #include <cstdint>
 #include <memory>
 #include <string>

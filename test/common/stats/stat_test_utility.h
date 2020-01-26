@@ -4,6 +4,7 @@
 
 #include "common/common/logger.h"
 #include "common/memory/stats.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/symbol_table_creator.h"
 
 #include "absl/strings/str_join.h"
@@ -72,6 +73,33 @@ public:
 
 private:
   const size_t memory_at_construction_;
+};
+
+// Helps tests do stat-name lookups based on strings.
+class StatNameLookupContext {
+ public:
+  StatNameLookupContext() : owned_storage_(std::make_unique<IsolatedStoreImpl>()),
+                            store_(*owned_storage_) {}
+  explicit StatNameLookupContext(SymbolTable& symbol_table)
+      : owned_storage_(std::make_unique<IsolatedStoreImpl>(symbol_table)),
+        store_(*owned_storage_) {}
+  explicit StatNameLookupContext(Store& store) : store_(store) {}
+
+  Counter& counter(absl::string_view name);
+  Gauge gauge(absl::string_view name);
+  Histogram& histogram(absl::string_view name);
+
+  Store& store() { return store_; }
+
+ private:
+  StorePtr owned_storage_; // Used for empty constructor.
+  Store& store_;
+  uint64_t num_counters_{0};
+  uint64_t num_gauges_{0};
+  uint64_t num_histograms_{0};
+  absl::flat_hash_map<std::string, Counter*> counters_;
+  absl::flat_hash_map<std::string, Gauge*> gauges_;
+  absl::flat_hash_map<std::string, Histogram*> histograms_;
 };
 
 // Helps tests construct StatName with symbolic and dynamic components.

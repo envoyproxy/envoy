@@ -1,3 +1,4 @@
+#include "test/common/stats/stat_test_utility.h"
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/zookeeper_proxy/decoder.h"

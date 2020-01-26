@@ -135,6 +135,19 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
+Counter& StatNameLookupContext::counter(absl::string_view name) {
+  if (store_.numCounters() != num_counters_) {
+    ENVOY_LOG_MISC(error, "recomputing counter table");
+    for (CounterSharedPtr& counter : store_.counters()) {
+      counters_[counter->name()] = counter.get();
+    }
+    num_counters_ = store_.numCounters();
+  }
+  auto p = counters_.find(name);
+  RELEASE_ASSERT(p != counters_.end(), absl::StrCat("cannot find counter: ", name));
+  return *p->second;
+}
+
 MixedStatNames::MixedStatNames(Store& store)
     : store_(store), pool_(store.symbolTable()), dynamic_pool_(store.symbolTable()) {}
 
