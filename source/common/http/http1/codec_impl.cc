@@ -10,7 +10,6 @@
 #include "envoy/network/connection.h"
 
 #include "common/common/enum_to_int.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_utility.h"
@@ -18,6 +17,8 @@
 #include "common/http/http1/header_formatter.h"
 #include "common/http/utility.h"
 #include "common/runtime/runtime_impl.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Http {
@@ -451,7 +452,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   data.getRawSlices(slices.begin(), num_slices);
   for (const Buffer::RawSlice& slice : slices) {
     total_parsed += slice.len_;
@@ -475,7 +476,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
     uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
     data.getRawSlices(slices.begin(), num_slices);
     for (const Buffer::RawSlice& slice : slices) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
@@ -753,6 +754,14 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 
     headers->setMethod(method_string);
 
+    // Make sure the host is valid.
+    auto details = HeaderUtility::requestHeadersValid(*headers);
+    if (details.has_value()) {
+      sendProtocolError(details.value().get());
+      throw CodecProtocolException(
+          "http/1.1 protocol error: request headers failed spec compliance checks");
+    }
+
     // Determine here whether we have a body or not. This uses the new RFC semantics where the
     // presence of content-length or chunked transfer-encoding indicates a body vs. a particular
     // method. If there is no body, we defer raising decodeHeaders() until the parser is flushed
@@ -944,7 +953,7 @@ void ClientConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
     // reused, unwind any outstanding readDisable() calls here. Only do this if there are no
     // pipelined responses remaining. Also do this before we dispatch end_stream in case the caller
     // immediately reuses the connection.
-    if (pending_responses_.empty()) {
+    if (connection_.state() == Network::Connection::State::Open && pending_responses_.empty()) {
       while (!connection_.readEnabled()) {
         connection_.readDisable(false);
       }

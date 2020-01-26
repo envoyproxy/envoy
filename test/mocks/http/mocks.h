@@ -136,8 +136,10 @@ public:
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(clusterInfo, Upstream::ClusterInfoConstSharedPtr());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
+  MOCK_METHOD1(requestRouteConfigUpdate, void(Http::RouteConfigUpdatedCallbackSharedPtr));
+  MOCK_METHOD0(routeConfig, absl::optional<Router::ConfigConstSharedPtr>());
   MOCK_METHOD0(clearRouteCache, void());
-  MOCK_METHOD0(streamId, uint64_t());
+  MOCK_CONST_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
@@ -209,8 +211,10 @@ public:
   MOCK_METHOD0(resetStream, void());
   MOCK_METHOD0(clusterInfo, Upstream::ClusterInfoConstSharedPtr());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
+  MOCK_METHOD1(requestRouteConfigUpdate, void(std::function<void()>));
+  MOCK_METHOD0(canRequestRouteConfigUpdate, bool());
   MOCK_METHOD0(clearRouteCache, void());
-  MOCK_METHOD0(streamId, uint64_t());
+  MOCK_CONST_METHOD0(streamId, uint64_t());
   MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());

@@ -4,8 +4,8 @@
 #include <string>
 
 #include "common/common/assert.h"
-#include "common/common/stack_array.h"
 
+#include "absl/container/fixed_array.h"
 #include "event2/buffer.h"
 
 namespace Envoy {
@@ -36,7 +36,7 @@ void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 void OwnedImpl::add(const Instance& data) {
   ASSERT(&data != this);
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, RawSlice, num_slices);
+  absl::FixedArray<RawSlice> slices(num_slices);
   data.getRawSlices(slices.begin(), num_slices);
   for (const RawSlice& slice : slices) {
     add(slice.mem_, slice.len_);
@@ -452,7 +452,7 @@ OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, 
 
 std::string OwnedImpl::toString() const {
   uint64_t num_slices = getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, RawSlice, num_slices);
+  absl::FixedArray<RawSlice> slices(num_slices);
   getRawSlices(slices.begin(), num_slices);
   size_t len = 0;
   for (const RawSlice& slice : slices) {

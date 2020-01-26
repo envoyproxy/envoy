@@ -4,7 +4,7 @@ package envoy.config.filter.http.jwt_authn.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/http_uri.proto";
-import "envoy/api/v2/route/route.proto";
+import "envoy/api/v2/route/route_components.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
@@ -16,7 +16,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.jwt_authn.v2alpha"
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.jwt_authn.v3alpha";
+    "envoy.extensions.filters.http.jwt_authn.v3";
 
 // [#protodoc-title: JWT Authentication]
 // JWT Authentication :ref:`configuration overview <config_http_filters_jwt_authn>`.

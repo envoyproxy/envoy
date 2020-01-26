@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.v3;
+
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.v3";
+option java_outer_classname = "SampleProto";
+option java_multiple_files = true;
+
+enum SomeEnum {
+  hidden_envoy_deprecated_DEFAULT = 0 [deprecated = true];
+  FOO = 1;
+  hidden_envoy_deprecated_BAR = 2 [deprecated = true];
+  WOW = 3;
+}
+
+message Sample {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample";
+
+  message Entry {
+    option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample.Entry";
+
+    string key = 1;
+
+    string value = 2;
+  }
+
+  repeated Entry entries = 1;
+
+  string hidden_envoy_deprecated_will_deprecated = 2 [deprecated = true];
+
+  string renamed_component = 3;
+}

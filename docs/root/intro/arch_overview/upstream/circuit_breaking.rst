@@ -30,8 +30,8 @@ configure and code each application independently. Envoy supports various types 
   overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter
   for the cluster will increment.
 * **Cluster maximum active retries**: The maximum number of retries that can be outstanding to all
-  hosts in a cluster at any given time. In general we recommend aggressively circuit breaking
-  retries so that retries for sporadic failures are allowed but the overall retry volume cannot
+  hosts in a cluster at any given time. In general we recommend using :ref:`retry budgets <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>`; however, if static circuit breaking is preferred it should aggressively circuit break
+  retries. This is so that retries for sporadic failures are allowed, but the overall retry volume cannot
   explode and cause large scale cascading failure. If this circuit breaker overflows the
   :ref:`upstream_rq_retry_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
   will increment.

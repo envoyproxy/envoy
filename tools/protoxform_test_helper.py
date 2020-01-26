@@ -108,9 +108,9 @@ if __name__ == "__main__":
   for target in sys.argv[1:]:
     path, filename = PathAndFilename(target)
     messages += Run(path, filename, 'v2')
-    messages += Run(path, filename, 'v3alpha')
-    messages += Run(path, filename, 'v3alpha')
-    messages += Run(path, filename, 'v3alpha.envoy_internal')
+    messages += Run(path, filename, 'v3')
+    messages += Run(path, filename, 'v3')
+    messages += Run(path, filename, 'v3.envoy_internal')
 
   if len(messages) == 0:
     logging.warning("PASS")

@@ -43,8 +43,8 @@ envoy_cc_library(
     srcs = ["base64.cc"],
     hdrs = ["base64.h"],
     deps = [
+        ":assert_lib",
         ":empty_string",
-        ":stack_array",
         "//include/envoy/buffer:buffer_interface",
     ],
 )
@@ -180,8 +180,8 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -194,7 +194,7 @@ envoy_cc_library(
         "//include/envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
         "@com_googlesource_code_re2//:re2",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -220,14 +220,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
-)
-
-envoy_cc_library(
-    name = "stack_array",
-    hdrs = ["stack_array.h"],
-    deps = [
-        ":assert_lib",
-    ],
 )
 
 envoy_cc_library(
@@ -328,6 +320,10 @@ envoy_cc_library(
         "version.h",
         ":generate_version_number",
     ],
+    deps = [
+        "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -351,6 +347,7 @@ envoy_cc_library(
     deps = [
         ":version_includes",
         "//source/common/common:macros",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

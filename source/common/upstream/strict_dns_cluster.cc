@@ -1,17 +1,17 @@
 #include "common/upstream/strict_dns_cluster.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
 namespace Envoy {
 namespace Upstream {
 
 StrictDnsClusterImpl::StrictDnsClusterImpl(
-    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
@@ -23,9 +23,10 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       cluster, dns_refresh_rate_ms_.count(), factory_context.random());
 
   std::list<ResolveTargetPtr> resolve_targets;
-  const envoy::api::v2::ClusterLoadAssignment load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
+  const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment(
+      cluster.has_load_assignment()
+          ? cluster.load_assignment()
+          : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts()));
   const auto& locality_lb_endpoints = load_assignment.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
@@ -82,8 +83,8 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
     StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher, const std::string& url,
-    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint)
     : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
       port_(Network::Utility::portFromTcpUrl(url)),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
@@ -170,8 +171,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 StrictDnsClusterFactory::createClusterImpl(
-    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 
