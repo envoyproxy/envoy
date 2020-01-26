@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
-#include "envoy/config/metrics/v3alpha/stats.pb.validate.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/network/resolver_impl.h"
@@ -19,13 +19,13 @@ namespace Hystrix {
 Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                    Server::Instance& server) {
   const auto& hystrix_sink =
-      MessageUtil::downcastAndValidate<const envoy::config::metrics::v3alpha::HystrixSink&>(
+      MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::HystrixSink&>(
           config, server.messageValidationContext().staticValidationVisitor());
   return std::make_unique<Hystrix::HystrixSink>(server, hystrix_sink.num_buckets());
 }
 
 ProtobufTypes::MessagePtr HystrixSinkFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::metrics::v3alpha::HystrixSink>();
+  return std::make_unique<envoy::config::metrics::v3::HystrixSink>();
 }
 
 std::string HystrixSinkFactory::name() const { return StatsSinkNames::get().Hystrix; }

@@ -11,6 +11,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/sensitive.proto";
+
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -18,7 +20,7 @@ option java_package = "io.envoyproxy.envoy.api.v2.auth";
 option java_outer_classname = "CertProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.transport_sockets.tls.v3alpha";
+    "envoy.extensions.transport_sockets.tls.v3";
 
 // [#protodoc-title: Common TLS configuration]
 
@@ -116,9 +118,9 @@ message PrivateKeyProvider {
 
   // Private key method provider specific configuration.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
+    google.protobuf.Struct config = 2 [deprecated = true, (udpa.annotations.sensitive) = true];
 
-    google.protobuf.Any typed_config = 3;
+    google.protobuf.Any typed_config = 3 [(udpa.annotations.sensitive) = true];
   }
 }
 
@@ -128,7 +130,7 @@ message TlsCertificate {
   core.DataSource certificate_chain = 1;
 
   // The TLS private key.
-  core.DataSource private_key = 2;
+  core.DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
 
   // BoringSSL private key method provider. This is an alternative to :ref:`private_key
   // <envoy_api_field_auth.TlsCertificate.private_key>` field. This can't be
@@ -141,7 +143,7 @@ message TlsCertificate {
 
   // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
   // TLS private key is not password encrypted.
-  core.DataSource password = 3;
+  core.DataSource password = 3 [(udpa.annotations.sensitive) = true];
 
   // [#not-implemented-hide:]
   core.DataSource ocsp_staple = 4;
@@ -174,7 +176,8 @@ message TlsSessionTicketKeys {
   //   * Keep the session ticket keys at least as secure as your TLS certificate private keys
   //   * Rotate session ticket keys at least daily, and preferably hourly
   //   * Always generate keys using a cryptographically-secure random data source
-  repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated core.DataSource keys = 1
+      [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
 // [#next-free-field: 10]
@@ -189,8 +192,8 @@ message CertificateValidationContext {
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`, or
-  // :ref:`verify_subject_alt_name
-  // <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`) is also
+  // :ref:`match_subject_alt_names
+  // <envoy_api_field_auth.CertificateValidationContext.match_subject_alt_names>`) is also
   // specified.
   //
   // It can optionally contain certificate revocation lists, in which case Envoy will verify

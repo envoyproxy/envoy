@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -22,9 +22,9 @@ namespace Envoy {
 namespace Upstream {
 
 namespace {
-envoy::config::endpoint::v3alpha::ClusterLoadAssignment
-convertPriority(const envoy::config::endpoint::v3alpha::ClusterLoadAssignment& load_assignment) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment converted;
+envoy::config::endpoint::v3::ClusterLoadAssignment
+convertPriority(const envoy::config::endpoint::v3::ClusterLoadAssignment& load_assignment) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment converted;
   converted.MergeFrom(load_assignment);
 
   // We convert the priority set by the configuration back to zero. This helps
@@ -43,9 +43,9 @@ convertPriority(const envoy::config::endpoint::v3alpha::ClusterLoadAssignment& l
 } // namespace
 
 LogicalDnsCluster::LogicalDnsCluster(
-    const envoy::config::cluster::v3alpha::Cluster& cluster, Runtime::Loader& runtime,
+    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       dns_resolver_(dns_resolver),
@@ -55,9 +55,10 @@ LogicalDnsCluster::LogicalDnsCluster(
       resolve_timer_(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
-      load_assignment_(cluster.has_load_assignment()
-                           ? convertPriority(cluster.load_assignment())
-                           : Config::Utility::translateClusterHosts(cluster.hosts())) {
+      load_assignment_(
+          cluster.has_load_assignment()
+              ? convertPriority(cluster.load_assignment())
+              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())) {
   failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
       cluster, dns_refresh_rate_ms_.count(), factory_context.random());
 
@@ -71,7 +72,7 @@ LogicalDnsCluster::LogicalDnsCluster(
     }
   }
 
-  const envoy::config::core::v3alpha::SocketAddress& socket_address =
+  const envoy::config::core::v3::SocketAddress& socket_address =
       lbEndpoint().endpoint().address().socket_address();
 
   if (!socket_address.resolver_name().empty()) {
@@ -151,8 +152,8 @@ void LogicalDnsCluster::startResolve() {
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 LogicalDnsClusterFactory::createClusterImpl(
-    const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 

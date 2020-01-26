@@ -1,9 +1,9 @@
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.validate.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
@@ -14,10 +14,12 @@
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -32,8 +34,8 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-static envoy::config::route::v3alpha::Route parseRouteFromV2Yaml(const std::string& yaml) {
-  envoy::config::route::v3alpha::Route route;
+static envoy::config::route::v3::Route parseRouteFromV2Yaml(const std::string& yaml) {
+  envoy::config::route::v3::Route route;
   TestUtility::loadFromYaml(yaml, route);
   return route;
 }
@@ -82,6 +84,29 @@ TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariabl
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.host_.reset();
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithHostnameVariable) {
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char*, size_t) -> Api::SysCallIntResult {
+          return {-1, ENAMETOOLONG};
+        }));
+    testFormatting("HOSTNAME", "-");
+  }
+
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+          StringUtil::strlcpy(name, "myhostname", 11);
+          return {0, 0};
+        }));
+    testFormatting("HOSTNAME", "myhostname");
+  }
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
@@ -434,8 +459,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
 
-  auto metadata = std::make_shared<envoy::config::core::v3alpha::Metadata>(
-      TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           namespace:
@@ -513,8 +538,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 // size checks on user defined headers.
 TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
   {
-    envoy::config::route::v3alpha::RouteConfiguration route;
-    envoy::config::core::v3alpha::HeaderValueOption* header =
+    envoy::config::route::v3::RouteConfiguration route;
+    envoy::config::core::v3::HeaderValueOption* header =
         route.mutable_request_headers_to_add()->Add();
     std::string long_string(16385, 'a');
     header->mutable_header()->set_key("header_name");
@@ -524,9 +549,9 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
                             "Proto constraint validation failed.*");
   }
   {
-    envoy::config::route::v3alpha::RouteConfiguration route;
+    envoy::config::route::v3::RouteConfiguration route;
     for (int i = 0; i < 1001; ++i) {
-      envoy::config::core::v3alpha::HeaderValueOption* header =
+      envoy::config::core::v3::HeaderValueOption* header =
           route.mutable_request_headers_to_add()->Add();
       header->mutable_header()->set_key("header_name");
       header->mutable_header()->set_value("value");
@@ -803,8 +828,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
 
   // Upstream metadata with percent signs in the key.
-  auto metadata = std::make_shared<envoy::config::core::v3alpha::Metadata>(
-      TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           ns:
@@ -827,8 +852,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
   for (const auto& test_case : test_cases) {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValueOption> to_add;
-    envoy::config::core::v3alpha::HeaderValueOption* header = to_add.Add();
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
+    envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
     header->mutable_header()->set_key("x-header");
     header->mutable_header()->set_value(test_case.input_);
 
@@ -901,7 +926,7 @@ request_headers_to_add:
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  auto metadata = std::make_shared<envoy::config::core::v3alpha::Metadata>();
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -979,8 +1004,8 @@ request_headers_to_remove: ["x-nope"]
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
   // Metadata with percent signs in the key.
-  auto metadata = std::make_shared<envoy::config::core::v3alpha::Metadata>(
-      TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           namespace:
@@ -1059,7 +1084,7 @@ request_headers_to_add:
 )EOF";
 
   // Disable append mode.
-  envoy::config::route::v3alpha::Route route = parseRouteFromV2Yaml(ymal);
+  envoy::config::route::v3::Route route = parseRouteFromV2Yaml(ymal);
   route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);

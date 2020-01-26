@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/message_impl.h"
@@ -37,7 +37,7 @@ class TestFilter : public Filter {
 public:
   using Filter::Filter;
 
-  MOCK_METHOD2(scriptLog, void(spdlog::level::level_enum level, const char* message));
+  MOCK_METHOD(void, scriptLog, (spdlog::level::level_enum level, const char* message));
 };
 
 class LuaHttpFilterTest : public testing::Test {
@@ -98,7 +98,7 @@ public:
   std::unique_ptr<TestFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
-  envoy::config::core::v3alpha::Metadata metadata_;
+  envoy::config::core::v3::Metadata metadata_;
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;

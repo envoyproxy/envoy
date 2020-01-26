@@ -12,7 +12,7 @@ option java_package = "io.envoyproxy.envoy.config.transport_socket.tap.v2alpha";
 option java_outer_classname = "TapProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.transport_sockets.tap.v3alpha";
+    "envoy.extensions.transport_sockets.tap.v3";
 
 // [#protodoc-title: Tap]
 // [#extension: envoy.transport_sockets.tap]

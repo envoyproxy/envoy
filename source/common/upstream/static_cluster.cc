@@ -1,23 +1,24 @@
 #include "common/upstream/static_cluster.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 
 namespace Envoy {
 namespace Upstream {
 
 StaticClusterImpl::StaticClusterImpl(
-    const envoy::config::cluster::v3alpha::Cluster& cluster, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
   // TODO(dio): Use by-reference when cluster.hosts() is removed.
-  const envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
+  const envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment(
+      cluster.has_load_assignment()
+          ? cluster.load_assignment()
+          : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts()));
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
@@ -57,8 +58,8 @@ void StaticClusterImpl::startPreInit() {
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 StaticClusterFactory::createClusterImpl(
-    const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   return std::make_pair(
       std::make_shared<StaticClusterImpl>(cluster, context.runtime(), socket_factory_context,

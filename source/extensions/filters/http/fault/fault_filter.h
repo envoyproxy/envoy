@@ -6,12 +6,12 @@
 #include <unordered_set>
 #include <vector>
 
-#include "envoy/extensions/filters/http/fault/v3alpha/fault.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/token_bucket_impl.h"
@@ -47,12 +47,12 @@ struct FaultFilterStats {
  */
 class FaultSettings : public Router::RouteSpecificFilterConfig {
 public:
-  FaultSettings(const envoy::extensions::filters::http::fault::v3alpha::HTTPFault& fault);
+  FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault);
 
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
     return fault_filter_headers_;
   }
-  envoy::type::v3alpha::FractionalPercent abortPercentage() const { return abort_percentage_; }
+  envoy::type::v3::FractionalPercent abortPercentage() const { return abort_percentage_; }
   uint64_t abortCode() const { return http_status_; }
   const Filters::Common::Fault::FaultDelayConfig* requestDelay() const {
     return request_delay_config_.get();
@@ -85,7 +85,7 @@ private:
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
 
-  envoy::type::v3alpha::FractionalPercent abort_percentage_;
+  envoy::type::v3::FractionalPercent abort_percentage_;
   uint64_t http_status_{}; // HTTP or gRPC return codes
   Filters::Common::Fault::FaultDelayConfigPtr request_delay_config_;
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
@@ -106,7 +106,7 @@ private:
  */
 class FaultFilterConfig {
 public:
-  FaultFilterConfig(const envoy::extensions::filters::http::fault::v3alpha::HTTPFault& fault,
+  FaultFilterConfig(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
                     Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
                     TimeSource& time_source);
 
@@ -116,17 +116,17 @@ public:
   const FaultSettings* settings() { return &settings_; }
   TimeSource& timeSource() { return time_source_; }
 
-  void incDelays(absl::string_view downstream_cluster) {
+  void incDelays(Stats::StatName downstream_cluster) {
     incCounter(downstream_cluster, delays_injected_);
   }
 
-  void incAborts(absl::string_view downstream_cluster) {
+  void incAborts(Stats::StatName downstream_cluster) {
     incCounter(downstream_cluster, aborts_injected_);
   }
 
 private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
-  void incCounter(absl::string_view downstream_cluster, Stats::StatName stat_name);
+  void incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name);
 
   const FaultSettings settings_;
   Runtime::Loader& runtime_;
@@ -258,6 +258,7 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
+  std::unique_ptr<Stats::StatNameDynamicStorage> downstream_cluster_storage_;
   const FaultSettings* fault_settings_;
   bool fault_active_{};
   std::unique_ptr<StreamRateLimiter> response_limiter_;

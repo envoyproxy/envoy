@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/service/auth/v3alpha/external_auth.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -21,10 +21,10 @@ public:
   ~MockClient() override;
 
   // ExtAuthz::Client
-  MOCK_METHOD0(cancel, void());
-  MOCK_METHOD3(check, void(RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3alpha::CheckRequest& request,
-                           Tracing::Span& parent_span));
+  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, check,
+              (RequestCallbacks & callbacks, const envoy::service::auth::v3::CheckRequest& request,
+               Tracing::Span& parent_span));
 };
 
 class MockRequestCallbacks : public RequestCallbacks {
@@ -34,7 +34,7 @@ public:
 
   void onComplete(ResponsePtr&& response) override { onComplete_(response); }
 
-  MOCK_METHOD1(onComplete_, void(ResponsePtr& response));
+  MOCK_METHOD(void, onComplete_, (ResponsePtr & response));
 };
 
 } // namespace ExtAuthz

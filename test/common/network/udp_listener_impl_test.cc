@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -109,7 +109,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
                                                            nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_BOUND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
                            dispatcherImpl().timeSource());
@@ -149,6 +149,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
                                             *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, second.length());
 
+  EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
@@ -199,6 +200,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 
   std::vector<std::string> server_received_data;
 
+  EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
@@ -286,6 +288,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
                                             *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, second.length());
 
+  EXPECT_CALL(listener_callbacks_, onReadReady()).Times(0);
   EXPECT_CALL(listener_callbacks_, onData(_)).Times(0);
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).Times(0);
@@ -294,6 +297,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
 
   listener_->enable();
 
+  EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(2)
       .WillOnce(Return())
@@ -338,6 +342,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
     EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
   }));
 
+  EXPECT_CALL(listener_callbacks_, onReadReady());
   EXPECT_CALL(listener_callbacks_, onReceiveError(_))
       .WillOnce(Invoke([&](Api::IoError::IoErrorCode err) -> void {
         ASSERT_EQ(Api::IoError::IoErrorCode::NoSupport, err);

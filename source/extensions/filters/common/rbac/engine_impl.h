@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/rbac/v3alpha/rbac.pb.h"
+#include "envoy/config/rbac/v3/rbac.pb.h"
 
 #include "extensions/filters/common/rbac/engine.h"
 #include "extensions/filters/common/rbac/matchers.h"
@@ -13,7 +13,7 @@ namespace RBAC {
 
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {
 public:
-  RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3alpha::RBAC& rules);
+  RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3::RBAC& rules);
 
   bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const StreamInfo::StreamInfo& info, std::string* effective_policy_id) const override;

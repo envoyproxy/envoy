@@ -11,9 +11,9 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -51,7 +51,7 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
                           &BufferInstanceContainer::derefBufferInstanceContainer, container);
     return {&one_slice, 1};
   }
-  STACK_ARRAY(many_raw_slices, Buffer::RawSlice, n_slices);
+  absl::FixedArray<Buffer::RawSlice> many_raw_slices(n_slices);
   container->buffer_->getRawSlices(many_raw_slices.begin(), n_slices);
   std::vector<grpc::Slice> slices;
   slices.reserve(n_slices);

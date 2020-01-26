@@ -1,8 +1,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/event/dispatcher_impl.h"
@@ -39,12 +39,12 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket = bootstrap.mutable_static_resources()
                                    ->mutable_listeners(0)
                                    ->mutable_filter_chains(0)
                                    ->mutable_transport_socket();
-      envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
       auto* common_tls_context = tls_context.mutable_common_tls_context();
       common_tls_context->add_alpn_protocols("http/1.1");
 
@@ -114,8 +114,8 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-      envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext tls_context;
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs()->set_name(
           "client_cert");
       auto* transport_socket =

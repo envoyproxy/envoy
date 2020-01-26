@@ -8,7 +8,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -16,12 +16,12 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
@@ -449,13 +449,13 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
 }
 
 Address::InstanceConstSharedPtr
-Utility::protobufAddressToAddress(const envoy::config::core::v3alpha::Address& proto_address) {
+Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
-  case envoy::config::core::v3alpha::Address::AddressCase::kSocketAddress:
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return Utility::parseInternetAddress(proto_address.socket_address().address(),
                                          proto_address.socket_address().port_value(),
                                          !proto_address.socket_address().ipv4_compat());
-  case envoy::config::core::v3alpha::Address::AddressCase::kPipe:
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
                                                    proto_address.pipe().mode());
   default:
@@ -464,7 +464,7 @@ Utility::protobufAddressToAddress(const envoy::config::core::v3alpha::Address& p
 }
 
 void Utility::addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::config::core::v3alpha::Address& proto_address) {
+                                       envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
   } else {
@@ -476,20 +476,20 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
 }
 
 Address::SocketType
-Utility::protobufAddressSocketType(const envoy::config::core::v3alpha::Address& proto_address) {
+Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
-  case envoy::config::core::v3alpha::Address::AddressCase::kSocketAddress: {
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress: {
     const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
-    case envoy::config::core::v3alpha::SocketAddress::TCP:
+    case envoy::config::core::v3::SocketAddress::TCP:
       return Address::SocketType::Stream;
-    case envoy::config::core::v3alpha::SocketAddress::UDP:
+    case envoy::config::core::v3::SocketAddress::UDP:
       return Address::SocketType::Datagram;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
-  case envoy::config::core::v3alpha::Address::AddressCase::kPipe:
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
     return Address::SocketType::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -500,7 +500,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::I
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
   const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
   return writeToSocket(handle, slices.begin(), num_slices, local_ip, peer_address);
 }

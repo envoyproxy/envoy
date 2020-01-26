@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.foo.v3;
+
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.foo.v3";
+option java_outer_classname = "PackageMoveProto";
+option java_multiple_files = true;
+
+message Package {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Package";
+
+  message Entry {
+    option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Package.Entry";
+
+    string key = 1;
+
+    string value = 2;
+  }
+
+  repeated Entry entries = 1;
+}

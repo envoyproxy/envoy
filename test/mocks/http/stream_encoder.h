@@ -15,12 +15,12 @@ public:
   ~MockStreamEncoder() override;
 
   // Http::StreamEncoder
-  MOCK_METHOD1(encode100ContinueHeaders, void(const HeaderMap& headers));
-  MOCK_METHOD2(encodeHeaders, void(const HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
-  MOCK_METHOD1(encodeTrailers, void(const HeaderMap& trailers));
-  MOCK_METHOD1(encodeMetadata, void(const MetadataMapVector& metadata_map_vector));
-  MOCK_METHOD0(getStream, Stream&());
+  MOCK_METHOD(void, encode100ContinueHeaders, (const HeaderMap& headers));
+  MOCK_METHOD(void, encodeHeaders, (const HeaderMap& headers, bool end_stream));
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, encodeTrailers, (const HeaderMap& trailers));
+  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector));
+  MOCK_METHOD(Stream&, getStream, ());
 
   testing::NiceMock<MockStream> stream_;
 };

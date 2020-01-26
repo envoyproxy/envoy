@@ -591,6 +591,9 @@ Supported variable names are:
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
 
+%HOSTNAME%
+    The system hostname.
+
 %PROTOCOL%
     The original protocol which is already added by Envoy as a
     :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>` request header.

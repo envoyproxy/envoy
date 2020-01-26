@@ -1,5 +1,5 @@
-#include "envoy/config/trace/v3alpha/trace.pb.h"
-#include "envoy/config/trace/v3alpha/trace.pb.validate.h"
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/zipkin/config.h"
@@ -32,7 +32,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
       collector_endpoint_version: HTTP_JSON
   )EOF";
 
-  envoy::config::trace::v3alpha::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   ZipkinTracerFactory factory;
@@ -58,7 +58,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
       collector_endpoint_version: HTTP_PROTO
   )EOF";
 
-  envoy::config::trace::v3alpha::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   ZipkinTracerFactory factory;

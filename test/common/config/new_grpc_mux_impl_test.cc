@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/new_grpc_mux_impl.h"
@@ -49,7 +49,8 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_, local_info_);
+        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
+        local_info_);
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -57,9 +58,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::unique_ptr<NewGrpcMuxImpl> grpc_mux_;
-  NiceMock<
-      Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>>
-      callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
@@ -89,33 +88,101 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
 
   {
     auto unexpected_response =
-        std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
+        std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     unexpected_response->set_type_url(type_url);
     unexpected_response->set_system_version_info("0");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
     grpc_mux_->onDiscoveryResponse(std::move(unexpected_response));
   }
   {
-    auto response = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_system_version_info("1");
-    envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment;
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(load_assignment));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-        .WillOnce(Invoke(
-            [&load_assignment](
-                const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-                    added_resources,
-                const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        .WillOnce(
+            Invoke([&load_assignment](
+                       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&
+                           added_resources,
+                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
               EXPECT_EQ(1, added_resources.size());
-              envoy::config::endpoint::v3alpha::ClusterLoadAssignment expected_assignment =
-                  MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
+              envoy::config::endpoint::v3::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(
                       added_resources[0].resource());
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
     grpc_mux_->onDiscoveryResponse(std::move(response));
   }
+}
+
+// DeltaDiscoveryResponse that comes in response to an on-demand request updates the watch with
+// resource's name. The watch is initially created with an alias used in the on-demand request.
+TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().VirtualHost;
+  auto* watch = grpc_mux_->addOrUpdateWatch(type_url, nullptr, {"domain1.test"}, callbacks_,
+                                            std::chrono::milliseconds(0));
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  envoy::config::route::v3::VirtualHost vhost;
+  vhost.set_name("vhost_1");
+  vhost.add_domains("domain1.test");
+  vhost.add_domains("domain2.test");
+
+  response->add_resources()->mutable_resource()->PackFrom(vhost);
+  response->mutable_resources()->at(0).set_name("vhost_1");
+  response->mutable_resources()->at(0).add_aliases("domain1.test");
+  response->mutable_resources()->at(0).add_aliases("domain2.test");
+
+  grpc_mux_->onDiscoveryResponse(std::move(response));
+
+  const auto& subscriptions = grpc_mux_->subscriptions();
+  auto sub = subscriptions.find(type_url);
+
+  EXPECT_TRUE(sub != subscriptions.end());
+  const auto found_resource_names = sub->second->watch_map_.updateWatchInterest(watch, {});
+  EXPECT_TRUE(found_resource_names.removed_.find("vhost_1") != found_resource_names.removed_.end());
+}
+
+// DeltaDiscoveryResponse that comes in response to an on-demand request that couldn't be resolved
+// will contain an empty Resource. The Resource's aliases field will be populated with the alias
+// originally used in the request.
+TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().VirtualHost;
+  auto* watch = grpc_mux_->addOrUpdateWatch(type_url, nullptr, {"domain1.test"}, callbacks_,
+                                            std::chrono::milliseconds(0));
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  response->add_resources();
+  response->mutable_resources()->at(0).set_name("not-found");
+  response->mutable_resources()->at(0).add_aliases("domain1.test");
+
+  grpc_mux_->onDiscoveryResponse(std::move(response));
+
+  const auto& subscriptions = grpc_mux_->subscriptions();
+  auto sub = subscriptions.find(type_url);
+
+  EXPECT_TRUE(sub != subscriptions.end());
+  const auto found_resource_names = sub->second->watch_map_.updateWatchInterest(watch, {});
+  EXPECT_TRUE(found_resource_names.removed_.find("not-found") !=
+              found_resource_names.removed_.end());
 }
 
 } // namespace

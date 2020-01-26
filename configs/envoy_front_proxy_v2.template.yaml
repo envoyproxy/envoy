@@ -57,7 +57,8 @@
             "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
             max_request_bytes: 5242880
         - name: envoy.rate_limit
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
             domain: envoy_front
             request_type: external
             rate_limit_service:

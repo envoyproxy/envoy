@@ -5,14 +5,20 @@
 #include <string>
 #include <vector>
 
-#include "envoy/admin/v3alpha/server_info.pb.h"
+#include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/utility.h"
 
 #include "server/options_impl.h"
+
+#include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #if defined(__linux__)
 #include <sched.h>
@@ -74,7 +80,7 @@ TEST_F(OptionsImplTest, All) {
       "--file-flush-interval-msec 9000 "
       "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
-      "--reject-unknown-dynamic-fields");
+      "--reject-unknown-dynamic-fields --use-fake-symbol-table 0");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -131,7 +137,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setBaseId(109876);
   options->setConcurrency(42);
   options->setConfigPath("foo");
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_foo{};
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_foo{};
   bootstrap_foo.mutable_node()->set_id("foo");
   options->setConfigProto(bootstrap_foo);
   options->setConfigYaml("bogus:");
@@ -158,7 +164,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
   EXPECT_EQ("foo", options->configPath());
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_bar{};
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_bar{};
   bootstrap_bar.mutable_node()->set_id("foo");
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap_bar, options->configProto()));
   EXPECT_EQ("bogus:", options->configYaml());
@@ -190,7 +196,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->configPath(), command_line_options->config_path());
   EXPECT_EQ(options->configYaml(), command_line_options->config_yaml());
   EXPECT_EQ(options->adminAddressPath(), command_line_options->admin_address_path());
-  EXPECT_EQ(envoy::admin::v3alpha::CommandLineOptions::v6,
+  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::v6,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
   EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()), command_line_options->log_level());
@@ -201,7 +207,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->restartEpoch(), command_line_options->restart_epoch());
   EXPECT_EQ(options->fileFlushIntervalMsec().count() / 1000,
             command_line_options->file_flush_interval().seconds());
-  EXPECT_EQ(envoy::admin::v3alpha::CommandLineOptions::Validate, command_line_options->mode());
+  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::Validate, command_line_options->mode());
   EXPECT_EQ(options->serviceClusterName(), command_line_options->service_cluster());
   EXPECT_EQ(options->serviceNodeName(), command_line_options->service_node());
   EXPECT_EQ(options->serviceZone(), command_line_options->service_zone());
@@ -226,9 +232,9 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(600, command_line_options->drain_time().seconds());
   EXPECT_EQ(900, command_line_options->parent_shutdown_time().seconds());
   EXPECT_EQ("", command_line_options->admin_address_path());
-  EXPECT_EQ(envoy::admin::v3alpha::CommandLineOptions::v4,
+  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::v4,
             command_line_options->local_address_ip_version());
-  EXPECT_EQ(envoy::admin::v3alpha::CommandLineOptions::Serve, command_line_options->mode());
+  EXPECT_EQ(envoy::admin::v3::CommandLineOptions::Serve, command_line_options->mode());
   EXPECT_FALSE(command_line_options->disable_hot_restart());
   EXPECT_FALSE(command_line_options->cpuset_threads());
   EXPECT_FALSE(command_line_options->allow_unknown_static_fields());
@@ -451,10 +457,14 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 
 #endif
 
-class TestFactory : public Config::UntypedFactory {
+class TestFactory : public Config::TypedFactory {
 public:
   virtual ~TestFactory() = default;
   std::string category() const override { return "test"; }
+  std::string configType() override { return "google.protobuf.StringValue"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
 };
 
 class TestTestFactory : public TestFactory {
@@ -462,10 +472,14 @@ public:
   std::string name() const override { return "test"; }
 };
 
-class TestingFactory : public Config::UntypedFactory {
+class TestingFactory : public Config::TypedFactory {
 public:
   virtual ~TestingFactory() = default;
   std::string category() const override { return "testing"; }
+  std::string configType() override { return "google.protobuf.StringValue"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
 };
 
 class TestTestingFactory : public TestingFactory {
@@ -486,6 +500,8 @@ TEST(DisableExtensions, IsDisabled) {
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactoryByType("google.protobuf.StringValue"),
+            nullptr);
 
   EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
   EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
@@ -502,6 +518,30 @@ TEST(DisableExtensions, IsDisabled) {
   EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
   EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
   EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
+
+  // Typing map for TestingFactory should be constructed here after disabling
+  EXPECT_EQ(
+      Registry::FactoryRegistry<TestingFactory>::getFactoryByType("google.protobuf.StringValue"),
+      nullptr);
+}
+
+TEST(FactoryByTypeTest, EarlierVersionConfigType) {
+  envoy::config::filter::http::ip_tagging::v2::IPTagging v2_config;
+  auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
+      getFactoryByType(v2_config.GetDescriptor()->full_name());
+  EXPECT_NE(factory, nullptr);
+  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().IpTagging);
+
+  envoy::extensions::filters::http::ip_tagging::v3::IPTagging v3_config;
+  factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
+      getFactoryByType(v3_config.GetDescriptor()->full_name());
+  EXPECT_NE(factory, nullptr);
+  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().IpTagging);
+
+  ProtobufWkt::Any non_api_type;
+  factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
+      getFactoryByType(non_api_type.GetDescriptor()->full_name());
+  EXPECT_EQ(factory, nullptr);
 }
 
 } // namespace

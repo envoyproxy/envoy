@@ -3,12 +3,12 @@
 #include <functional>
 
 #include "envoy/api/api.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -24,7 +24,7 @@ class CdsApiImpl : public CdsApi,
                    Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
-  static CdsApiPtr create(const envoy::config::core::v3alpha::ConfigSource& cds_config,
+  static CdsApiPtr create(const envoy::config::core::v3::ConfigSource& cds_config,
                           ClusterManager& cm, Stats::Scope& scope,
                           ProtobufMessage::ValidationVisitor& validation_visitor);
 
@@ -39,18 +39,17 @@ private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void
-  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-                     added_resources,
-                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                 const std::string& system_version_info) override;
+  void onConfigUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::config::cluster::v3alpha::Cluster>(resource).name();
+    return MessageUtil::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
   }
-  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
-  CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_config, ClusterManager& cm,
+  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
+  CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();
 

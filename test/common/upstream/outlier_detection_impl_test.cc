@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/common/time.h"
-#include "envoy/config/cluster/v3alpha/outlier_detection.pb.h"
+#include "envoy/config/cluster/v3/outlier_detection.pb.h"
 #include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 
 #include "common/network/utility.h"
@@ -57,7 +57,7 @@ TEST(OutlierDetectorImplFactoryTest, Detector) {
 
 class CallbackChecker {
 public:
-  MOCK_METHOD1(check, void(HostSharedPtr host));
+  MOCK_METHOD(void, check, (HostSharedPtr host));
 };
 
 class OutlierDetectorImplTest : public testing::Test {
@@ -115,8 +115,8 @@ public:
   CallbackChecker checker_;
   Event::SimulatedTimeSystem time_system_;
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
-  envoy::config::cluster::v3alpha::OutlierDetection empty_outlier_detection_;
-  envoy::config::cluster::v3alpha::OutlierDetection outlier_detection_split_;
+  envoy::config::cluster::v3::OutlierDetection empty_outlier_detection_;
+  envoy::config::cluster::v3::OutlierDetection outlier_detection_split_;
   Stats::Gauge& outlier_detection_ejections_active_;
 };
 
@@ -136,7 +136,7 @@ failure_percentage_request_volume: 25
 failure_percentage_threshold: 70
   )EOF";
 
-  envoy::config::cluster::v3alpha::OutlierDetection outlier_detection;
+  envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(100), _));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(

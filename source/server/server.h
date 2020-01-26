@@ -8,13 +8,14 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
@@ -121,8 +122,7 @@ public:
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion
-  loadBootstrapConfig(envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap,
-                      const Options& options,
+  loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
@@ -145,11 +145,16 @@ private:
   Event::SignalEventPtr sig_hup_;
 };
 
-class ServerFactoryContextImpl : public Configuration::ServerFactoryContext {
+// ServerFactoryContextImpl implements both ServerFactoryContext and
+// TransportSocketFactoryContext for convenience as these two contexts
+// share common member functions and member variables.
+class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
+                                 public Configuration::TransportSocketFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
       : server_(server), server_scope_(server_.stats().createScope("")) {}
 
+  // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
@@ -161,6 +166,22 @@ public:
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
+
+  // Configuration::TransportSocketFactoryContext
+  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
+  Stats::Store& stats() override { return server_.stats(); }
+  Init::Manager* initManager() override { return &server_.initManager(); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Server has two message validation visitors, one for static and
+    // other for dynamic configuration. Choose the dynamic validation
+    // visitor if server's init manager indicates that the server is
+    // in the Initialized state, as this state is engaged right after
+    // the static configuration (e.g., bootstrap) has been completed.
+    return initManager()->state() == Init::Manager::State::Initialized
+               ? server_.messageValidationContext().dynamicValidationVisitor()
+               : server_.messageValidationContext().staticValidationVisitor();
+  }
 
 private:
   Instance& server_;
@@ -225,7 +246,11 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
 
-  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
+
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+    return server_contexts_;
+  }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
@@ -302,7 +327,7 @@ private:
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
@@ -319,7 +344,7 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
 
-  ServerFactoryContextImpl server_context_;
+  ServerFactoryContextImpl server_contexts_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
