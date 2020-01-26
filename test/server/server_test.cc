@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"

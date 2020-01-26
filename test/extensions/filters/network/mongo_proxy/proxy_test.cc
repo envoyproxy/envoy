@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -66,7 +65,7 @@ public:
 class MongoProxyFilterTest : public testing::Test {
 public:
   MongoProxyFilterTest()
-      : stat_lookup_(store_), mongo_stats_(std::make_shared<MongoStats>(store_, "test")) {
+      : mixed_stat_names_(store_), mongo_stats_(std::make_shared<MongoStats>(store_, "test")) {
     setup();
   }
 
@@ -120,7 +119,7 @@ public:
 
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
-  Stats::TestUtil::StatNameLookupContext stat_lookup_;
+  Stats::TestUtil::MixedStatNames mixed_stat_names_;
   MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -329,8 +328,8 @@ TEST_F(MongoProxyFilterTest, Stats) {
   EXPECT_EQ(1U, store_.counter("test.op_query_no_max_time").value());
   EXPECT_EQ(1U, store_.counter("test.op_query_scatter_get").value());
 
-  EXPECT_EQ(1U, stat_lookup_.counter("test.collection.test.query.total").value());
-  EXPECT_EQ(1U, stat_lookup_.counter("test.collection.test.query.scatter_get").value());
+  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.total"));
+  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.scatter_get"));
 
   EXPECT_EQ(1U, store_.counter("test.op_reply").value());
   EXPECT_EQ(1U, store_.counter("test.op_reply_cursor_not_found").value());
@@ -438,12 +437,12 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, stat_lookup_.counter("test.collection.test.query.total").value());
-  EXPECT_EQ(1U, stat_lookup_.counter("test.collection.test.query.scatter_get").value());
-  EXPECT_EQ(1U, stat_lookup_.counter(
-      "test.collection.test.callsite.getByMongoId.query.total").value());
-  EXPECT_EQ(1U, stat_lookup_.counter(
-      "test.collection.test.callsite.getByMongoId.query.scatter_get").value());
+  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.total"));
+  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.scatter_get"));
+  EXPECT_EQ(1U, mixed_stat_names_.counterValue(
+                    "test.collection.`test`.callsite.`getByMongoId`.query.total"));
+  EXPECT_EQ(1U, mixed_stat_names_.counterValue(
+                    "test.collection.`test`.callsite.`getByMongoId`.query.scatter_get"));
 
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
@@ -493,7 +492,7 @@ TEST_F(MongoProxyFilterTest, MultiGet) {
   filter_->onData(fake_data_, false);
 
   EXPECT_EQ(1U, store_.counter("test.op_query_multi_get").value());
-  EXPECT_EQ(1U, stat_lookup_.counter("test.collection.test.query.multi_get").value());
+  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.multi_get"));
 }
 
 TEST_F(MongoProxyFilterTest, MaxTime) {

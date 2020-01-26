@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include <memory>
 
 #include "extensions/tracers/common/ot/opentracing_driver_impl.h"

@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include <memory>
 
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"

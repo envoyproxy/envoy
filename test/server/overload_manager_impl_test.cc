@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"

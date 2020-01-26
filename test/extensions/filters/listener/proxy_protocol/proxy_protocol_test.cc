@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include <functional>
 #include <memory>
 #include <string>

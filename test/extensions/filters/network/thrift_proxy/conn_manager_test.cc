@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include <memory>
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"

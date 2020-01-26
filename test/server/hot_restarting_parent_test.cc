@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include <memory>
 
 #include "server/hot_restarting_parent.h"

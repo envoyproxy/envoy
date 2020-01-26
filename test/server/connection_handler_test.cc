@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/server/active_udp_listener_config.h"
