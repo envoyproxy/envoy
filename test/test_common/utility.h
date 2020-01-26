@@ -461,10 +461,6 @@ public:
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
-  static void renameFile(const std::string& old_name, const std::string& new_name);
-  static void createDirectory(const std::string& name);
-  static void createSymlink(const std::string& target, const std::string& link);
-
   /**
    * Return a prefix string matcher.
    * @param string prefix.
@@ -614,23 +610,6 @@ private:
   Thread::CondVar cv_;
   Thread::MutexBasicLockable mutex_;
   bool ready_{false};
-};
-
-/**
- * A utility class for atomically updating a file using symbolic link swap.
- */
-class AtomicFileUpdater {
-public:
-  AtomicFileUpdater(const std::string& filename);
-
-  void update(const std::string& contents);
-
-private:
-  const std::string link_;
-  const std::string new_link_;
-  const std::string target1_;
-  const std::string target2_;
-  bool use_target1_;
 };
 
 namespace Http {
