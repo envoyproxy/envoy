@@ -36,7 +36,7 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           std::chrono::milliseconds init_fetch_timeout);
+                           std::chrono::milliseconds init_fetch_timeout) override;
 
   // TODO(fredlas) PR #8478 will remove this.
   bool isDelta() const override { return true; }
