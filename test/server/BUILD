@@ -141,8 +141,11 @@ envoy_cc_test(
     srcs = ["options_impl_test.cc"],
     deps = [
         "//include/envoy/config:typed_config_interface",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/ip_tagging:config",
         "//source/server:options_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:environment_lib",
@@ -151,6 +154,8 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
     ],
 )
 

@@ -16,44 +16,40 @@
 namespace Envoy {
 namespace Filesystem {
 
-WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
-    : queue_(kqueue()), kqueue_event_(dispatcher.createFileEvent(
-                            queue_,
-                            [this](uint32_t events) -> void {
-                              if (events & Event::FileReadyType::Read) {
-                                onKqueueEvent();
-                              }
-                            },
-                            Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
+WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
+    : api_(api), queue_(kqueue()), kqueue_event_(dispatcher.createFileEvent(
+                                       queue_,
+                                       [this](uint32_t events) -> void {
+                                         if (events & Event::FileReadyType::Read) {
+                                           onKqueueEvent();
+                                         }
+                                       },
+                                       Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
 
 WatcherImpl::~WatcherImpl() {
   close(queue_);
   watches_.clear();
 }
 
-void WatcherImpl::addWatch(const std::string& path, uint32_t events, Watcher::OnChangedCb cb) {
+void WatcherImpl::addWatch(absl::string_view path, uint32_t events, Watcher::OnChangedCb cb) {
   FileWatchPtr watch = addWatch(path, events, cb, false);
   if (watch == nullptr) {
     throw EnvoyException(absl::StrCat("invalid watch path ", path));
   }
 }
 
-WatcherImpl::FileWatchPtr WatcherImpl::addWatch(const std::string& path, uint32_t events,
+WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t events,
                                                 Watcher::OnChangedCb cb, bool path_must_exist) {
   bool watching_dir = false;
-  int watch_fd = open(path.c_str(), O_SYMLINK);
+  std::string pathname(path);
+  int watch_fd = open(pathname.c_str(), O_SYMLINK);
   if (watch_fd == -1) {
     if (path_must_exist) {
       return nullptr;
     }
 
-    size_t last_slash = path.rfind('/');
-    if (last_slash == std::string::npos) {
-      return nullptr;
-    }
-
-    std::string directory = path.substr(0, last_slash);
-    watch_fd = open(directory.c_str(), 0);
+    watch_fd =
+        open(std::string(api_.fileSystem().splitPathFromFilename(path).directory_).c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;
     }
@@ -63,7 +59,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(const std::string& path, uint32_
 
   FileWatchPtr watch(new FileWatch());
   watch->fd_ = watch_fd;
-  watch->file_ = path;
+  watch->file_ = pathname;
   watch->events_ = events;
   watch->callback_ = cb;
   watch->watching_dir_ = watching_dir;

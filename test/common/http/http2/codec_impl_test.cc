@@ -17,7 +17,6 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "codec_impl_test_util.h"
@@ -234,10 +233,6 @@ protected:
       data.add(emptyDataFrame.data(), emptyDataFrame.size());
     }
   }
-
-  // Make sure the test fixture has a fake runtime, for the tests which use
-  // Runtime::LoaderSingleton::getExisting()->mergeValues(...)
-  TestScopedRuntime scoped_runtime_;
 };
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
@@ -466,25 +461,6 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
 
 TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
   stream_error_on_invalid_http_messaging_ = true;
-  initialize();
-
-  MockStreamCallbacks request_callbacks;
-  request_encoder_->getStream().addCallbacks(request_callbacks);
-
-  ON_CALL(client_connection_, write(_, _))
-      .WillByDefault(
-          Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
-
-  request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
-  server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
-}
-
-TEST_P(Http2CodecImplTest, InvalidHeadersFrameOverridden) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
-        "true"}});
   initialize();
 
   MockStreamCallbacks request_callbacks;
@@ -1305,9 +1281,7 @@ TEST_P(Http2CodecImplTest, PingFlood) {
 
 // Verify that codec allows PING flood when mitigation is disabled
 TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_outbound_control_frames",
-        "2147483647"}});
+  max_outbound_control_frames_ = 2147483647;
   initialize();
 
   TestHeaderMapImpl request_headers;
@@ -1432,8 +1406,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
 
 // Verify that codec allows outbound DATA flood when mitigation is disabled
 TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_outbound_frames", "2147483647"}});
+  max_outbound_control_frames_ = 2147483647;
   initialize();
 
   TestHeaderMapImpl request_headers;
@@ -1540,9 +1513,7 @@ TEST_P(Http2CodecImplTest, PriorityFlood) {
 }
 
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_inbound_priority_frames_per_stream",
-        "2147483647"}});
+  max_inbound_priority_frames_per_stream_ = 2147483647;
 
   priorityFlood();
   EXPECT_NO_THROW(client_->sendPendingFrames());
@@ -1554,10 +1525,7 @@ TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_inbound_window_update_frames_per_"
-        "data_frame_sent",
-        "2147483647"}});
+  max_inbound_window_update_frames_per_data_frame_sent_ = 2147483647;
   windowUpdateFlood();
   EXPECT_NO_THROW(client_->sendPendingFrames());
 }
@@ -1570,10 +1538,7 @@ TEST_P(Http2CodecImplTest, EmptyDataFlood) {
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_consecutive_inbound_frames_with_"
-        "empty_payload",
-        "2147483647"}});
+  max_consecutive_inbound_frames_with_empty_payload_ = 2147483647;
   Buffer::OwnedImpl data;
   emptyDataFlood(data);
   EXPECT_CALL(request_decoder_, decodeData(_, false))

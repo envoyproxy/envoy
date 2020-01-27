@@ -62,7 +62,7 @@ protected:
     return state_.handleResponse(message);
   }
 
-  NiceMock<MockSubscriptionCallbacks<envoy::config::cluster::v3::Cluster>> callbacks_;
+  NiceMock<MockSubscriptionCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   // We start out interested in three resources: name1, name2, and name3.

@@ -48,7 +48,7 @@ public:
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Runtime::MockRandomGenerator random_;
-  MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment> callbacks_;
+  MockSubscriptionCallbacks callbacks_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

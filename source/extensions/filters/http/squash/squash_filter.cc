@@ -8,12 +8,13 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
-#include "common/common/stack_array.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -309,7 +310,7 @@ void SquashFilter::cleanup() {
 Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::MessagePtr&& m) {
   Buffer::InstancePtr& data = m->body();
   uint64_t num_slices = data->getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   data->getRawSlices(slices.begin(), num_slices);
   std::string jsonbody;
   for (const Buffer::RawSlice& slice : slices) {
