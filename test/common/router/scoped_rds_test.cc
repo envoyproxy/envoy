@@ -461,7 +461,7 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-  init_watcher_.expectReady().Times(1); // SRDS subscription::parent_inti_target_.
+  init_watcher_.expectReady().Times(1); // SRDS subscription::parent_init_target_.
   context_init_manager_.initialize(init_watcher_);
   EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
@@ -489,7 +489,7 @@ key:
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
   init_watcher_.expectReady().Times(
-      2); // Just SRDS subscription::inti_target_ and the first scope's RDS subscription.
+      2); // Just SRDS subscription::init_target_ and the first scope's RDS subscription.
   context_init_manager_.initialize(init_watcher_);
 
   EXPECT_THROW_WITH_REGEX(
