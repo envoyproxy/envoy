@@ -468,6 +468,9 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
   getStreamInfo().setUpstreamLocalAddress(connection.localAddress());
   getStreamInfo().setUpstreamSslConnection(connection.streamInfo().downstreamSslConnection());
 
+  read_callbacks_->connection().streamInfo().setUpstreamFilterState(
+      connection.streamInfo().filterStatePtr());
+
   // Simulate the event that onPoolReady represents.
   upstream_callbacks_->onEvent(Network::ConnectionEvent::Connected);
 
