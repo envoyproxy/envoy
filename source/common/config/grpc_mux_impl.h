@@ -90,7 +90,7 @@ private:
       cancel();
     }
 
-    void update(const std::set<std::string>&) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+    void update(const std::set<std::string>&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;
@@ -147,7 +147,7 @@ public:
   bool paused(const std::string&) const override { return false; }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
-                           std::chrono::milliseconds) {
+                           std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
 

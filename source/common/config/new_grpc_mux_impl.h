@@ -92,7 +92,7 @@ private:
       }
     }
 
-    void update(const std::set<std::string>& resources) {
+    void update(const std::set<std::string>& resources) override {
       parent_.updateWatch(type_url_, watch_, resources);
     }
 
