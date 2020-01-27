@@ -11,6 +11,7 @@ Services
   metrics/v3/*
   ratelimit/v3/*
   runtime/v3/*
+  status/v3/*
   tap/v3/*
   ../config/tap/v3/*
   trace/v3/*

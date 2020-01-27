@@ -6,10 +6,10 @@
 #include "envoy/buffer/buffer.h"
 
 #include "common/api/os_sys_calls_impl.h"
-#include "common/common/stack_array.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
 
 using Envoy::Api::SysCallIntResult;
@@ -37,7 +37,7 @@ bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }
 
 Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                                   uint64_t num_slice) {
-  STACK_ARRAY(iov, iovec, num_slice);
+  absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_to_read = 0;
   uint64_t num_bytes_to_read = 0;
   for (; num_slices_to_read < num_slice && num_bytes_to_read < max_length; num_slices_to_read++) {
@@ -56,7 +56,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
 
 Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                    uint64_t num_slice) {
-  STACK_ARRAY(iov, iovec, num_slice);
+  absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
@@ -80,7 +80,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&peer_address);
   sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
 
-  STACK_ARRAY(iov, iovec, num_slice);
+  absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
@@ -111,7 +111,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
     const size_t cmsg_space = (space_v4 < space_v6) ? space_v6 : space_v4;
     // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
-    STACK_ARRAY(cbuf, char, cmsg_space);
+    absl::FixedArray<char> cbuf(cmsg_space);
     memset(cbuf.begin(), 0, cmsg_space);
 
     message.msg_control = cbuf.begin();
@@ -218,10 +218,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   // addresses.
   const size_t cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                             CMSG_SPACE(sizeof(struct in6_pktinfo));
-  STACK_ARRAY(cbuf, char, cmsg_space);
+  absl::FixedArray<char> cbuf(cmsg_space);
   memset(cbuf.begin(), 0, cmsg_space);
 
-  STACK_ARRAY(iov, iovec, num_slice);
+  absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_for_read = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {

@@ -45,8 +45,6 @@ constexpr const char* runtime_features[] = {
 constexpr const char* disabled_runtime_features[] = {
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
-    // Should be removed as part of https://github.com/envoyproxy/envoy/issues/8993
-    "envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

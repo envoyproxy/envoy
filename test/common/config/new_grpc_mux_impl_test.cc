@@ -58,8 +58,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::unique_ptr<NewGrpcMuxImpl> grpc_mux_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment>>
-      callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;

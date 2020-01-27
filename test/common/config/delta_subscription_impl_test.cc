@@ -135,8 +135,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment>>
-      callbacks;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks;
   auto* async_client = new Grpc::MockAsyncClient();
 
   const Protobuf::MethodDescriptor* method_descriptor =

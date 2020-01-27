@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <deque>
 #include <functional>
 #include <string>
@@ -221,6 +222,8 @@ public:
                     const std::vector<std::string>& server_names, TimeSource& time_source);
 
 private:
+  using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
+
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
   int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
@@ -229,8 +232,8 @@ private:
   // Select the TLS certificate context in SSL_CTX_set_select_certificate_cb() callback with
   // ClientHello details.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
-  void generateHashForSessionContexId(const std::vector<std::string>& server_names,
-                                      uint8_t* session_context_buf, unsigned& session_context_len);
+
+  SessionContextID generateHashForSessionContexId(const std::vector<std::string>& server_names);
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };

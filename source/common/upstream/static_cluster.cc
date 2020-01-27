@@ -9,7 +9,7 @@ namespace Upstream {
 
 StaticClusterImpl::StaticClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       priority_state_manager_(
@@ -59,7 +59,7 @@ void StaticClusterImpl::startPreInit() {
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 StaticClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   return std::make_pair(
       std::make_shared<StaticClusterImpl>(cluster, context.runtime(), socket_factory_context,

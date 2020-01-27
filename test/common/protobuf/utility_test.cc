@@ -1645,8 +1645,9 @@ TEST(StatusCode, Strings) {
   for (int i = 0; i < last_code; ++i) {
     EXPECT_NE(MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(i)), "");
   }
-  ASSERT_EQ("",
+  ASSERT_EQ("UNKNOWN",
             MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+  ASSERT_EQ("OK", MessageUtil::CodeEnumToString(ProtobufUtil::error::OK));
 }
 
 TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {
