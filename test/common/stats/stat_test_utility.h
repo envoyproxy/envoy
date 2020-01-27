@@ -76,23 +76,23 @@ private:
 };
 
 // Helps tests do stat-name lookups based on strings.
-class StatNameLookupContext {
+class TestStatStore {
 public:
-  StatNameLookupContext()
+  TestStatStore()
       : owned_storage_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_storage_) {}
-  explicit StatNameLookupContext(SymbolTable& symbol_table)
+  explicit TestStatStore(SymbolTable& symbol_table)
       : owned_storage_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_storage_) {
   }
-  explicit StatNameLookupContext(Store& store) : store_(store) {}
+  explicit TestStatStore(Store& store) : store_(store) {}
 
   OptionalCounter findCounter(absl::string_view name);
-  const Counter& counter(absl::string_view name) {
+  Counter& counter(absl::string_view name) {
     OptionalCounter opt = findCounter(name);
     RELEASE_ASSERT(opt, absl::StrCat("could not find counter ", name));
     return opt->get();
   }
-  const Gauge& gauge(absl::string_view name);
-  const Histogram& histogram(absl::string_view name);
+  Gauge& gauge(absl::string_view name);
+  Histogram& histogram(absl::string_view name);
 
   Store& store() { return store_; }
 

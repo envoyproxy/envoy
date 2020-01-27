@@ -18,7 +18,7 @@ protected:
 
   SymbolTablePtr symbol_table_;
   IsolatedStoreImpl store_;
-  TestUtil::StatNameLookupContext lookup_context_;
+  TestUtil::TestStatStore lookup_context_;
 };
 
 TEST_F(StatTestUtilityTest, InjectDynamics) {

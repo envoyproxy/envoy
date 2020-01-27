@@ -358,15 +358,14 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 template <class StatType>
-absl::optional<std::reference_wrapper<const StatType>>
-ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
+absl::optional<std::reference_wrapper<StatType>> ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
     StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
     return absl::nullopt;
   }
 
-  return std::cref(*iter->second);
+  return std::ref(*iter->second);
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
@@ -512,22 +511,22 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   return **central_ref;
 }
 
-OptionalCounter ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
+OptionalCounter ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) {
   return findStatLockHeld<Counter>(name, central_cache_->counters_);
 }
 
-OptionalGauge ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
+OptionalGauge ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) {
   return findStatLockHeld<Gauge>(name, central_cache_->gauges_);
 }
 
-OptionalHistogram ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
+OptionalHistogram ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) {
   auto iter = central_cache_->histograms_.find(name);
   if (iter == central_cache_->histograms_.end()) {
     return absl::nullopt;
   }
 
   RefcountPtr<Histogram> histogram_ref(iter->second);
-  return std::cref(*histogram_ref);
+  return std::ref(*histogram_ref);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,

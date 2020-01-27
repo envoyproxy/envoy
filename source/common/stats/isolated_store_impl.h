@@ -81,12 +81,12 @@ public:
 private:
   friend class IsolatedStoreImpl;
 
-  absl::optional<std::reference_wrapper<const Base>> find(StatName name) const {
+  absl::optional<std::reference_wrapper<Base>> find(StatName name) const {
     auto stat = stats_.find(name);
     if (stat == stats_.end()) {
       return absl::nullopt;
     }
-    return std::cref(*stat->second);
+    return std::ref(*stat->second);
   }
 
   StatNameHashMap<RefcountPtr<Base>> stats_;
@@ -115,9 +115,9 @@ public:
     Histogram& histogram = histograms_.get(name, unit);
     return histogram;
   }
-  OptionalCounter findCounter(StatName name) const override { return counters_.find(name); }
-  OptionalGauge findGauge(StatName name) const override { return gauges_.find(name); }
-  OptionalHistogram findHistogram(StatName name) const override { return histograms_.find(name); }
+  OptionalCounter findCounter(StatName name) override { return counters_.find(name); }
+  OptionalGauge findGauge(StatName name) override { return gauges_.find(name); }
+  OptionalHistogram findHistogram(StatName name) override { return histograms_.find(name); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }

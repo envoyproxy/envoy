@@ -26,6 +26,7 @@ envoy_extension_cc_test(
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stats:fake_symbol_table_lib",
         "//source/extensions/tracers/lightstep:lightstep_tracer_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",

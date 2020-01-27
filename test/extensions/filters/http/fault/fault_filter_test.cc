@@ -139,7 +139,7 @@ public:
   void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
                                 const Router::RouteSpecificFilterConfig* vhost_fault);
 
-  Stats::TestUtil::StatNameLookupContext stats_;
+  Stats::TestUtil::TestStatStore stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;

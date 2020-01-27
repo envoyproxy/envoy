@@ -260,9 +260,9 @@ public:
   std::string upstream_zone_{"to_az"};
   envoy::config::core::v3::Locality upstream_locality_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  Stats::TestUtil::StatNameLookupContext stats_;
+  Stats::TestUtil::TestStatStore stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  Stats::TestUtil::StatNameLookupContext cm_stats_;
+  Stats::TestUtil::TestStatStore cm_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::ConnectionPool::MockCancellable cancellable_;

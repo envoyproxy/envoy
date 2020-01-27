@@ -43,7 +43,9 @@ public:
   MOCK_METHOD(void, onData, (Buffer::Instance & data));
 };
 
-class TestStatStore : public Stats::IsolatedStoreImpl {
+// Note: there is a MockStore in test/common/stats/mocks.h but it appears to
+// only allow for one mock counter, so we must create our own.
+class MockIsolatedStatStore : public Stats::IsolatedStoreImpl {
 public:
   MOCK_METHOD(void, deliverHistogramToSinks, (const Stats::Histogram& histogram, uint64_t value));
 };
@@ -118,8 +120,8 @@ public:
   }
 
   Buffer::OwnedImpl fake_data_;
-  NiceMock<TestStatStore> store_;
-  Stats::TestUtil::StatNameLookupContext stats_;
+  NiceMock<MockIsolatedStatStore> store_;
+  Stats::TestUtil::TestStatStore stats_;
   MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;

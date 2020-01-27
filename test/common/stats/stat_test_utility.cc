@@ -135,7 +135,7 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
-OptionalCounter StatNameLookupContext::findCounter(absl::string_view name) {
+OptionalCounter TestStatStore::findCounter(absl::string_view name) {
   if (store_.numCounters() != num_counters_) {
     ENVOY_LOG_MISC(error, "recomputing counter table");
     for (CounterSharedPtr& counter : store_.counters()) {
@@ -151,7 +151,7 @@ OptionalCounter StatNameLookupContext::findCounter(absl::string_view name) {
   return ret;
 }
 
-const Gauge& StatNameLookupContext::gauge(absl::string_view name) {
+Gauge& TestStatStore::gauge(absl::string_view name) {
   if (store_.numGauges() != num_gauges_) {
     ENVOY_LOG_MISC(error, "recomputing gauge table");
     for (GaugeSharedPtr& gauge : store_.gauges()) {
