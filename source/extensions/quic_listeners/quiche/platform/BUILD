@@ -206,7 +206,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
-        "//source/common/common:stack_array",
         "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_base",
     ],

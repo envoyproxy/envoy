@@ -305,14 +305,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/protocolbuffers/upb/archive/8a3ae1ef3e3e3f26b45dec735c5776737fc7247f.tar.gz"],
     ),
     kafka_source = dict(
-        sha256 = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1",  # 2.2.0-rc2
-        strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
-        urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
+        sha256 = "feaa32e5c42acf42bd587f8f0b1ccce679db227620da97eed013f4c44a44f64d",
+        strip_prefix = "kafka-2.3.1/clients/src/main/resources/common/message",
+        urls = ["https://github.com/apache/kafka/archive/2.3.1.zip"],
     ),
     kafka_server_binary = dict(
-        sha256 = "a009624fae678fa35968f945e18e45fbea9a30fa8080d5dcce7fdea726120027",
-        strip_prefix = "kafka_2.12-2.2.0",
-        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.2.0/kafka_2.12-2.2.0.tgz"],
+        sha256 = "5a3ddd4148371284693370d56f6f66c7a86d86dd96c533447d2a94d176768d2e",
+        strip_prefix = "kafka_2.12-2.3.1",
+        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.3.1/kafka_2.12-2.3.1.tgz"],
     ),
     kafka_python_client = dict(
         sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",

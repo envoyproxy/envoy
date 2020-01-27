@@ -6,7 +6,7 @@ binary program restarts. The metrics are tracked as:
  * Counters: strictly increasing 64-bit integers.
  * Gauges: 64-bit integers that can rise and fall.
  * Histograms: mapping ranges of values to frequency. The ranges are auto-adjusted as
-   data accumulates. Unliked counters and gauges, histogram data is not retained across
+   data accumulates. Unlike counters and gauges, histogram data is not retained across
    binary program restarts.
 
 In order to support restarting the Envoy binary program without losing counter and gauge

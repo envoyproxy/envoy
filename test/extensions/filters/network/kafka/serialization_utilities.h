@@ -1,10 +1,10 @@
 #pragma once
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/stack_array.h"
 
 #include "extensions/filters/network/kafka/serialization.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 

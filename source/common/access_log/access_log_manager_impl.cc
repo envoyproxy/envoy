@@ -5,7 +5,8 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
-#include "common/common/stack_array.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -95,7 +96,7 @@ AccessLogFileImpl::~AccessLogFileImpl() {
 
 void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
 
   // We must do the actual writes to disk under lock, so that we don't intermix chunks from

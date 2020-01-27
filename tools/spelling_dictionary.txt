@@ -41,6 +41,7 @@ CRC
 CRL
 CRLFs
 CRT
+CSDS
 CSRF
 CSS
 CSV
@@ -159,6 +160,7 @@ LEV
 LF
 LHS
 LLVM
+LPT
 LRS
 MB
 MD
@@ -295,6 +297,7 @@ UA
 UBSAN
 UDP
 UDS
+UNC
 URI
 URL
 USEVC
@@ -691,6 +694,7 @@ lookups
 loopback
 lossy
 lowp
+lstat
 ltrim
 lua
 lyft
@@ -921,6 +925,7 @@ ruleset
 runfiles
 runtime
 runtimes
+rver
 sandboxed
 sanitization
 sanitizer

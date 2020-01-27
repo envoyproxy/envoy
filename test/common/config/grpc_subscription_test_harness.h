@@ -176,8 +176,7 @@ public:
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::config::core::v3::Node node_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment>>
-      callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::shared_ptr<GrpcMuxImpl> mux_;
   std::unique_ptr<GrpcSubscriptionImpl> subscription_;
