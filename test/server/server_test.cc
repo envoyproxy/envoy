@@ -440,7 +440,7 @@ TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   try {
-    initialize(std::string());
+    initialize("test/server/test_data/server/unparseable_bootstrap.yaml");
     FAIL();
   } catch (const EnvoyException& e) {
     EXPECT_THAT(e.what(), HasSubstr("Unable to parse JSON as proto"));
@@ -847,7 +847,7 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   try {
-    initialize(std::string());
+    initialize("test/server/test_data/server/empty_bootstrap.yaml");
     FAIL();
   } catch (const EnvoyException& e) {
     EXPECT_THAT(e.what(), HasSubstr("Failed to open log-file"));

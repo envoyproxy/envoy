@@ -244,43 +244,6 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
   return ret;
 }
 
-void TestUtility::renameFile(const std::string& old_name, const std::string& new_name) {
-#ifdef WIN32
-  // use MoveFileEx, since ::rename will not overwrite an existing file. See
-  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
-  const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
-  ASSERT_NE(0, rc);
-#else
-  const int rc = ::rename(old_name.c_str(), new_name.c_str());
-  ASSERT_EQ(0, rc);
-#endif
-};
-
-void TestUtility::createDirectory(const std::string& name) {
-#ifdef WIN32
-  ::_mkdir(name.c_str());
-#else
-  ::mkdir(name.c_str(), S_IRWXU);
-#endif
-}
-
-void TestUtility::createSymlink(const std::string& target, const std::string& link) {
-#ifdef WIN32
-  const DWORD attributes = ::GetFileAttributes(target.c_str());
-  ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
-  int flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
-  if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
-    flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
-  }
-
-  const BOOLEAN rc = ::CreateSymbolicLink(link.c_str(), target.c_str(), flags);
-  ASSERT_NE(rc, 0);
-#else
-  const int rc = ::symlink(target.c_str(), link.c_str());
-  ASSERT_EQ(rc, 0);
-#endif
-}
-
 // static
 absl::Time TestUtility::parseTime(const std::string& input, const std::string& input_format) {
   absl::Time time;
@@ -359,27 +322,6 @@ void ConditionalInitializer::wait() {
   while (!ready_) {
     cv_.wait(mutex_);
   }
-}
-
-AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
-    : link_(filename), new_link_(absl::StrCat(filename, ".new")),
-      target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
-      use_target1_(true) {
-  unlink(link_.c_str());
-  unlink(new_link_.c_str());
-  unlink(target1_.c_str());
-  unlink(target2_.c_str());
-}
-
-void AtomicFileUpdater::update(const std::string& contents) {
-  const std::string target = use_target1_ ? target1_ : target2_;
-  use_target1_ = !use_target1_;
-  {
-    std::ofstream file(target, std::ios_base::binary);
-    file << contents;
-  }
-  TestUtility::createSymlink(target, new_link_);
-  TestUtility::renameFile(new_link_, link_);
 }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;

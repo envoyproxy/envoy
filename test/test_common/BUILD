@@ -34,6 +34,7 @@ envoy_cc_test_library(
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",

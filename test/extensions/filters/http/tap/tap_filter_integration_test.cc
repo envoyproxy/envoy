@@ -93,10 +93,9 @@ public:
 
   std::string getTempPathPrefix() {
     const std::string path_prefix = TestEnvironment::temporaryDirectory() + "/tap_integration_" +
-                                    testing::UnitTest::GetInstance()->current_test_info()->name() +
-                                    "/";
+                                    testing::UnitTest::GetInstance()->current_test_info()->name();
     TestEnvironment::createPath(path_prefix);
-    return path_prefix;
+    return path_prefix + "/";
   }
 
   std::vector<envoy::data::tap::v3::TraceWrapper>

@@ -100,8 +100,8 @@ protected:
     EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
       Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
-          .WillRepeatedly(Invoke(
-              [this](const std::string& path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+          .WillRepeatedly(
+              Invoke([this](absl::string_view path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 EXPECT_EQ(path, expected_watch_root_);
                 on_changed_cbs_.emplace_back(cb);
               }));
