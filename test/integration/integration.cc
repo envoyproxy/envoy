@@ -20,7 +20,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/config/api_version.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
@@ -37,6 +36,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 

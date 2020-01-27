@@ -202,8 +202,7 @@ public:
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
   envoy::config::core::v3::Node node_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment>>
-      callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};

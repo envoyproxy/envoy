@@ -9,12 +9,10 @@ namespace Envoy {
 namespace Config {
 
 const Protobuf::Descriptor*
-ApiTypeOracle::getEarlierVersionDescriptor(const Protobuf::Message& message) {
-  const std::string target_type = message.GetDescriptor()->full_name();
-
-  // Determine if there is an earlier API version for target_type.
+ApiTypeOracle::getEarlierVersionDescriptor(const std::string& message_type) {
+  // Determine if there is an earlier API version for message_type.
   const Protobuf::Descriptor* desc =
-      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(std::string{target_type});
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(std::string{message_type});
   if (desc == nullptr) {
     return nullptr;
   }

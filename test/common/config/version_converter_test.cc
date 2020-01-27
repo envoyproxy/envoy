@@ -62,6 +62,15 @@ TEST(VersionConverterTest, Upgrade) {
   EXPECT_THAT(original_sub_msg, ProtoEq(source.eds_cluster_config()));
 }
 
+// Bad UTF-8 can fail wire cast during upgrade.
+TEST(VersionConverterTest, UpgradeException) {
+  API_NO_BOOST(envoy::api::v2::Cluster) source;
+  source.mutable_eds_cluster_config()->set_service_name("UPST128\tAM_HO\001\202\247ST");
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
+  EXPECT_THROW_WITH_MESSAGE(VersionConverter::upgrade(source, dst), EnvoyException,
+                            "Unable to deserialize during wireCast()");
+}
+
 // Verify that VersionUtil::scrubHiddenEnvoyDeprecated recursively scrubs any
 // deprecated fields.
 TEST(VersionConverterTest, ScrubHiddenEnvoyDeprecated) {

@@ -13,7 +13,7 @@ namespace quic {
 quiche::QuicheStringPiece QuicMemSliceSpanImpl::GetData(size_t index) {
   uint64_t num_slices = buffer_->getRawSlices(nullptr, 0);
   ASSERT(num_slices > index);
-  Envoy::STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
+  absl::FixedArray<Envoy::Buffer::RawSlice> slices(num_slices);
   buffer_->getRawSlices(slices.begin(), num_slices);
   return {reinterpret_cast<char*>(slices[index].mem_), slices[index].len_};
 }

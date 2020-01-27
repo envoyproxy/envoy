@@ -919,6 +919,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/stats:stats_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -1010,24 +1011,5 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "aws_metadata_fetcher_integration_test",
-    srcs = [
-        "aws_metadata_fetcher_integration_test.cc",
-    ],
-    deps = [
-        ":integration_lib",
-        "//source/common/common:fmt_lib",
-        "//source/extensions/filters/http/common/aws:utility_lib",
-        "//source/extensions/filters/http/fault:config",
-        "//source/extensions/filters/http/fault:fault_filter_lib",
-        "//source/extensions/filters/http/router:config",
-        "//source/extensions/filters/network/echo:config",
-        "//source/extensions/filters/network/http_connection_manager:config",
-        "//test/server:utility_lib",
-        "//test/test_common:utility_lib",
     ],
 )

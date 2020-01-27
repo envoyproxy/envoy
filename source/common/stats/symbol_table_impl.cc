@@ -531,7 +531,7 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
   // First encode all the names.
   size_t total_size_bytes = 1; /* one byte for holding the number of names */
 
-  STACK_ARRAY(encodings, Encoding, num_names);
+  absl::FixedArray<Encoding> encodings(num_names);
   for (uint32_t i = 0; i < num_names; ++i) {
     Encoding& encoding = encodings[i];
     addTokensToEncoding(names[i], encoding);
