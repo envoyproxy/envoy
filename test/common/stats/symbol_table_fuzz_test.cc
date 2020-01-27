@@ -72,9 +72,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       } else {
         for (uint32_t i = 0; i < joined.size(); ++i) {
           if (joined[i] != name1_name2[i]) {
-            std::cerr << "char [" << i << "] mismatch: " << joined[i] << "("
-                      << static_cast<uint32_t>(joined[i]) << ") != " << name1_name2[i] << "("
-                      << static_cast<uint32_t>(name1_name2[i]) << ")" << std::endl;
+            ENVOY_LOG_MISC(error, "char [{}] mismatch: {}({}) != {}({})", i, joined[i],
+                           static_cast<uint32_t>(joined[i]), name1_name2[i],
+                           static_cast<uint32_t>(name1_name2[i]));
             ok = false;
           }
         }
