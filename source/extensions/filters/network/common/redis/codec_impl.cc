@@ -317,7 +317,7 @@ RespValue::CompositeArray::CompositeArrayConstIterator::operator++() {
 }
 
 bool RespValue::CompositeArray::CompositeArrayConstIterator::operator!=(
-  const CompositeArrayConstIterator& rhs) const {
+    const CompositeArrayConstIterator& rhs) const {
   return command_ != (rhs.command_) || &array_ != &(rhs.array_) || index_ != rhs.index_ ||
          first_ != rhs.first_;
 }
