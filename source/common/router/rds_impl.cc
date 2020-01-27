@@ -316,13 +316,13 @@ void RdsRouteConfigProviderImpl::validateConfig(
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
-    std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   auto alias =
       VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
-  factory_context_.dispatcher().post([this, alias, &thread_local_dispatcher,
-                                      route_config_updated_cb]() -> void {
+  std::weak_ptr<Http::RouteConfigUpdatedCallback> cb(route_config_updated_cb);
+  factory_context_.dispatcher().post([this, alias, &thread_local_dispatcher, cb]() -> void {
     subscription_->updateOnDemand(alias);
-    config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+    config_update_callbacks_.push_back({alias, thread_local_dispatcher, cb});
   });
 }
 
