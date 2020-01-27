@@ -44,7 +44,9 @@ Histogram& ScopePrefixer::histogramFromStatName(StatName name, Histogram::Unit u
   return scope_.histogramFromStatName(StatName(stat_name_storage.get()), unit);
 }
 
-CounterOptConstRef ScopePrefixer::findCounter(StatName name) const { return scope_.findCounter(name); }
+CounterOptConstRef ScopePrefixer::findCounter(StatName name) const {
+  return scope_.findCounter(name);
+}
 
 GaugeOptConstRef ScopePrefixer::findGauge(StatName name) const { return scope_.findGauge(name); }
 

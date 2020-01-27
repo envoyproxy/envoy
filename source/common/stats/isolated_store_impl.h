@@ -116,7 +116,9 @@ public:
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
   GaugeOptConstRef findGauge(StatName name) const override { return gauges_.find(name); }
-  HistogramOptConstRef findHistogram(StatName name) const override { return histograms_.find(name); }
+  HistogramOptConstRef findHistogram(StatName name) const override {
+    return histograms_.find(name);
+  }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
