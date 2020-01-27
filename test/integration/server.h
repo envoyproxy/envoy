@@ -112,15 +112,15 @@ public:
     return histogramFromStatName(storage.statName(), unit);
   }
 
-  OptionalCounter findCounter(StatName name) override {
+  OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findCounter(name);
   }
-  OptionalGauge findGauge(StatName name) override {
+  OptionalGauge findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findGauge(name);
   }
-  OptionalHistogram findHistogram(StatName name) override {
+  OptionalHistogram findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findHistogram(name);
   }
