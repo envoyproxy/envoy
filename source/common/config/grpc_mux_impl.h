@@ -46,7 +46,7 @@ public:
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           std::chrono::milliseconds init_fetch_timeout);
+                           std::chrono::milliseconds init_fetch_timeout) override;
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
