@@ -84,7 +84,8 @@ public:
    * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
    * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
    */
-  virtual GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+  virtual GrpcMuxWatchPtr addWatch(const std::string& type_url,
+                                   const std::set<std::string>& resources,
                                    SubscriptionCallbacks& callbacks,
                                    std::chrono::milliseconds init_fetch_timeout) PURE;
 
