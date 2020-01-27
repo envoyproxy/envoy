@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <iostream>
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
