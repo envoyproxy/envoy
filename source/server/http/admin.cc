@@ -915,17 +915,22 @@ Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::H
 
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
-  time_t current_time = time(nullptr);
+  const std::time_t current_time =
+      std::chrono::system_clock::to_time_t(server_.timeSource().systemTime());
+  const std::time_t uptime_current_epoch = current_time - server_.startTimeCurrentEpoch();
+  const std::time_t uptime_all_epochs = current_time - server_.startTimeFirstEpoch();
+
+  ASSERT(uptime_current_epoch >= 0);
+  ASSERT(uptime_all_epochs >= 0);
+
   envoy::admin::v3::ServerInfo server_info;
   server_info.set_version(VersionInfo::version());
   server_info.set_hot_restart_version(server_.hotRestart().version());
   server_info.set_state(
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed()));
 
-  server_info.mutable_uptime_current_epoch()->set_seconds(current_time -
-                                                          server_.startTimeCurrentEpoch());
-  server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
-                                                       server_.startTimeFirstEpoch());
+  server_info.mutable_uptime_current_epoch()->set_seconds(uptime_current_epoch);
+  server_info.mutable_uptime_all_epochs()->set_seconds(uptime_all_epochs);
   envoy::admin::v3::CommandLineOptions* command_line_options =
       server_info.mutable_command_line_options();
   *command_line_options = *server_.options().toCommandLineOptions();

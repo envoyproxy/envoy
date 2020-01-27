@@ -1123,9 +1123,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     }
   }
 
-  if (grpc_status.has_value() &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.outlier_detection_support_for_grpc_status")) {
+  if (grpc_status.has_value()) {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(grpc_to_http_status);
   } else {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
