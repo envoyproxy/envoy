@@ -224,6 +224,13 @@ TEST(Context, ResponseAttributes) {
   }
 
   {
+    auto value = response[CelValue::CreateStringView(TotalSize)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(160, value.value().Int64OrDie());
+  }
+
+  {
     auto value = response[CelValue::CreateStringView(Code)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
