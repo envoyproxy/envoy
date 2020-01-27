@@ -202,6 +202,10 @@ public:
     return store_.histograms();
   }
 
+  uint64_t numCounters() const override { return store_.numCounters(); }
+  uint64_t numGauges() const override { return store_.numGauges(); }
+  uint64_t numHistograms() const override { return store_.numHistograms(); }
+
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}

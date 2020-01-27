@@ -2,7 +2,6 @@
 
 #include "extensions/tracers/common/ot/opentracing_driver_impl.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -62,7 +61,7 @@ public:
   SystemTime start_time_;
 
   std::unique_ptr<TestDriver> driver_;
-  Stats::TestUtil::StatNameLookupContext stats_;
+  Stats::IsolatedStoreImpl stats_;
 
   NiceMock<Tracing::MockConfig> config_;
 };

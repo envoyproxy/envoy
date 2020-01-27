@@ -22,7 +22,6 @@
 
 #include "server/transport_socket_config_impl.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
@@ -59,7 +58,7 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Stats::TestUtil::StatNameLookupContext stats_;
+  Stats::IsolatedStoreImpl stats_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
@@ -1847,7 +1846,7 @@ public:
                                                   *factory_context_, std::move(scope_), false);
   }
 
-  Stats::TestUtil::StatNameLookupContext stats_;
+  Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
   NiceMock<Event::MockDispatcher> dispatcher_;

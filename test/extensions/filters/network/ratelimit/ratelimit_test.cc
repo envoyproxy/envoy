@@ -9,7 +9,6 @@
 
 #include "extensions/filters/network/ratelimit/ratelimit.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
@@ -87,7 +86,7 @@ stat_prefix: name
 failure_mode_deny: true
 )EOF";
 
-  Stats::TestUtil::StatNameLookupContext stats_store_;
+  Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;

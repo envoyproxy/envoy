@@ -13,7 +13,6 @@
 
 #include "server/transport_socket_config_impl.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -114,7 +113,7 @@ protected:
   }
 
   bool initialized_{};
-  Stats::TestUtil::StatNameLookupContext stats_;
+  Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;

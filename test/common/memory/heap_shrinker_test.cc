@@ -2,7 +2,6 @@
 #include "common/memory/heap_shrinker.h"
 #include "common/memory/stats.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
@@ -28,7 +27,7 @@ protected:
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  Envoy::Stats::TestUtil::StatNameLookupContext stats_;
+  Envoy::Stats::IsolatedStoreImpl stats_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherImpl dispatcher_;

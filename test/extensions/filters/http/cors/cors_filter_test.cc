@@ -5,7 +5,6 @@
 
 #include "extensions/filters/http/cors/cors_filter.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -65,7 +64,7 @@ public:
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  Stats::TestUtil::StatNameLookupContext stats_;
+  Stats::IsolatedStoreImpl stats_;
   CorsFilterConfigSharedPtr config_;
   CorsFilter filter_;
   Buffer::OwnedImpl data_;

@@ -13,7 +13,6 @@
 
 #include "extensions/filters/network/ext_authz/ext_authz.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -76,7 +75,7 @@ public:
     }
   }
 
-  Stats::TestUtil::StatNameLookupContext stats_store_;
+  Stats::IsolatedStoreImpl stats_store_;
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;

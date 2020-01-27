@@ -41,7 +41,7 @@ namespace {
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
-  Stats::TestUtil::StatNameLookupContext store;
+  Stats::IsolatedStoreImpl store;
   Stats::Counter& c = store.counter("hello");
   c.inc();
   store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);

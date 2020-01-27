@@ -11,7 +11,6 @@
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/local_info/mocks.h"

@@ -293,6 +293,10 @@ public:
   MOCK_METHOD(OptionalGauge, findGauge, (StatName), (const));
   MOCK_METHOD(OptionalHistogram, findHistogram, (StatName), (const));
 
+  MOCK_METHOD(uint64_t, numCounters, (), (const));
+  MOCK_METHOD(uint64_t, numGauges, (), (const));
+  MOCK_METHOD(uint64_t, numHistograms, (), (const));
+
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));
   }

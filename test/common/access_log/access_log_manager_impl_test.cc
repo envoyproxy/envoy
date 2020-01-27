@@ -4,7 +4,6 @@
 #include "common/filesystem/file_shared_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -52,7 +51,7 @@ protected:
   NiceMock<Filesystem::MockInstance> file_system_;
   NiceMock<Filesystem::MockFile>* file_;
   const std::chrono::milliseconds timeout_40ms_{40};
-  Stats::TestUtil::StatNameLookupContext store_;
+  Stats::IsolatedStoreImpl store_;
   Thread::ThreadFactory& thread_factory_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Thread::MutexBasicLockable lock_;

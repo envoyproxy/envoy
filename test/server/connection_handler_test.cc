@@ -12,7 +12,6 @@
 
 #include "server/connection_handler_impl.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -149,7 +148,7 @@ public:
     return listeners_.back().get();
   }
 
-  Stats::TestUtil::StatNameLookupContext stats_store_;
+  Stats::IsolatedStoreImpl stats_store_;
   std::shared_ptr<Network::MockListenSocketFactory> socket_factory_;
   Network::Address::InstanceConstSharedPtr local_address_{
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};

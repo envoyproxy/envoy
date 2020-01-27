@@ -20,7 +20,6 @@
 #include "extensions/filters/http/ext_authz/ext_authz.h"
 #include "extensions/filters/http/well_known_names.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"

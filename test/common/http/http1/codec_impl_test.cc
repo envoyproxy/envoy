@@ -11,7 +11,6 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/runtime/runtime_impl.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -90,7 +89,7 @@ public:
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
-  Stats::TestUtil::StatNameLookupContext store_;
+  Stats::IsolatedStoreImpl store_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Protocol p, bool allow_absolute_url,
@@ -1260,7 +1259,7 @@ public:
   std::unique_ptr<ClientConnectionImpl> codec_;
 
 protected:
-  Stats::TestUtil::StatNameLookupContext store_;
+  Stats::IsolatedStoreImpl store_;
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
 };
 

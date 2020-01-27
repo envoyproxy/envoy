@@ -10,7 +10,6 @@
 #include "common/http/header_map_impl.h"
 #include "common/stats/symbol_table_creator.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -47,8 +46,8 @@ public:
   }
 
   Stats::TestSymbolTable symbol_table_;
-  Stats::TestUtil::StatNameLookupContext global_store_;
-  Stats::TestUtil::StatNameLookupContext cluster_scope_;
+  Stats::IsolatedStoreImpl global_store_;
+  Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
   Stats::StatNamePool pool_;
 };

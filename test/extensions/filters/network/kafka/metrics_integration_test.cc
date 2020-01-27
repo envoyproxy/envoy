@@ -3,7 +3,6 @@
 #include "extensions/filters/network/kafka/external/request_metrics.h"
 #include "extensions/filters/network/kafka/external/response_metrics.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/kafka/message_utilities.h"
 
 #include "gtest/gtest.h"
@@ -16,7 +15,7 @@ namespace MetricsIntegrationTest {
 
 class MetricsIntegrationTest : public testing::Test {
 protected:
-  Stats::TestUtil::StatNameLookupContext scope_;
+  Stats::IsolatedStoreImpl scope_;
   RichRequestMetricsImpl request_metrics_{scope_, "prefix"};
   RichResponseMetricsImpl response_metrics_{scope_, "prefix"};
 };
