@@ -167,6 +167,42 @@ private:
 };
 
 /**
+ * Integer deserializer for uint32_t that was encoded as variable-length byte array.
+ * Encoding documentation:
+ * https://cwiki.apache.org/confluence/display/KAFKA/KIP-482%3A+The+Kafka+Protocol+should+Support+Optional+Tagged+Fields#KIP-482:TheKafkaProtocolshouldSupportOptionalTaggedFields-UnsignedVarints
+ */
+class VarUInt32Deserializer : public Deserializer<uint32_t> {
+public:
+  VarUInt32Deserializer() = default;
+
+  uint32_t feed(absl::string_view& data) override {
+    uint32_t processed = 0;
+    while (!ready_ && !data.empty()) {
+      uint8_t el;
+      memcpy(&el, data.data(), sizeof(uint8_t));
+      data = {data.data() + 1, data.size() - 1};
+      result_ |= ((el & 0x7f) << offset_);
+      offset_ += 7;
+      processed++;
+      if ((el & 0x80) == 0) {
+        ready_ = true;
+      }
+      // missing sanity check
+    }
+    return processed;
+  }
+
+  bool ready() const override { return ready_; }
+
+  uint32_t get() const override { return result_; }
+
+private:
+  uint32_t result_ = 0;
+  uint32_t offset_ = 0;
+  bool ready_ = false;
+};
+
+/**
  * Deserializer of string value.
  * First reads length (INT16) and then allocates the buffer of given length.
  *
@@ -191,6 +227,32 @@ private:
   bool length_consumed_{false};
 
   int16_t required_;
+  std::vector<char> data_buf_;
+
+  bool ready_{false};
+};
+
+/**
+ * Deserializer of compact string value.
+ * First reads length (UNSIGNED_VARINT) and then allocates the buffer of given length.
+ *
+ * From Kafka documentation:
+ * First the length N + 1 is given as an UNSIGNED_VARINT.
+ * Then N bytes follow which are the UTF-8 encoding of the character sequence.
+ */
+class CompactStringDeserializer : public Deserializer<std::string> {
+public:
+  uint32_t feed(absl::string_view& data) override;
+
+  bool ready() const override { return ready_; }
+
+  std::string get() const override { return std::string(data_buf_.begin(), data_buf_.end()); }
+
+private:
+  VarUInt32Deserializer length_buf_;
+  bool length_consumed_{false};
+
+  uint32_t required_;
   std::vector<char> data_buf_;
 
   bool ready_{false};
@@ -232,6 +294,35 @@ private:
 };
 
 /**
+ * Deserializer of nullable compact string value.
+ * First reads length (UNSIGNED_VARINT) and then allocates the buffer of given length.
+ * If length was 0, buffer allocation is omitted and deserializer is immediately ready (returning
+ * null value).
+ *
+ * From Kafka documentation:
+ * First the length N + 1 is given as an UNSIGNED_VARINT.
+ * Then N bytes follow which are the UTF-8 encoding of the character sequence.
+ * A null string is represented with a length of 0.
+ */
+class NullableCompactStringDeserializer : public Deserializer<NullableString> {
+public:
+  uint32_t feed(absl::string_view& data) override;
+
+  bool ready() const override { return ready_; }
+
+  NullableString get() const override;
+
+private:
+  VarUInt32Deserializer length_buf_;
+  bool length_consumed_{false};
+
+  uint32_t required_;
+  std::vector<char> data_buf_;
+
+  bool ready_{false};
+};
+
+/**
  * Deserializer of bytes value.
  * First reads length (INT32) and then allocates the buffer of given length.
  *
@@ -253,6 +344,33 @@ private:
   Int32Deserializer length_buf_;
   bool length_consumed_{false};
   int32_t required_;
+
+  std::vector<unsigned char> data_buf_;
+  bool ready_{false};
+};
+
+/**
+ * Deserializer of compact bytes value.
+ * First reads length (UNSIGNED_VARINT) and then allocates the buffer of given length.
+ *
+ * From Kafka documentation:
+ * First the length N+1 is given as an UNSIGNED_VARINT. Then N bytes follow.
+ */
+class CompactBytesDeserializer : public Deserializer<Bytes> {
+public:
+  /**
+   * Can throw EnvoyException if given bytes length is not valid.
+   */
+  uint32_t feed(absl::string_view& data) override;
+
+  bool ready() const override { return ready_; }
+
+  Bytes get() const override { return data_buf_; }
+
+private:
+  VarUInt32Deserializer length_buf_;
+  bool length_consumed_{false};
+  uint32_t required_;
 
   std::vector<unsigned char> data_buf_;
   bool ready_{false};
@@ -285,6 +403,33 @@ private:
   Int32Deserializer length_buf_;
   bool length_consumed_{false};
   int32_t required_;
+
+  std::vector<unsigned char> data_buf_;
+  bool ready_{false};
+};
+
+/**
+ * Deserializer of nullable compact bytes value.
+ * First reads length (UNSIGNED_VARINT) and then allocates the buffer of given length.
+ * If length was 0, buffer allocation is omitted and deserializer is immediately ready (returning
+ * null value).
+ *
+ * From Kafka documentation:
+ * First the length N+1 is given as an UNSIGNED_VARINT.
+ * Then N bytes follow. A null object is represented with a length of 0.
+ */
+class NullableCompactBytesDeserializer : public Deserializer<NullableBytes> {
+public:
+  uint32_t feed(absl::string_view& data) override;
+
+  bool ready() const override { return ready_; }
+
+  NullableBytes get() const override;
+
+private:
+  VarUInt32Deserializer length_buf_;
+  bool length_consumed_{false};
+  uint32_t required_;
 
   std::vector<unsigned char> data_buf_;
   bool ready_{false};
@@ -362,6 +507,82 @@ private:
   Int32Deserializer length_buf_;
   bool length_consumed_{false};
   int32_t required_;
+  std::vector<DeserializerType> children_;
+  bool children_setup_{false};
+  bool ready_{false};
+};
+
+/**
+ * Deserializer for compact array of objects of the same type.
+ *
+ * First reads the length of the array, then initializes N underlying deserializers of type
+ * DeserializerType. After the last of N deserializers is ready, the results of each of them are
+ * gathered and put in a vector.
+ * @param ResponseType result type returned by deserializer of type DeserializerType.
+ * @param DeserializerType underlying deserializer type.
+ *
+ * From Kafka documentation:
+ * Represents a sequence of objects of a given type T. Type T can be either a primitive type (e.g.
+ * STRING) or a structure. First, the length N + 1 is given as an UNSIGNED_VARINT. Then N instances
+ * of type T follow. A null array is represented with a length of 0.
+ */
+template <typename ResponseType, typename DeserializerType>
+class CompactArrayDeserializer : public Deserializer<std::vector<ResponseType>> {
+public:
+  /**
+   * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
+   */
+  uint32_t feed(absl::string_view& data) override {
+
+    const uint32_t length_consumed = length_buf_.feed(data);
+    if (!length_buf_.ready()) {
+      // Break early: we still need to fill in length buffer.
+      return length_consumed;
+    }
+
+    if (!length_consumed_) {
+      const uint32_t required = length_buf_.get();
+      if (required >= 1) {
+        children_ = std::vector<DeserializerType>(required - 1);
+      } else {
+        throw EnvoyException(absl::StrCat("invalid COMPACT_ARRAY length: ", required));
+      }
+      length_consumed_ = true;
+    }
+
+    if (ready_) {
+      return length_consumed;
+    }
+
+    uint32_t child_consumed{0};
+    for (DeserializerType& child : children_) {
+      child_consumed += child.feed(data);
+    }
+
+    bool children_ready_ = true;
+    for (DeserializerType& child : children_) {
+      children_ready_ &= child.ready();
+    }
+    ready_ = children_ready_;
+
+    return length_consumed + child_consumed;
+  }
+
+  bool ready() const override { return ready_; }
+
+  std::vector<ResponseType> get() const override {
+    std::vector<ResponseType> result{};
+    result.reserve(children_.size());
+    for (const DeserializerType& child : children_) {
+      const ResponseType child_result = child.get();
+      result.push_back(child_result);
+    }
+    return result;
+  }
+
+private:
+  VarUInt32Deserializer length_buf_;
+  bool length_consumed_{false};
   std::vector<DeserializerType> children_;
   bool children_setup_{false};
   bool ready_{false};
@@ -451,6 +672,91 @@ private:
   Int32Deserializer length_buf_;
   bool length_consumed_{false};
   int32_t required_;
+  std::vector<DeserializerType> children_;
+  bool children_setup_{false};
+  bool ready_{false};
+};
+
+/**
+ * Deserializer for compact nullable array of objects of the same type.
+ *
+ * First reads the length of the array, then initializes N underlying deserializers of type
+ * DeserializerType. After the last of N deserializers is ready, the results of each of them are
+ * gathered and put in a vector.
+ * @param ResponseType result type returned by deserializer of type DeserializerType.
+ * @param DeserializerType underlying deserializer type.
+ *
+ * From Kafka documentation:
+ * Represents a sequence of objects of a given type T. Type T can be either a primitive type (e.g.
+ * STRING) or a structure. First, the length N + 1 is given as an UNSIGNED_VARINT. Then N instances
+ * of type T follow. A null array is represented with a length of 0.
+ */
+template <typename ResponseType, typename DeserializerType>
+class NullableCompactArrayDeserializer : public Deserializer<NullableArray<ResponseType>> {
+public:
+  /**
+   * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
+   */
+  uint32_t feed(absl::string_view& data) override {
+
+    const uint32_t length_consumed = length_buf_.feed(data);
+    if (!length_buf_.ready()) {
+      // Break early: we still need to fill in length buffer.
+      return length_consumed;
+    }
+
+    if (!length_consumed_) {
+      const uint32_t required = length_buf_.get();
+
+      // Length is unsigned, so we never throw exceptions.
+      if (required >= 1) {
+        children_ = std::vector<DeserializerType>(required - 1);
+      } else {
+        ready_ = true;
+      }
+
+      length_consumed_ = true;
+    }
+
+    if (ready_) {
+      return length_consumed;
+    }
+
+    uint32_t child_consumed{0};
+    for (DeserializerType& child : children_) {
+      child_consumed += child.feed(data);
+    }
+
+    bool children_ready_ = true;
+    for (DeserializerType& child : children_) {
+      children_ready_ &= child.ready();
+    }
+    ready_ = children_ready_;
+
+    return length_consumed + child_consumed;
+  }
+
+  bool ready() const override { return ready_; }
+
+  NullableArray<ResponseType> get() const override {
+    if (NULL_ARRAY_LENGTH != length_buf_.get()) {
+      std::vector<ResponseType> result{};
+      result.reserve(children_.size());
+      for (const DeserializerType& child : children_) {
+        const ResponseType child_result = child.get();
+        result.push_back(child_result);
+      }
+      return result;
+    } else {
+      return absl::nullopt;
+    }
+  }
+
+private:
+  constexpr static int32_t NULL_ARRAY_LENGTH{0};
+
+  VarUInt32Deserializer length_buf_;
+  bool length_consumed_{false};
   std::vector<DeserializerType> children_;
   bool children_setup_{false};
   bool ready_{false};
