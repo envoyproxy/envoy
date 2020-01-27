@@ -200,11 +200,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
   for (const auto& header : request.attributes().request().http().headers()) {
     const Http::LowerCaseString key{header.first};
+    // Skip setting content-length header since it is already configured at initialization.
+    if (key == Http::Headers::get().ContentLength) {
+      continue;
+    }
+
     if (config_->requestHeaderMatchers()->matches(key.get())) {
       if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
-        std::string value;
-        absl::StrAppend(&value, config_->pathPrefix(), header.second);
-        headers->addCopy(key, value);
+        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
       } else {
         headers->addCopy(key, header.second);
       }
