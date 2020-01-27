@@ -730,6 +730,7 @@ multicast
 multikill
 multimap
 multivalue
+mutator
 mutex
 mutexes
 mux
