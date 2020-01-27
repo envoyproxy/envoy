@@ -251,13 +251,9 @@ void ConnectionImpl::flushOutput() {
 
 void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_.add(data); }
 
-void ConnectionImpl::addCharToBuffer(char c) {
-  output_buffer_.add(&c, 1);
-}
+void ConnectionImpl::addCharToBuffer(char c) { output_buffer_.add(&c, 1); }
 
-void ConnectionImpl::addIntToBuffer(uint64_t i) {
-  output_buffer_.add(absl::StrCat(i));
-}
+void ConnectionImpl::addIntToBuffer(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
 
 void ConnectionImpl::copyToBuffer(const char* data, uint64_t length) {
   output_buffer_.add(data, length);
