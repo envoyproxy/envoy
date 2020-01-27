@@ -485,7 +485,7 @@ public:
 
   /**
    * FilterState object to be shared between upstream and downstream filters.
-   * @param pointer to downstream connections filterstate.
+   * @param pointer to upstream connections filterstate.
    * @return pointer to filterstate to be used by upstream connections.
    */
   virtual std::shared_ptr<FilterState> upstreamFilterState() PURE;
