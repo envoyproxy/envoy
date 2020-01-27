@@ -449,10 +449,11 @@ public:
                    const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix, Init::Manager& init_manager));
-  MOCK_METHOD2(
+  MOCK_METHOD3(
       createStaticRouteConfigProvider,
       RouteConfigProviderPtr(const envoy::config::route::v3::RouteConfiguration& route_config,
-                             Server::Configuration::ServerFactoryContext& factory_context));
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             ProtobufMessage::ValidationVisitor& validator));
 };
 
 class MockScopedConfig : public ScopedConfig {

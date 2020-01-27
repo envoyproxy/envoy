@@ -225,11 +225,11 @@ private:
   const uint64_t hash_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
-  // This init watcher, if available, notifies the "parent" listener manager when listener
-  // initialization is complete. It may be reset to cancel interest.
-  std::unique_ptr<Init::WatcherImpl> init_watcher_;
+  // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
+  // listener initialization is complete.
+  Init::WatcherImpl init_watcher_;
   // A target is added to Server's InitManager if workers_started_ is false.
-  std::unique_ptr<Init::TargetImpl> listener_init_target_;
+  Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   Init::ManagerImpl dynamic_init_manager_;

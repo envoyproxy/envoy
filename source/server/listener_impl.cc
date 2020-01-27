@@ -142,18 +142,18 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      init_watcher_(std::make_unique<Init::WatcherImpl>("ListenerImpl",
-                                                        [this] {
-                                                          if (workers_started_) {
-                                                            parent_.onListenerWarmed(*this);
-                                                          } else {
-                                                            ASSERT(listener_init_target_ !=
-                                                                   nullptr);
-                                                            // Notify Server that this listener is
-                                                            // ready.
-                                                            listener_init_target_->ready();
-                                                          }
-                                                        })),
+      init_watcher_("ListenerImpl",
+                    [this] {
+                      if (workers_started_) {
+                        parent_.onListenerWarmed(*this);
+                      } else {
+                        // Notify Server that this listener is
+                        // ready.
+                        listener_init_target_.ready();
+                      }
+                    }),
+      listener_init_target_(fmt::format("Listener Initializer {}", name),
+                            [this]() { dynamic_init_manager_.initialize(init_watcher_); }),
       dynamic_init_manager_(fmt::format("Listener {}", name)),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
@@ -316,11 +316,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
 
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
-    listener_init_target_ =
-        std::make_unique<Init::TargetImpl>(fmt::format("Listener Initializer {}", name), [this]() {
-          dynamic_init_manager_.initialize(*init_watcher_);
-        });
-    parent_.server_.initManager().add(*listener_init_target_);
+    parent_.server_.initManager().add(listener_init_target_);
   }
 }
 
@@ -330,7 +326,6 @@ ListenerImpl::~ListenerImpl() {
   // a local init manager we should block the notification from trying to move us from warming to
   // active. This is done here explicitly by resetting the watcher and then clearing the factory
   // vector for clarity.
-  init_watcher_.reset();
 }
 
 AccessLog::AccessLogManager& ListenerImpl::accessLogManager() {
@@ -414,7 +409,7 @@ void ListenerImpl::initialize() {
   if (workers_started_) {
     // If workers_started_ is true, dynamic_init_manager_ should be initialized by listener manager
     // directly..
-    dynamic_init_manager_.initialize(*init_watcher_);
+    dynamic_init_manager_.initialize(init_watcher_);
   }
 }
 

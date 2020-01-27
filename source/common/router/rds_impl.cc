@@ -28,13 +28,14 @@ namespace Router {
 RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config,
-    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager) {
   switch (config.route_specifier_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
-    return route_config_provider_manager.createStaticRouteConfigProvider(config.route_config(),
-                                                                         factory_context);
+    return route_config_provider_manager.createStaticRouteConfigProvider(
+        config.route_config(), factory_context, validator);
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRds:
     return route_config_provider_manager.createRdsRouteConfigProvider(
@@ -49,11 +50,9 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::config::route::v3::RouteConfiguration& config,
     Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : config_(new ConfigImpl(config, factory_context,
-                             factory_context.messageValidationContext().staticValidationVisitor(),
-                             true)),
-
+    : config_(new ConfigImpl(config, factory_context, validator, true)),
       route_config_proto_{config}, last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {
   route_config_provider_manager_.static_route_config_providers_.insert(this);
@@ -72,9 +71,9 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       parent_init_target_(fmt::format("RdsRouteConfigSubscription init {}", route_config_name_),
-                          [this]() { local_init_manager_.initialize(init_watcher_); }),
-      init_watcher_(fmt::format("RDS local-init-watcher {}", rds.route_config_name()),
-                    [this]() { parent_init_target_.ready(); }),
+                          [this]() { local_init_manager_.initialize(local_init_watcher_); }),
+      local_init_watcher_(fmt::format("RDS local-init-watcher {}", rds.route_config_name()),
+                          [this]() { parent_init_target_.ready(); }),
       local_init_target_(
           fmt::format("RdsRouteConfigSubscription local-init-target {}", route_config_name_),
           [this]() { subscription_->start({route_config_name_}); }),
@@ -374,9 +373,10 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
 
 RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(
     const envoy::config::route::v3::RouteConfiguration& route_config,
-    Server::Configuration::ServerFactoryContext& factory_context) {
-  auto provider =
-      std::make_unique<StaticRouteConfigProviderImpl>(route_config, factory_context, *this);
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator) {
+  auto provider = std::make_unique<StaticRouteConfigProviderImpl>(route_config, factory_context,
+                                                                  validator, *this);
   static_route_config_providers_.insert(provider.get());
   return provider;
 }

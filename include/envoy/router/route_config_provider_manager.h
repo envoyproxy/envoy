@@ -46,12 +46,13 @@ public:
    * Get a RouteConfigSharedPtr for a statically defined route. Ownership is as described for
    * getRdsRouteConfigProvider above. This method always create a new RouteConfigProvider.
    * @param route_config supplies the RouteConfiguration for this route
-   * @param runtime supplies the runtime loader.
-   * @param cm supplies the ClusterManager.
+   * @param factory_context is the context to use for the route config provider.
+   * @param validator is the message validator for route config.
    */
-  virtual RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const envoy::config::route::v3::RouteConfiguration& route_config,
-      Server::Configuration::ServerFactoryContext& factory_context) PURE;
+  virtual RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
+                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  ProtobufMessage::ValidationVisitor& validator) PURE;
 };
 
 } // namespace Router

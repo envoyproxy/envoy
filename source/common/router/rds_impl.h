@@ -53,7 +53,8 @@ public:
   static RouteConfigProviderSharedPtr create(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           config,
-      Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
       const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager);
 };
 
@@ -66,6 +67,7 @@ class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
                                 Server::Configuration::ServerFactoryContext& factory_context,
+                                ProtobufMessage::ValidationVisitor& validator,
                                 RouteConfigProviderManagerImpl& route_config_provider_manager);
   ~StaticRouteConfigProviderImpl() override;
 
@@ -119,9 +121,7 @@ public:
     return route_config_providers_;
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
-
   void updateOnDemand(const std::string& aliases);
-
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
                               std::unique_ptr<Cleanup>& resume_rds);
@@ -161,14 +161,10 @@ private:
   // Init target used to notify the parent init manager that the subscription [and its sub resource]
   // is ready.
   Init::SharedTargetImpl parent_init_target_;
-
   // Init watcher on RDS and VHDS ready event. This watcher marks parent_init_target_ ready.
-  Init::WatcherImpl init_watcher_;
-
+  Init::WatcherImpl local_init_watcher_;
   // Target which starts the RDS subscription.
   Init::TargetImpl local_init_target_;
-  // Init manager used in intializing sub-resources (VHDS subscription if configured), it may get
-  // recreated when a RDS response contains a new VHDS subscription message.
   Init::ManagerImpl local_init_manager_;
   Stats::ScopePtr scope_;
   std::string stat_prefix_;
@@ -249,9 +245,10 @@ public:
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 
-  RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const envoy::config::route::v3::RouteConfiguration& route_config,
-      Server::Configuration::ServerFactoryContext& factory_context) override;
+  RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
+                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  ProtobufMessage::ValidationVisitor& validator) override;
 
 private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map

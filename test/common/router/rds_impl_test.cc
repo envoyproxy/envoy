@@ -55,7 +55,7 @@ public:
     ON_CALL(server_factory_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
     EXPECT_CALL(validation_context_, dynamicValidationVisitor())
-        .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+        .WillRepeatedly(ReturnRef(validation_visitor_));
 
     ON_CALL(outer_init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
@@ -69,6 +69,7 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Init::MockManager> outer_init_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
@@ -104,9 +105,9 @@ http_filters:
     )EOF";
 
     EXPECT_CALL(outer_init_manager_, add(_));
-    rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                           server_factory_context_, outer_init_manager_, "foo.",
-                                           *route_config_provider_manager_);
+    rds_ = RouteConfigProviderUtil::create(
+        parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
+        validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
     rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
                 start(_));
@@ -136,7 +137,8 @@ http_filters:
     )EOF";
 
   EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                               server_factory_context_, outer_init_manager_, "foo.",
+                                               server_factory_context_, validation_visitor_,
+                                               outer_init_manager_, "foo.",
                                                *route_config_provider_manager_),
                EnvoyException);
 }
@@ -318,7 +320,7 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
   EnvoyException e("test");
   rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                        &e);
-  // Not noop init manager will be created as local_init_manager_ is initialized.
+  // Now noop init manager will be created as local_init_manager_ is initialized.
   subscription.maybeCreateInitManager("version_info", noop_init_manager, init_vhds);
   EXPECT_NE(init_vhds, nullptr);
   EXPECT_NE(noop_init_manager, nullptr);
@@ -387,7 +389,8 @@ virtual_hosts:
   // Only static route.
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
-          parseRouteConfigurationFromV2Yaml(config_yaml), server_factory_context_);
+          parseRouteConfigurationFromV2Yaml(config_yaml), server_factory_context_,
+          validation_visitor_);
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
