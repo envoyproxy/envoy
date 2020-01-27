@@ -89,7 +89,7 @@ public:
   Counter& counter(absl::string_view name) {
     OptionalCounter opt = findCounter(name);
     RELEASE_ASSERT(opt, absl::StrCat("could not find counter ", name));
-    return opt->get();
+    return const_cast<Counter&>(opt->get());
   }
   Gauge& gauge(absl::string_view name);
   Histogram& histogram(absl::string_view name);

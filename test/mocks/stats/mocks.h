@@ -289,9 +289,9 @@ public:
   MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
   MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
 
-  MOCK_METHOD(OptionalCounter, findCounter, (StatName), ());
-  MOCK_METHOD(OptionalGauge, findGauge, (StatName), ());
-  MOCK_METHOD(OptionalHistogram, findHistogram, (StatName), ());
+  MOCK_METHOD(OptionalCounter, findCounter, (StatName), (const));
+  MOCK_METHOD(OptionalGauge, findGauge, (StatName), (const));
+  MOCK_METHOD(OptionalHistogram, findHistogram, (StatName), (const));
 
   MOCK_METHOD(uint64_t, numCounters, (), (const));
   MOCK_METHOD(uint64_t, numGauges, (), (const));

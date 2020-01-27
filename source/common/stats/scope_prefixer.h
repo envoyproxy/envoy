@@ -35,9 +35,9 @@ public:
     return histogramFromStatName(storage.statName(), unit);
   }
 
-  OptionalCounter findCounter(StatName name) override;
-  OptionalGauge findGauge(StatName name) override;
-  OptionalHistogram findHistogram(StatName name) override;
+  OptionalCounter findCounter(StatName name) const override;
+  OptionalGauge findGauge(StatName name) const override;
+  OptionalHistogram findHistogram(StatName name) const override;
 
   const SymbolTable& constSymbolTable() const override { return scope_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return scope_.symbolTable(); }

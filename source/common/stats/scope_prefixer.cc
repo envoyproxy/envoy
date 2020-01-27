@@ -44,11 +44,13 @@ Histogram& ScopePrefixer::histogramFromStatName(StatName name, Histogram::Unit u
   return scope_.histogramFromStatName(StatName(stat_name_storage.get()), unit);
 }
 
-OptionalCounter ScopePrefixer::findCounter(StatName name) { return scope_.findCounter(name); }
+OptionalCounter ScopePrefixer::findCounter(StatName name) const { return scope_.findCounter(name); }
 
-OptionalGauge ScopePrefixer::findGauge(StatName name) { return scope_.findGauge(name); }
+OptionalGauge ScopePrefixer::findGauge(StatName name) const { return scope_.findGauge(name); }
 
-OptionalHistogram ScopePrefixer::findHistogram(StatName name) { return scope_.findHistogram(name); }
+OptionalHistogram ScopePrefixer::findHistogram(StatName name) const {
+  return scope_.findHistogram(name);
+}
 
 void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {
   scope_.deliverHistogramToSinks(histograms, val);
