@@ -306,9 +306,11 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
-  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, foo_callbacks, std::chrono::milliseconds(0));
+  auto foo_sub =
+      grpc_mux_->addWatch(type_url, {"x", "y"}, foo_callbacks, std::chrono::milliseconds(0));
   NiceMock<MockSubscriptionCallbacks> bar_callbacks;
-  auto bar_sub = grpc_mux_->addWatch(type_url, {"y", "z"}, bar_callbacks, std::chrono::milliseconds(0));
+  auto bar_sub =
+      grpc_mux_->addWatch(type_url, {"y", "z"}, bar_callbacks, std::chrono::milliseconds(0));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Should dedupe the "x" resource.
   expectSendMessage(type_url, {"y", "z", "x"}, "", true);
@@ -391,7 +393,8 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
-  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, foo_callbacks, std::chrono::milliseconds(0));
+  auto foo_sub =
+      grpc_mux_->addWatch(type_url, {"x", "y"}, foo_callbacks, std::chrono::milliseconds(0));
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x", "y"}, "", true);

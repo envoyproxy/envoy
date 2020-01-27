@@ -81,8 +81,9 @@ public:
   MOCK_METHOD(void, updateResourceInterest,
               (const std::set<std::string>& resources, const std::string& type_url));
 
-  MOCK_METHOD(GrpcMuxWatchPtr, addWatch, (const std::string& type_url, const std::set<std::string>& resources,
-              SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout));
+  MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
+              (const std::string& type_url, const std::set<std::string>& resources,
+               SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout));
 };
 
 class MockGrpcStreamCallbacks
