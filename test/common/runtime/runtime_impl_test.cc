@@ -11,6 +11,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -111,7 +112,7 @@ protected:
 
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::StatNameLookupContext store_;
   MockRandomGenerator generator_;
   std::unique_ptr<LoaderImpl> loader_;
   Api::ApiPtr api_;

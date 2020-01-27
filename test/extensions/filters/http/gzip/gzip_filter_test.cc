@@ -9,6 +9,7 @@
 
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -183,7 +184,7 @@ protected:
   Decompressor::ZlibDecompressorImpl decompressor_;
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::StatNameLookupContext stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };

@@ -10,6 +10,7 @@
 
 #include "server/guarddog_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -71,7 +72,7 @@ protected:
   }
 
   std::unique_ptr<Event::TestTimeSystem> time_system_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::StatNameLookupContext stats_store_;
   Api::ApiPtr api_;
   std::unique_ptr<GuardDogImpl> guard_dog_;
 };

@@ -2,6 +2,7 @@
 
 #include "server/hot_restarting_parent.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 
@@ -61,7 +62,7 @@ TEST_F(HotRestartingParentTest, getListenSocketsForChildNotBindPort) {
 }
 
 TEST_F(HotRestartingParentTest, exportStatsToChild) {
-  Stats::IsolatedStoreImpl store;
+  Stats::TestUtil::StatNameLookupContext store;
   MockListenerManager listener_manager;
   EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));

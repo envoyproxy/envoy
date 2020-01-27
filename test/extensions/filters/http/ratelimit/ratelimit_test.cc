@@ -11,6 +11,7 @@
 
 #include "extensions/filters/http/ratelimit/ratelimit.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"

@@ -65,7 +65,7 @@ public:
 class MongoProxyFilterTest : public testing::Test {
 public:
   MongoProxyFilterTest()
-      : mixed_stat_names_(store_), mongo_stats_(std::make_shared<MongoStats>(store_, "test")) {
+      : stats_(store_), mongo_stats_(std::make_shared<MongoStats>(store_, "test")) {
     setup();
   }
 
@@ -119,7 +119,7 @@ public:
 
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
-  Stats::TestUtil::MixedStatNames mixed_stat_names_;
+  Stats::TestUtil::StatNameLookupContext stats_;
   MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -152,7 +152,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   }));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_query").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_query").value());
 
   // Requests during active delay.
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -164,7 +164,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   }));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(2U, store_.counter("test.op_query").value());
+  EXPECT_EQ(2U, stats_.counter("test.op_query").value());
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     GetMoreMessagePtr message(new GetMoreMessageImpl(0, 0));
@@ -173,7 +173,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
     filter_->callbacks_->decodeGetMore(std::move(message));
   }));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_get_more").value());
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     KillCursorsMessagePtr message(new KillCursorsMessageImpl(0, 0));
@@ -182,11 +182,11 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
     filter_->callbacks_->decodeKillCursors(std::move(message));
   }));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_kill_cursors").value());
 
   EXPECT_CALL(read_filter_callbacks_, continueReading());
   delay_timer->invokeCallback();
-  EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
+  EXPECT_EQ(1U, stats_.counter("test.delays_injected").value());
 }
 
 TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
@@ -205,7 +205,7 @@ TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
   }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data_, false));
-  EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
+  EXPECT_EQ(0U, stats_.counter("test.delays_injected").value());
 }
 
 TEST_F(MongoProxyFilterTest, DynamicMetadata) {
@@ -320,21 +320,21 @@ TEST_F(MongoProxyFilterTest, Stats) {
   }));
   filter_->onWrite(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.op_query").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_tailable_cursor").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_no_cursor_timeout").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_await_data").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_exhaust").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_no_max_time").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_scatter_get").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_query").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_query_tailable_cursor").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_query_no_cursor_timeout").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_query_await_data").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_query_exhaust").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_query_no_max_time").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_query_scatter_get").value());
 
-  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.total"));
-  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.scatter_get"));
+  EXPECT_EQ(1U, stats_.counter("test.collection.test.query.total").value());
+  EXPECT_EQ(1U, stats_.counter("test.collection.test.query.scatter_get").value());
 
-  EXPECT_EQ(1U, store_.counter("test.op_reply").value());
-  EXPECT_EQ(1U, store_.counter("test.op_reply_cursor_not_found").value());
-  EXPECT_EQ(1U, store_.counter("test.op_reply_query_failure").value());
-  EXPECT_EQ(1U, store_.counter("test.op_reply_valid_cursor").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_reply").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_reply_cursor_not_found").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_reply_query_failure").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_reply_valid_cursor").value());
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     GetMoreMessagePtr message(new GetMoreMessageImpl(0, 0));
@@ -378,12 +378,12 @@ TEST_F(MongoProxyFilterTest, Stats) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
-  EXPECT_EQ(1U, store_.counter("test.op_insert").value());
-  EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
-  EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
-  EXPECT_EQ(1U, store_.counter("test.op_command").value());
-  EXPECT_EQ(1U, store_.counter("test.op_command_reply").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_get_more").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_insert").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_kill_cursors").value());
+  EXPECT_EQ(0U, stats_.counter("test.delays_injected").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_command").value());
+  EXPECT_EQ(1U, stats_.counter("test.op_command_reply").value());
 }
 
 TEST_F(MongoProxyFilterTest, CommandStats) {
@@ -414,7 +414,7 @@ TEST_F(MongoProxyFilterTest, CommandStats) {
   }));
   filter_->onWrite(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.cmd.insert.total").value());
+  EXPECT_EQ(1U, stats_.counter("test.cmd.insert.total").value());
 }
 
 TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
@@ -437,12 +437,11 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.total"));
-  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.scatter_get"));
-  EXPECT_EQ(1U, mixed_stat_names_.counterValue(
-                    "test.collection.`test`.callsite.`getByMongoId`.query.total"));
-  EXPECT_EQ(1U, mixed_stat_names_.counterValue(
-                    "test.collection.`test`.callsite.`getByMongoId`.query.scatter_get"));
+  EXPECT_EQ(1U, stats_.counter("test.collection.test.query.total").value());
+  EXPECT_EQ(1U, stats_.counter("test.collection.test.query.scatter_get").value());
+  EXPECT_EQ(1U, stats_.counter("test.collection.test.callsite.getByMongoId.query.total").value());
+  EXPECT_EQ(1U,
+            stats_.counter("test.collection.test.callsite.getByMongoId.query.scatter_get").value());
 
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
@@ -491,8 +490,8 @@ TEST_F(MongoProxyFilterTest, MultiGet) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.op_query_multi_get").value());
-  EXPECT_EQ(1U, mixed_stat_names_.counterValue("test.collection.`test`.query.multi_get"));
+  EXPECT_EQ(1U, stats_.counter("test.op_query_multi_get").value());
+  EXPECT_EQ(1U, stats_.counter("test.collection.test.query.multi_get").value());
 }
 
 TEST_F(MongoProxyFilterTest, MaxTime) {
@@ -507,7 +506,7 @@ TEST_F(MongoProxyFilterTest, MaxTime) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
+  EXPECT_EQ(0U, stats_.counter("test.op_query_no_max_time").value());
 }
 
 TEST_F(MongoProxyFilterTest, DecodeError) {
@@ -521,7 +520,7 @@ TEST_F(MongoProxyFilterTest, DecodeError) {
   // Should not call decode again.
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.decoding_error").value());
+  EXPECT_EQ(1U, stats_.counter("test.decoding_error").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
@@ -541,7 +540,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);
-  EXPECT_EQ(2U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(2U, stats_.gauge("test.op_query_active").value());
 
   Event::MockTimer* drain_timer = nullptr;
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -568,8 +567,8 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
 
-  EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
-  EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
+  EXPECT_EQ(0U, stats_.gauge("test.op_query_active").value());
+  EXPECT_EQ(1U, stats_.counter("test.cx_drain_close").value());
 }
 
 TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
@@ -593,8 +592,8 @@ TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
   }));
   filter_->onWrite(fake_data_, false);
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(0U, stats_.counter("test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(0U, stats_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
@@ -617,8 +616,8 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
 
   EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(1U, stats_.counter("test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(0U, stats_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
@@ -641,8 +640,8 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
 
   EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(1U, stats_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(0U, stats_.counter("test.cx_destroy_local_with_active_rq").value());
 }
 
 } // namespace MongoProxy

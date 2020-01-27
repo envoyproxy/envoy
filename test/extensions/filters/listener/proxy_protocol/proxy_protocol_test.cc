@@ -17,6 +17,7 @@
 
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -168,7 +169,7 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::StatNameLookupContext stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
@@ -1000,7 +1001,7 @@ public:
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::StatNameLookupContext stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::MockListenSocketFactory socket_factory_;

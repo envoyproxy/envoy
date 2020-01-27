@@ -18,6 +18,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -1392,7 +1393,7 @@ protected:
   const bool with_upgrade_;
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl store_;
+  Stats::TestUtil::StatNameLookupContext store_;
   Runtime::MockRandomGenerator generator_;
   Api::ApiPtr api_;
   Runtime::MockRandomGenerator rand_;

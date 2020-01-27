@@ -20,6 +20,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -115,7 +116,7 @@ public:
     Event::MockTimer* interval_timer_{};
     Event::MockTimer* timeout_timer_{};
     Http::MockClientConnection* codec_{};
-    Stats::IsolatedStoreImpl stats_store_;
+    Stats::TestUtil::StatNameLookupContext stats_store_;
     Network::MockClientConnection* client_connection_{};
     NiceMock<Http::MockStreamEncoder> request_encoder_;
     Http::StreamDecoder* stream_response_callbacks_{};
@@ -3373,7 +3374,7 @@ public:
     Event::MockTimer* interval_timer_{};
     Event::MockTimer* timeout_timer_{};
     Http::MockClientConnection* codec_{};
-    Stats::IsolatedStoreImpl stats_store_;
+    Stats::TestUtil::StatNameLookupContext stats_store_;
     Network::MockClientConnection* client_connection_{};
     NiceMock<Http::MockStreamEncoder> request_encoder_;
     Http::StreamDecoder* stream_response_callbacks_{};

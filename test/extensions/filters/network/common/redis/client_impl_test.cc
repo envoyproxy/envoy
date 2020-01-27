@@ -9,6 +9,7 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/utility.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/mocks/network/mocks.h"
@@ -1186,7 +1187,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
-  Stats::IsolatedStoreImpl stats_;
+  Stats::TestUtil::StatNameLookupContext stats_;
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
   const std::string auth_password;

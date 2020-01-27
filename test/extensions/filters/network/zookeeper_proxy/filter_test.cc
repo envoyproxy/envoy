@@ -3,6 +3,7 @@
 #include "extensions/filters/network/zookeeper_proxy/decoder.h"
 #include "extensions/filters/network/zookeeper_proxy/filter.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -500,7 +501,7 @@ public:
     return scope_.findHistogram(storage.statName());
   }
 
-  Stats::IsolatedStoreImpl scope_;
+  Stats::TestUtil::StatNameLookupContext scope_;
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<ZooKeeperFilter> filter_;
   std::string stat_prefix_{"test.zookeeper"};

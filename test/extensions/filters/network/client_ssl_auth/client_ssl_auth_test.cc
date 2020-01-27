@@ -9,6 +9,7 @@
 
 #include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -112,7 +113,7 @@ ip_white_list:
   std::unique_ptr<ClientSslAuthFilter> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::StatNameLookupContext stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_;

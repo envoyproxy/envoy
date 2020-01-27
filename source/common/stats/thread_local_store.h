@@ -217,7 +217,7 @@ public:
   }
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
-  uint64_t numGauges() const override { return counters().size(); }
+  uint64_t numCounters() const override { return counters().size(); }
   std::vector<GaugeSharedPtr> gauges() const override;
   uint64_t numGauges() const override { return gauges().size(); }
   std::vector<ParentHistogramSharedPtr> histograms() const override;

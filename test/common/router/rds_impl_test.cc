@@ -15,6 +15,7 @@
 
 #include "server/http/admin.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/mocks.h"

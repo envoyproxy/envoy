@@ -12,39 +12,25 @@ namespace {
 
 class StatTestUtilityTest : public testing::Test {
 protected:
-  StatTestUtilityTest() : symbol_table_(SymbolTableCreator::initAndMakeSymbolTable(false)),
-                          store_(*symbol_table_), mixed_stat_names_(store_) {}
+  StatTestUtilityTest()
+      : symbol_table_(SymbolTableCreator::initAndMakeSymbolTable(false)), store_(*symbol_table_),
+        lookup_context_(store_) {}
 
   SymbolTablePtr symbol_table_;
   IsolatedStoreImpl store_;
-  TestUtil::MixedStatNames mixed_stat_names_;
+  TestUtil::StatNameLookupContext lookup_context_;
 };
 
 TEST_F(StatTestUtilityTest, InjectDynamics) {
-  StatName hello_world_symbolic = mixed_stat_names_.injectDynamics("hello.world");
-  EXPECT_EQ("hello.world", symbol_table_->toString(hello_world_symbolic));
-  EXPECT_EQ(hello_world_symbolic, mixed_stat_names_.injectDynamics("hello.world"));
+  StatNameDynamicPool dynamic(*symbol_table_);
+  StatNamePool pool(*symbol_table_);
 
-  // Declaring 'hello' as dynamic gives us the same string representation as
-  // above, but a differing StatName.
-  StatName hello_world_dynamic1 = mixed_stat_names_.injectDynamics("`hello`.world");
-  EXPECT_EQ("hello.world", symbol_table_->toString(hello_world_dynamic1));
-  EXPECT_NE(hello_world_dynamic1, hello_world_symbolic);
-
-  // Declaring 'world' as dynamic gives us the same string representation as
-  // above, but a differing StatName from all the above.
-  StatName hello_world_dynamic2 = mixed_stat_names_.injectDynamics("hello.`world`");
-  EXPECT_EQ("hello.world", symbol_table_->toString(hello_world_dynamic2));
-  EXPECT_NE(hello_world_dynamic2, hello_world_dynamic1);
-  EXPECT_NE(hello_world_dynamic2, hello_world_symbolic);
-
-  // Ditto for declaring all of "hello.world" as dynamic, which also
-  // demonstrates that we can embed dots in the dynamic.
-  StatName hello_world_dynamic3 = mixed_stat_names_.injectDynamics("`hello.world`");
-  EXPECT_EQ("hello.world", symbol_table_->toString(hello_world_dynamic3));
-  EXPECT_NE(hello_world_dynamic3, hello_world_dynamic1);
-  EXPECT_NE(hello_world_dynamic3, hello_world_dynamic2);
-  EXPECT_NE(hello_world_dynamic3, hello_world_symbolic);
+  store_.counterFromStatName(dynamic.add("dynamic.stat")).inc();
+  store_.counterFromStatName(pool.add("symbolic.stat")).inc();
+  EXPECT_EQ(1, lookup_context_.counter("dynamic.stat").value());
+  EXPECT_FALSE(lookup_context_.findCounter("dynamic.stat2"));
+  EXPECT_EQ(1, lookup_context_.counter("symbolic.stat").value());
+  EXPECT_FALSE(lookup_context_.findCounter("symbolic.stat2"));
 }
 
 } // namespace

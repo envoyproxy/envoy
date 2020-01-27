@@ -120,10 +120,8 @@ public:
 
   const std::string v2_empty_fault_config_yaml = "{}";
 
-  FaultFilterTest() : mixed_stat_names_(stats_) {}
-
   void SetUpTest(const envoy::extensions::filters::http::fault::v3::HTTPFault fault) {
-    config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_, time_system_));
+    config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_.store(), time_system_));
     filter_ = std::make_unique<FaultFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
@@ -141,8 +139,7 @@ public:
   void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
                                 const Router::RouteSpecificFilterConfig* vhost_fault);
 
-  Stats::IsolatedStoreImpl stats_;
-  Stats::TestUtil::MixedStatNames mixed_stat_names_;
+  Stats::TestUtil::StatNameLookupContext stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
@@ -425,8 +422,8 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
-  EXPECT_EQ(1UL, mixed_stat_names_.counterValue("prefix.fault.`cluster`.delays_injected"));
-  EXPECT_EQ(0UL, mixed_stat_names_.counterValue("prefix.fault.`cluster`.aborts_injected"));
+  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.delays_injected").value());
+  EXPECT_FALSE(stats_.findCounter("prefix.fault.cluster.aborts_injected"));
 }
 
 TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
@@ -488,8 +485,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
-  EXPECT_EQ(1UL, mixed_stat_names_.counterValue("prefix.fault.`cluster`.delays_injected"));
-  EXPECT_EQ(1UL, mixed_stat_names_.counterValue("prefix.fault.`cluster`.aborts_injected"));
+  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.delays_injected").value());
+  EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.aborts_injected").value());
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
 }
 

@@ -77,21 +77,26 @@ private:
 
 // Helps tests do stat-name lookups based on strings.
 class StatNameLookupContext {
- public:
-  StatNameLookupContext() : owned_storage_(std::make_unique<IsolatedStoreImpl>()),
-                            store_(*owned_storage_) {}
+public:
+  StatNameLookupContext()
+      : owned_storage_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_storage_) {}
   explicit StatNameLookupContext(SymbolTable& symbol_table)
-      : owned_storage_(std::make_unique<IsolatedStoreImpl>(symbol_table)),
-        store_(*owned_storage_) {}
+      : owned_storage_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_storage_) {
+  }
   explicit StatNameLookupContext(Store& store) : store_(store) {}
 
-  Counter& counter(absl::string_view name);
-  Gauge gauge(absl::string_view name);
-  Histogram& histogram(absl::string_view name);
+  OptionalCounter findCounter(absl::string_view name);
+  const Counter& counter(absl::string_view name) {
+    OptionalCounter opt = findCounter(name);
+    RELEASE_ASSERT(opt, absl::StrCat("could not find counter ", name));
+    return opt->get();
+  }
+  const Gauge& gauge(absl::string_view name);
+  const Histogram& histogram(absl::string_view name);
 
   Store& store() { return store_; }
 
- private:
+private:
   StorePtr owned_storage_; // Used for empty constructor.
   Store& store_;
   uint64_t num_counters_{0};

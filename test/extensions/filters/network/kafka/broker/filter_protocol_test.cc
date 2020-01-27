@@ -1,3 +1,5 @@
+#include "test/common/stats/stat_test_utility.h"
+
 /**
  * Tests in this file verify whether Kafka broker filter instance is capable of processing protocol
  * messages properly.
@@ -32,7 +34,7 @@ class KafkaBrokerFilterProtocolTest : public testing::Test,
                                       protected RequestB,
                                       protected ResponseB {
 protected:
-  Stats::IsolatedStoreImpl scope_;
+  Stats::TestUtil::StatNameLookupContext scope_;
   Event::TestRealTimeSystem time_source_;
   KafkaBrokerFilter testee_{scope_, time_source_, "prefix"};
 

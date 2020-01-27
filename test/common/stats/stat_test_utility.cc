@@ -135,7 +135,7 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
-Counter& StatNameLookupContext::counter(absl::string_view name) {
+OptionalCounter StatNameLookupContext::findCounter(absl::string_view name) {
   if (store_.numCounters() != num_counters_) {
     ENVOY_LOG_MISC(error, "recomputing counter table");
     for (CounterSharedPtr& counter : store_.counters()) {
@@ -144,7 +144,23 @@ Counter& StatNameLookupContext::counter(absl::string_view name) {
     num_counters_ = store_.numCounters();
   }
   auto p = counters_.find(name);
-  RELEASE_ASSERT(p != counters_.end(), absl::StrCat("cannot find counter: ", name));
+  OptionalCounter ret;
+  if (p != counters_.end()) {
+    ret = *p->second;
+  }
+  return ret;
+}
+
+const Gauge& StatNameLookupContext::gauge(absl::string_view name) {
+  if (store_.numGauges() != num_gauges_) {
+    ENVOY_LOG_MISC(error, "recomputing gauge table");
+    for (GaugeSharedPtr& gauge : store_.gauges()) {
+      gauges_[gauge->name()] = gauge.get();
+    }
+    num_gauges_ = store_.numGauges();
+  }
+  auto p = gauges_.find(name);
+  RELEASE_ASSERT(p != gauges_.end(), absl::StrCat("cannot find gauge: ", name));
   return *p->second;
 }
 

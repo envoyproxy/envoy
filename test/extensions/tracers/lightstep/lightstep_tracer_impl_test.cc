@@ -1,4 +1,3 @@
-#include "test/common/stats/stat_test_utility.h"
 #include <chrono>
 #include <memory>
 #include <sstream>
@@ -49,8 +48,9 @@ namespace {
 
 class LightStepDriverTest : public testing::Test {
 public:
-  LightStepDriverTest() : grpc_context_(*symbol_table_), stats_(*symbol_table_),
-                          cluster_stats_(cm_.thread_local_cluster_.cluster_.info_->stats_store_) {}
+  LightStepDriverTest()
+      : grpc_context_(*symbol_table_), stats_(*symbol_table_),
+        cluster_stats_(cm_.thread_local_cluster_.cluster_.info_->stats_store_) {}
 
   void setup(envoy::config::trace::v3::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
@@ -68,8 +68,9 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _));
     }
 
-    driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_.store(), tls_, runtime_,
-                                                std::move(opts), propagation_mode, grpc_context_);
+    driver_ =
+        std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_.store(), tls_, runtime_,
+                                          std::move(opts), propagation_mode, grpc_context_);
   }
 
   void setupValidDriver(Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
@@ -97,7 +98,7 @@ public:
   Stats::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  //NiceMock<Stats::MockIsolatedStatsStore> stats_;
+  // NiceMock<Stats::MockIsolatedStatsStore> stats_;
   Stats::TestUtil::StatNameLookupContext stats_;
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
@@ -221,11 +222,12 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
 
   callback->onSuccess(std::move(msg));
 
-  EXPECT_EQ(1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.success")
-                    .value());
+  EXPECT_EQ(
+      1U,
+      cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.success").value());
 
-  EXPECT_EQ(1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.total")
-                    .value());
+  EXPECT_EQ(
+      1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.total").value());
   EXPECT_EQ(2U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
@@ -265,10 +267,11 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
 
-  EXPECT_EQ(1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.failure")
-                    .value());
-  EXPECT_EQ(1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.total")
-                    .value());
+  EXPECT_EQ(
+      1U,
+      cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.failure").value());
+  EXPECT_EQ(
+      1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.total").value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
@@ -314,10 +317,11 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
 
   callback->onSuccess(std::move(msg));
 
-  EXPECT_EQ(1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.failure")
-                    .value());
-  EXPECT_EQ(1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.total")
-                    .value());
+  EXPECT_EQ(
+      1U,
+      cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.failure").value());
+  EXPECT_EQ(
+      1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.total").value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
@@ -387,10 +391,11 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
   // No trailers, gRPC is considered failed.
   callback->onSuccess(std::move(msg));
 
-  EXPECT_EQ(1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.failure")
-                    .value());
-  EXPECT_EQ(1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.total")
-                    .value());
+  EXPECT_EQ(
+      1U,
+      cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.failure").value());
+  EXPECT_EQ(
+      1U, cluster_stats_.counter("grpc.lightstep.collector.CollectorService.Report.total").value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
