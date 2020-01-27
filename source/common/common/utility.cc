@@ -241,8 +241,8 @@ bool StringUtil::atoull(const char* str, uint64_t& out, int base) {
   }
 }
 
-absl::string_view StringUtil::ltrim(absl::string_view source, absl::string_view delims) {
-  const absl::string_view::size_type pos = source.find_first_not_of(delims);
+absl::string_view StringUtil::ltrim(absl::string_view source) {
+  const absl::string_view::size_type pos = source.find_first_not_of(WhitespaceChars);
   if (pos != absl::string_view::npos) {
     source.remove_prefix(pos);
   } else {
@@ -251,8 +251,8 @@ absl::string_view StringUtil::ltrim(absl::string_view source, absl::string_view 
   return source;
 }
 
-absl::string_view StringUtil::rtrim(absl::string_view source, absl::string_view delims) {
-  const absl::string_view::size_type pos = source.find_last_not_of(delims);
+absl::string_view StringUtil::rtrim(absl::string_view source) {
+  const absl::string_view::size_type pos = source.find_last_not_of(WhitespaceChars);
   if (pos != absl::string_view::npos) {
     source.remove_suffix(source.size() - pos - 1);
   } else {
@@ -261,9 +261,7 @@ absl::string_view StringUtil::rtrim(absl::string_view source, absl::string_view 
   return source;
 }
 
-absl::string_view StringUtil::trim(absl::string_view source, absl::string_view delims) {
-  return ltrim(rtrim(source, delims), delims);
-}
+absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
 
 absl::string_view StringUtil::removeTrailingCharacters(absl::string_view source, char ch) {
   const absl::string_view::size_type pos = source.find_last_not_of(ch);

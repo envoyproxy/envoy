@@ -107,45 +107,6 @@ private:
   absl::flat_hash_map<std::string, Histogram*> histograms_;
 };
 
-// Helps tests construct StatName with symbolic and dynamic components.
-class MixedStatNames {
-public:
-  explicit MixedStatNames(Store& store);
-
-  /**
-   * Parses an stat name based on injectDynamics (below) and looks up its value.
-   *
-   * @param name the stat name with backquotes surrounding dynamic portions.
-   * @return the counter value, or 0 if the counter is not found.
-   */
-  uint64_t counterValue(absl::string_view name);
-
-  /**
-   * Parses 'name' into dynamic and symbolic segments. The dynamic segments
-   * are delimited by backquotes. For example, "hello.`world`" joins a
-   * a StatName where the "hello" is symbolic, created via a StatNamePool,
-   * and the "world" is dynamic -- created via a StatNameDynamicPool.
-   *
-   * Dots must go immediately outside the backquotes, e.g.
-   * "symbolic.`dynamic`.symbolic, or they can be nested inside the dynamic,
-   * such as "`dynamic.group`.symbolic".
-   *
-   * This makes it easier to write unit tests that look up stats created
-   * from a combination of dynamic and symbolic components.
-   *
-   * This method is exposed for testing.
-   *
-   * @param name the stat name with backquotes surrounding dynamic portions.
-   */
-  StatName injectDynamics(absl::string_view name);
-
-private:
-  Store& store_;
-  StatNamePool pool_;
-  StatNameDynamicPool dynamic_pool_;
-  std::vector<SymbolTable::StoragePtr> joins_;
-};
-
 // Compares the memory consumed against an exact expected value, but only on
 // canonical platforms, or when the expected value is zero. Canonical platforms
 // currently include only for 'release' tests in ci. On other platforms an info
