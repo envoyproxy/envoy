@@ -7,6 +7,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/secret/secret_provider.h"
 
+#include "common/config/datasource.h"
 #include "common/grpc/common.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
@@ -20,8 +21,9 @@ namespace Envoy {
 // validation.
 class SdsGenericSecretTestFilter : public Http::StreamDecoderFilter {
 public:
-  SdsGenericSecretTestFilter(Secret::GenericSecretConfigProviderSharedPtr config_provider)
-      : config_provider_(config_provider) {}
+  SdsGenericSecretTestFilter(Api::Api& api,
+                             Secret::GenericSecretConfigProviderSharedPtr config_provider)
+      : api_(api), config_provider_(config_provider) {}
 
   // Http::StreamFilterBase
   void onDestroy() override{};
@@ -29,7 +31,7 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
     headers.addCopy(Http::LowerCaseString("secret"),
-                    config_provider_->secret()->secret().inline_string());
+                    Config::DataSource::read(config_provider_->secret()->secret(), true, api_));
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -46,6 +48,7 @@ public:
   }
 
 private:
+  Api::Api& api_;
   Secret::GenericSecretConfigProviderSharedPtr config_provider_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
 };
@@ -69,10 +72,11 @@ public:
             .clusterManagerFactory()
             .secretManager()
             .findOrCreateGenericSecretProvider(config_source_, "encryption_key", factory_context);
-    return [secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(
-          std::make_shared<::Envoy::SdsGenericSecretTestFilter>(secret_provider));
-    };
+    return
+        [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::SdsGenericSecretTestFilter>(
+              factory_context.api(), secret_provider));
+        };
   }
 
 private:
