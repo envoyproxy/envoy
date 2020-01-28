@@ -22,8 +22,6 @@ namespace Runtime {
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
-//
-// After features are removed from this list, they should be added to removed_runtime_features.
 constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
@@ -47,23 +45,12 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.test_feature_false",
 };
 
-// Finally this is a section for runtime features which used to exist and have
-// been removed in the last few years. It exists to allow best-effort attempts
-// to warn folks to clean up use of removed runtime guards.
-constexpr const char* removed_runtime_features[] = {
-    "envoy.reloadable_features.buffer_filter_populate_content_length",
-    "envoy.reloadable_features.outlier_detection_support_for_grpc_status",
-};
-
 RuntimeFeatures::RuntimeFeatures() {
   for (auto& feature : runtime_features) {
     enabled_features_.insert(feature);
   }
   for (auto& feature : disabled_runtime_features) {
     disabled_features_.insert(feature);
-  }
-  for (auto& feature : removed_runtime_features) {
-    removed_features_.insert(feature);
   }
 }
 

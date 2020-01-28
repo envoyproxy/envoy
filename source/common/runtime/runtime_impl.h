@@ -100,12 +100,12 @@ public:
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
   bool exists(const std::string& key) const override { return values_.contains(key); }
 
-  static Entry createEntry(const std::string& key, const std::string& value);
-  static Entry createEntry(const std::string& key, const ProtobufWkt::Value& value);
+  static Entry createEntry(const std::string& value);
+  static Entry createEntry(const ProtobufWkt::Value& value);
 
 private:
-  static void resolveEntryType(const std::string& key, Entry& entry) {
-    if (parseEntryBooleanValue(key, entry)) {
+  static void resolveEntryType(Entry& entry) {
+    if (parseEntryBooleanValue(entry)) {
       return;
     }
 
@@ -121,7 +121,7 @@ private:
     parseEntryFractionalPercentValue(entry);
   }
 
-  static bool parseEntryBooleanValue(const std::string& key, Entry& entry);
+  static bool parseEntryBooleanValue(Entry& entry);
   static bool parseEntryDoubleValue(Entry& entry);
   static void parseEntryFractionalPercentValue(Entry& entry);
 

@@ -63,25 +63,6 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
   return default_value;
 }
 
-void checkForRemovedFeature(absl::string_view feature, bool value) {
-  if (RuntimeFeaturesDefaults::get().existedButRemoved(feature)) {
-    const std::string common_message = absl::StrCat("Setting removed deprecated feature ", feature,
-                                                    " to ", (value ? "true" : "false"), ".");
-    if (value) {
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
-                          "{} Now that this runtime guarded feature has been removed, setting it "
-                          "to true is a no-op.",
-                          common_message);
-    } else {
-      ENVOY_LOG_TO_LOGGER(
-          Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), error,
-          "{} Now that this runtime guarded feature has been removed, setting it to false is no "
-          "longer effective. You may encounter an unexpected behavioral change as a result.",
-          common_message);
-    }
-  }
-}
-
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 uint64_t RandomGeneratorImpl::random() {
@@ -339,34 +320,31 @@ SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
   stats.num_keys_.set(values_.size());
 }
 
-SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& key, const std::string& value) {
+SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
   Entry entry;
   entry.raw_string_value_ = value;
 
   // As a perf optimization, attempt to parse the entry's string and store it inside the struct. If
   // we don't succeed that's fine.
-  resolveEntryType(key, entry);
+  resolveEntryType(entry);
 
   return entry;
 }
 
-SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& key,
-                                              const ProtobufWkt::Value& value) {
+SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value) {
   // This isn't the smartest way to do it; we're round-tripping via YAML, this should be optimized
   // if runtime parsing becomes performance sensitive.
-  return createEntry(key, MessageUtil::getYamlStringFromMessage(value, false, false));
+  return createEntry(MessageUtil::getYamlStringFromMessage(value, false, false));
 }
 
-bool SnapshotImpl::parseEntryBooleanValue(const std::string& key, Entry& entry) {
+bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
 
   if (absl::EqualsIgnoreCase(stripped, "true")) {
-    checkForRemovedFeature(key, true);
     entry.bool_value_ = true;
     return true;
   } else if (absl::EqualsIgnoreCase(stripped, "false")) {
-    checkForRemovedFeature(key, false);
     entry.bool_value_ = false;
     return true;
   }
@@ -403,7 +381,7 @@ void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>&
   for (const auto& kv : values) {
     values_.erase(kv.first);
     if (!kv.second.empty()) {
-      values_.emplace(kv.first, SnapshotImpl::createEntry(kv.first, kv.second));
+      values_.emplace(kv.first, SnapshotImpl::createEntry(kv.second));
     }
   }
   stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
@@ -466,7 +444,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
       // Separate erase/insert calls required due to the value type being constant; this prevents
       // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
-      values_.insert({full_prefix, SnapshotImpl::createEntry(full_prefix, value)});
+      values_.insert({full_prefix, SnapshotImpl::createEntry(value)});
     }
   }
 }
@@ -486,17 +464,17 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     throw EnvoyException(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
-    values_.emplace(prefix, SnapshotImpl::createEntry(prefix, v.string_value()));
+    values_.emplace(prefix, SnapshotImpl::createEntry(v.string_value()));
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
-    values_.emplace(prefix, SnapshotImpl::createEntry(prefix, v));
+    values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;
   case ProtobufWkt::Value::kStructValue: {
     const ProtobufWkt::Struct& s = v.struct_value();
     if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
         s.fields().find("denominator") != s.fields().end()) {
-      values_.emplace(prefix, SnapshotImpl::createEntry(prefix, v));
+      values_.emplace(prefix, SnapshotImpl::createEntry(v));
       break;
     }
     for (const auto& f : s.fields()) {
