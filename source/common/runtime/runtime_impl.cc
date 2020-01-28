@@ -65,8 +65,8 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 
 void checkForRemovedFeature(absl::string_view feature, bool value) {
   if (RuntimeFeaturesDefaults::get().existedButRemoved(feature)) {
-    std::string common_message = absl::StrCat("Setting removed deprecated feature ", feature,
-                                              " to ", (value ? "true" : "false"), ".");
+    const std::string common_message = absl::StrCat("Setting removed deprecated feature ", feature,
+                                                    " to ", (value ? "true" : "false"), ".");
     if (value) {
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
                           "{} Now that this runtime guarded feature has been removed, setting it "
