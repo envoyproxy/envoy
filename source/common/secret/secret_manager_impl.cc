@@ -1,3 +1,5 @@
+#include "common/secret/secret_manager_impl.h"
+
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -9,7 +11,6 @@
 #include "common/config/version_converter.h"
 #include "common/protobuf/utility.h"
 #include "common/secret/sds_api.h"
-#include "common/secret/secret_manager_impl.h"
 #include "common/secret/secret_provider_impl.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"

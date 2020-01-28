@@ -1,3 +1,5 @@
+#include "common/secret/sds_api.h"
+
 #include <unordered_map>
 
 #include "envoy/api/v2/auth/cert.pb.h"
@@ -10,7 +12,6 @@
 #include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
-#include "common/secret/sds_api.h"
 
 namespace Envoy {
 namespace Secret {
