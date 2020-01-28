@@ -175,7 +175,7 @@ void LoadStatsReporter::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata)
 }
 
 void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
+  ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
   response_timer_->disableTimer();
   stream_ = nullptr;
   handleFailure();
