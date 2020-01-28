@@ -10,7 +10,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -76,9 +75,6 @@ MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
         histograms_.emplace_back(histogram);
         return *histogram;
       }));
-  ON_CALL(*this, numCounters()).WillByDefault(Return(0));
-  ON_CALL(*this, numGauges()).WillByDefault(Return(0));
-  ON_CALL(*this, numHistograms()).WillByDefault(Return(0));
 }
 MockStore::~MockStore() = default;
 
