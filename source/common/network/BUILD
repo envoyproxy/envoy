@@ -25,7 +25,6 @@ envoy_cc_library(
         "//include/envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:stack_array",
         "//source/common/common:utility_lib",
     ],
 )

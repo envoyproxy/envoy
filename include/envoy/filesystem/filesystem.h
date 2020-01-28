@@ -66,6 +66,15 @@ public:
 using FilePtr = std::unique_ptr<File>;
 
 /**
+ * Contains the result of splitting the file name and its parent directory from
+ * a given file path.
+ */
+struct PathSplitResult {
+  absl::string_view directory_;
+  absl::string_view file_;
+};
+
+/**
  * Abstraction for some basic filesystem operations
  */
 class Instance {
@@ -103,6 +112,13 @@ public:
   virtual std::string fileReadToEnd(const std::string& path) PURE;
 
   /**
+   * @path file path to split
+   * @return PathSplitResult containing the parent directory of the input path and the file name
+   * @note will throw an exception if path does not contain any path separator character
+   */
+  virtual PathSplitResult splitPathFromFilename(absl::string_view path) PURE;
+
+  /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This
    * is a basic sanity check for users, blacklisting some clearly bad paths. Paths
    * may still be problematic (e.g. indirectly leading to /dev/mem) even if this
@@ -130,10 +146,6 @@ struct DirectoryEntry {
   }
 };
 
-/**
- * Abstraction for listing a directory.
- * TODO(sesmith177): replace with std::filesystem::directory_iterator once we move to C++17
- */
 class DirectoryIteratorImpl;
 class DirectoryIterator {
 public:

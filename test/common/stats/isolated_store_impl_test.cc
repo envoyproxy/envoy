@@ -37,7 +37,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("scope1.c2", c2.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
-  OptionalCounter opt_counter = scope1->findCounter(c2.statName());
+  CounterOptConstRef opt_counter = scope1->findCounter(c2.statName());
   ASSERT_TRUE(opt_counter);
   EXPECT_EQ(&c2, &opt_counter->get());
   StatName not_found = pool_.add("not_found");
@@ -60,7 +60,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("scope1.g2", g2.tagExtractedName());
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g2.tags().size());
-  OptionalGauge opt_gauge = scope1->findGauge(g2.statName());
+  GaugeOptConstRef opt_gauge = scope1->findGauge(g2.statName());
   ASSERT_TRUE(opt_gauge);
   EXPECT_EQ(&g2, &opt_gauge->get());
   EXPECT_FALSE(scope1->findGauge(not_found));
@@ -91,7 +91,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(0, h2.tags().size());
   h1.recordValue(200);
   h2.recordValue(200);
-  OptionalHistogram opt_histogram = scope1->findHistogram(h2.statName());
+  HistogramOptConstRef opt_histogram = scope1->findHistogram(h2.statName());
   ASSERT_TRUE(opt_histogram);
   EXPECT_EQ(&h2, &opt_histogram->get());
   EXPECT_FALSE(scope1->findHistogram(not_found));

@@ -40,7 +40,7 @@ public:
   MOCK_METHOD0(fileSystem, Filesystem::Instance&());
   MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
   MOCK_METHOD0(rootScope, const Stats::Scope&());
-  MOCK_METHOD0(processContext, OptProcessContextRef());
+  MOCK_METHOD0(processContext, ProcessContextOptRef());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;

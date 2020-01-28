@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.type.matcher;
 
-import "envoy/type/matcher/metadata.proto";
 import "envoy/type/matcher/string.proto";
+import "envoy/type/matcher/struct.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher";
 option java_outer_classname = "NodeProto";
@@ -18,5 +18,5 @@ message NodeMatcher {
   StringMatcher node_id = 1;
 
   // Specifies match criteria on the node metadata.
-  repeated MetadataMatcher node_metadatas = 2;
+  repeated StructMatcher node_metadatas = 2;
 }
