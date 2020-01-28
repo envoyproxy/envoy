@@ -21,6 +21,7 @@
 #include "common/stats/symbol_table_creator.h"
 #include "common/stats/timespan_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
@@ -312,12 +313,48 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : public SymbolTableProvider, public IsolatedStoreImpl {
+class MockIsolatedStatsStore : public SymbolTableProvider, public Store {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;
 
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
+
+  // These overrides are used from production code to populate the store.
+  ScopePtr createScope(const std::string& name) override { return store().createScope(name); }
+  Counter& counterFromStatName(StatName name) override { return store().counterFromStatName(name); }
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+    return store().gaugeFromStatName(name, import_mode);
+  }
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+    return store().histogramFromStatName(name, unit);
+  }
+  NullGaugeImpl& nullGauge(const std::string& name) override { return store().nullGauge(name); }
+  OptionalCounter findCounter(StatName name) const override { return store().findCounter(name); }
+  OptionalGauge findGauge(StatName name) const override { return store().findGauge(name); }
+  OptionalHistogram findHistogram(StatName name) const override {
+    return store().findHistogram(name);
+  }
+  const SymbolTable& constSymbolTable() const override { return store().constSymbolTable(); }
+  SymbolTable& symbolTable() override { return store().symbolTable(); }
+  std::vector<CounterSharedPtr> counters() const override { return store().counters(); }
+  std::vector<GaugeSharedPtr> gauges() const override { return store().gauges(); }
+  std::vector<ParentHistogramSharedPtr> histograms() const override { return store().histograms(); }
+
+  // These overrides are used exclusively from tests to find them.
+  Counter& counter(const std::string& name) override { return test_store_.counter(name); }
+  Gauge& gauge(const std::string& name, Gauge::ImportMode) override {
+    return test_store_.gauge(name);
+  }
+  Histogram& histogram(const std::string& name, Histogram::Unit) override {
+    return test_store_.histogram(name);
+  }
+
+private:
+  Store& store() { return test_store_.store(); }
+  const Store& store() const { return test_store_.store(); }
+
+  TestUtil::TestStore test_store_;
 };
 
 class MockStatsMatcher : public StatsMatcher {

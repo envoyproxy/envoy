@@ -7,8 +7,6 @@
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/symbol_table_creator.h"
 
-#include "test/test_common/utility.h"
-
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 
@@ -77,6 +75,30 @@ private:
   const size_t memory_at_construction_;
 };
 
+/**
+ * Find a counter in a stats store.
+ * @param store supplies the stats store.
+ * @param name supplies the name to search for.
+ * @return Stats::CounterSharedPtr the counter or nullptr if there is none.
+ */
+CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
+
+/**
+ * Find a gauge in a stats store.
+ * @param store supplies the stats store.
+ * @param name supplies the name to search for.
+ * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
+ */
+GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
+
+/**
+ * Find a histogram in a stats store.
+ * @param store supplies the stats store.
+ * @param name supplies the name to search for.
+ * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
+ */
+HistogramSharedPtr findHistogram(Stats::Store& store, const std::string& name);
+
 // Helper class to use in lieu of an actual Stats::Store for doing lookups by
 // name. The intent is to remove the deprecated Scope::counter(const
 // std::string&) methods, and always use this class for accessing stats by
@@ -111,7 +133,7 @@ public:
   explicit TestStore(Store& store) : store_(store) {}
 
   OptionalCounter findCounter(const std::string& name) {
-    CounterSharedPtr counter = TestUtility::findCounter(store_, name);
+    CounterSharedPtr counter = TestUtil::findCounter(store_, name);
     return counter == nullptr ? OptionalCounter() : *counter;
   }
   Counter& counter(const std::string& name) {
@@ -120,7 +142,7 @@ public:
     return const_cast<Counter&>(opt->get());
   }
   OptionalGauge findGauge(const std::string& name) {
-    GaugeSharedPtr gauge = TestUtility::findGauge(store_, name);
+    GaugeSharedPtr gauge = TestUtil::findGauge(store_, name);
     return gauge == nullptr ? OptionalGauge() : *gauge;
   }
   Gauge& gauge(const std::string& name) {
@@ -128,22 +150,18 @@ public:
     RELEASE_ASSERT(opt, absl::StrCat("could not find gauge ", name));
     return const_cast<Gauge&>(opt->get());
   }
-
-  // TODO(jmarantz): support for histograms will be added when needed as we
-  // proceed with refactoring. Currently this code does not compile because
-  // TestUtility does not implement findHistogram.
-  //
-  // OptionalHistogram findHistogram(const std::string& name) {
-  //   HistogramSharedPtr histogram = TestUtility::findHistogram(store_, name);
-  //   return histogram == nullptr ? OptionalHistogram() : *histogram;
-  // }
-  // Histogram& histogram(absl::string_view name) {
-  //   OptionalHistogram opt = findHistogram(name);
-  //   RELEASE_ASSERT(opt, absl::StrCat("could not find histogram ", name));
-  //   return const_cast<Histogram&>(opt->get());
-  // }
+  OptionalHistogram findHistogram(const std::string& name) {
+    HistogramSharedPtr histogram = TestUtil::findHistogram(store_, name);
+    return histogram == nullptr ? OptionalHistogram() : *histogram;
+  }
+  Histogram& histogram(const std::string& name) {
+    OptionalHistogram opt = findHistogram(name);
+    RELEASE_ASSERT(opt, absl::StrCat("could not find histogram ", name));
+    return const_cast<Histogram&>(opt->get());
+  }
 
   Store& store() { return store_; }
+  const Store& store() const { return store_; }
 
 private:
   StorePtr owned_storage_; // Used for empty constructor.
