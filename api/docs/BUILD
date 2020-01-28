@@ -101,6 +101,7 @@ proto_library(
         "//envoy/config/transport_socket/alts/v2alpha:pkg",
         "//envoy/config/transport_socket/raw_buffer/v2:pkg",
         "//envoy/config/transport_socket/tap/v2alpha:pkg",
+        "//envoy/config/wasm/v2alpha:pkg",
         "//envoy/data/accesslog/v2:pkg",
         "//envoy/data/cluster/v2alpha:pkg",
         "//envoy/data/core/v2alpha:pkg",
