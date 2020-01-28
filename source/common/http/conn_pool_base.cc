@@ -147,11 +147,6 @@ void ConnPoolImplBase::onUpstreamReady() {
   }
 }
 
-void ConnPoolImplBase::addDrainedCallback(DrainedCb cb) {
-  drained_callbacks_.push_back(cb);
-  checkForDrained();
-}
-
 bool ConnPoolImplBase::hasActiveConnections() const {
   return (!pending_requests_.empty() || (num_active_requests_ > 0));
 }
@@ -189,6 +184,11 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
   }
 }
 
+void ConnPoolImplBase::addDrainedCallback(DrainedCb cb) {
+  drained_callbacks_.push_back(cb);
+  checkForDrained();
+}
+
 void ConnPoolImplBase::closeIdleConnections() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
@@ -199,9 +199,11 @@ void ConnPoolImplBase::closeIdleConnections() {
     }
   }
 
-  for (auto& client : busy_clients_) {
-    if (client->state_ == ActiveClient::State::CONNECTING) {
-      to_close.push_back(client.get());
+  if (pending_requests_.empty()) {
+    for (auto& client : busy_clients_) {
+      if (client->state_ == ActiveClient::State::CONNECTING) {
+        to_close.push_back(client.get());
+      }
     }
   }
 
@@ -224,7 +226,12 @@ void ConnPoolImplBase::drainConnections() {
   // so use a for-loop since the list is not mutated.
   ASSERT(&owningList(ActiveClient::State::DRAINING) == &busy_clients_);
   for (auto& busy_client : busy_clients_) {
-    transitionActiveClientState(*busy_client, ActiveClient::State::DRAINING);
+    // Moving a CONNECTING client to DRAINING would violate state assumptions, namely that DRAINING
+    // connections have active requests (otherwise they would be closed) and that clients receiving
+    // a Connected event are in state CONNECTING.
+    if (busy_client->state_ != ActiveClient::State::CONNECTING) {
+      transitionActiveClientState(*busy_client, ActiveClient::State::DRAINING);
+    }
   }
 }
 

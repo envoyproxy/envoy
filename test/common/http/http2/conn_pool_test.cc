@@ -147,7 +147,8 @@ public:
       EXPECT_CALL(callbacks_.pool_ready_, ready());
       EXPECT_EQ(nullptr, test.pool_.newStream(decoder_, callbacks_));
     } else {
-      EXPECT_NE(nullptr, test.pool_.newStream(decoder_, callbacks_));
+      handle_ = test.pool_.newStream(decoder_, callbacks_);
+      EXPECT_NE(nullptr, handle_);
     }
   }
 
@@ -155,6 +156,7 @@ public:
   ConnPoolCallbacks callbacks_;
   Http::StreamDecoder* inner_decoder_{};
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
+  ConnectionPool::Cancellable* handle_{};
 };
 
 void Http2ConnPoolImplTest::expectClientConnect(size_t index, ActiveTestRequest& r) {
@@ -258,13 +260,22 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionBusy) {
   r.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
 }
 
+/**
+ * Verify that draining connections with a pending request does not
+ * close the connection, but draining without a pending request does close
+ * the connection.
+ */
 TEST_F(Http2ConnPoolImplTest, DrainConnectionConnecting) {
   InSequence s;
 
   expectClientCreate();
   ActiveTestRequest r(*this, 0, false);
 
-  expectStreamReset(r);
+  // Pending request prevents the connection from being drained
+  pool_.drainConnections();
+
+  // Cancel the pending request, and then the connection can be closed.
+  r.handle_->cancel();
   EXPECT_CALL(*this, onClientDestroy());
   pool_.drainConnections();
 }

@@ -164,9 +164,11 @@ protected:
   std::list<PendingRequestPtr> pending_requests_to_purge_;
 
   // Clients that are ready to handle additional requests.
+  // All entries are in state READY.
   std::list<ActiveClientPtr> ready_clients_;
 
   // Clients that are not ready to handle additional requests.
+  // Entries are in possible states CONNECTING, BUSY, or DRAINING.
   std::list<ActiveClientPtr> busy_clients_;
 
   // The number of requests currently attached to clients.
