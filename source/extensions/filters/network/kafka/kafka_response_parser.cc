@@ -26,12 +26,24 @@ ResponseParseResponse ResponseHeaderParser::parse(absl::string_view& data) {
   context_->remaining_response_size_ -= sizeof(context_->correlation_id_);
   context_->correlation_id_ = correlation_id_deserializer_.get();
 
-  const ExpectedResponseSpec spec = getResponseSpec(context_->correlation_id_);
-  context_->api_key_ = spec.first;
-  context_->api_version_ = spec.second;
-  // At this stage, we have setup the context - we know the response's api key & version, so we can
-  // safely create the payload parser.
+  // We have correlation id now, so we can see what is the expected response api key & version.
+  if (-1 == context_->api_key_) {
+    const ExpectedResponseSpec spec = getResponseSpec(context_->correlation_id_);
+    context_->api_key_ = spec.first;
+    context_->api_version_ = spec.second;
+  }
 
+  // Depending on response's api key & version, we might need to parse tagged fields element.
+  if (responseUsesTaggedFieldsInHeader(context_->api_key_, context_->api_version_) &&
+      18 != context_->api_key_) {
+    context_->remaining_response_size_ -= tagged_fields_deserializer_.feed(data);
+    if (!tagged_fields_deserializer_.ready()) {
+      return ResponseParseResponse::stillWaiting();
+    }
+  }
+
+  // At this stage, we have fully setup the context - we know the response's api key & version,
+  // so we can safely create the payload parser.
   auto next_parser = parser_resolver_.createParser(context_);
   return ResponseParseResponse::nextParser(next_parser);
 }

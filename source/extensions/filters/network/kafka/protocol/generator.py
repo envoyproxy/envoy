@@ -151,6 +151,10 @@ class StatefulProcessor:
     else:
       flexible_versions = []
 
+    # Sanity check - all flexible versions need to be versioned.
+    if [x for x in flexible_versions if x not in versions]:
+      raise ValueError('invalid flexible versions')
+
     try:
       # In 2.4 some types are declared at top level, and only referenced inside.
       # So let's parse them and store them in state.
@@ -166,11 +170,7 @@ class StatefulProcessor:
 
       # Parse the type itself.
       complex_type = self.parse_complex_type(self.currently_processed_message_type, spec, versions)
-
-      # 2.4 support:
-      # To prevent parsers from breaking, we are going to support ONLY non-flexible versions.
-      # This will be replaced in further commits when proper support for 2.4 is added.
-      complex_type.versions = [x for x in complex_type.versions if x not in flexible_versions]
+      complex_type.register_flexible_versions(flexible_versions)
 
       # Request / response types need to carry api key version.
       result = complex_type.with_extra('api_key', spec['apiKey'])
@@ -191,7 +191,8 @@ class StatefulProcessor:
       fields = []
       for child_field in field_spec['fields']:
         child = self.parse_field(child_field, versions[-1])
-        fields.append(child)
+        if child is not None:
+          fields.append(child)
 
       # Some of the types repeat multiple times (e.g. AlterableConfig).
       # In such a case, every second or later occurrence of the same name is going to be prefixed
@@ -215,6 +216,9 @@ class StatefulProcessor:
     actually used (nullable or not). Obviously, field cannot be used in version higher than its
     type's usage.
     """
+    if field_spec.get('tag') is not None:
+      return None
+
     version_usage = Statics.parse_version_string(field_spec['versions'], highest_possible_version)
     version_usage_as_nullable = Statics.parse_version_string(
         field_spec['nullableVersions'],
@@ -232,7 +236,7 @@ class StatefulProcessor:
       underlying_type = self.parse_type(type_name[2:], field_spec, highest_possible_version)
       return Array(underlying_type)
     else:
-      if (type_name in Primitive.PRIMITIVE_TYPE_NAMES):
+      if (type_name in Primitive.USABLE_PRIMITIVE_TYPE_NAMES):
         return Primitive(type_name, field_spec.get('default'))
       else:
         versions = Statics.parse_version_string(field_spec['versions'], highest_possible_version)
@@ -260,11 +264,12 @@ class Statics:
 class FieldList:
   """
   List of fields used by given entity (request or child structure) in given message version
-  (as fields get added or removed across versions).
+  (as fields get added or removed across versions and/or they change compaction level).
   """
 
-  def __init__(self, version, fields):
+  def __init__(self, version, uses_compact_fields, fields):
     self.version = version
+    self.uses_compact_fields = uses_compact_fields
     self.fields = fields
 
   def used_fields(self):
@@ -376,11 +381,11 @@ class FieldSpec:
     else:
       return str(self.type.example_value_for_test(version))
 
-  def deserializer_name_in_version(self, version):
+  def deserializer_name_in_version(self, version, compact):
     if self.is_nullable_in_version(version):
-      return 'Nullable%s' % self.type.deserializer_name_in_version(version)
+      return 'Nullable%s' % self.type.deserializer_name_in_version(version, compact)
     else:
-      return self.type.deserializer_name_in_version(version)
+      return self.type.deserializer_name_in_version(version, compact)
 
   def is_printable(self):
     return self.type.is_printable()
@@ -394,7 +399,7 @@ class TypeSpecification:
     """
     raise NotImplementedError()
 
-  def deserializer_name_in_version(self, version):
+  def deserializer_name_in_version(self, version, compact):
     """
     Renders the deserializer name of given type, in message with given version.
     """
@@ -403,6 +408,12 @@ class TypeSpecification:
   def default_value(self):
     """
     Returns a default value for given type.
+    """
+    raise NotImplementedError()
+
+  def has_flexible_handling(self):
+    """
+    Whether the given type has special encoding when carrying message is using flexible encoding.
     """
     raise NotImplementedError()
 
@@ -431,12 +442,16 @@ class Array(TypeSpecification):
     # To use an array of type T, we just need to be capable of using type T.
     return self.underlying.compute_declaration_chain()
 
-  def deserializer_name_in_version(self, version):
-    return 'ArrayDeserializer<%s, %s>' % (self.underlying.name,
-                                          self.underlying.deserializer_name_in_version(version))
+  def deserializer_name_in_version(self, version, compact):
+    return '%sArrayDeserializer<%s, %s>' % ("Compact" if compact else "", self.underlying.name,
+                                            self.underlying.deserializer_name_in_version(
+                                                version, compact))
 
   def default_value(self):
     return 'std::vector<%s>{}' % (self.underlying.name)
+
+  def has_flexible_handling(self):
+    return True
 
   def example_value_for_test(self, version):
     return 'std::vector<%s>{ %s }' % (self.underlying.name,
@@ -451,7 +466,7 @@ class Primitive(TypeSpecification):
   Represents a Kafka primitive value.
   """
 
-  PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes']
+  USABLE_PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes']
 
   KAFKA_TYPE_TO_ENVOY_TYPE = {
       'string': 'std::string',
@@ -461,6 +476,7 @@ class Primitive(TypeSpecification):
       'int32': 'int32_t',
       'int64': 'int64_t',
       'bytes': 'Bytes',
+      'tagged_fields': 'TaggedFields',
   }
 
   KAFKA_TYPE_TO_DESERIALIZER = {
@@ -471,6 +487,12 @@ class Primitive(TypeSpecification):
       'int32': 'Int32Deserializer',
       'int64': 'Int64Deserializer',
       'bytes': 'BytesDeserializer',
+      'tagged_fields': 'TaggedFieldsDeserializer',
+  }
+
+  KAFKA_TYPE_TO_COMPACT_DESERIALIZER = {
+      'string': 'CompactStringDeserializer',
+      'bytes': 'CompactBytesDeserializer'
   }
 
   # See https://github.com/apache/kafka/tree/trunk/clients/src/main/resources/common/message#deserializing-messages
@@ -482,24 +504,33 @@ class Primitive(TypeSpecification):
       'int32': '0',
       'int64': '0',
       'bytes': '{}',
+      'tagged_fields': 'TaggedFields({})',
   }
 
   # Custom values that make test code more readable.
   KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST = {
-      'string': '"string"',
-      'bool': 'false',
-      'int8': 'static_cast<int8_t>(8)',
-      'int16': 'static_cast<int16_t>(16)',
-      'int32': 'static_cast<int32_t>(32)',
-      'int64': 'static_cast<int64_t>(64)',
-      'bytes': 'Bytes({0, 1, 2, 3})',
+      'string':
+          '"string"',
+      'bool':
+          'false',
+      'int8':
+          'static_cast<int8_t>(8)',
+      'int16':
+          'static_cast<int16_t>(16)',
+      'int32':
+          'static_cast<int32_t>(32)',
+      'int64':
+          'static_cast<int64_t>(64)',
+      'bytes':
+          'Bytes({0, 1, 2, 3})',
+      'tagged_fields':
+          'TaggedFields{std::vector<TaggedField>{{10, Bytes({1, 2, 3})}, {20, Bytes({4, 5, 6})}}}',
   }
 
   def __init__(self, name, custom_default_value):
     self.original_name = name
     self.name = Primitive.compute(name, Primitive.KAFKA_TYPE_TO_ENVOY_TYPE)
     self.custom_default_value = custom_default_value
-    self.deserializer_name = Primitive.compute(name, Primitive.KAFKA_TYPE_TO_DESERIALIZER)
 
   @staticmethod
   def compute(name, map):
@@ -512,8 +543,11 @@ class Primitive(TypeSpecification):
     # Primitives need no declarations.
     return []
 
-  def deserializer_name_in_version(self, version):
-    return self.deserializer_name
+  def deserializer_name_in_version(self, version, compact):
+    if compact and self.original_name in Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER.keys():
+      return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_COMPACT_DESERIALIZER)
+    else:
+      return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DESERIALIZER)
 
   def default_value(self):
     if self.custom_default_value is not None:
@@ -521,11 +555,23 @@ class Primitive(TypeSpecification):
     else:
       return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_DEFAULT_VALUE)
 
+  def has_flexible_handling(self):
+    return self.original_name in ['string', 'bytes', 'tagged_fields']
+
   def example_value_for_test(self, version):
     return Primitive.compute(self.original_name, Primitive.KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST)
 
   def is_printable(self):
     return self.name not in ['Bytes']
+
+
+class FieldSerializationSpec():
+
+  def __init__(self, field, versions, compute_size_method_name, encode_method_name):
+    self.field = field
+    self.versions = versions
+    self.compute_size_method_name = compute_size_method_name
+    self.encode_method_name = encode_method_name
 
 
 class Complex(TypeSpecification):
@@ -538,7 +584,18 @@ class Complex(TypeSpecification):
     self.name = name
     self.fields = fields
     self.versions = versions
+    self.flexible_versions = None  # Will be set in 'register_flexible_versions'.
     self.attributes = {}
+
+  def register_flexible_versions(self, flexible_versions):
+    # If flexible versions are present, so we need to add placeholder 'tagged_fields' field to
+    # *every* type that's used in by this message type.
+    for type in self.compute_declaration_chain():
+      type.flexible_versions = flexible_versions
+      if len(flexible_versions) > 0:
+        tagged_fields_field = FieldSpec('tagged_fields', Primitive('tagged_fields', None),
+                                        flexible_versions, [])
+        type.fields.append(tagged_fields_field)
 
   def compute_declaration_chain(self):
     """
@@ -591,11 +648,26 @@ class Complex(TypeSpecification):
     """
     field_lists = []
     for version in self.versions:
-      field_list = FieldList(version, self.fields)
+      field_list = FieldList(version, version in self.flexible_versions, self.fields)
       field_lists.append(field_list)
     return field_lists
 
-  def deserializer_name_in_version(self, version):
+  def compute_serialization_specs(self):
+    result = []
+    for field in self.fields:
+      if field.type.has_flexible_handling():
+        flexible = [x for x in field.version_usage if x in self.flexible_versions]
+        non_flexible = [x for x in field.version_usage if x not in flexible]
+        if non_flexible:
+          result.append(FieldSerializationSpec(field, non_flexible, 'computeSize', 'encode'))
+        if flexible:
+          result.append(
+              FieldSerializationSpec(field, flexible, 'computeCompactSize', 'encodeCompact'))
+      else:
+        result.append(FieldSerializationSpec(field, field.version_usage, 'computeSize', 'encode'))
+    return result
+
+  def deserializer_name_in_version(self, version, compact):
     return '%sV%dDeserializer' % (self.name, version)
 
   def name_in_c_case(self):
@@ -605,6 +677,9 @@ class Complex(TypeSpecification):
 
   def default_value(self):
     raise NotImplementedError('unable to create default value of complex type')
+
+  def has_flexible_handling(self):
+    return False
 
   def example_value_for_test(self, version):
     field_list = next(fl for fl in self.compute_field_lists() if fl.version == version)

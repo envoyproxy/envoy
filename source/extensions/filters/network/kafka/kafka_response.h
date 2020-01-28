@@ -2,11 +2,14 @@
 
 #include "extensions/filters/network/kafka/external/serialization_composite.h"
 #include "extensions/filters/network/kafka/serialization.h"
+#include "extensions/filters/network/kafka/tagged_fields.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
+
+bool responseUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version);
 
 /**
  * Represents Kafka response metadata: expected api key, version and correlation id.
@@ -77,7 +80,14 @@ public:
    */
   uint32_t computeSize() const override {
     const EncodingContext context{metadata_.api_version_};
-    return context.computeSize(metadata_.correlation_id_) + context.computeSize(data_);
+    uint32_t result{0};
+    result += context.computeSize(metadata_.correlation_id_);
+    if (responseUsesTaggedFieldsInHeader(metadata_.api_key_, metadata_.api_version_) &&
+        18 != metadata_.api_key_) {
+      result += context.computeCompactSize(TaggedFields{});
+    }
+    result += context.computeSize(data_);
+    return result;
   }
 
   /**
@@ -88,6 +98,10 @@ public:
     uint32_t written{0};
     // Encode correlation id (api key / version are not present in responses).
     written += context.encode(metadata_.correlation_id_, dst);
+    if (responseUsesTaggedFieldsInHeader(metadata_.api_key_, metadata_.api_version_) &&
+        18 != metadata_.api_key_) {
+      written += context.encodeCompact(TaggedFields{}, dst);
+    }
     // Encode response-specific data.
     written += context.encode(data_, dst);
     return written;

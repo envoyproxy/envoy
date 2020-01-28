@@ -5,6 +5,7 @@
 
 #include "extensions/filters/network/kafka/kafka_response.h"
 #include "extensions/filters/network/kafka/parser.h"
+#include "extensions/filters/network/kafka/tagged_fields.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +24,7 @@ struct ResponseContext {
   /**
    * Api key of response that's being parsed.
    */
-  int16_t api_key_;
+  int16_t api_key_ = -1;
 
   /**
    * Api version of response that's being parsed.
@@ -119,6 +120,7 @@ private:
 
   Int32Deserializer length_deserializer_;
   Int32Deserializer correlation_id_deserializer_;
+  TaggedFieldsDeserializer tagged_fields_deserializer_;
 };
 
 /**

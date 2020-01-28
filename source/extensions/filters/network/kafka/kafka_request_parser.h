@@ -8,6 +8,7 @@
 
 #include "extensions/filters/network/kafka/kafka_request.h"
 #include "extensions/filters/network/kafka/parser.h"
+#include "extensions/filters/network/kafka/tagged_fields.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,10 +92,31 @@ private:
  * Can throw, as one of the fields (client-id) can throw (nullable string with invalid length).
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
-class RequestHeaderDeserializer
-    : public CompositeDeserializerWith4Delegates<RequestHeader, Int16Deserializer,
-                                                 Int16Deserializer, Int32Deserializer,
-                                                 NullableStringDeserializer> {};
+class RequestHeaderDeserializer : public Deserializer<RequestHeader>,
+                                  private Logger::Loggable<Logger::Id::kafka> {
+
+  // Request header, no matter what, has at least 4 fields. They are extracted here.
+  using CommonPartDeserializer =
+      CompositeDeserializerWith4Delegates<RequestHeader, Int16Deserializer, Int16Deserializer,
+                                          Int32Deserializer, NullableStringDeserializer>;
+
+public:
+  RequestHeaderDeserializer() = default;
+
+  uint32_t feed(absl::string_view& data) override;
+  bool ready() const override;
+  RequestHeader get() const override;
+
+private:
+  // Deserializer for the first 4 fields, that are present in every request header.
+  CommonPartDeserializer common_part_deserializer_;
+
+  // Tagged fields are used only in request header v2.
+  // This flag will be set depending on common part's result (api key & version), and will decide
+  // whether we want to feed data to tagged fields deserializer.
+  bool tagged_fields_present_;
+  TaggedFieldsDeserializer tagged_fields_deserializer_;
+};
 
 using RequestHeaderDeserializerPtr = std::unique_ptr<RequestHeaderDeserializer>;
 

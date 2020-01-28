@@ -1,5 +1,6 @@
-#include "test/extensions/filters/network/kafka/serialization_utilities.h"
 #include "extensions/filters/network/kafka/tagged_fields.h"
+
+#include "test/extensions/filters/network/kafka/serialization_utilities.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -4,11 +4,14 @@
 
 #include "extensions/filters/network/kafka/external/serialization_composite.h"
 #include "extensions/filters/network/kafka/serialization.h"
+#include "extensions/filters/network/kafka/tagged_fields.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
+
+bool requestUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version);
 
 /**
  * Represents fields that are present in every Kafka request message.
@@ -99,6 +102,9 @@ public:
     result += context.computeSize(request_header_.api_version_);
     result += context.computeSize(request_header_.correlation_id_);
     result += context.computeSize(request_header_.client_id_);
+    if (requestUsesTaggedFieldsInHeader(request_header_.api_key_, request_header_.api_version_)) {
+      result += context.computeCompactSize(TaggedFields{});
+    }
     // Compute size of request data.
     result += context.computeSize(data_);
     return result;
@@ -115,6 +121,9 @@ public:
     written += context.encode(request_header_.api_version_, dst);
     written += context.encode(request_header_.correlation_id_, dst);
     written += context.encode(request_header_.client_id_, dst);
+    if (requestUsesTaggedFieldsInHeader(request_header_.api_key_, request_header_.api_version_)) {
+      written += context.encodeCompact(TaggedFields{}, dst);
+    }
     // Encode request-specific data.
     written += context.encode(data_, dst);
     return written;
