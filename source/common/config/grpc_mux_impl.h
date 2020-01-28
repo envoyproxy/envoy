@@ -45,8 +45,7 @@ public:
   bool paused(const std::string& type_url) const override;
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                           SubscriptionCallbacks& callbacks,
-                           std::chrono::milliseconds init_fetch_timeout) override;
+                           SubscriptionCallbacks& callbacks, std::chrono::milliseconds) override;
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
