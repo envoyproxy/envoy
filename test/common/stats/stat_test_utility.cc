@@ -135,6 +135,7 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
+#if 0
 OptionalCounter TestStatStore::findCounter(absl::string_view name) {
   if (store_.numCounters() != num_counters_) {
     ENVOY_LOG_MISC(error, "recomputing counter table");
@@ -163,6 +164,7 @@ Gauge& TestStatStore::gauge(absl::string_view name) {
   RELEASE_ASSERT(p != gauges_.end(), absl::StrCat("cannot find gauge: ", name));
   return *p->second;
 }
+#endif
 
 // TODO(jmarantz): this utility is intended to be used both for unit tests
 // and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs

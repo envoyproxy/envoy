@@ -7,6 +7,8 @@
 #include "common/stats/isolated_store_impl.h"
 #include "common/stats/symbol_table_creator.h"
 
+#include "test/test_common/utility.h"
+
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 
@@ -85,13 +87,24 @@ public:
   }
   explicit TestStatStore(Store& store) : store_(store) {}
 
-  OptionalCounter findCounter(absl::string_view name);
-  Counter& counter(absl::string_view name) {
+  OptionalCounter findCounter(const std::string& name) {
+    CounterSharedPtr counter = TestUtility::findCounter(store_, name);
+    return counter == nullptr ? OptionalCounter() : *counter;
+  }
+  Counter& counter(const std::string& name) {
     OptionalCounter opt = findCounter(name);
     RELEASE_ASSERT(opt, absl::StrCat("could not find counter ", name));
     return const_cast<Counter&>(opt->get());
   }
-  Gauge& gauge(absl::string_view name);
+  OptionalGauge findGauge(const std::string& name) {
+    GaugeSharedPtr gauge = TestUtility::findGauge(store_, name);
+    return gauge == nullptr ? OptionalGauge() : *gauge;
+  }
+  Gauge& gauge(const std::string& name) {
+    OptionalGauge opt = findGauge(name);
+    RELEASE_ASSERT(opt, absl::StrCat("could not find gauge ", name));
+    return const_cast<Gauge&>(opt->get());
+  }
   Histogram& histogram(absl::string_view name);
 
   Store& store() { return store_; }
@@ -99,12 +112,14 @@ public:
 private:
   StorePtr owned_storage_; // Used for empty constructor.
   Store& store_;
+  /*
   uint64_t num_counters_{0};
   uint64_t num_gauges_{0};
   uint64_t num_histograms_{0};
   absl::flat_hash_map<std::string, Counter*> counters_;
   absl::flat_hash_map<std::string, Gauge*> gauges_;
   absl::flat_hash_map<std::string, Histogram*> histograms_;
+  */
 };
 
 // Compares the memory consumed against an exact expected value, but only on

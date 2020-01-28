@@ -22,9 +22,6 @@ class NullGaugeImpl;
 using OptionalCounter = absl::optional<std::reference_wrapper<const Counter>>;
 using OptionalGauge = absl::optional<std::reference_wrapper<const Gauge>>;
 using OptionalHistogram = absl::optional<std::reference_wrapper<const Histogram>>;
-using CounterOptRef = absl::optional<std::reference_wrapper<Counter>>;
-using GaugeOptRef = absl::optional<std::reference_wrapper<Gauge>>;
-using HistogramOptRef = absl::optional<std::reference_wrapper<Histogram>>;
 using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
