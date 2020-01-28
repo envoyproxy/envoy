@@ -104,7 +104,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
 
 OriginalDstCluster::OriginalDstCluster(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
       dispatcher_(factory_context.dispatcher()),
@@ -178,7 +178,7 @@ void OriginalDstCluster::cleanup() {
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 OriginalDstClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   if (cluster.lb_policy() !=
           envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB &&

@@ -13,13 +13,13 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -61,6 +61,34 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
     return {Status::WellKnownGrpcStatus::InvalidCode};
   }
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};
+}
+
+absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers,
+                                                         const Http::HeaderMap& headers,
+                                                         const StreamInfo::StreamInfo& info,
+                                                         bool allow_user_defined) {
+  // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
+  // request. When it is returned, it will be in the response trailers. With that said, Envoy will
+  // treat a trailers-only response as a headers-only response, so we have to check the following
+  // in order:
+  //   1. trailers gRPC status, if it exists.
+  //   2. headers gRPC status, if it exists.
+  //   3. Inferred from info HTTP status, if it exists.
+  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
+      {Grpc::Common::getGrpcStatus(trailers, allow_user_defined)},
+      {Grpc::Common::getGrpcStatus(headers, allow_user_defined)},
+      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
+                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
+                           : absl::nullopt},
+  }};
+
+  for (const auto& optional_status : optional_statuses) {
+    if (optional_status.has_value()) {
+      return optional_status;
+    }
+  }
+
+  return absl::nullopt;
 }
 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {

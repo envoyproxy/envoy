@@ -10,5 +10,6 @@ Overview
   versioning
   bootstrap
   examples
+  extension
   xds_api
   mgmt_server
