@@ -147,6 +147,9 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
       return CelValue::CreateInt64(optional_status.value());
     }
     return {};
+  } else if (value == TotalSize) {
+    return CelValue::CreateInt64(info_.bytesSent() + headers_.value_->byteSize() +
+                                 trailers_.value_->byteSize());
   }
   return {};
 }
