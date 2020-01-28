@@ -165,7 +165,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
                            std::string error, const Protobuf::Message& message) {
 // This option is for Envoy builds with --define deprecated_features=disabled
 // The build options CI then verifies that as Envoy developers deprecate fields,
-// that they update canonocal configs and unit tests to not use those deprecated
+// that they update canonical configs and unit tests to not use those deprecated
 // fields, by making their use fatal in the build options CI.
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   bool warn_only = false;
