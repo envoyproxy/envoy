@@ -24,6 +24,12 @@ message UpstreamHttpProtocolOptions {
   // upstream connections based on the downstream HTTP host/authority header, as seen by the
   // :ref:`router filter <config_http_filters_router>`.
   bool auto_sni = 1;
+
+  // Automatic validate upstream presented certificate for new upstream connections based on the
+  // downstream HTTP host/authority header, as seen by the
+  // :ref:`router filter <config_http_filters_router>`.
+  // This field is intended to set with `auto_sni` field.
+  bool auto_san_validation = 2;
 }
 
 message HttpProtocolOptions {
