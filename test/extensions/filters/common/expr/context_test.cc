@@ -32,12 +32,14 @@ TEST(Context, EmptyHeadersAttributes) {
 
 TEST(Context, RequestAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
+  NiceMock<StreamInfo::MockStreamInfo> empty_info;
   Http::TestHeaderMapImpl header_map{
       {":method", "POST"},           {":scheme", "http"},      {":path", "/meow?yes=1"},
       {":authority", "kittens.com"}, {"referer", "dogs.com"},  {"user-agent", "envoy-mobile"},
       {"content-length", "10"},      {"x-request-id", "blah"},
   };
   RequestWrapper request(&header_map, info);
+  RequestWrapper empty_request(nullptr, empty_info);
 
   EXPECT_CALL(info, bytesReceived()).WillRepeatedly(Return(10));
   // "2018-04-03T23:06:09.123Z".
@@ -67,6 +69,12 @@ TEST(Context, RequestAttributes) {
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("http", value.value().StringOrDie().value());
   }
+
+  {
+    auto value = empty_request[CelValue::CreateStringView(Scheme)];
+    EXPECT_FALSE(value.has_value());
+  }
+
   {
     auto value = request[CelValue::CreateStringView(Host)];
     EXPECT_TRUE(value.has_value());
@@ -132,6 +140,14 @@ TEST(Context, RequestAttributes) {
   }
 
   {
+    auto value = empty_request[CelValue::CreateStringView(TotalSize)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    // this includes the headers size
+    EXPECT_EQ(0, value.value().Int64OrDie());
+  }
+
+  {
     auto value = request[CelValue::CreateStringView(Time)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsTimestamp());
@@ -160,10 +176,20 @@ TEST(Context, RequestAttributes) {
   }
 
   {
+    auto value = empty_request[CelValue::CreateStringView(Duration)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
     auto value = request[CelValue::CreateStringView(Protocol)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("HTTP/2", value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = empty_request[CelValue::CreateStringView(Protocol)];
+    EXPECT_FALSE(value.has_value());
   }
 }
 
@@ -195,12 +221,14 @@ TEST(Context, RequestFallbackAttributes) {
 
 TEST(Context, ResponseAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
+  NiceMock<StreamInfo::MockStreamInfo> empty_info;
   const std::string header_name = "test-header";
   const std::string trailer_name = "test-trailer";
   const std::string grpc_status = "grpc-status";
   Http::TestHeaderMapImpl header_map{{header_name, "a"}};
   Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}, {grpc_status, "8"}};
   ResponseWrapper response(&header_map, &trailer_map, info);
+  ResponseWrapper empty_response(nullptr, nullptr, empty_info);
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
@@ -228,6 +256,13 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(160, value.value().Int64OrDie());
+  }
+
+  {
+    auto value = empty_response[CelValue::CreateStringView(TotalSize)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(0, value.value().Int64OrDie());
   }
 
   {
@@ -267,18 +302,26 @@ TEST(Context, ResponseAttributes) {
     ASSERT_TRUE(header.value().IsString());
     EXPECT_EQ("b", header.value().StringOrDie().value());
   }
+
   {
     auto value = response[CelValue::CreateStringView(Flags)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(0x1, value.value().Int64OrDie());
   }
+
   {
     auto value = response[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(0x8, value.value().Int64OrDie());
   }
+
+  {
+    auto value = empty_response[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_FALSE(value.has_value());
+  }
+
   {
     Http::TestHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
     Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};

@@ -80,6 +80,9 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     } else {
       return CelValue::CreateInt64(info_.bytesReceived());
     }
+  } else if (value == TotalSize) {
+    return CelValue::CreateInt64(info_.bytesReceived() +
+                                 (headers_.value_ ? headers_.value_->byteSize() : 0));
   } else if (value == Duration) {
     auto duration = info_.requestComplete();
     if (duration.has_value()) {
@@ -115,8 +118,6 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
       return convertHeaderEntry(headers_.value_->RequestId());
     } else if (value == UserAgent) {
       return convertHeaderEntry(headers_.value_->UserAgent());
-    } else if (value == TotalSize) {
-      return CelValue::CreateInt64(info_.bytesReceived() + headers_.value_->byteSize());
     }
   }
   return {};
@@ -142,14 +143,15 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return CelValue::CreateInt64(info_.responseFlags());
   } else if (value == GrpcStatus) {
     auto const& optional_status =
-        Grpc::Common::getGrpcStatus(*(trailers_.value_), *(headers_.value_), info_);
+        Grpc::Common::getGrpcStatus(trailers_.value_, headers_.value_, info_);
     if (optional_status.has_value()) {
       return CelValue::CreateInt64(optional_status.value());
     }
     return {};
   } else if (value == TotalSize) {
-    return CelValue::CreateInt64(info_.bytesSent() + headers_.value_->byteSize() +
-                                 trailers_.value_->byteSize());
+    return CelValue::CreateInt64(info_.bytesSent() +
+                                 (headers_.value_ ? headers_.value_->byteSize() : 0) +
+                                 (trailers_.value_ ? trailers_.value_->byteSize() : 0));
   }
   return {};
 }

@@ -63,8 +63,8 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};
 }
 
-absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers,
-                                                         const Http::HeaderMap& headers,
+absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap* trailers,
+                                                         const Http::HeaderMap* headers,
                                                          const StreamInfo::StreamInfo& info,
                                                          bool allow_user_defined) {
   // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
@@ -74,18 +74,20 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
   //   1. trailers gRPC status, if it exists.
   //   2. headers gRPC status, if it exists.
   //   3. Inferred from info HTTP status, if it exists.
-  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
-      {Grpc::Common::getGrpcStatus(trailers, allow_user_defined)},
-      {Grpc::Common::getGrpcStatus(headers, allow_user_defined)},
-      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
-                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
-                           : absl::nullopt},
-  }};
-
-  for (const auto& optional_status : optional_statuses) {
-    if (optional_status.has_value()) {
-      return optional_status;
+  if (trailers) {
+    auto status = Grpc::Common::getGrpcStatus(*trailers, allow_user_defined);
+    if (status.has_value()) {
+      return status;
     }
+  }
+  if (headers) {
+    auto status = Grpc::Common::getGrpcStatus(*headers, allow_user_defined);
+    if (status.has_value()) {
+      return status;
+    }
+  }
+  if (info.responseCode()) {
+    return Grpc::Utility::httpToGrpcStatus(info.responseCode().value());
   }
 
   return absl::nullopt;
