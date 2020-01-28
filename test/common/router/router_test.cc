@@ -3628,6 +3628,7 @@ TEST_F(RouterTest, AltStatName) {
 
   EXPECT_EQ(1U, cm_stats_.counter("alt_stat.upstream_rq_200").value());
   EXPECT_EQ(1U, cm_stats_.counter("alt_stat.zone.zone_name.to_az.upstream_rq_200").value());
+  EXPECT_EQ(1U, cm_stats_.counter("alt_stat.zone.zone_name.to_az.upstream_rq_2xx").value());
 }
 
 TEST_F(RouterTest, Redirect) {
