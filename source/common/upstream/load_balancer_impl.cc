@@ -281,8 +281,8 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
   // First calculate total number of hosts across all priorities regardless
   // whether they are healthy or not.
   const uint32_t total_hosts_count = std::accumulate(
-      priority_set_.hostSetsPerPriority().begin(), priority_set_.hostSetsPerPriority().end(), 0,
-      [](size_t acc, const std::unique_ptr<Envoy::Upstream::HostSet>& host_set) {
+      priority_set_.hostSetsPerPriority().begin(), priority_set_.hostSetsPerPriority().end(),
+      (size_t)0, [](size_t acc, const std::unique_ptr<Envoy::Upstream::HostSet>& host_set) {
         return acc + host_set->hosts().size();
       });
 
