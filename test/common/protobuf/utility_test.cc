@@ -40,7 +40,7 @@ protected:
   const uint kLargeMessageSize = 1 << 20;
   const std::string kVeryLargeString{std::string(1 << 20, 'A')};
   Api::ApiPtr api_;
-}; // namespace Envoy
+};
 
 TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -1145,7 +1145,6 @@ TEST_F(ProtobufUtilityTest, UnpackToErrorMessageTruncated) {
     MessageUtil::unpackTo(source_any, dest);
   } catch (EnvoyException& e) {
     const std::string& err_msg = e.what();
-    ENVOY_LOG_MISC(error, "DDD error msg: {}", err_msg);
     EXPECT_TRUE(absl::EndsWith(err_msg, "AAAAAAAAA..."));
     EXPECT_LT(err_msg.length(), kLargeMessageSize);
   }
@@ -1294,7 +1293,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertErrorMessageTruncated) {
       EXPECT_TRUE(absl::EndsWith(err_msg, "AAAAAAAAAAA..."));
     }
   }
-} // namespace Envoy
+}
 
 TEST_F(ProtobufUtilityTest, LoadYamlErrorMessageTruncated) {
   ProtobufWkt::DoubleValue v;
@@ -1303,7 +1302,6 @@ TEST_F(ProtobufUtilityTest, LoadYamlErrorMessageTruncated) {
                               ProtobufMessage::getNullValidationVisitor());
   } catch (EnvoyException& e) {
     const std::string& err_msg = e.what();
-    ENVOY_LOG_MISC(error, "DDD SSS {}", err_msg);
     EXPECT_TRUE(absl::EndsWith(err_msg, "AAAAAAAAAAA..."));
   }
 }
@@ -1331,8 +1329,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
   bootstrap.mutable_cluster_manager()->set_local_cluster_name("foo");
   ProtobufWkt::Struct json;
   TestUtility::jsonConvert(bootstrap, json);
-  // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity
-  // check.
+  // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity check.
   TestUtility::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap);
   // Verify we don't do a camel case conversion.
   EXPECT_EQ("foo", json.fields()
