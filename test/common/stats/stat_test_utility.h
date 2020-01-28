@@ -77,15 +77,38 @@ private:
   const size_t memory_at_construction_;
 };
 
-// Helps tests do stat-name lookups based on strings.
-class TestStatStore {
+// Helper class to use in lieu of an actual Stats::Store for doing lookups by
+// name. The intent is to remove the deprecated Scope::counter(const
+// std::string&) methods, and always use this class for accessing stats by
+// name.
+//
+// This string-based lookup wrapper is needed because the underlying name
+// representation, StatName, has multiple ways to represent the same string,
+// depending on which name segments are symbolic (known at compile time), and
+// which are dynamic (e.g. based on the request, e.g. request-headers, ssl
+// cipher, grpc method, etc). We need to do name-matching based only on strings
+// to avoid having the tests know which segments are dynamic.
+//
+// Note that this class does not implement the of Stats::Store interface, but
+// provides similar methods used for lookup by name, as well as an accessor
+// to the underlying store.
+class TestStore {
 public:
-  TestStatStore()
-      : owned_storage_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_storage_) {}
-  explicit TestStatStore(SymbolTable& symbol_table)
+  // Constructs a TestStore with an owned IsolatedStoreImpl. This is useful
+  // for replacing the IsolatedStoreImpl in a unit-test with this class, with
+  // minimal code changes, other than accessing the underlying store with
+  // ".store()".
+  TestStore() : owned_storage_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_storage_) {}
+
+  // Constructs a store using a symbol table, allowing for explicit sharing.
+  explicit TestStore(SymbolTable& symbol_table)
       : owned_storage_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_storage_) {
   }
-  explicit TestStatStore(Store& store) : store_(store) {}
+
+  // Constructs a TestStore with an already-existing
+  // IsolatedStatStoreImpl. This is useful when a test is built using a mock
+  // store, or we are referencing the local store held in an Upstream.
+  explicit TestStore(Store& store) : store_(store) {}
 
   OptionalCounter findCounter(const std::string& name) {
     CounterSharedPtr counter = TestUtility::findCounter(store_, name);
@@ -105,21 +128,26 @@ public:
     RELEASE_ASSERT(opt, absl::StrCat("could not find gauge ", name));
     return const_cast<Gauge&>(opt->get());
   }
-  Histogram& histogram(absl::string_view name);
+
+  // TODO(jmarantz): support for histograms will be added when needed as we
+  // proceed with refactoring. Currently this code does not compile because
+  // TestUtility does not implement findHistogram.
+  //
+  // OptionalHistogram findHistogram(const std::string& name) {
+  //   HistogramSharedPtr histogram = TestUtility::findHistogram(store_, name);
+  //   return histogram == nullptr ? OptionalHistogram() : *histogram;
+  // }
+  // Histogram& histogram(absl::string_view name) {
+  //   OptionalHistogram opt = findHistogram(name);
+  //   RELEASE_ASSERT(opt, absl::StrCat("could not find histogram ", name));
+  //   return const_cast<Histogram&>(opt->get());
+  // }
 
   Store& store() { return store_; }
 
 private:
   StorePtr owned_storage_; // Used for empty constructor.
   Store& store_;
-  /*
-  uint64_t num_counters_{0};
-  uint64_t num_gauges_{0};
-  uint64_t num_histograms_{0};
-  absl::flat_hash_map<std::string, Counter*> counters_;
-  absl::flat_hash_map<std::string, Gauge*> gauges_;
-  absl::flat_hash_map<std::string, Histogram*> histograms_;
-  */
 };
 
 // Compares the memory consumed against an exact expected value, but only on

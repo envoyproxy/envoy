@@ -121,7 +121,7 @@ public:
 
   Buffer::OwnedImpl fake_data_;
   NiceMock<MockIsolatedStatStore> store_;
-  Stats::TestUtil::TestStatStore stats_;
+  Stats::TestUtil::TestStore stats_;
   MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;

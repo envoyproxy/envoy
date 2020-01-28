@@ -135,37 +135,6 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
-#if 0
-OptionalCounter TestStatStore::findCounter(absl::string_view name) {
-  if (store_.numCounters() != num_counters_) {
-    ENVOY_LOG_MISC(error, "recomputing counter table");
-    for (CounterSharedPtr& counter : store_.counters()) {
-      counters_[counter->name()] = counter.get();
-    }
-    num_counters_ = store_.numCounters();
-  }
-  auto p = counters_.find(name);
-  OptionalCounter ret;
-  if (p != counters_.end()) {
-    ret = *p->second;
-  }
-  return ret;
-}
-
-Gauge& TestStatStore::gauge(absl::string_view name) {
-  if (store_.numGauges() != num_gauges_) {
-    ENVOY_LOG_MISC(error, "recomputing gauge table");
-    for (GaugeSharedPtr& gauge : store_.gauges()) {
-      gauges_[gauge->name()] = gauge.get();
-    }
-    num_gauges_ = store_.numGauges();
-  }
-  auto p = gauges_.find(name);
-  RELEASE_ASSERT(p != gauges_.end(), absl::StrCat("cannot find gauge: ", name));
-  return *p->second;
-}
-#endif
-
 // TODO(jmarantz): this utility is intended to be used both for unit tests
 // and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs
 // FUZZ_ASSERT.
