@@ -17,7 +17,7 @@ public:
   virtual ~NullVmPlugin() = default;
 
   // NB: These are defined rather than declared PURE because gmock uses __LINE__ internally for
-  // uniqueness, making it impossible to use FOR_ALL_WASM_VM_EXPORTS with MOCK_METHOD2.
+  // uniqueness, making it impossible to use FOR_ALL_WASM_VM_EXPORTS with MOCK_METHOD.
 #define _DEFINE_GET_FUNCTION(_T)                                                                   \
   virtual void getFunction(absl::string_view, _T* f) { *f = nullptr; }
   FOR_ALL_WASM_VM_EXPORTS(_DEFINE_GET_FUNCTION)
