@@ -146,5 +146,7 @@ private:
   const std::vector<uint8_t> value_;
 };
 
+using SocketOptionImplOptRef = absl::optional<std::reference_wrapper<SocketOptionImpl>>;
+
 } // namespace Network
 } // namespace Envoy

@@ -362,9 +362,7 @@ private:
       return socket_;
     }
 
-    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-      return absl::nullopt;
-    }
+    Network::SocketOptRef sharedSocket() const override { return absl::nullopt; }
 
   private:
     Network::SocketSharedPtr socket_;
