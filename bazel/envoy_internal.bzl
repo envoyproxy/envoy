@@ -11,6 +11,8 @@ def envoy_copts(repository, test = False):
         "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
+        "-Wformat",
+        "-Wformat-security",
         "-Wvla",
         "-std=c++14",
     ]

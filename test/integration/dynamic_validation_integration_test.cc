@@ -7,6 +7,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -43,9 +44,6 @@ private:
   }
 };
 
-REGISTER_FACTORY(TestDynamicValidationNetworkFilterConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory);
-
 // Pretty-printing of parameterized test names.
 std::string dynamicValidationTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
@@ -76,6 +74,11 @@ public:
   ApiFilesystemConfig api_filesystem_config_;
   const bool reject_unknown_dynamic_fields_;
   bool allow_lds_rejection_{};
+
+private:
+  TestDynamicValidationNetworkFilterConfigFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> register_{
+      factory_};
 };
 
 INSTANTIATE_TEST_SUITE_P(

@@ -1,10 +1,10 @@
 #include "extensions/common/crypto/utility_impl.h"
 
 #include "common/common/assert.h"
-#include "common/common/stack_array.h"
 
 #include "extensions/common/crypto/crypto_impl.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
 
@@ -18,7 +18,7 @@ std::vector<uint8_t> UtilityImpl::getSha256Digest(const Buffer::Instance& buffer
   auto rc = EVP_DigestInit(ctx, EVP_sha256());
   RELEASE_ASSERT(rc == 1, "Failed to init digest context");
   const auto num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
   for (const auto& slice : slices) {
     rc = EVP_DigestUpdate(ctx, slice.mem_, slice.len_);

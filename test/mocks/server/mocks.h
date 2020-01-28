@@ -59,7 +59,8 @@ namespace Server {
 
 namespace Configuration {
 class MockServerFactoryContext;
-}
+class MockTransportSocketFactoryContext;
+} // namespace Configuration
 
 class MockOptions : public Options {
 public:
@@ -407,6 +408,7 @@ public:
   MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
+  MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -439,6 +441,8 @@ public:
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
       server_factory_context_;
+  std::shared_ptr<testing::NiceMock<Configuration::MockTransportSocketFactoryContext>>
+      transport_socket_factory_context_;
 };
 
 namespace Configuration {
@@ -504,6 +508,7 @@ public:
   ~MockFactoryContext() override;
 
   MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
@@ -562,13 +567,12 @@ public:
 
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
-  MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
+  MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, ());
+  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
   MOCK_METHOD(Stats::Store&, stats, ());
-  MOCK_METHOD(void, setInitManager, (Init::Manager&));
   MOCK_METHOD(Init::Manager*, initManager, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::SlotAllocator&, threadLocal, ());

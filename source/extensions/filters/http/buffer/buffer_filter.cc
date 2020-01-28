@@ -100,10 +100,7 @@ void BufferFilter::maybeAddContentLength() {
   // request_headers_ is initialized iff plugin is enabled.
   if (request_headers_ != nullptr && request_headers_->ContentLength() == nullptr) {
     ASSERT(!settings_->disabled());
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.buffer_filter_populate_content_length")) {
-      request_headers_->setContentLength(content_length_);
-    }
+    request_headers_->setContentLength(content_length_);
   }
 }
 

@@ -118,7 +118,7 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
 
 // TODO(fredlas) to be removed from the GrpcMux interface very soon.
 GrpcMuxWatchPtr NewGrpcMuxImpl::subscribe(const std::string&, const std::set<std::string>&,
-                                          GrpcMuxCallbacks&) {
+                                          SubscriptionCallbacks&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 

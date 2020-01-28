@@ -4,7 +4,8 @@
   issues are taken care of automatically. The CircleCI tests will automatically check
   the code format and fail. There are make targets that can both check the format
   (check_format) as well as fix the code format for you (fix_format). Errors in
-  .clang-tidy are enforced while other warnings are suggestions.
+  .clang-tidy are enforced while other warnings are suggestions. Note that code and
+  comment blocks designated `clang-format off` must be closed with `clang-format on`.
   To run these checks locally, see [Support Tools](support/README.md).
 * Beyond code formatting, for the most part Envoy uses the
   [Google C++ style guidelines](https://google.github.io/styleguide/cppguide.html).
