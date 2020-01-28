@@ -31,6 +31,12 @@ using Envoy::Config::ConfigProviderPtr;
 
 namespace Envoy {
 namespace Router {
+namespace {
+
+// GRPC error message is sent back via trailers, which by default has a 8KiB size limit.
+constexpr uint32_t kMaxErrMsgLen = 6 * 1024;
+
+} // namespace
 namespace ScopedRoutesConfigProviderUtil {
 ConfigProviderPtr create(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -138,6 +144,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
   absl::flat_hash_set<std::string> unique_resource_names;
+  uint32_t total_err_msg_len = 0;
   for (const auto& resource : resources) {
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config;
     try {
@@ -181,7 +188,12 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       ENVOY_LOG(debug, "srds: add/update scoped_route '{}', version: {}",
                 scoped_route_info->scopeName(), version_info);
     } catch (const EnvoyException& e) {
-      exception_msgs.emplace_back(absl::StrCat("", e.what()));
+      ENVOY_LOG_MISC(warn, "add or update scope {} failed {} ", resource.name(), e.what());
+      if (total_err_msg_len < kMaxErrMsgLen) {
+        absl::string_view err_msg = e.what();
+        exception_msgs.emplace_back(err_msg.substr(0, kMaxErrMsgLen - total_err_msg_len));
+        total_err_msg_len += err_msg.length();
+      }
     }
   }
   return any_applied;
