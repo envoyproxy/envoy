@@ -66,14 +66,14 @@ StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3::StringMatch
   if (matcher.match_pattern_case() ==
       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
     if (matcher.ignore_case()) {
-      PANIC("ignore_case has no effect for regex.");
+      throw EnvoyException("ignore_case has no effect for regex.");
     }
     regex_ =
         Regex::Utility::parseStdRegexAsCompiledMatcher(matcher_.hidden_envoy_deprecated_regex());
   } else if (matcher.match_pattern_case() ==
              envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
     if (matcher.ignore_case()) {
-      PANIC("ignore_case has no effect for safe_regex.");
+      throw EnvoyException("ignore_case has no effect for safe_regex.");
     }
     regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
   }

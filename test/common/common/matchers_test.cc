@@ -1,3 +1,4 @@
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -6,6 +7,8 @@
 #include "common/common/matchers.h"
 #include "common/config/metadata.h"
 #include "common/protobuf/protobuf.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -310,6 +313,15 @@ TEST(StringMatcher, SafeRegexValue) {
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("foo"));
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("foobar"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("bar"));
+}
+
+TEST(StringMatcher, SafeRegexValueIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_ignore_case(true);
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex("foo");
+  EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
+                            "ignore_case has no effect for safe_regex.");
 }
 
 TEST(LowerCaseStringMatcher, MatchExactValue) {
