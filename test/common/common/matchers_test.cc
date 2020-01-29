@@ -263,9 +263,14 @@ TEST(StringMatcher, ExactMatchIgnoreCase) {
   matcher.set_exact("exact");
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("exact"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("EXACT"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("exacz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
   matcher.set_ignore_case(true);
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("exact"));
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("EXACT"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("exacz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
 }
 
 TEST(StringMatcher, PrefixMatchIgnoreCase) {
@@ -273,9 +278,14 @@ TEST(StringMatcher, PrefixMatchIgnoreCase) {
   matcher.set_prefix("prefix");
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("prefix-abc"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("PREFIX-ABC"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("prefiz-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
   matcher.set_ignore_case(true);
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("prefix-abc"));
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("PREFIX-ABC"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("prefiz-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
 }
 
 TEST(StringMatcher, SuffixMatchIgnoreCase) {
@@ -283,9 +293,14 @@ TEST(StringMatcher, SuffixMatchIgnoreCase) {
   matcher.set_suffix("suffix");
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("abc-suffix"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("ABC-SUFFIX"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("abc-suffiz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
   matcher.set_ignore_case(true);
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("abc-suffix"));
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("ABC-SUFFIX"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("abc-suffiz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
 }
 
 TEST(StringMatcher, SafeRegexValue) {
