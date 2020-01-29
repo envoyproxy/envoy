@@ -103,13 +103,12 @@ void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const std::set<std::string>& resources,
-                                         SubscriptionCallbacks& callbacks,
-                                         std::chrono::milliseconds init_fetch_timeout) {
+                                         SubscriptionCallbacks& callbacks) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url, init_fetch_timeout);
-    return addWatch(type_url, resources, callbacks, init_fetch_timeout);
+    addSubscription(type_url);
+    return addWatch(type_url, resources, callbacks);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks);
@@ -143,10 +142,8 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
-                                     std::chrono::milliseconds init_fetch_timeout) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, init_fetch_timeout,
-                                                                       dispatcher_, local_info_));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url) {
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_));
   subscription_ordering_.emplace_back(type_url);
 }
 
