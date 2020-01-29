@@ -1,17 +1,13 @@
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-load(
-    "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
-)
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
 
 envoy_package()
 
-envoy_extension_cc_test(
+# TODO(toddmgreer) Change to envoy_extension_cc_test when adding the full filter.
+envoy_cc_test(
     name = "http_cache_utils_test",
     srcs = ["http_cache_utils_test.cc"],
-    extension_name = "envoy.filters.http.cache",
     deps = [
         "//include/envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
