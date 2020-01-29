@@ -58,6 +58,7 @@ DFATAL
 DGRAM
 DLOG
 DNS
+DQUOTE
 DRYs
 DS
 DST
@@ -121,6 +122,7 @@ HCM
 HDS
 HMAC
 HPACK
+HTAB
 HTML
 HTTP
 HTTPS
@@ -306,6 +308,7 @@ UTF
 UUID
 UUIDs
 VC
+VCHAR
 VH
 VHDS
 VLOG
@@ -354,6 +357,7 @@ args
 argv
 artisanal
 ary
+asctime
 async
 atoi
 atomicity
@@ -561,6 +565,7 @@ filenames
 fileno
 filesystem
 firefox
+fixdate
 fixup
 fld
 fmt
@@ -703,6 +708,7 @@ malloc
 matchable
 matcher
 matchers
+maxage
 maxbuffer
 megamiss
 mem
@@ -849,6 +855,7 @@ pts
 pubkey
 pwd
 py
+qdtext
 qps
 quantile
 quantiles
@@ -1018,6 +1025,8 @@ syscalls
 sysctl
 sz
 tbl
+tchar
+tchars
 tcmalloc
 tcpdump
 teardown
