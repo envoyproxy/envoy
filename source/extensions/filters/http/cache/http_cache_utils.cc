@@ -70,7 +70,7 @@ void Utils::eatDirectiveArgument(absl::string_view& s) {
     return;
   }
   if (s.front() == '"') {
-    // TODO(toddmgreer): handle \-escaped quotes
+    // TODO(#9833): handle \-escaped quotes
     const size_t closing_quote = s.find('"', 1);
     s.remove_prefix(closing_quote);
   } else {
@@ -99,7 +99,7 @@ SystemTime::duration Utils::eatLeadingDuration(absl::string_view& s) {
 // SystemTime::duration::zero(), or is less than the response's, the response
 // should be validated.
 //
-// TODO(toddmgreer): Write a CacheControl class to fully parse the cache-control
+// TODO(#9833): Write a CacheControl class to fully parse the cache-control
 // header value. Consider sharing with the gzip filter.
 SystemTime::duration Utils::effectiveMaxAge(absl::string_view cache_control) {
   // The grammar for This Cache-Control header value should be:
