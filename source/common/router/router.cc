@@ -529,10 +529,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
       // TODO: Add SAN verification here and use it from dynamic_forward_proxy
       // Update filter state with the host/authority to use for setting SNI in the transport
       // socket options. This is referenced during the getConnPool() call below.
-      filterState->setData(
-          Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
-          StreamInfo::FilterState::StateType::Mutable);
+      filterState->setData(Network::UpstreamServerName::key(),
+                           std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+                           StreamInfo::FilterState::StateType::Mutable);
     }
   }
 

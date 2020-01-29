@@ -80,7 +80,7 @@ public:
               (const std::string&, const std::string&, const std::string&));
   MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
-  MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, ());
+  MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
   MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
   MOCK_METHOD(void, setRequestedServerName, (const absl::string_view));
   MOCK_METHOD(const std::string&, requestedServerName, (), (const));
