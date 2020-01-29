@@ -173,6 +173,7 @@ public:
     const std::string NoCache{"no-cache"};
     const std::string NoCacheMaxAge0{"no-cache, max-age=0"};
     const std::string NoTransform{"no-transform"};
+    const std::string Private{"private"};
   } CacheControlValues;
 
   struct {
