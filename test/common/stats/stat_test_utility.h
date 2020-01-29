@@ -109,26 +109,26 @@ public:
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
 
   // New APIs available for tests.
-  OptionalCounter findCounterByString(const std::string& name) const {
+  CounterOptConstRef findCounterByString(const std::string& name) const {
     auto iter = counter_map_.find(name);
     if (iter == counter_map_.end()) {
-      return OptionalCounter();
+      return CounterOptConstRef();
     }
-    return OptionalCounter(*iter->second);
+    return CounterOptConstRef(*iter->second);
   }
-  OptionalGauge findGaugeByString(const std::string& name) const {
+  GaugeOptConstRef findGaugeByString(const std::string& name) const {
     auto iter = gauge_map_.find(name);
     if (iter == gauge_map_.end()) {
-      return OptionalGauge();
+      return GaugeOptConstRef();
     }
-    return OptionalGauge(*iter->second);
+    return GaugeOptConstRef(*iter->second);
   }
-  OptionalHistogram findHistogramByString(const std::string& name) const {
+  HistogramOptConstRef findHistogramByString(const std::string& name) const {
     auto iter = histogram_map_.find(name);
     if (iter == histogram_map_.end()) {
-      return OptionalHistogram();
+      return HistogramOptConstRef();
     }
-    return OptionalHistogram(*iter->second);
+    return HistogramOptConstRef(*iter->second);
   }
 
 private:
