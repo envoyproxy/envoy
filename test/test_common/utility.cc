@@ -137,6 +137,14 @@ void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint6
   buffer.add(str);
 }
 
+Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std::string& name) {
+  return findByName(store.counters(), name);
+}
+
+Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::string& name) {
+  return findByName(store.gauges(), name);
+}
+
 void TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name, uint64_t value,
                                    Event::TestTimeSystem& time_system) {
   while (findCounter(store, name) == nullptr || findCounter(store, name)->value() != value) {

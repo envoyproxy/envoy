@@ -319,44 +319,6 @@ public:
   ~MockIsolatedStatsStore() override;
 
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
-
-#if 0
-  // These overrides are used from production code to populate the store.
-  ScopePtr createScope(const std::string& name) override { return store().createScope(name); }
-  Counter& counterFromStatName(StatName name) override { return store().counterFromStatName(name); }
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    return store().gaugeFromStatName(name, import_mode);
-  }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    return store().histogramFromStatName(name, unit);
-  }
-  NullGaugeImpl& nullGauge(const std::string& name) override { return store().nullGauge(name); }
-  OptionalCounter findCounter(StatName name) const override { return store().findCounter(name); }
-  OptionalGauge findGauge(StatName name) const override { return store().findGauge(name); }
-  OptionalHistogram findHistogram(StatName name) const override {
-    return store().findHistogram(name);
-  }
-  const SymbolTable& constSymbolTable() const override { return store().constSymbolTable(); }
-  SymbolTable& symbolTable() override { return store().symbolTable(); }
-  std::vector<CounterSharedPtr> counters() const override { return store().counters(); }
-  std::vector<GaugeSharedPtr> gauges() const override { return store().gauges(); }
-  std::vector<ParentHistogramSharedPtr> histograms() const override { return store().histograms(); }
-
-  // These overrides are used exclusively from tests to find them.
-  Counter& counter(const std::string& name) override { return test_store_.counter(name); }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
-    return test_store_.gauge(name, import_mode);
-  }
-  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
-    return test_store_.histogram(name, unit);
-  }
-
-private:
-  Store& store() { return test_store_.store(); }
-  const Store& store() const { return test_store_.store(); }
-
-  TestUtil::TestStore test_store_;
-#endif
 };
 
 class MockStatsMatcher : public StatsMatcher {

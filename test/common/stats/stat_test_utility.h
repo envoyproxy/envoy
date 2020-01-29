@@ -75,30 +75,6 @@ private:
   const size_t memory_at_construction_;
 };
 
-/**
- * Find a counter in a stats store.
- * @param store supplies the stats store.
- * @param name supplies the name to search for.
- * @return Stats::CounterSharedPtr the counter or nullptr if there is none.
- */
-CounterSharedPtr findCounter(const Stats::Store& store, const std::string& name);
-
-/**
- * Find a gauge in a stats store.
- * @param store supplies the stats store.
- * @param name supplies the name to search for.
- * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
- */
-GaugeSharedPtr findGauge(const Stats::Store& store, const std::string& name);
-
-/**
- * Find a histogram in a stats store.
- * @param store supplies the stats store.
- * @param name supplies the name to search for.
- * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
- */
-HistogramSharedPtr findHistogram(const Stats::Store& store, const std::string& name);
-
 // Helper class to use in lieu of an actual Stats::Store for doing lookups by
 // name. The intent is to remove the deprecated Scope::counter(const
 // std::string&) methods, and always use this class for accessing stats by
@@ -108,79 +84,57 @@ HistogramSharedPtr findHistogram(const Stats::Store& store, const std::string& n
 // representation, StatName, has multiple ways to represent the same string,
 // depending on which name segments are symbolic (known at compile time), and
 // which are dynamic (e.g. based on the request, e.g. request-headers, ssl
-// cipher, grpc method, etc). We need to do name-matching based only on strings
-// to avoid having the tests know which segments are dynamic.
-//
-// Note that this class does not implement the of Stats::Store interface, but
-// provides similar methods used for lookup by name, as well as an accessor
-// to the underlying store.
+// cipher, grpc method, etc). While the production Store implementations
+// use the StatName as a key, we must use strings in tests to avoid forcing
+// the tests to construct the StatName using the same pattern of dynamic
+// and symbol strings as production.
 class TestStore : public IsolatedStoreImpl {
 public:
-  // Constructs a TestStore with an owned IsolatedStoreImpl. This is useful
-  // for replacing the IsolatedStoreImpl in a unit-test with this class, with
-  // minimal code changes, other than accessing the underlying store with
-  // ".store()".
-  TestStore() {}//: owned_storage_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_storage_) {}
+  TestStore() {}
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
   explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
-  //: owned_storage_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_storage_) {
-  //}
 
-  // Constructs a TestStore with an already-existing
-  // IsolatedStatStoreImpl. This is useful when a test is built using a mock
-  // store, or we are referencing the local store held in an Upstream.
-  //explicit TestStore(Store& store) : store_(store) {}
-
+  // Override the Stats::Store methods for name-based lookup of stats, to use
+  // and update the string-maps in this class. Note that IsolatedStoreImpl
+  // does not support deletion of stats, so we only have to track additions
+  // to keep the maps up-to-date.
+  //
+  // Stats::Scope
   Counter& counter(const std::string& name) override;
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override;
+  Counter& counterFromStatName(StatName name) override;
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
 
+  // New APIs available for tests.
   OptionalCounter findCounterByString(const std::string& name) const {
-    CounterSharedPtr counter = TestUtil::findCounter(*this, name);
-    return counter == nullptr ? OptionalCounter() : *counter;
+    auto iter = counter_map_.find(name);
+    if (iter == counter_map_.end()) {
+      return OptionalCounter();
+    }
+    return OptionalCounter(*iter->second);
   }
   OptionalGauge findGaugeByString(const std::string& name) const {
-    GaugeSharedPtr gauge = TestUtil::findGauge(*this, name);
-    return gauge == nullptr ? OptionalGauge() : *gauge;
+    auto iter = gauge_map_.find(name);
+    if (iter == gauge_map_.end()) {
+      return OptionalGauge();
+    }
+    return OptionalGauge(*iter->second);
   }
   OptionalHistogram findHistogramByString(const std::string& name) const {
-    HistogramSharedPtr histogram = TestUtil::findHistogram(*this, name);
-    return histogram == nullptr ? OptionalHistogram() : *histogram;
+    auto iter = histogram_map_.find(name);
+    if (iter == histogram_map_.end()) {
+      return OptionalHistogram();
+    }
+    return OptionalHistogram(*iter->second);
   }
 
-  /*
-  OptionalCounter findCounter(StatName name) const override { return store_.findCounter(name); }
-  OptionalGauge findGauge(StatName name) const override { return store_.findGauge(name); }
-  OptionalHistogram findHistogram(StatName name) const override {
-    return store_.findHistogram(name);
-  }
-
-  //Store& store() { return store_; }
-  //const Store& store() const { return store_; }
-
-  ScopePtr createScope(const std::string& name) override { return store_.createScope(name); }
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    return store_.deliverHistogramToSinks(histogram, value);
-  }
-  Counter& counterFromStatName(StatName name) override { return store_.counterFromStatName(name); }
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    return store_.gaugeFromStatName(name, import_mode);
-  }
-  NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    return store_.histogramFromStatName(name, unit);
-  }
-  const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
-  SymbolTable& symbolTable() override { return store_.symbolTable(); }
-  std::vector<CounterSharedPtr> counters() const override { return store_.counters(); }
-  std::vector<GaugeSharedPtr> gauges() const override { return store_.gauges(); }
-  std::vector<ParentHistogramSharedPtr> histograms() const override { return store_.histograms(); }
-  */
-
-  /*private:
-  StorePtr owned_storage_; // Used for empty constructor.
-  Store& store_;*/
+private:
+  absl::flat_hash_map<std::string, Counter*> counter_map_;
+  absl::flat_hash_map<std::string, Gauge*> gauge_map_;
+  absl::flat_hash_map<std::string, Histogram*> histogram_map_;
 };
 
 // Compares the memory consumed against an exact expected value, but only on

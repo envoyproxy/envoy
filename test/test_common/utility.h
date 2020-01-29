@@ -24,7 +24,6 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/fake_symbol_table_impl.h"
 
-#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
@@ -166,15 +165,27 @@ public:
                                              uint64_t seed = 0);
 
   /**
+   * Finds a stat in a vector with the given name.
+   * @param name the stat name to look for.
+   * @param v the vector of stats.
+   * @return the stat
+   */
+  template <typename T> static T findByName(const std::vector<T>& v, const std::string& name) {
+    auto pos = std::find_if(v.begin(), v.end(),
+                            [&name](const T& stat) -> bool { return stat->name() == name; });
+    if (pos == v.end()) {
+      return nullptr;
+    }
+    return *pos;
+  }
+
+  /**
    * Find a counter in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.
    * @return Stats::CounterSharedPtr the counter or nullptr if there is none.
    */
-  static Stats::CounterSharedPtr findCounter(Stats::Store& store, const std::string& name) {
-    // TODO(jmarantz): remove this indirection and change callers to use underlying function.
-    return Stats::TestUtil::findCounter(store, name);
-  }
+  static Stats::CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
 
   /**
    * Find a gauge in a stats store.
@@ -182,9 +193,7 @@ public:
    * @param name supplies the name to search for.
    * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
    */
-  static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name) {
-    return Stats::TestUtil::findGauge(store, name);
-  }
+  static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
    * Wait till Counter value is equal to the passed ion value.

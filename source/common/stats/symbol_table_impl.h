@@ -583,6 +583,11 @@ private:
  *   StatNameDynamicPool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
+ *
+ * Note; StatNameDynamicPool::add("foo") != StatNamePool::add("foo"), even
+ * though their string representations are identical. They also will not match
+ * in map lookups. Tests for StatName with dynamic components must therefore
+ * be looked up by string, via Stats::TestUtil::TestStore.
  */
 class StatNameDynamicPool {
 public:

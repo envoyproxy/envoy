@@ -116,7 +116,6 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
-        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
