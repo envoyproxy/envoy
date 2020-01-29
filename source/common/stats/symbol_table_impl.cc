@@ -1,8 +1,8 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 #include "common/common/assert.h"
@@ -40,20 +40,23 @@ uint64_t StatName::dataSize() const {
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
+  // TODO(jmarantz): capture this functionality (always prints regardless of
+  // loglevel) in an ENVOY_LOG macro variant or similar, perhaps
+  // ENVOY_LOG_MISC(stderr, ...);
   if (size_and_data_ == nullptr) {
-    ENVOY_LOG_MISC(info, "Null StatName");
+    std::cerr << "Null StatName" << std::endl;
   } else {
     const uint64_t nbytes = dataSize();
-    std::string msg = absl::StrCat("dataSize=", nbytes, ":");
+    std::cerr << "dataSize=" << nbytes << ":";
     for (uint64_t i = 0; i < nbytes; ++i) {
-      absl::StrAppend(&msg, " ", static_cast<uint64_t>(data()[i]));
+      std::cerr << " " << static_cast<uint64_t>(data()[i]);
     }
     const SymbolVec encoding = SymbolTableImpl::Encoding::decodeSymbols(data(), dataSize());
-    absl::StrAppend(&msg, ", numSymbols=", encoding.size(), ":");
+    std::cerr << ", numSymbols=" << encoding.size() << ":";
     for (Symbol symbol : encoding) {
-      absl::StrAppend(&msg, " ", symbol);
+      std::cerr << " " << symbol;
     }
-    ENVOY_LOG_MISC(info, "{}", msg);
+    std::cerr << std::endl;
   }
 }
 #endif
@@ -524,26 +527,24 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   return mem_block.release();
 }
 
-void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_names,
-                                   StatNameList& list) {
+void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names, StatNameList& list) {
   RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
   // First encode all the names.
   size_t total_size_bytes = 1; /* one byte for holding the number of names */
 
-  absl::FixedArray<Encoding> encodings(num_names);
   for (uint32_t i = 0; i < num_names; ++i) {
-    Encoding& encoding = encodings[i];
-    addTokensToEncoding(names[i], encoding);
-    total_size_bytes += encoding.bytesRequired();
+    total_size_bytes += names[i].size();
   }
 
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
   MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
   mem_block.appendOne(num_names);
-  for (auto& encoding : encodings) {
-    encoding.moveToMemBlock(mem_block);
+  for (uint32_t i = 0; i < num_names; ++i) {
+    const StatName stat_name = names[i];
+    incRefCount(stat_name);
+    mem_block.appendData(absl::MakeSpan(stat_name.sizeAndData(), stat_name.size()));
   }
 
   // This assertion double-checks the arithmetic where we computed

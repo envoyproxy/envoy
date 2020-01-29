@@ -78,7 +78,7 @@ MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
 }
 MockStore::~MockStore() = default;
 
-MockIsolatedStatsStore::MockIsolatedStatsStore() : IsolatedStoreImpl(*global_symbol_table_) {}
+MockIsolatedStatsStore::MockIsolatedStatsStore() : TestUtil::TestStore(*global_symbol_table_) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() = default;
 
 MockStatsMatcher::MockStatsMatcher() = default;

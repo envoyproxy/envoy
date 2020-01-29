@@ -20,6 +20,7 @@
 #include "test/extensions/filters/http/fault/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -138,7 +139,7 @@ public:
   void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
                                 const Router::RouteSpecificFilterConfig* vhost_fault);
 
-  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;

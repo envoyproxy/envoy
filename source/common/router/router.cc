@@ -521,15 +521,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
   if (upstream_http_protocol_options.has_value()) {
-    const auto host_str = headers.Host()->value().getStringView();
-    const auto parsed_authority = Http::Utility::parseAuthority(host_str);
-    if (!parsed_authority.is_ip_address_) {
-      if (upstream_http_protocol_options.value().auto_sni()) {
-        callbacks_->streamInfo().filterState().setData(
-            Network::UpstreamServerName::key(),
-            std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
-            StreamInfo::FilterState::StateType::Mutable);
-      }
+    const auto parsed_authority =
+        Http::Utility::parseAuthority(headers.Host()->value().getStringView());
+    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
+      callbacks_->streamInfo().filterState().setData(
+          Network::UpstreamServerName::key(),
+          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::StateType::Mutable);
     }
 
     if (upstream_http_protocol_options.value().auto_san_validation()) {
@@ -627,7 +625,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   return Http::FilterHeadersStatus::StopIteration;
-}
+} // namespace Router
 
 Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
