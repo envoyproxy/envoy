@@ -258,6 +258,36 @@ TEST(MetadataTest, MatchDoubleListValue) {
   metadataValue.Clear();
 }
 
+TEST(StringMatcher, ExactMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("exact");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("exact"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("EXACT"));
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("exact"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("EXACT"));
+}
+
+TEST(StringMatcher, PrefixMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix("prefix");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("prefix-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("PREFIX-ABC"));
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("prefix-abc"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("PREFIX-ABC"));
+}
+
+TEST(StringMatcher, SuffixMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_suffix("suffix");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("abc-suffix"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("ABC-SUFFIX"));
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("abc-suffix"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("ABC-SUFFIX"));
+}
+
 TEST(StringMatcher, SafeRegexValue) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.mutable_safe_regex()->mutable_google_re2();

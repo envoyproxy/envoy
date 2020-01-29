@@ -16,7 +16,7 @@ option java_multiple_files = true;
 // [#protodoc-title: String matcher]
 
 // Specifies the way to match a string.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message StringMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.StringMatcher";
 
@@ -53,6 +53,11 @@ message StringMatcher {
     // The input string must match the regular expression specified here.
     RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];
   }
+
+  // If true, indicates the exact/prefix/suffix matching should be case insensitive. This has no
+  // effect for the safe_regex match.
+  // For example, the matcher *data* will match both input string *Data* and *data* if set to true.
+  bool ignore_case = 6;
 }
 
 // Specifies a list of ways to match a string.
