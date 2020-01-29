@@ -13,9 +13,8 @@ Deprecated items below are listed in chronological order.
 1.14.0 (Pending)
 ================
 * The previous behavior for upstream connection pool circuit breaking described
-  `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>` has
-  been deprecated in favor of the new behavior described
-  `here <https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/circuit_breaking>`.
+  `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_ has
+  been deprecated in favor of the new behavior described :ref:`here <arch_overview_circuit_break>`.
 
 1.13.0 (January 20, 2020)
 =========================

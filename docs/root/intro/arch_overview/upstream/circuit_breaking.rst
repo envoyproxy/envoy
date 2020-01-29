@@ -3,14 +3,6 @@
 Circuit breaking
 ================
 
-.. attention::
-
-  Circuit breaking behavior changed in version 1.14. If the previous behavior (documented `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_
-  is needed, disable runtime feature "envoy.reloadable_features.new_http1_connection_pool_behavior" or
-  "envoy.reloadable_features.new_http2_connection_pool_behavior" and then re-configure your clusters or
-  restart Envoy. Note that the old behavior is deprecated and will be removed according to the deprecation
-  policy.
-
 Circuit breaking is a critical component of distributed systems. It’s nearly always better to fail
 quickly and apply back pressure downstream as soon as possible. One of the main benefits of an Envoy
 mesh is that Envoy enforces circuit breaking limits at the network level as opposed to having to
