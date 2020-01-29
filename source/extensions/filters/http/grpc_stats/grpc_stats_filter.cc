@@ -81,10 +81,12 @@ public:
     if (filter_object_ == nullptr) {
       auto state = std::make_unique<GrpcStatsObject>();
       filter_object_ = state.get();
-      decoder_callbacks_->streamInfo().filterState().setData(
-          HttpFilterNames::get().GrpcStats, std::move(state),
-          StreamInfo::FilterState::StateType::Mutable,
-          StreamInfo::FilterState::LifeSpan::FilterChain);
+      if (decoder_callbacks_->streamInfo().filterState()) {
+        decoder_callbacks_->streamInfo().filterState()->setData(
+            HttpFilterNames::get().GrpcStats, std::move(state),
+            StreamInfo::FilterState::StateType::Mutable,
+            StreamInfo::FilterState::LifeSpan::FilterChain);
+      }
     }
     filter_object_->request_message_count = request_counter_.frameCount();
     filter_object_->response_message_count = response_counter_.frameCount();

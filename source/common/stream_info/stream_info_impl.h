@@ -19,14 +19,12 @@ struct StreamInfoImpl : public StreamInfo {
   StreamInfoImpl(TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()),
-        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
-        upstream_filter_state_(nullptr) {}
+        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
-        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
-        upstream_filter_state_(nullptr) {}
+        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
                  std::shared_ptr<FilterState>& parent_filter_state)
@@ -35,8 +33,7 @@ struct StreamInfoImpl : public StreamInfo {
         filter_state_(std::make_shared<FilterStateImpl>(
             FilterStateImpl::LazyCreateAncestor(parent_filter_state,
                                                 FilterState::LifeSpan::DownstreamConnection),
-            FilterState::LifeSpan::FilterChain)),
-        upstream_filter_state_(nullptr) {}
+            FilterState::LifeSpan::FilterChain)) {}
 
   SystemTime startTime() const override { return start_time_; }
 
@@ -219,13 +216,13 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  FilterState& filterState() override { return *filter_state_; }
+  const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
-  std::shared_ptr<FilterState> filterStatePtr() override { return filter_state_; }
 
-  std::shared_ptr<FilterState> upstreamFilterState() override { return upstream_filter_state_; }
-  const FilterState* upstreamFilterState() const override { return upstream_filter_state_.get(); }
-  void setUpstreamFilterState(std::shared_ptr<FilterState> filter_state) override {
+  const FilterStateSharedPtr& upstreamFilterState() const override {
+    return upstream_filter_state_;
+  }
+  void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) override {
     upstream_filter_state_ = filter_state;
   }
 
@@ -271,8 +268,8 @@ struct StreamInfoImpl : public StreamInfo {
   bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
-  std::shared_ptr<FilterStateImpl> filter_state_;
-  std::shared_ptr<FilterState> upstream_filter_state_;
+  FilterStateSharedPtr filter_state_{};
+  FilterStateSharedPtr upstream_filter_state_{};
   std::string route_name_;
 
 private:

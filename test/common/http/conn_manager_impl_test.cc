@@ -5117,15 +5117,15 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
     InSequence s;
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
-          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+          decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_filter_chain", std::make_unique<SimpleType>(1),
               StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::FilterChain);
-          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+          decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_request", std::make_unique<SimpleType>(2),
               StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::DownstreamRequest);
-          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+          decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_connection", std::make_unique<SimpleType>(3),
               StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::DownstreamConnection);
@@ -5134,26 +5134,26 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
           EXPECT_FALSE(
-              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_filter_chain"));
           EXPECT_TRUE(
-              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_request"));
           EXPECT_TRUE(
-              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
           return FilterHeadersStatus::StopIteration;
         }));
     EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
         .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
           EXPECT_FALSE(
-              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_filter_chain"));
           EXPECT_FALSE(
-              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_request"));
           EXPECT_TRUE(
-              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
           return FilterHeadersStatus::StopIteration;
         }));

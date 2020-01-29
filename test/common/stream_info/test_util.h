@@ -174,8 +174,16 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const Envoy::StreamInfo::FilterState& filterState() const override { return filter_state_; }
-  Envoy::StreamInfo::FilterState& filterState() override { return filter_state_; }
+  const Envoy::StreamInfo::FilterStateSharedPtr& filterState() override { return filter_state_; }
+  const Envoy::StreamInfo::FilterState& filterState() const override { return *filter_state_; }
+
+  const Envoy::StreamInfo::FilterStateSharedPtr& upstreamFilterState() const override {
+    return upstream_filter_state_;
+  }
+  void
+  setUpstreamFilterState(const Envoy::StreamInfo::FilterStateSharedPtr& filter_state) override {
+    upstream_filter_state_ = filter_state;
+  }
 
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
@@ -224,7 +232,9 @@ public:
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
-  Envoy::StreamInfo::FilterStateImpl filter_state_;
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state_{new Envoy::StreamInfo::FilterStateImpl(
+      Envoy::StreamInfo::FilterState::LifeSpan::FilterChain)};
+  Envoy::StreamInfo::FilterStateSharedPtr upstream_filter_state_{nullptr};
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
