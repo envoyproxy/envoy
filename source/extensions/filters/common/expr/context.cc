@@ -143,10 +143,9 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   } else if (value == Flags) {
     return CelValue::CreateInt64(info_.responseFlags());
   } else if (value == GrpcStatus) {
-    ConstSingleton<Http::HeaderMapImpl> empty_headers;
     auto const& optional_status = Grpc::Common::getGrpcStatus(
-        trailers_.value_ ? *trailers_.value_ : empty_headers.get(),
-        headers_.value_ ? *headers_.value_ : empty_headers.get(), info_);
+        trailers_.value_ ? *trailers_.value_ : ConstSingleton<Http::HeaderMapImpl>::get(),
+        headers_.value_ ? *headers_.value_ : ConstSingleton<Http::HeaderMapImpl>::get(), info_);
     if (optional_status.has_value()) {
       return CelValue::CreateInt64(optional_status.value());
     }
