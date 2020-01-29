@@ -150,6 +150,8 @@ public:
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
+  std::string toString(StatName stat_name) { return alloc_.symbolTable().toString(stat_name); }
+
   SymbolTablePtr symbol_table_storage_;
   AllocatorImpl alloc_;
   IsolatedStatsCache<Counter> counters_;
