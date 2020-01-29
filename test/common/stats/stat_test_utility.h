@@ -109,27 +109,9 @@ public:
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
 
   // New APIs available for tests.
-  CounterOptConstRef findCounterByString(const std::string& name) const {
-    auto iter = counter_map_.find(name);
-    if (iter == counter_map_.end()) {
-      return CounterOptConstRef();
-    }
-    return CounterOptConstRef(*iter->second);
-  }
-  GaugeOptConstRef findGaugeByString(const std::string& name) const {
-    auto iter = gauge_map_.find(name);
-    if (iter == gauge_map_.end()) {
-      return GaugeOptConstRef();
-    }
-    return GaugeOptConstRef(*iter->second);
-  }
-  HistogramOptConstRef findHistogramByString(const std::string& name) const {
-    auto iter = histogram_map_.find(name);
-    if (iter == histogram_map_.end()) {
-      return HistogramOptConstRef();
-    }
-    return HistogramOptConstRef(*iter->second);
-  }
+  CounterOptConstRef findCounterByString(const std::string& name) const;
+  GaugeOptConstRef findGaugeByString(const std::string& name) const;
+  HistogramOptConstRef findHistogramByString(const std::string& name) const;
 
 private:
   absl::flat_hash_map<std::string, Counter*> counter_map_;
