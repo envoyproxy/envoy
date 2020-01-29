@@ -100,7 +100,7 @@ TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
   EXPECT_STREQ(NULL, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
 }
 
-TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
+TEST_P(AutoSniIntegrationTest, PassingHostWithoutPort) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const auto response_ =
