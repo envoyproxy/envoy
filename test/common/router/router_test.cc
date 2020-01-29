@@ -23,7 +23,6 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
-#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -91,8 +90,7 @@ class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
-      : stats_(stats_store_), cm_stats_(cm_.thread_local_cluster_.cluster_.info_->stats_store_),
-        http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
+      : http_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
                 ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
                 false, std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_),
@@ -260,9 +258,7 @@ public:
   std::string upstream_zone_{"to_az"};
   envoy::config::core::v3::Locality upstream_locality_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  Stats::TestUtil::TestStore stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  Stats::TestUtil::TestStore cm_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::ConnectionPool::MockCancellable cancellable_;
@@ -735,7 +731,9 @@ TEST_F(RouterTest, NoHost) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ(0U, cm_stats_.counter("upstream_rq_maintenance_mode").value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_maintenance_mode")
+                    .value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(callbacks_.details_, "no_healthy_upstream");
 }
@@ -755,7 +753,9 @@ TEST_F(RouterTest, MaintenanceMode) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_maintenance_mode").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_maintenance_mode")
+                    .value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
                     .counter("upstream_rq_dropped")
@@ -1158,7 +1158,9 @@ TEST_F(RouterTest, UpstreamTimeout) {
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
 
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_timeout").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1357,7 +1359,9 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   per_try_timeout_->invokeCallback();
 
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_per_try_timeout").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
 }
@@ -1444,7 +1448,9 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   response_timeout_->invokeCallback();
 
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_timeout").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
 }
@@ -1783,7 +1789,9 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(204)));
   response_timeout_->invokeCallback();
 
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_timeout").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1829,7 +1837,9 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
   per_try_timeout_->invokeCallback();
 
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_per_try_timeout").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1878,7 +1888,9 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   per_try_timeout_->invokeCallback();
 
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_per_try_timeout").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1931,7 +1943,9 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   per_try_timeout_->invokeCallback();
 
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_per_try_timeout").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -2878,7 +2892,9 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   response_decoder->decodeData(body, true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-  EXPECT_EQ(0U, cm_stats_.counter("upstream_rq_per_try_timeout").value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
 }
 
 TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
@@ -2936,7 +2952,9 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
   EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_));
   Http::HeaderMapPtr continue_headers(new Http::TestHeaderMapImpl{{":status", "100"}});
   response_decoder->decode100ContinueHeaders(std::move(continue_headers));
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_100").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
@@ -3172,10 +3190,18 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 
-  EXPECT_EQ(1U, cm_stats_.counter("retry.upstream_rq_503").value());
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_rq_200").value());
-  EXPECT_EQ(1U, cm_stats_.counter("zone.zone_name.to_az.upstream_rq_200").value());
-  EXPECT_EQ(1U, cm_stats_.counter("zone.zone_name.to_az.upstream_rq_2xx").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("retry.upstream_rq_503")
+                .value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("zone.zone_name.to_az.upstream_rq_200")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("zone.zone_name.to_az.upstream_rq_2xx")
+                    .value());
 }
 
 // Validate gRPC Cancelled response stats are sane when retry is taking effect.
@@ -3426,7 +3452,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
 
   Buffer::OwnedImpl data("1234567890");
   response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_failed_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
@@ -3438,7 +3466,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
 
   Buffer::OwnedImpl data("1234567890");
   response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_failed_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
@@ -3450,7 +3480,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithInvalidLocation) {
 
   Buffer::OwnedImpl data("1234567890");
   response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_failed_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
@@ -3462,7 +3494,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutCompleteRequest) {
 
   Buffer::OwnedImpl data("1234567890");
   response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_failed_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
@@ -3474,7 +3508,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithoutLocation) {
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl data("1234567890");
   response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_failed_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
@@ -3486,7 +3522,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithBody) {
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   Buffer::OwnedImpl data("1234567890");
   response_decoder_->decodeData(data, true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_failed_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
@@ -3496,7 +3534,9 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
   redirect_headers_->setLocation("https://www.foo.com");
   response_decoder_->decodeHeaders(std::move(redirect_headers_), true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_failed_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
 }
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
@@ -3509,7 +3549,9 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_succeeded_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
 
   // In production, the HCM recreateStream would have called this.
   router_.onDestroy();
@@ -3532,7 +3574,9 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(callbacks_, recreateStream()).Times(1).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_internal_redirect_succeeded_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_succeeded_total")
+                    .value());
 
   // In production, the HCM recreateStream would have called this.
   router_.onDestroy();
@@ -3624,11 +3668,18 @@ TEST_F(RouterTest, AltStatName) {
   EXPECT_EQ(1U,
             stats_store_.counter("vhost.fake_vhost.vcluster.fake_virtual_cluster.upstream_rq_200")
                 .value());
-  EXPECT_EQ(1U, cm_stats_.counter("canary.upstream_rq_200").value());
-
-  EXPECT_EQ(1U, cm_stats_.counter("alt_stat.upstream_rq_200").value());
-  EXPECT_EQ(1U, cm_stats_.counter("alt_stat.zone.zone_name.to_az.upstream_rq_200").value());
-  EXPECT_EQ(1U, cm_stats_.counter("alt_stat.zone.zone_name.to_az.upstream_rq_2xx").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
+                .value());
+  EXPECT_EQ(
+      1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("alt_stat.upstream_rq_200")
+              .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("alt_stat.zone.zone_name.to_az.upstream_rq_200")
+                    .value());
 }
 
 TEST_F(RouterTest, Redirect) {
@@ -4493,7 +4544,9 @@ TEST_F(RouterTest, CanaryStatusTrue) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
-  EXPECT_EQ(1U, cm_stats_.counter("canary.upstream_rq_200").value());
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
+                .value());
 }
 
 TEST_F(RouterTest, CanaryStatusFalse) {
@@ -4523,7 +4576,9 @@ TEST_F(RouterTest, CanaryStatusFalse) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
-  EXPECT_FALSE(cm_stats_.findCounter("canary.upstream_rq_200"));
+  EXPECT_EQ(0U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("canary.upstream_rq_200")
+                .value());
 }
 
 TEST_F(RouterTest, AutoHostRewriteEnabled) {
@@ -4694,9 +4749,13 @@ TEST_F(WatermarkTest, DownstreamWatermarks) {
   sendRequest();
 
   stream_callbacks_->onAboveWriteBufferHighWatermark();
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_flow_control_backed_up_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
   stream_callbacks_->onBelowWriteBufferLowWatermark();
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_flow_control_drained_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
+                    .value());
 
   sendResponse();
 }
@@ -4713,12 +4772,16 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
   EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(_));
   watermark_callbacks->onAboveWriteBufferHighWatermark();
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_flow_control_paused_reading_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_paused_reading_total")
+                    .value());
 
   EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(_));
   watermark_callbacks->onBelowWriteBufferLowWatermark();
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_flow_control_resumed_reading_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_resumed_reading_total")
+                    .value());
 
   Buffer::OwnedImpl data;
   EXPECT_CALL(encoder_, getStream()).Times(2).WillRepeatedly(ReturnRef(stream_));
@@ -4734,21 +4797,29 @@ TEST_F(WatermarkTest, FilterWatermarks) {
   // Send 10 bytes of body to fill the 10 byte buffer.
   Buffer::OwnedImpl data("1234567890");
   router_.decodeData(data, false);
-  EXPECT_EQ(0u, cm_stats_.counter("upstream_flow_control_backed_up_total").value());
+  EXPECT_EQ(0u, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
 
   // Send one extra byte. This should cause the buffer to go over the limit and pause downstream
   // data.
   Buffer::OwnedImpl last_byte("!");
   router_.decodeData(last_byte, true);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_flow_control_backed_up_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_backed_up_total")
+                    .value());
 
   // Now set up the downstream connection. The encoder will be given the buffered request body,
   // The mock invocation below drains it, and the buffer will go under the watermark limit again.
-  EXPECT_EQ(0U, cm_stats_.counter("upstream_flow_control_drained_total").value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
+                    .value());
   EXPECT_CALL(encoder_, encodeData(_, true))
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void { data.drain(data.length()); }));
   pool_callbacks_->onPoolReady(encoder_, cm_.conn_pool_.host_, upstream_stream_info_);
-  EXPECT_EQ(1U, cm_stats_.counter("upstream_flow_control_drained_total").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_flow_control_drained_total")
+                    .value());
 
   sendResponse();
 } // namespace Router

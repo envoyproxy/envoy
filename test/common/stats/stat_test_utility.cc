@@ -150,16 +150,42 @@ template <typename T> static T findByName(const std::vector<T>& v, const std::st
   return *pos;
 }
 
-Stats::CounterSharedPtr findCounter(Stats::Store& store, const std::string& name) {
+Stats::CounterSharedPtr findCounter(const Stats::Store& store, const std::string& name) {
   return findByName(store.counters(), name);
 }
 
-Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name) {
+Stats::GaugeSharedPtr findGauge(const Stats::Store& store, const std::string& name) {
   return findByName(store.gauges(), name);
 }
 
-Stats::HistogramSharedPtr findHistogram(Stats::Store& store, const std::string& name) {
+Stats::HistogramSharedPtr findHistogram(const Stats::Store& store, const std::string& name) {
   return findByName(store.histograms(), name);
+}
+
+Counter& TestStore::counter(const std::string& name) {
+  OptionalCounter opt = findCounterByString(name);
+  if (opt) {
+    return const_cast<Counter&>(opt->get());
+  }
+  return IsolatedStoreImpl::counter(name);
+}
+
+Gauge& TestStore::gauge(const std::string& name, Gauge::ImportMode mode) {
+  OptionalGauge opt = findGaugeByString(name);
+  if (opt) {
+    ASSERT(opt->get().importMode() == mode);
+    return const_cast<Gauge&>(opt->get());
+  }
+  return IsolatedStoreImpl::gauge(name, mode);
+}
+
+Histogram& TestStore::histogram(const std::string& name, Histogram::Unit unit) {
+  OptionalHistogram opt = findHistogramByString(name);
+  if (opt) {
+    ASSERT(opt->get().unit() == unit);
+    return const_cast<Histogram&>(opt->get());
+  }
+  return IsolatedStoreImpl::histogram(name, unit);
 }
 
 // TODO(jmarantz): this utility is intended to be used both for unit tests

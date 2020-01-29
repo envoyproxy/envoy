@@ -81,7 +81,7 @@ private:
  * @param name supplies the name to search for.
  * @return Stats::CounterSharedPtr the counter or nullptr if there is none.
  */
-CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
+CounterSharedPtr findCounter(const Stats::Store& store, const std::string& name);
 
 /**
  * Find a gauge in a stats store.
@@ -89,7 +89,7 @@ CounterSharedPtr findCounter(Stats::Store& store, const std::string& name);
  * @param name supplies the name to search for.
  * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
  */
-GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
+GaugeSharedPtr findGauge(const Stats::Store& store, const std::string& name);
 
 /**
  * Find a histogram in a stats store.
@@ -97,7 +97,7 @@ GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
  * @param name supplies the name to search for.
  * @return Stats::GaugeSharedPtr the gauge or nullptr if there is none.
  */
-HistogramSharedPtr findHistogram(Stats::Store& store, const std::string& name);
+HistogramSharedPtr findHistogram(const Stats::Store& store, const std::string& name);
 
 // Helper class to use in lieu of an actual Stats::Store for doing lookups by
 // name. The intent is to remove the deprecated Scope::counter(const
@@ -114,58 +114,73 @@ HistogramSharedPtr findHistogram(Stats::Store& store, const std::string& name);
 // Note that this class does not implement the of Stats::Store interface, but
 // provides similar methods used for lookup by name, as well as an accessor
 // to the underlying store.
-class TestStore {
+class TestStore : public IsolatedStoreImpl {
 public:
   // Constructs a TestStore with an owned IsolatedStoreImpl. This is useful
   // for replacing the IsolatedStoreImpl in a unit-test with this class, with
   // minimal code changes, other than accessing the underlying store with
   // ".store()".
-  TestStore() : owned_storage_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_storage_) {}
+  TestStore() {}//: owned_storage_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_storage_) {}
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
-  explicit TestStore(SymbolTable& symbol_table)
-      : owned_storage_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_storage_) {
-  }
+  explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
+  //: owned_storage_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_storage_) {
+  //}
 
   // Constructs a TestStore with an already-existing
   // IsolatedStatStoreImpl. This is useful when a test is built using a mock
   // store, or we are referencing the local store held in an Upstream.
-  explicit TestStore(Store& store) : store_(store) {}
+  //explicit TestStore(Store& store) : store_(store) {}
 
-  OptionalCounter findCounter(const std::string& name) {
-    CounterSharedPtr counter = TestUtil::findCounter(store_, name);
+  Counter& counter(const std::string& name) override;
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override;
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override;
+
+  OptionalCounter findCounterByString(const std::string& name) const {
+    CounterSharedPtr counter = TestUtil::findCounter(*this, name);
     return counter == nullptr ? OptionalCounter() : *counter;
   }
-  Counter& counter(const std::string& name) {
-    OptionalCounter opt = findCounter(name);
-    RELEASE_ASSERT(opt, absl::StrCat("could not find counter ", name));
-    return const_cast<Counter&>(opt->get());
-  }
-  OptionalGauge findGauge(const std::string& name) {
-    GaugeSharedPtr gauge = TestUtil::findGauge(store_, name);
+  OptionalGauge findGaugeByString(const std::string& name) const {
+    GaugeSharedPtr gauge = TestUtil::findGauge(*this, name);
     return gauge == nullptr ? OptionalGauge() : *gauge;
   }
-  Gauge& gauge(const std::string& name) {
-    OptionalGauge opt = findGauge(name);
-    RELEASE_ASSERT(opt, absl::StrCat("could not find gauge ", name));
-    return const_cast<Gauge&>(opt->get());
-  }
-  OptionalHistogram findHistogram(const std::string& name) {
-    HistogramSharedPtr histogram = TestUtil::findHistogram(store_, name);
+  OptionalHistogram findHistogramByString(const std::string& name) const {
+    HistogramSharedPtr histogram = TestUtil::findHistogram(*this, name);
     return histogram == nullptr ? OptionalHistogram() : *histogram;
   }
-  Histogram& histogram(const std::string& name) {
-    OptionalHistogram opt = findHistogram(name);
-    RELEASE_ASSERT(opt, absl::StrCat("could not find histogram ", name));
-    return const_cast<Histogram&>(opt->get());
+
+  /*
+  OptionalCounter findCounter(StatName name) const override { return store_.findCounter(name); }
+  OptionalGauge findGauge(StatName name) const override { return store_.findGauge(name); }
+  OptionalHistogram findHistogram(StatName name) const override {
+    return store_.findHistogram(name);
   }
 
-  Store& store() { return store_; }
-  const Store& store() const { return store_; }
+  //Store& store() { return store_; }
+  //const Store& store() const { return store_; }
 
-private:
+  ScopePtr createScope(const std::string& name) override { return store_.createScope(name); }
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
+    return store_.deliverHistogramToSinks(histogram, value);
+  }
+  Counter& counterFromStatName(StatName name) override { return store_.counterFromStatName(name); }
+  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+    return store_.gaugeFromStatName(name, import_mode);
+  }
+  NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
+  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+    return store_.histogramFromStatName(name, unit);
+  }
+  const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
+  SymbolTable& symbolTable() override { return store_.symbolTable(); }
+  std::vector<CounterSharedPtr> counters() const override { return store_.counters(); }
+  std::vector<GaugeSharedPtr> gauges() const override { return store_.gauges(); }
+  std::vector<ParentHistogramSharedPtr> histograms() const override { return store_.histograms(); }
+  */
+
+  /*private:
   StorePtr owned_storage_; // Used for empty constructor.
-  Store& store_;
+  Store& store_;*/
 };
 
 // Compares the memory consumed against an exact expected value, but only on

@@ -313,13 +313,14 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : public SymbolTableProvider, public Store {
+class MockIsolatedStatsStore : public SymbolTableProvider, public TestUtil::TestStore {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;
 
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
 
+#if 0
   // These overrides are used from production code to populate the store.
   ScopePtr createScope(const std::string& name) override { return store().createScope(name); }
   Counter& counterFromStatName(StatName name) override { return store().counterFromStatName(name); }
@@ -343,11 +344,11 @@ public:
 
   // These overrides are used exclusively from tests to find them.
   Counter& counter(const std::string& name) override { return test_store_.counter(name); }
-  Gauge& gauge(const std::string& name, Gauge::ImportMode) override {
-    return test_store_.gauge(name);
+  Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
+    return test_store_.gauge(name, import_mode);
   }
-  Histogram& histogram(const std::string& name, Histogram::Unit) override {
-    return test_store_.histogram(name);
+  Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
+    return test_store_.histogram(name, unit);
   }
 
 private:
@@ -355,6 +356,7 @@ private:
   const Store& store() const { return test_store_.store(); }
 
   TestUtil::TestStore test_store_;
+#endif
 };
 
 class MockStatsMatcher : public StatsMatcher {
