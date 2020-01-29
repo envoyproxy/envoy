@@ -521,15 +521,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   if (upstream_http_protocol_options.has_value() &&
       upstream_http_protocol_options.value().auto_sni()) {
-    const auto host_str = headers.Host()->value().getStringView();
-    const auto parsed_authority = Http::Utility::parseAuthority(host_str);
+    const auto parsed_authority =
+        Http::Utility::parseAuthority(headers.Host()->value().getStringView());
     if (!parsed_authority.is_ip_address_) {
       // TODO: Add SAN verification here and use it from dynamic_forward_proxy
       // Update filter state with the host/authority to use for setting SNI in the transport
       // socket options. This is referenced during the getConnPool() call below.
       callbacks_->streamInfo().filterState().setData(
           Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(host_str),
+          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
           StreamInfo::FilterState::StateType::Mutable);
     }
   }
