@@ -174,6 +174,7 @@ public:
    */
   void flushOutput();
 
+  void addToBuffer(absl::string_view data);
   void addCharToBuffer(char c);
   void addIntToBuffer(uint64_t i);
   Buffer::WatermarkBuffer& buffer() { return output_buffer_; }
@@ -315,8 +316,6 @@ private:
   HeaderString current_header_field_;
   HeaderString current_header_value_;
   Buffer::WatermarkBuffer output_buffer_;
-  Buffer::RawSlice reserved_iovec_;
-  char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;

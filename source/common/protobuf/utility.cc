@@ -158,6 +158,53 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   }
 }
 
+// Logs a warning for use of a deprecated field or runtime-overridden use of an
+// otherwise fatal field. Throws a warning on use of a fatal by default field.
+void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_deprecated,
+                           bool proto_annotated_as_disallowed, const std::string& feature_name,
+                           std::string error, const Protobuf::Message& message) {
+// This option is for Envoy builds with --define deprecated_features=disabled
+// The build options CI then verifies that as Envoy developers deprecate fields,
+// that they update canonical configs and unit tests to not use those deprecated
+// fields, by making their use fatal in the build options CI.
+#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+  bool warn_only = false;
+#else
+  bool warn_only = true;
+#endif
+
+  bool warn_default = warn_only;
+  // Allow runtime to be null both to not crash if this is called before server initialization,
+  // and so proto validation works in context where runtime singleton is not set up (e.g.
+  // standalone config validation utilities)
+  if (runtime && proto_annotated_as_deprecated) {
+    // This is set here, rather than above, so that in the absence of a
+    // registry (i.e. test) the default for if a feature is allowed or not is
+    // based on ENVOY_DISABLE_DEPRECATED_FEATURES.
+    warn_only &= !proto_annotated_as_disallowed;
+    warn_default = warn_only;
+    warn_only = runtime->snapshot().deprecatedFeatureEnabled(feature_name, warn_only);
+  }
+  // Note this only checks if the runtime override has an actual effect. It
+  // does not change the logged warning if someone "allows" a deprecated but not
+  // yet fatal field.
+  const bool runtime_overridden = (warn_default == false && warn_only == true);
+
+  std::string with_overridden = fmt::format(
+      error,
+      (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
+  if (warn_only) {
+    ENVOY_LOG_MISC(warn, "{}", with_overridden);
+  } else {
+    const char fatal_error[] =
+        " If continued use of this field is absolutely necessary, see "
+        "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
+        "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
+        "highly discouraged override.";
+    throw ProtoValidationException(with_overridden + fatal_error, message);
+  }
+}
+
 } // namespace
 
 namespace ProtobufPercentHelper {
@@ -341,38 +388,19 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
   if (!enum_value_descriptor->options().deprecated()) {
     return;
   }
-  std::string err = fmt::format(
-      "Using {}deprecated value {} for enum '{}' from file {}. This enum value will be removed "
-      "from Envoy soon{}. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
-      "for details.",
-      (default_value ? "the default now-" : ""), enum_value_descriptor->name(), field->full_name(),
-      filename, (default_value ? " so a non-default value must now be explicitly set" : ""));
-#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
-  bool warn_only = false;
-#else
-  bool warn_only = true;
-#endif
 
-  if (runtime) {
-    // This is set here, rather than above, so that in the absence of a
-    // registry (i.e. unit tests) the default for if a feature is allowed or not is
-    // based on ENVOY_DISABLE_DEPRECATED_FEATURES.
-    warn_only &= !enum_value_descriptor->options().GetExtension(
-        envoy::annotations::disallowed_by_default_enum);
-    warn_only = runtime->snapshot().deprecatedFeatureEnabled(
-        absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()), warn_only);
-  }
-
-  if (warn_only) {
-    ENVOY_LOG_MISC(warn, "{}", err);
-  } else {
-    const char fatal_error[] =
-        " If continued use of this field is absolutely necessary, see "
-        "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
-        "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
-        "highly discouraged override.";
-    throw ProtoValidationException(err + fatal_error, message);
-  }
+  const std::string error =
+      absl::StrCat("Using {}", (default_value ? "the default now-" : ""), "deprecated value ",
+                   enum_value_descriptor->name(), " for enum '", field->full_name(), "' from file ",
+                   filename, ". This enum value will be removed from Envoy soon",
+                   (default_value ? " so a non-default value must now be explicitly set" : ""),
+                   ". Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
+                   "for details.");
+  deprecatedFieldHelper(
+      runtime, true /*deprecated*/,
+      enum_value_descriptor->options().GetExtension(envoy::annotations::disallowed_by_default_enum),
+      absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()), error,
+      message);
 }
 
 void checkForUnexpectedFields(const Protobuf::Message& message,
@@ -413,40 +441,18 @@ void checkForUnexpectedFields(const Protobuf::Message& message,
       continue;
     }
 
-#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
-    bool warn_only = false;
-#else
-    bool warn_only = true;
-#endif
-    // Allow runtime to be null both to not crash if this is called before server initialization,
-    // and so proto validation works in context where runtime singleton is not set up (e.g.
-    // standalone config validation utilities)
-    if (runtime && field->options().deprecated()) {
-      // This is set here, rather than above, so that in the absence of a
-      // registry (i.e. test) the default for if a feature is allowed or not is
-      // based on ENVOY_DISABLE_DEPRECATED_FEATURES.
-      warn_only &= !field->options().GetExtension(envoy::annotations::disallowed_by_default);
-      warn_only = runtime->snapshot().deprecatedFeatureEnabled(
-          absl::StrCat("envoy.deprecated_features:", field->full_name()), warn_only);
-    }
-
     // If this field is deprecated, warn or throw an error.
     if (field->options().deprecated()) {
-      std::string err = fmt::format(
-          "Using deprecated option '{}' from file {}. This configuration will be removed from "
+      const std::string warning = absl::StrCat(
+          "Using {}deprecated option '", field->full_name(), "' from file ", filename,
+          ". This configuration will be removed from "
           "Envoy soon. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
-          "for details.",
-          field->full_name(), filename);
-      if (warn_only) {
-        ENVOY_LOG_MISC(warn, "{}", err);
-      } else {
-        const char fatal_error[] =
-            " If continued use of this field is absolutely necessary, see "
-            "https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime"
-            "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
-            "highly discouraged override.";
-        throw ProtoValidationException(err + fatal_error, message);
-      }
+          "for details.");
+
+      deprecatedFieldHelper(
+          runtime, true /*deprecated*/,
+          field->options().GetExtension(envoy::annotations::disallowed_by_default),
+          absl::StrCat("envoy.deprecated_features:", field->full_name()), warning, message);
     }
 
     // If this is a message, recurse to check for deprecated fields in the sub-message.

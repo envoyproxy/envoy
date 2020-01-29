@@ -195,10 +195,10 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return OptProcessContextRef an optional reference to the
+   * @return ProcessContextOptRef an optional reference to the
    * process context. Will be unset when running in validation mode.
    */
-  virtual OptProcessContextRef processContext() PURE;
+  virtual ProcessContextOptRef processContext() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration

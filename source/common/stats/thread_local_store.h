@@ -182,8 +182,8 @@ public:
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
-  OptionalCounter findCounter(StatName name) const override {
-    OptionalCounter found_counter;
+  CounterOptConstRef findCounter(StatName name) const override {
+    CounterOptConstRef found_counter;
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       found_counter = scope->findCounter(name);
@@ -193,8 +193,8 @@ public:
     }
     return absl::nullopt;
   }
-  OptionalGauge findGauge(StatName name) const override {
-    OptionalGauge found_gauge;
+  GaugeOptConstRef findGauge(StatName name) const override {
+    GaugeOptConstRef found_gauge;
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       found_gauge = scope->findGauge(name);
@@ -204,8 +204,8 @@ public:
     }
     return absl::nullopt;
   }
-  OptionalHistogram findHistogram(StatName name) const override {
-    OptionalHistogram found_histogram;
+  HistogramOptConstRef findHistogram(StatName name) const override {
+    HistogramOptConstRef found_histogram;
     Thread::LockGuard lock(lock_);
     for (ScopeImpl* scope : scopes_) {
       found_histogram = scope->findHistogram(name);
@@ -306,9 +306,9 @@ private:
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.
-    OptionalCounter findCounter(StatName name) const override;
-    OptionalGauge findGauge(StatName name) const override;
-    OptionalHistogram findHistogram(StatName name) const override;
+    CounterOptConstRef findCounter(StatName name) const override;
+    GaugeOptConstRef findGauge(StatName name) const override;
+    HistogramOptConstRef findHistogram(StatName name) const override;
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(Allocator&, StatName name,

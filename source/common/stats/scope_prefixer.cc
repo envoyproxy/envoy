@@ -44,11 +44,13 @@ Histogram& ScopePrefixer::histogramFromStatName(StatName name, Histogram::Unit u
   return scope_.histogramFromStatName(StatName(stat_name_storage.get()), unit);
 }
 
-OptionalCounter ScopePrefixer::findCounter(StatName name) const { return scope_.findCounter(name); }
+CounterOptConstRef ScopePrefixer::findCounter(StatName name) const {
+  return scope_.findCounter(name);
+}
 
-OptionalGauge ScopePrefixer::findGauge(StatName name) const { return scope_.findGauge(name); }
+GaugeOptConstRef ScopePrefixer::findGauge(StatName name) const { return scope_.findGauge(name); }
 
-OptionalHistogram ScopePrefixer::findHistogram(StatName name) const {
+HistogramOptConstRef ScopePrefixer::findHistogram(StatName name) const {
   return scope_.findHistogram(name);
 }
 
