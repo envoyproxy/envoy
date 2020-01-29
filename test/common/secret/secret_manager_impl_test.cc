@@ -387,7 +387,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
   envoy::config::core::v3::ConfigSource config_source;
 
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Stats::IsolatedStoreImpl stats;
@@ -396,18 +396,18 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   Init::TargetHandlePtr init_target_handle;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
 
-  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
-  EXPECT_CALL(factory_context, messageValidationVisitor()).WillOnce(ReturnRef(validation_visitor));
-  EXPECT_CALL(factory_context, scope()).WillOnce(ReturnRef(stats));
-  EXPECT_CALL(factory_context, initManager()).WillOnce(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(secret_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, messageValidationVisitor()).WillOnce(ReturnRef(validation_visitor));
+  EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(init_manager, add(_))
       .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
       }));
 
   auto secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "encryption_key", factory_context);
+      config_source, "encryption_key", secret_context);
 
   const std::string yaml = R"EOF(
 name: "encryption_key"
@@ -420,8 +420,8 @@ generic_secret:
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
   secret_resources.Add()->PackFrom(typed_secret);
   init_target_handle->initialize(init_watcher);
-  factory_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-      secret_resources, "");
+  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(secret_resources,
+                                                                                   "");
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
       *secret_provider->secret());
@@ -612,15 +612,9 @@ dynamic_active_secrets:
   checkConfigDump(TestEnvironment::substitute(updated_once_more_config_dump));
 
   // Add a dynamic generic secret provider.
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
-  EXPECT_CALL(factory_context, scope()).WillOnce(ReturnRef(stats));
-  EXPECT_CALL(factory_context, initManager()).WillOnce(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
-
   time_system_.setSystemTime(std::chrono::milliseconds(1234567900000));
   auto generic_secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "signing_key", factory_context);
+      config_source, "signing_key", secret_context);
 
   const std::string generic_secret_yaml = R"EOF(
 name: "signing_key"
@@ -632,7 +626,7 @@ generic_secret:
   secret_resources.Clear();
   secret_resources.Add()->PackFrom(typed_secret);
   init_target_handle->initialize(init_watcher);
-  factory_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+  secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       secret_resources, "signing-key-v1");
 
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
@@ -786,14 +780,9 @@ dynamic_warming_secrets:
 )EOF";
   checkConfigDump(updated_once_more_config_dump);
 
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
-  EXPECT_CALL(factory_context, scope()).WillOnce(ReturnRef(stats));
-  EXPECT_CALL(factory_context, initManager()).WillOnce(ReturnRef(init_manager));
-  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   time_system_.setSystemTime(std::chrono::milliseconds(1234567900000));
   auto generic_secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "signing_key", factory_context);
+      config_source, "signing_key", secret_context);
   init_target_handle->initialize(init_watcher);
   const std::string config_dump_with_generic_secret = R"EOF(
 dynamic_warming_secrets:

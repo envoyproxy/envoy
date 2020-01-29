@@ -154,7 +154,7 @@ public:
    */
   virtual GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::FactoryContext& secret_provider_context) PURE;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
 
 } // namespace Secret

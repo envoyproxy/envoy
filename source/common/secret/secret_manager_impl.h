@@ -6,7 +6,6 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
-#include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
@@ -66,7 +65,7 @@ public:
 
   GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::FactoryContext& secret_provider_context) override;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
   ProtobufTypes::MessagePtr dumpSecretConfigs();
@@ -77,10 +76,8 @@ private:
     // Finds or creates SdsApi object.
     std::shared_ptr<SecretType>
     findOrCreate(const envoy::config::core::v3::ConfigSource& sds_config_source,
-                 const std::string& config_name, Config::SubscriptionFactory& subscription_factory,
-                 TimeSource& time_source, ProtobufMessage::ValidationVisitor& validation_visitor,
-                 Stats::Scope& stats, Init::Manager& init_manager,
-                 const LocalInfo::LocalInfo& local_info) {
+                 const std::string& config_name,
+                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
       const std::string map_key =
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
 
@@ -91,9 +88,9 @@ private:
         std::function<void()> unregister_secret_provider = [map_key, this]() {
           removeDynamicSecretProvider(map_key);
         };
-        secret_provider = SecretType::create(sds_config_source, config_name, subscription_factory,
-                                             time_source, validation_visitor, stats, init_manager,
-                                             local_info, unregister_secret_provider);
+        ASSERT(secret_provider_context.initManager() != nullptr);
+        secret_provider = SecretType::create(secret_provider_context, sds_config_source,
+                                             config_name, unregister_secret_provider);
         dynamic_secret_providers_[map_key] = secret_provider;
       }
       return secret_provider;

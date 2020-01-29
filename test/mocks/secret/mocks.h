@@ -4,7 +4,6 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_manager.h"
-#include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
@@ -55,7 +54,7 @@ public:
                Server::Configuration::TransportSocketFactoryContext&));
   MOCK_METHOD(GenericSecretConfigProviderSharedPtr, findOrCreateGenericSecretProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
-               Server::Configuration::FactoryContext&));
+               Server::Configuration::TransportSocketFactoryContext&));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {
