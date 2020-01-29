@@ -1,7 +1,5 @@
 #include <string>
 
-#include "common/stats/isolated_store_impl.h"
-
 #include "test/common/stats/stat_test_utility.h"
 
 #include "gtest/gtest.h"
@@ -17,7 +15,6 @@ protected:
         test_store_(*symbol_table_), dynamic_(*symbol_table_), symbolic_(*symbol_table_) {}
 
   SymbolTablePtr symbol_table_;
-  // IsolatedStoreImpl store_;
   TestUtil::TestStore test_store_;
   StatNameDynamicPool dynamic_;
   StatNamePool symbolic_;

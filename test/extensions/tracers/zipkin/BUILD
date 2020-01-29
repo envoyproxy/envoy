@@ -32,7 +32,6 @@ envoy_extension_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/tracers/zipkin:zipkin_lib",
-        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
