@@ -30,6 +30,8 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_authority_validation",
     "envoy.reloadable_features.reject_unsupported_transfer_encodings",
     "envoy.reloadable_features.strict_method_validation",
+    "envoy.reloadable_features.new_http1_connection_pool_behavior",
+    "envoy.reloadable_features.new_http2_connection_pool_behavior",
 };
 
 // This is a section for officially sanctioned runtime features which are too

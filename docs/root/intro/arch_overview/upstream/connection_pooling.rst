@@ -20,9 +20,14 @@ downstream request must be reset if the upstream connection is severed.
 HTTP/2
 ------
 
-The HTTP/2 connection pool acquires a single connection to an upstream host. All requests are
-multiplexed over this connection. If a GOAWAY frame is received or if the connection reaches the
-maximum stream limit, the connection pool will create a new connection and drain the existing one.
+The HTTP/2 connection pool multiplexes multiple requests over a single connection, up to the limits
+imposed by :ref:`max concurrent streams <envoy_api_field_core.Http2ProtocolOptions.max_concurrent_streams>`
+and :ref:`max requests per connection <envoy_api_field_Cluster.max_requests_per_connection>`.
+The HTTP/2 connection pool establishes only as many connections as are needed to serve the current
+requests. With no limits, this will be only a single connection. If a GOAWAY frame is received or
+if the connection reaches the maximum stream limit, the connection pool will drain the existing one.
+New connections are established anytime there is a pending request without a connection that it can
+be dispatched to (up to circuit breaker limits for connections).
 HTTP/2 is the preferred communication protocol as connections rarely if ever get severed.
 
 .. _arch_overview_conn_pool_health_checking:
