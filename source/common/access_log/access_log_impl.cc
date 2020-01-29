@@ -234,7 +234,7 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
   const auto& optional_status =
-      Grpc::Common::getGrpcStatus(&response_trailers, &response_headers, info);
+      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info);
   if (optional_status.has_value()) {
     status = optional_status.value();
   }

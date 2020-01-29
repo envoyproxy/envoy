@@ -63,8 +63,8 @@ public:
    * @return absl::optional<Status::GrpcStatus> the parsed status code or absl::nullopt if no status
    * is found
    */
-  static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap* trailers,
-                                                          const Http::HeaderMap* headers,
+  static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& trailers,
+                                                          const Http::HeaderMap& headers,
                                                           const StreamInfo::StreamInfo& info,
                                                           bool allow_user_defined = false);
 

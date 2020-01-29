@@ -44,18 +44,14 @@ TEST(GrpcContextTest, GetGrpcStatusWithFallbacks) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   EXPECT_CALL(info, responseCode()).WillRepeatedly(testing::Return(404));
 
-  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(&ok_status, &no_status, info).value());
-  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(&ok_status, nullptr, info).value());
+  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(ok_status, no_status, info).value());
 
-  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(&no_status, &ok_status, info).value());
-  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(nullptr, &ok_status, info).value());
+  EXPECT_EQ(Status::Ok, Common::getGrpcStatus(no_status, ok_status, info).value());
 
-  EXPECT_EQ(Status::Unimplemented, Common::getGrpcStatus(&no_status, &no_status, info).value());
-  EXPECT_EQ(Status::Unimplemented, Common::getGrpcStatus(nullptr, nullptr, info).value());
+  EXPECT_EQ(Status::Unimplemented, Common::getGrpcStatus(no_status, no_status, info).value());
 
   NiceMock<StreamInfo::MockStreamInfo> info_without_code;
-  EXPECT_FALSE(Common::getGrpcStatus(&no_status, &no_status, info_without_code));
-  EXPECT_FALSE(Common::getGrpcStatus(nullptr, nullptr, info_without_code));
+  EXPECT_FALSE(Common::getGrpcStatus(no_status, no_status, info_without_code));
 }
 
 TEST(GrpcContextTest, GetGrpcMessage) {
