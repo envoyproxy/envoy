@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.type.matcher.v3;
 
-import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/matcher/v3/struct.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -22,5 +22,5 @@ message NodeMatcher {
   StringMatcher node_id = 1;
 
   // Specifies match criteria on the node metadata.
-  repeated MetadataMatcher node_metadatas = 2;
+  repeated StructMatcher node_metadatas = 2;
 }

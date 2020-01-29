@@ -293,7 +293,7 @@ public:
   MOCK_METHOD(Network::Address::SocketType, socketType, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Network::SocketSharedPtr, getListenSocket, ());
-  MOCK_METHOD(absl::optional<std::reference_wrapper<Socket>>, sharedSocket, (), (const));
+  MOCK_METHOD(SocketOptRef, sharedSocket, (), (const));
 };
 
 class MockListenerConfig : public ListenerConfig {

@@ -437,7 +437,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   }
 
   if (alpn_protocols.size() >= 65535) {
-    throw EnvoyException("invalid ALPN protocol string");
+    throw EnvoyException("Invalid ALPN protocol string");
   }
 
   std::vector<uint8_t> out(alpn_protocols.size() + 1);
@@ -445,7 +445,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   for (size_t i = 0; i <= alpn_protocols.size(); i++) {
     if (i == alpn_protocols.size() || alpn_protocols[i] == ',') {
       if (i - start > 255) {
-        throw EnvoyException("invalid ALPN protocol string");
+        throw EnvoyException("Invalid ALPN protocol string");
       }
 
       out[start] = i - start;
@@ -924,9 +924,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   // Compute the session context ID hash. We use all the certificate identities,
   // since we should have a common ID for session resumption no matter what cert
   // is used.
-  uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
-  unsigned session_context_len = 0;
-  generateHashForSessionContexId(server_names, session_context_buf, session_context_len);
+  const SessionContextID session_id = generateHashForSessionContexId(server_names);
   for (auto& ctx : tls_contexts_) {
     if (config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
@@ -963,15 +961,17 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
       SSL_CTX_set_timeout(ctx.ssl_ctx_.get(), uint32_t(timeout));
     }
 
-    int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf,
-                                            session_context_len);
+    int rc =
+        SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_id.begin(), session_id.size());
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 }
 
-void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::string>& server_names,
-                                                       uint8_t* session_context_buf,
-                                                       unsigned& session_context_len) {
+ServerContextImpl::SessionContextID
+ServerContextImpl::generateHashForSessionContexId(const std::vector<std::string>& server_names) {
+  uint8_t hash_buffer[EVP_MAX_MD_SIZE];
+  unsigned hash_length;
+
   EVP_MD_CTX md;
   int rc = EVP_DigestInit(&md, EVP_sha256());
   RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
@@ -1012,10 +1012,12 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
     }
 
     X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
-    rc =
-        X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
-    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
-    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+    rc = X509_NAME_digest(cert_issuer_name, EVP_sha256(), hash_buffer, &hash_length);
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
+                   fmt::format("invalid SHA256 hash length {}", hash_length));
+
+    rc = EVP_DigestUpdate(&md, hash_buffer, hash_length);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 
@@ -1024,9 +1026,12 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
   // the correct settings, even if session resumption across different listeners
   // is enabled.
   if (ca_cert_ != nullptr) {
-    rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
-    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
-    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
+    rc = X509_digest(ca_cert_.get(), EVP_sha256(), hash_buffer, &hash_length);
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
+                   fmt::format("invalid SHA256 hash length {}", hash_length));
+
+    rc = EVP_DigestUpdate(&md, hash_buffer, hash_length);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
     // verify_subject_alt_name_list_ can only be set with a ca_cert
@@ -1057,8 +1062,19 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 
-  rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
+  SessionContextID session_id;
+
+  // Ensure that the output size of the hash we are using is no greater than
+  // TLS session ID length that we want to generate.
+  static_assert(session_id.size() == SHA256_DIGEST_LENGTH, "hash size mismatch");
+  static_assert(session_id.size() == SSL_MAX_SSL_SESSION_ID_LENGTH, "TLS session ID size mismatch");
+
+  rc = EVP_DigestFinal(&md, session_id.begin(), &hash_length);
   RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  RELEASE_ASSERT(hash_length == session_id.size(),
+                 "SHA256 hash length must match TLS Session ID size");
+
+  return session_id;
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,

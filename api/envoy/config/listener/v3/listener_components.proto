@@ -4,6 +4,7 @@ package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/range.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -206,6 +207,47 @@ message FilterChain {
   string name = 7;
 }
 
+// [#not-implemented-hide:]
+// Listener filter chain match configuration. This is a recursive structure which allows complex
+// nested match configurations to be built using various logical operators.
+// [#next-free-field: 6]
+message ListenerFilterChainMatchPredicate {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.listener.ListenerFilterChainMatchPredicate";
+
+  // A set of match configurations used for logical operations.
+  message MatchSet {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.listener.ListenerFilterChainMatchPredicate.MatchSet";
+
+    // The list of rules that make up the set.
+    repeated ListenerFilterChainMatchPredicate rules = 1
+        [(validate.rules).repeated = {min_items: 2}];
+  }
+
+  oneof rule {
+    option (validate.required) = true;
+
+    // A set that describes a logical OR. If any member of the set matches, the match configuration
+    // matches.
+    MatchSet or_match = 1;
+
+    // A set that describes a logical AND. If all members of the set match, the match configuration
+    // matches.
+    MatchSet and_match = 2;
+
+    // A negation match. The match configuration will match if the negated match condition matches.
+    ListenerFilterChainMatchPredicate not_match = 3;
+
+    // The match configuration will always match.
+    bool any_match = 4 [(validate.rules).bool = {const: true}];
+
+    // Match destination port. Particularly, the match evaluation must use the recovered local port if
+    // the owning listener filter is after :ref:`an original_dst listener filter <config_listener_filters_original_dst>`.
+    type.v3.Int32Range destination_port_range = 5;
+  }
+}
+
 message ListenerFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.ListenerFilter";
@@ -223,4 +265,18 @@ message ListenerFilter {
   oneof config_type {
     google.protobuf.Any typed_config = 3;
   }
+
+  // [#not-implemented-hide:]
+  // Decide when to disable this listener filter on incoming traffic.
+  // Example:
+  // 0. always enable filter
+  //    don't set `filter_disabled`
+  // 1. disable when the destination port is 3306
+  //    rule.destination_port_range = Int32Range {start = 3306, end = 3307}
+  // 2. disable when the destination port is 3306 or 15000
+  //    rule.or_match = MatchSet.rules [
+  //       rule.destination_port_range = Int32Range {start = 3306, end = 3307},
+  //       rule.destination_port_range = Int32Range {start = 15000, end = 15001},
+  //    ]
+  ListenerFilterChainMatchPredicate filter_disabled = 4;
 }

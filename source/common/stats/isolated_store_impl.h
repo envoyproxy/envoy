@@ -28,6 +28,7 @@ public:
   using CounterAllocator = std::function<RefcountPtr<Base>(StatName name)>;
   using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
   using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
+  using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
   IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
   IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
@@ -79,7 +80,7 @@ public:
 private:
   friend class IsolatedStoreImpl;
 
-  absl::optional<std::reference_wrapper<const Base>> find(StatName name) const {
+  BaseOptConstRef find(StatName name) const {
     auto stat = stats_.find(name);
     if (stat == stats_.end()) {
       return absl::nullopt;
@@ -113,9 +114,11 @@ public:
     Histogram& histogram = histograms_.get(name, unit);
     return histogram;
   }
-  OptionalCounter findCounter(StatName name) const override { return counters_.find(name); }
-  OptionalGauge findGauge(StatName name) const override { return gauges_.find(name); }
-  OptionalHistogram findHistogram(StatName name) const override { return histograms_.find(name); }
+  CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
+  GaugeOptConstRef findGauge(StatName name) const override { return gauges_.find(name); }
+  HistogramOptConstRef findHistogram(StatName name) const override {
+    return histograms_.find(name);
+  }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }

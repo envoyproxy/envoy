@@ -512,15 +512,15 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   return **central_ref;
 }
 
-OptionalCounter ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
+CounterOptConstRef ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
   return findStatLockHeld<Counter>(name, central_cache_->counters_);
 }
 
-OptionalGauge ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
+GaugeOptConstRef ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
   return findStatLockHeld<Gauge>(name, central_cache_->gauges_);
 }
 
-OptionalHistogram ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
+HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
   auto iter = central_cache_->histograms_.find(name);
   if (iter == central_cache_->histograms_.end()) {
     return absl::nullopt;

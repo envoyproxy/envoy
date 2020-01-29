@@ -74,15 +74,13 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
 void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
                                      uint32_t value_size) {
 
-  connection_.reserveBuffer(key_size + value_size + 4);
   ASSERT(key_size > 0);
 
   connection_.copyToBuffer(key, key_size);
   connection_.addCharToBuffer(':');
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(value, value_size);
-  connection_.addCharToBuffer('\r');
-  connection_.addCharToBuffer('\n');
+  connection_.addToBuffer(CRLF);
 }
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   this->encodeHeader(key.data(), key.size(), value.data(), value.size());
@@ -175,9 +173,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
     }
   }
 
-  connection_.reserveBuffer(2);
-  connection_.addCharToBuffer('\r');
-  connection_.addCharToBuffer('\n');
+  connection_.addToBuffer(CRLF);
 
   if (end_stream) {
     endEncode();
@@ -249,49 +245,18 @@ void StreamEncoderImpl::endEncode() {
 }
 
 void ConnectionImpl::flushOutput() {
-  if (reserved_current_) {
-    reserved_iovec_.len_ = reserved_current_ - static_cast<char*>(reserved_iovec_.mem_);
-    output_buffer_.commit(&reserved_iovec_, 1);
-    reserved_current_ = nullptr;
-  }
-
   connection().write(output_buffer_, false);
   ASSERT(0UL == output_buffer_.length());
 }
 
-void ConnectionImpl::addCharToBuffer(char c) {
-  ASSERT(bufferRemainingSize() >= 1);
-  *reserved_current_++ = c;
-}
+void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_.add(data); }
 
-void ConnectionImpl::addIntToBuffer(uint64_t i) {
-  reserved_current_ += StringUtil::itoa(reserved_current_, bufferRemainingSize(), i);
-}
+void ConnectionImpl::addCharToBuffer(char c) { output_buffer_.add(&c, 1); }
 
-uint64_t ConnectionImpl::bufferRemainingSize() {
-  return reserved_iovec_.len_ - (reserved_current_ - static_cast<char*>(reserved_iovec_.mem_));
-}
+void ConnectionImpl::addIntToBuffer(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
 
 void ConnectionImpl::copyToBuffer(const char* data, uint64_t length) {
-  ASSERT(bufferRemainingSize() >= length);
-  memcpy(reserved_current_, data, length);
-  reserved_current_ += length;
-}
-
-void ConnectionImpl::reserveBuffer(uint64_t size) {
-  if (reserved_current_ && bufferRemainingSize() >= size) {
-    return;
-  }
-
-  if (reserved_current_) {
-    reserved_iovec_.len_ = reserved_current_ - static_cast<char*>(reserved_iovec_.mem_);
-    output_buffer_.commit(&reserved_iovec_, 1);
-  }
-
-  // TODO PERF: It would be better to allow a split reservation. That will make fill code more
-  //            complicated.
-  output_buffer_.reserve(std::max<uint64_t>(4096, size), &reserved_iovec_, 1);
-  reserved_current_ = static_cast<char*>(reserved_iovec_.mem_);
+  output_buffer_.add(data, length);
 }
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
@@ -313,7 +278,6 @@ void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end
   started_response_ = true;
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
-  connection_.reserveBuffer(4096);
   if (connection_.protocol() == Protocol::Http10 && connection_.supports_http_10()) {
     connection_.copyToBuffer(HTTP_10_RESPONSE_PREFIX, sizeof(HTTP_10_RESPONSE_PREFIX) - 1);
   } else {
@@ -353,7 +317,6 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
     head_request_ = true;
   }
   connection_.onEncodeHeaders(headers);
-  connection_.reserveBuffer(path->value().size() + method->value().size() + 4096);
   connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
