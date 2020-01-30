@@ -12,6 +12,7 @@
 #include "gtest/gtest.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -53,6 +54,56 @@ rules:
                       {":path", "/path2"},
                   },
                   filter_state) == nullptr);
+}
+
+TEST(HttpJwtAuthnFilterConfigTest, VerifyTLSLifetime) {
+  const char config[] = R"(
+providers:
+  provider1:
+    issuer: issuer1
+    local_jwks:
+      inline_string: jwks
+rules:
+- match:
+    path: /path1
+  requires:
+    provider_name: provider1
+)";
+
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  // make sure that the thread callbacks are not invoked inline.
+  server_context.thread_local_.defer_data = true;
+  void* filter_conf_void;
+  {
+    // scope in all the things that the filter depends on, so they are destroyed as we leave the 
+    // scope.
+    NiceMock<Server::Configuration::MockFactoryContext> context;
+    // the threadLocal, dispatcher and api that are used by the filter config, actually belong to the 
+    // server factory context that who's lifetime is longer. so we return them here.
+    ON_CALL(context, dispatcher()).WillByDefault(ReturnRef(server_context.dispatcher()));
+    ON_CALL(context, api()).WillByDefault(ReturnRef(server_context.api()));
+    ON_CALL(context, threadLocal()).WillByDefault(ReturnRef(server_context.threadLocal()));
+
+    JwtAuthentication proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+    // when api and dispacher are requested provided them from server ctx
+    // capture the tls set
+    std::unique_ptr<FilterConfig> filter_conf(new FilterConfig(proto_config, "", context));
+    filter_conf_void = filter_conf.get();
+  }
+
+  // simulate the heap space being re-claimed. while this is bit hacky,
+  // the test passes otherwise as a false positive.
+  memset(filter_conf_void, 0, sizeof(FilterConfig));
+  
+  // make sure the filter scheduled a callback
+  EXPECT_EQ(1, server_context.thread_local_.deferred_data_.size());
+
+  // Simulate a situation where the callback is called after the filter config is destroyed.
+  // call the tls callback. we want to make sure that it doesn't depend on objects
+  // that are out of scope.
+  EXPECT_NO_THROW(server_context.thread_local_.call());
 }
 
 TEST(HttpJwtAuthnFilterConfigTest, FindByFilterState) {
