@@ -94,6 +94,13 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
   if (!stat_merger_) {
     stat_merger_ = std::make_unique<Stats::StatMerger>(stats_store);
   }
+  auto dynamics = stats_proto.dynamics();
+  for (auto iter : dynamics) {
+    ENVOY_LOG_MISC(error, "dynamic name: {}", iter.first);
+    for (int i = 0; i < iter.second.index_size(); ++i) {
+      ENVOY_LOG_MISC(error, "value: {}", iter.second.index(i));
+    }
+  }
   stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges());
 }
 
