@@ -103,7 +103,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   envoy::config::core::v3::Metadata metadata_;
-  FilterStateSharePtr filter_state_;
+  FilterStateSharedPtr filter_state_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
