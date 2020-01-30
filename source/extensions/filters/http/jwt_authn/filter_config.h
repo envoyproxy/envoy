@@ -77,8 +77,8 @@ public:
     auto& timeSource = context.dispatcher().timeSource();
     auto& api = context.api();
     auto proto_config_copy = proto_config_;
-    tls_->set([proto_config_copy,
-               &timeSource, &api](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    tls_->set([proto_config_copy, &timeSource,
+               &api](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalCache>(proto_config_copy, timeSource, api);
     });
 

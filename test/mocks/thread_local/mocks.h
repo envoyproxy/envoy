@@ -72,7 +72,7 @@ public:
                               main_callback);
     }
 
-    void set(InitializeCb cb) override { 
+    void set(InitializeCb cb) override {
       if (parent_.defer_data) {
         parent_.deferred_data_[index_] = cb;
       } else {

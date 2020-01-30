@@ -70,17 +70,16 @@ rules:
     provider_name: provider1
 )";
 
-
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   // make sure that the thread callbacks are not invoked inline.
   server_context.thread_local_.defer_data = true;
   void* filter_conf_void;
   {
-    // scope in all the things that the filter depends on, so they are destroyed as we leave the 
+    // scope in all the things that the filter depends on, so they are destroyed as we leave the
     // scope.
     NiceMock<Server::Configuration::MockFactoryContext> context;
-    // the threadLocal, dispatcher and api that are used by the filter config, actually belong to the 
-    // server factory context that who's lifetime is longer. so we return them here.
+    // the threadLocal, dispatcher and api that are used by the filter config, actually belong to
+    // the server factory context that who's lifetime is longer. so we return them here.
     ON_CALL(context, dispatcher()).WillByDefault(ReturnRef(server_context.dispatcher()));
     ON_CALL(context, api()).WillByDefault(ReturnRef(server_context.api()));
     ON_CALL(context, threadLocal()).WillByDefault(ReturnRef(server_context.threadLocal()));
@@ -96,7 +95,7 @@ rules:
   // simulate the heap space being re-claimed. while this is bit hacky,
   // the test passes otherwise as a false positive.
   memset(filter_conf_void, 0, sizeof(FilterConfig));
-  
+
   // make sure the filter scheduled a callback
   EXPECT_EQ(1, server_context.thread_local_.deferred_data_.size());
 
