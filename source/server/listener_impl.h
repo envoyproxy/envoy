@@ -42,7 +42,7 @@ public:
   /**
    * @return the socket shared by worker threads; otherwise return null.
    */
-  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+  Network::SocketOptRef sharedSocket() const override {
     if (!reuse_port_) {
       ASSERT(socket_ != nullptr);
       return *socket_;
@@ -176,7 +176,7 @@ public:
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
+  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 

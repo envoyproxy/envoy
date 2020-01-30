@@ -120,8 +120,7 @@ public:
    * @param num_names The number of names.
    * @param symbol_table The symbol table in which to encode the names.
    */
-  virtual void populateList(const absl::string_view* names, uint32_t num_names,
-                            StatNameList& list) PURE;
+  virtual void populateList(const StatName* names, uint32_t num_names, StatNameList& list) PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;

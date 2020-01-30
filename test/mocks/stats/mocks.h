@@ -21,6 +21,7 @@
 #include "common/stats/symbol_table_creator.h"
 #include "common/stats/timespan_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
@@ -289,9 +290,9 @@ public:
   MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
   MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
 
-  MOCK_METHOD(OptionalCounter, findCounter, (StatName), (const));
-  MOCK_METHOD(OptionalGauge, findGauge, (StatName), (const));
-  MOCK_METHOD(OptionalHistogram, findHistogram, (StatName), (const));
+  MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
+  MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
+  MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
 
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));
@@ -312,7 +313,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : public SymbolTableProvider, public IsolatedStoreImpl {
+class MockIsolatedStatsStore : public SymbolTableProvider, public TestUtil::TestStore {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;

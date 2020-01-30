@@ -76,7 +76,7 @@ public:
   domain: foo
   )EOF";
 
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;
   std::unique_ptr<Filter> filter_;

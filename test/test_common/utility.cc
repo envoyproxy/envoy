@@ -272,16 +272,22 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
 }
 
 // static
-bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
-  // Returns true if all gauges are 0 except the circuit_breaker remaining resource
+std::string TestUtility::nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges) {
+  // Returns all gauges that are 0 except the circuit_breaker remaining resource
   // gauges which default to the resource max.
   std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+  std::string non_zero;
   for (const Stats::GaugeSharedPtr& gauge : gauges) {
     if (!std::regex_match(gauge->name(), omitted) && gauge->value() != 0) {
-      return false;
+      non_zero.append(fmt::format("{}: {}; ", gauge->name(), gauge->value()));
     }
   }
-  return true;
+  return non_zero;
+}
+
+// static
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
+  return nonZeroedGauges(gauges).empty();
 }
 
 // static

@@ -83,6 +83,7 @@ The following attributes are exposed to the language runtime:
    response.headers, string map, All response headers
    response.trailers, string map, All response trailers
    response.size, int, Size of the response body
+   response.total_size, int, Total size of the response including the approximate uncompressed size of the headers and the trailers
    response.flags, int, Additional details about the response beyond the standard response code
    source.address, string, Downstream connection remote address
    source.port, int, Downstream connection remote port
