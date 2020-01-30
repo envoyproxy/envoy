@@ -12,7 +12,9 @@ namespace Envoy {
 
 class TestStreamInfo : public StreamInfo::StreamInfo {
 public:
-  TestStreamInfo() : filter_state_(Envoy::StreamInfo::FilterState::LifeSpan::FilterChain) {
+  TestStreamInfo()
+      : filter_state_(std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+            Envoy::StreamInfo::FilterState::LifeSpan::FilterChain)) {
     // Use 1999-01-01 00:00:00 +0
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
@@ -225,7 +227,8 @@ public:
   const Router::RouteEntry* route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateSharedPtr filter_state_{
-      std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)};
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain)};
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
