@@ -156,7 +156,6 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       // For 204s and 1xx where content length is disallowed, don't append the content length but
       // also don't chunk encode.
       if (is_content_length_allowed_) {
-        saw_content_length = true;
         encodeFormattedHeader(Headers::get().ContentLength.get(), "0");
       }
       chunk_encoding_ = false;
@@ -174,13 +173,6 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       // "Transfer-Encoding: chunked" header, but should not send a chunk encoded body.
       chunk_encoding_ = !Utility::isUpgrade(headers) && !is_response_to_head_request_;
     }
-  }
-  // For HTTP/1.0 If the HCM doesn't see a Connection: Keep-Alive in the request, it will add a
-  // Connection: Close to the response. If no Connection: Close is  present and there's a content
-  // length header, add the Keep-Alive.
-  if (connection_.protocol() == Protocol::Http10 && saw_content_length && !headers.Connection()) {
-    encodeFormattedHeader(Headers::get().Connection.get(),
-                          Headers::get().ConnectionValues.KeepAlive);
   }
 
   connection_.reserveBuffer(2);

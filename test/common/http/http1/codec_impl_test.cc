@@ -385,7 +385,6 @@ TEST_F(Http1ServerConnectionImplTest, Http10Absolute) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
-  codec_settings_.accept_http_10_ = true;
   initialize();
 
   Http::MockStreamDecoder decoder;
@@ -407,7 +406,7 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
     ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
     TestHeaderMapImpl headers{{":status", "200"}};
     response_encoder->encodeHeaders(headers, true);
-    EXPECT_EQ("HTTP/1.0 200 OK\r\ncontent-length: 0\r\nconnection: keep-alive\r\n\r\n", output);
+    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
     EXPECT_EQ(Protocol::Http10, codec_->protocol());
   }
 

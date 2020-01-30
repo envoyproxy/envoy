@@ -560,7 +560,6 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndLwsNoContentLength) {
                                 "GET / HTTP/1.0\r\nHost: foo.com \r\nConnection:Keep-alive\r\n\r\n",
                                 &response, true);
   EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
-  EXPECT_THAT(response, Not(HasSubstr("connection: close")));
   EXPECT_THAT(response, Not(HasSubstr("connection: keep-alive")));
   EXPECT_THAT(response, Not(HasSubstr("content-length:")));
   EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
