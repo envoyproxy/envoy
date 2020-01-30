@@ -85,9 +85,20 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:symbol_table_creator_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stat_test_utility_test",
+    srcs = ["stat_test_utility_test.cc"],
+    deps = [
+        ":stat_test_utility_lib",
+        "//source/common/stats:isolated_store_lib",
     ],
 )
 
