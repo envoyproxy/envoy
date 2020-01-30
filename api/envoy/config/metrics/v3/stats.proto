@@ -76,6 +76,10 @@ message StatsConfig {
   // Inclusion/exclusion matcher for stat name creation. If not provided, all stats are instantiated
   // as normal. Preventing the instantiation of certain families of stats can improve memory
   // performance for Envoys running especially large configs.
+  //
+  // .. warning::
+  //   Excluding stats may affect Envoy's behavior in undocumented ways. See
+  //   [issue-9856](https://github.com/envoyproxy/envoy/issues/9856) for more information.
   StatsMatcher stats_matcher = 3;
 }
 
