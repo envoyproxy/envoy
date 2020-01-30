@@ -189,7 +189,14 @@ ClusterFactory::createClusterWithConfig(
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context.singletonManager(), context.dispatcher(), context.tls(), context.stats());
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
-  if (!cluster_config.has_upstream_http_protocol_options()) {
+  if (cluster_config.has_upstream_http_protocol_options()) {
+    if (!cluster_config.upstream_http_protocol_options().auto_sni() ||
+        !cluster_config.upstream_http_protocol_options().auto_san_validation()) {
+      throw EnvoyException(
+          "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true when "
+          "configured with upstream_http_protocol_options");
+    }
+  } else {
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_sni(true);
     cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
   }

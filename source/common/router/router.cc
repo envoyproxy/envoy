@@ -625,7 +625,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   return Http::FilterHeadersStatus::StopIteration;
-} // namespace Router
+}
 
 Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
