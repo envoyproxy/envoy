@@ -68,8 +68,10 @@ public:
         tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
         time_source_(context.dispatcher().timeSource()), api_(context.api()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
-    tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalCache>(proto_config_, time_source_, api_);
+    tls_->set([proto_config_copy = proto_config_,
+               &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<ThreadLocalCache>(proto_config_copy,
+                                                context.dispatcher().timeSource(), context.api());
     });
 
     for (const auto& rule : proto_config_.rules()) {
