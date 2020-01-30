@@ -285,6 +285,8 @@ def _com_github_google_libprotobuf_mutator():
     _repository_impl(
         name = "com_github_google_libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+	patch_args = ["-p1"],
+	patches = ["@envoy//bazel:lpm.patch"],
     )
 
 def _com_github_jbeder_yaml_cpp():

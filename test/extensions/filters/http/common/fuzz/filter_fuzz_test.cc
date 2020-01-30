@@ -138,17 +138,16 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
         Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
     static const auto factories =
         Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::factories();
+    // Choose a valid filter name.
     if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
         std::end(filter_names)) {
       absl::string_view filter_name = filter_names[seed % filter_names.size()];
       input->mutable_config()->set_name(std::string(filter_name));
     }
-    // Set appropriate type_url.
+    // Set the corresponding type_url for Any.
     auto& factory = factories.at(input->config().name());
-    input->mutable_config()->mutable_typed_config()->set_type_url(
-        factory->createEmptyConfigProto()->GetDescriptor()->full_name());
-    // Scrubs away any use of hidden_envoy_deprecated_* for the filter config.
-    Config::VersionUtil::scrubHiddenEnvoyDeprecated(*input->mutable_config());
+    input->mutable_config()->mutable_typed_config()->set_type_url(absl::StrCat(
+        "type.googleapis.com/", factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
   }};
 
   // Fuzz filter.
