@@ -56,7 +56,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: lrs_server
                 port_value: 18000
 cluster_manager:
   load_stats_config:
