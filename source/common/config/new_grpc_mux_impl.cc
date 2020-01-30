@@ -136,8 +136,8 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
 void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   updateWatch(type_url, watch, {});
   auto entry = subscriptions_.find(type_url);
-  RELEASE_ASSERT(entry != subscriptions_.end(),
-                 fmt::format("removeWatch() called for non-existent subscription {}.", type_url));
+  ASSERT(entry != subscriptions_.end(),
+         fmt::format("removeWatch() called for non-existent subscription {}.", type_url));
   entry->second->watch_map_.removeWatch(watch);
 }
 

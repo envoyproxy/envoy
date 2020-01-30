@@ -32,6 +32,10 @@ class GrpcMuxWatch {
 public:
   virtual ~GrpcMuxWatch() = default;
 
+  /**
+   * Updates the set of resources that the watch is interested in.
+   * @param resources set of resource names to watch for
+   */
   virtual void update(const std::set<std::string>& resources) PURE;
 };
 
