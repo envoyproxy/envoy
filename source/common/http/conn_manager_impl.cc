@@ -933,6 +933,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   if (hasCachedRoute() && cached_route_.value()->decorator()) {
     cached_route_.value()->decorator()->apply(*active_span_);
 
+    decorated_propagate_ = cached_route_.value()->decorator()->getPropagate();
+
     // Cache decorated operation.
     if (!cached_route_.value()->decorator()->getOperation().empty()) {
       decorated_operation_ = &cached_route_.value()->decorator()->getOperation();
@@ -941,9 +943,10 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
   if (connection_manager_.config_.tracingConfig()->operation_name_ ==
       Tracing::OperationName::Egress) {
-    // For egress (outbound) requests, pass the decorator's operation name (if defined)
-    // as a request header to enable the receiving service to use it in its server span.
-    if (decorated_operation_) {
+    // For egress (outbound) requests, pass the decorator's operation name (if defined and
+    // propagation enabled) as a request header to enable the receiving service to use it in its
+    // server span.
+    if (decorated_operation_ && decorated_propagate_) {
       request_headers_->setEnvoyDecoratorOperation(*decorated_operation_);
     }
   } else {
@@ -1616,9 +1619,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(HeaderMap& heade
     if (connection_manager_.config_.tracingConfig()->operation_name_ ==
         Tracing::OperationName::Ingress) {
       // For ingress (inbound) responses, if the request headers do not include a
-      // decorator operation (override), then pass the decorator's operation name (if defined)
+      // decorator operation (override), and the decorated operation should be
+      // propagated, then pass the decorator's operation name (if defined)
       // as a response header to enable the client service to use it in its client span.
-      if (decorated_operation_) {
+      if (decorated_operation_ && decorated_propagate_) {
         headers.setEnvoyDecoratorOperation(*decorated_operation_);
       }
     } else if (connection_manager_.config_.tracingConfig()->operation_name_ ==

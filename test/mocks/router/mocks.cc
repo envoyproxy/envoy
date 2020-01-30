@@ -112,6 +112,7 @@ MockConfig::~MockConfig() = default;
 
 MockDecorator::MockDecorator() {
   ON_CALL(*this, getOperation()).WillByDefault(ReturnRef(operation_));
+  ON_CALL(*this, getPropagate()).WillByDefault(Return(true));
 }
 MockDecorator::~MockDecorator() = default;
 
