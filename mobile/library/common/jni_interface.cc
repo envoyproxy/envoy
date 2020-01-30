@@ -214,8 +214,13 @@ static void jvm_on_error(envoy_error error, void* context) {
 }
 
 static void jvm_on_complete(void* context) {
-  JNIEnv* env = nullptr;
-  static_jvm->GetEnv((void**)&env, JNI_VERSION);
+  JNIEnv* env = get_env();
+  jobject j_context = static_cast<jobject>(context);
+  env->DeleteGlobalRef(j_context);
+}
+
+static void jvm_on_cancel(void* context) {
+  JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
   env->DeleteGlobalRef(j_context);
 }
@@ -294,9 +299,9 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 
   // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref
   jobject retained_context = env->NewGlobalRef(j_context);
-  envoy_http_callbacks native_callbacks = {jvm_on_headers,  jvm_on_data,  jvm_on_metadata,
-                                           jvm_on_trailers, jvm_on_error, jvm_on_complete,
-                                           retained_context};
+  envoy_http_callbacks native_callbacks = {jvm_on_headers,  jvm_on_data,     jvm_on_metadata,
+                                           jvm_on_trailers, jvm_on_error,    jvm_on_complete,
+                                           jvm_on_cancel,   retained_context};
   envoy_stream_options stream_options = {buffer_for_retry == JNI_TRUE ? true : false};
   envoy_status_t result =
       start_stream(static_cast<envoy_stream_t>(stream_handle), native_callbacks, stream_options);

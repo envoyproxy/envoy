@@ -3,19 +3,51 @@
  */
 const char* config_template = R"(
 static_resources:
+  listeners:
+  - name: base_api_listener
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    api_listener:
+      api_listener:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        stat_prefix: hcm
+        route_config:
+          name: api_router
+          virtual_hosts:
+            - name: api
+              domains:
+                - "*"
+              routes:
+                - match:
+                    prefix: "/"
+                  route:
+                    cluster_header: x-envoy-mobile-cluster
+        http_filters:
+          - name: envoy.filters.http.dynamic_forward_proxy
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+              dns_cache_config:
+                name: dynamic_forward_proxy_cache_config
+                dns_lookup_family: AUTO
+                dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+          - name: envoy.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
-  - name: base # Note: the direct API depends on the existence of a cluster with this name.
+  - name: base
     connect_timeout: {{ connect_timeout_seconds }}s
-    dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
-    http2_protocol_options: {}
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: base
-      endpoints: &base_endpoints
-        - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address: {address: {{ domain }}, port_value: 443}
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: AUTO
+          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
     transport_socket: &base_transport_socket
       name: envoy.transport_sockets.tls
       typed_config:
@@ -28,33 +60,38 @@ static_resources:
 #include "certificates.inc"
                               R"(
         sni: {{ domain }}
-    type: LOGICAL_DNS
     upstream_connection_options: &upstream_opts
       tcp_keepalive:
         keepalive_interval: 10
         keepalive_probes: 1
         keepalive_time: 5
-  - name: base_wlan # Note: the direct API depends on the existence of a cluster with this name.
-    connect_timeout: {{ connect_timeout_seconds }}s
-    dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
-    http2_protocol_options: {}
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: base_wlan
-      endpoints: *base_endpoints
     transport_socket: *base_transport_socket
-    type: LOGICAL_DNS
     upstream_connection_options: *upstream_opts
-  - name: base_wwan # Note: the direct API depends on the existence of a cluster with this name.
+  - name: base_wlan
     connect_timeout: {{ connect_timeout_seconds }}s
-    dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
-    http2_protocol_options: {}
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: base_wwan
-      endpoints: *base_endpoints
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: AUTO
+          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
     transport_socket: *base_transport_socket
-    type: LOGICAL_DNS
+    upstream_connection_options: *upstream_opts
+  - name: base_wwan
+    connect_timeout: {{ connect_timeout_seconds }}s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: AUTO
+          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+    transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
   - name: stats
     connect_timeout: {{ connect_timeout_seconds }}s

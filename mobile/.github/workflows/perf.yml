@@ -10,7 +10,7 @@ jobs:
   sizecurrent:
     name: size_current
     runs-on: ubuntu-18.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v1
         with:
@@ -26,7 +26,7 @@ jobs:
   sizemaster:
     name: size_master
     runs-on: ubuntu-18.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v1
         with:
@@ -45,7 +45,7 @@ jobs:
     name: size_compare
     needs: [sizecurrent, sizemaster]
     runs-on: ubuntu-18.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v1
       - name: 'Install dependencies'

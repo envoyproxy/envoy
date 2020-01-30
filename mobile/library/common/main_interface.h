@@ -30,6 +30,7 @@ envoy_stream_t init_stream(envoy_engine_t);
  * can occur.
  * @param stream, handle to the stream to be started.
  * @param callbacks, the callbacks that will run the stream callbacks.
+ * @param options, DEPRECATED.
  * @return envoy_stream, with a stream handle and a success status, or a failure status.
  */
 envoy_status_t start_stream(envoy_stream_t, envoy_http_callbacks callbacks,
