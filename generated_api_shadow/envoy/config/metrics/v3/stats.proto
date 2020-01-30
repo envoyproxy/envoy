@@ -77,7 +77,8 @@ message StatsConfig {
   //
   // .. warning::
   //   Excluding stats may affect Envoy's behavior in undocumented ways. See
-  //   [issue-9856](https://github.com/envoyproxy/envoy/issues/9856) for more information.
+  //   `issue #8771 <https://github.com/envoyproxy/envoy/issues/8771>`_ for more information.
+  //   If any unexpected behavior changes are observed, please open a new issue immediately.
   StatsMatcher stats_matcher = 3;
 }
 
