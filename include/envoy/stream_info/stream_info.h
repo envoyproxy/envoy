@@ -483,14 +483,6 @@ public:
   virtual const FilterState& filterState() const PURE;
 
   /**
-   * FilterState object to be shared between upstream and downstream filters.
-   * @param pointer to upstream connections filterstate.
-   * @return pointer to filterstate to be used by upstream connections.
-   */
-  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
-  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
-
-  /**
    * @param SNI value requested.
    */
   virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
