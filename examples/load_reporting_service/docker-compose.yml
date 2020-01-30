@@ -1,0 +1,22 @@
+version: '3'
+services:
+  http_service:
+    build:
+      context: .
+      dockerfile: Dockerfile-http-server
+    volumes:
+      - ./service-envoy-w-lrs.yaml:/etc/service-envoy-w-lrs.yaml
+    ports:
+      - "80:80"
+      - "8081:8081"
+    expose:
+      - "80"
+      - "8081"
+  lrs_server:
+    build:
+      context: .
+      dockerfile: Dockerfile-lrs
+    volumes:
+      - /go/src/github.com/envoyproxy/envoy/examples/load_reporting_service
+    ports:
+      - "18000:18000"
