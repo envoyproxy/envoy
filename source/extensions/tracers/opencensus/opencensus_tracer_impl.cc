@@ -28,6 +28,8 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
+constexpr char kGoogleStackdriverTraceAddress[] = "cloudtrace.googleapis.com";
+
 namespace {
 
 class ConstantValues {
@@ -233,6 +235,23 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& /*config*/, const std::
 
 void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampled", sampled}}); }
 
+std::shared_ptr<grpc::CallCredentials>
+getStackdriverCallCredential(const envoy::config::trace::v3::OpenCensusConfig& oc_config) {
+  const auto& credential = oc_config.stackdriver_call_credentials();
+  grpc::experimental::StsCredentialsOptions options = {
+      credential.sts_service().token_exchange_service_uri(),
+      credential.sts_service().resource(),
+      credential.sts_service().audience(),
+      credential.sts_service().scope(),
+      credential.sts_service().requested_token_type(),
+      credential.sts_service().subject_token_path(),
+      credential.sts_service().subject_token_type(),
+      credential.sts_service().actor_token_path(),
+      credential.sts_service().actor_token_type(),
+  };
+  return grpc::experimental::StsCredentials(options);
+}
+
 } // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
@@ -250,6 +269,14 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
     if (!oc_config.stackdriver_address().empty()) {
       auto channel =
           grpc::CreateChannel(oc_config.stackdriver_address(), grpc::InsecureChannelCredentials());
+      opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
+    } else if (oc_config.has_stackdriver_call_credentials() &&
+               oc_config.stackdriver_call_credentials().has_sts_service()) {
+      // If call credential is provided and is STS service, create a stub with that credential.
+      auto call_creds = getStackdriverCallCredential(oc_config);
+      auto channel_creds =
+          grpc::CompositeChannelCredentials(grpc::GoogleDefaultCredentials(), call_creds);
+      auto channel = grpc::CreateChannel(kGoogleStackdriverTraceAddress, channel_creds);
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     }
     ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));

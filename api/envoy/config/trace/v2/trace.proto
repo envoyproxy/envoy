@@ -142,7 +142,7 @@ message DatadogConfig {
 }
 
 // Configuration for the OpenCensus tracer.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 // [#extension: envoy.tracers.opencensus]
 message OpenCensusConfig {
   enum TraceContext {
@@ -183,6 +183,13 @@ message OpenCensusConfig {
   // to this address, which is in the gRPC format:
   // https://github.com/grpc/grpc/blob/master/doc/naming.md
   string stackdriver_address = 10;
+
+  // (optional) The call credentials used in gRPC call to production Stackdriver.
+  // Currently only :ref:`sts_service <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentails.sts_service>`
+  // is supported by opencensus tracer. If not provided, or the provided option is not
+  // :ref:`sts_service <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.CallCredentails.sts_service>`,
+  // the default Google credential will be used as call credential.
+  api.v2.core.GrpcService.GoogleGrpc.CallCredentials stackdriver_call_credentials = 13;
 
   // Enables the Zipkin exporter if set to true. The url and service name must
   // also be set.
