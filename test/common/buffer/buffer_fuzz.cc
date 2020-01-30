@@ -7,12 +7,12 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/common/stack_array.h"
 #include "common/memory/stats.h"
 #include "common/network/io_socket_handle_impl.h"
 
 #include "test/fuzz/utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 

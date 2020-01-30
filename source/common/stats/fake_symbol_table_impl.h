@@ -50,8 +50,7 @@ namespace Stats {
 class FakeSymbolTableImpl : public SymbolTable {
 public:
   // SymbolTable
-  void populateList(const absl::string_view* names, uint32_t num_names,
-                    StatNameList& list) override {
+  void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override {
     // This implementation of populateList is similar to
     // SymbolTableImpl::populateList. This variant is more efficient for
     // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
@@ -66,8 +65,7 @@ public:
 
     size_t total_size_bytes = 1; /* one byte for holding the number of names */
     for (uint32_t i = 0; i < num_names; ++i) {
-      size_t name_size = names[i].size();
-      total_size_bytes += SymbolTableImpl::Encoding::totalSizeBytes(name_size);
+      total_size_bytes += names[i].size();
     }
 
     // Now allocate the exact number of bytes required and move the encodings
@@ -75,12 +73,8 @@ public:
     MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
     mem_block.appendOne(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
-      absl::string_view name = names[i];
-      const size_t sz = name.size();
-      SymbolTableImpl::Encoding::appendEncoding(sz, mem_block);
-      if (!name.empty()) {
-        mem_block.appendData(absl::MakeSpan(reinterpret_cast<const uint8_t*>(name.data()), sz));
-      }
+      const StatName name = names[i];
+      mem_block.appendData(absl::MakeSpan(name.sizeAndData(), name.size()));
     }
 
     // This assertion double-checks the arithmetic where we computed
