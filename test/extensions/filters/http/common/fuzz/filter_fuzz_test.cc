@@ -38,10 +38,17 @@ public:
               filter_->setDecoderFilterCallbacks(callbacks_);
             }));
     // Ext-authz setup
+    prepareExtAuthz();
+  }
+
+  void prepareExtAuthz() {
+    // Preparing the expectations for the ext_authz filter.
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
     ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
     ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
     ON_CALL(callbacks_, connection()).WillByDefault(testing::Return(&connection_));
+    ON_CALL(callbacks_, activeSpan())
+        .WillByDefault(testing::ReturnRef(Tracing::NullSpan::instance()));
     callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
   }
 
