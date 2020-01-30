@@ -1,0 +1,19 @@
+licenses(["notice"])  # Apache 2
+
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
+
+envoy_package()
+
+envoy_cc_test(
+    name = "dispatcher_integration_test",
+    srcs = ["dispatcher_integration_test.cc"],
+    repository = "@envoy",
+    deps = [
+        "//library/common/http:dispatcher_lib",
+        "//library/common/http:header_utility_lib",
+        "//library/common/types:c_types_lib",
+        "@envoy//test/common/http:common_lib",
+        "@envoy//test/integration:http_integration_lib",
+        "@envoy//test/server:utility_lib",
+    ],
+)
