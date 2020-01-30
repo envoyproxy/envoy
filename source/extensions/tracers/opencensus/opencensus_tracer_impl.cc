@@ -28,7 +28,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
-constexpr char kGoogleStackdriverTraceAddress[] = "cloudtrace.googleapis.com";
+constexpr char GoogleStackdriverTraceAddress[] = "cloudtrace.googleapis.com";
 
 namespace {
 
@@ -276,7 +276,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       auto call_creds = getStackdriverCallCredential(oc_config);
       auto channel_creds =
           grpc::CompositeChannelCredentials(grpc::GoogleDefaultCredentials(), call_creds);
-      auto channel = grpc::CreateChannel(kGoogleStackdriverTraceAddress, channel_creds);
+      auto channel = grpc::CreateChannel(GoogleStackdriverTraceAddress, channel_creds);
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     }
     ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));

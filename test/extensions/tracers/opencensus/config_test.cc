@@ -75,6 +75,46 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
       {32, 32, 128, 32, ::opencensus::trace::ProbabilitySampler(1e-4)});
 }
 
+TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerStackdriverCallCredentials) {
+  NiceMock<Server::MockInstance> server;
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.tracers.opencensus
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
+      trace_config:
+        rate_limiting_sampler:
+          qps: 123
+        max_number_of_attributes: 12
+        max_number_of_annotations: 34
+        max_number_of_message_events: 56
+        max_number_of_links: 78
+      stackdriver_exporter_enabled: true
+      stackdriver_project_id: test_project_id
+      stackdriver_call_credentials:
+        sts_service:
+          token_exchange_service_uri: http://localhost
+          scope: test_scope
+          requested_token_type: test_token_type
+          subject_token_path: test_token_path
+          subject_token_type: test_token_type
+      incoming_trace_context: b3
+      incoming_trace_context: trace_context
+      incoming_trace_context: grpc_trace_bin
+      incoming_trace_context: cloud_trace_context
+      outgoing_trace_context: trace_context
+  )EOF";
+
+  envoy::config::trace::v3::Tracing configuration;
+  TestUtility::loadFromYaml(yaml_string, configuration);
+
+  OpenCensusTracerFactory factory;
+  auto message = Config::Utility::translateToFactoryConfig(
+      configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
+  EXPECT_NE(nullptr, tracer);
+}
+
 TEST(OpenCensusTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<OpenCensusTracerFactory, Server::Configuration::TracerFactory>()),
