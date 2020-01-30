@@ -68,10 +68,17 @@ public:
         tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
         time_source_(context.dispatcher().timeSource()), api_(context.api()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
-    tls_->set([proto_config_copy = proto_config_,
-               &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalCache>(proto_config_copy,
-                                                context.dispatcher().timeSource(), context.api());
+
+    // note: this and context has a a lifetime that may be shorter of the tls callback
+    // rime source and api are from the server context who's lifetime is longer. 
+    // so use them explicitly.
+    // we copy over the proto as we can't guarantee its lifetime otherwise
+    auto& timeSource = context.dispatcher().timeSource();
+    auto& api = context.api();
+    auto proto_config_copy = proto_config_;
+    tls_->set([proto_config_copy,
+               &timeSource, &api](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<ThreadLocalCache>(proto_config_copy, timeSource, api);
     });
 
     for (const auto& rule : proto_config_.rules()) {
