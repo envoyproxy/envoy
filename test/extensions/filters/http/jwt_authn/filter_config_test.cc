@@ -86,8 +86,6 @@ rules:
 
     JwtAuthentication proto_config;
     TestUtility::loadFromYaml(config, proto_config);
-    // when api and dispacher are requested provided them from server ctx
-    // capture the tls set
     std::unique_ptr<FilterConfig> filter_conf(new FilterConfig(proto_config, "", context));
     filter_conf_void = filter_conf.get();
   }
