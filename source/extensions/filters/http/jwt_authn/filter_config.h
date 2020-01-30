@@ -69,9 +69,10 @@ public:
         time_source_(context.dispatcher().timeSource()), api_(context.api()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
-    // note: this and context has a a lifetime that may be shorter of the tls callback
-    // rime source and api are from the server context who's lifetime is longer. 
-    // so use them explicitly.
+    // note: `this` and `context` has a a lifetime of the listener.
+    // that may be shorter of the tls callback if the listener is torn shortly after it is created.
+    // context.dispatcher().timeSource() and context.api() are from the server context who's
+    // lifetime is longer. so we use them explicitly.
     // we copy over the proto as we can't guarantee its lifetime otherwise
     auto& timeSource = context.dispatcher().timeSource();
     auto& api = context.api();
