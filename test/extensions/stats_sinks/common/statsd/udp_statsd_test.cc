@@ -27,7 +27,7 @@ namespace Common {
 namespace Statsd {
 namespace {
 
-class MockWriter : public Writer {
+class MockWriter : public UdpStatsdSink::Writer {
 public:
   MOCK_METHOD(void, write, (const std::string& message));
 };
@@ -39,15 +39,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,
 
 TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
-  NiceMock<Stats::MockMetricSnapshot> snapshot; // UDP statsd server address.
-  Network::Address::InstanceConstSharedPtr server_address =
-      Network::Utility::parseInternetAddressAndPort(
-          fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
-  UdpStatsdSink sink(tls_, server_address, false);
-  int fd = sink.getFdForTests();
-  EXPECT_NE(fd, -1);
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  Network::Test::UdpSyncPeer server(GetParam());
+  UdpStatsdSink sink(tls_, server.localAddress(), false);
 
-  // Check that fd has not changed.
   NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
   counter.used_ = true;
@@ -61,18 +56,20 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   snapshot.gauges_.push_back(gauge);
 
   sink.flush(snapshot);
+  Network::UdpRecvData data;
+  server.recv(data);
+  EXPECT_EQ("envoy.test_counter:1|c", data.buffer_->toString());
+  Network::UdpRecvData data2;
+  server.recv(data2);
+  EXPECT_EQ("envoy.test_gauge:1|g", data2.buffer_->toString());
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
   sink.onHistogramComplete(timer, 5);
+  Network::UdpRecvData data3;
+  server.recv(data3);
+  EXPECT_EQ("envoy.test_timer:5|ms", data3.buffer_->toString());
 
-  EXPECT_EQ(fd, sink.getFdForTests());
-
-  if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(fd)->asString());
-  } else {
-    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(fd)->asString());
-  }
   tls_.shutdownThread();
 }
 
@@ -84,15 +81,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkWithTagsTest,
 TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Stats::MockMetricSnapshot> snapshot;
-  // UDP statsd server address.
-  Network::Address::InstanceConstSharedPtr server_address =
-      Network::Utility::parseInternetAddressAndPort(
-          fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
-  UdpStatsdSink sink(tls_, server_address, true);
-  int fd = sink.getFdForTests();
-  EXPECT_NE(fd, -1);
+  Network::Test::UdpSyncPeer server(GetParam());
+  UdpStatsdSink sink(tls_, server.localAddress(), true);
 
-  // Check that fd has not changed.
   std::vector<Stats::Tag> tags = {Stats::Tag{"node", "test"}};
   NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
@@ -109,19 +100,21 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   snapshot.gauges_.push_back(gauge);
 
   sink.flush(snapshot);
+  Network::UdpRecvData data;
+  server.recv(data);
+  EXPECT_EQ("envoy.test_counter:1|c|#node:test", data.buffer_->toString());
+  Network::UdpRecvData data2;
+  server.recv(data2);
+  EXPECT_EQ("envoy.test_gauge:1|g|#node:test", data2.buffer_->toString());
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
   timer.setTags(tags);
   sink.onHistogramComplete(timer, 5);
+  Network::UdpRecvData data3;
+  server.recv(data3);
+  EXPECT_EQ("envoy.test_timer:5|ms|#node:test", data3.buffer_->toString());
 
-  EXPECT_EQ(fd, sink.getFdForTests());
-
-  if (GetParam() == Network::Address::IpVersion::v4) {
-    EXPECT_EQ("127.0.0.1:8125", Network::Address::peerAddressFromFd(fd)->asString());
-  } else {
-    EXPECT_EQ("[::1]:8125", Network::Address::peerAddressFromFd(fd)->asString());
-  }
   tls_.shutdownThread();
 }
 
