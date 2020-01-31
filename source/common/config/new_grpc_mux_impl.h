@@ -135,9 +135,9 @@ private:
              envoy::service::discovery::v3::DeltaDiscoveryResponse>
       grpc_stream_;
 
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
-
   const LocalInfo::LocalInfo& local_info_;
+
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;
