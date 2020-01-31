@@ -141,6 +141,11 @@ protected:
   }
 
   void disconnect(bool wait_for_remote_close) {
+    if (client_write_buffer_) {
+      EXPECT_CALL(*client_write_buffer_, drain(_))
+          .Times(AnyNumber())
+          .WillOnce(Invoke([&](uint64_t size) -> void { client_write_buffer_->baseDrain(size); }));
+    }
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
     client_connection_->close(ConnectionCloseType::NoFlush);
     if (wait_for_remote_close) {
@@ -845,8 +850,6 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
-  EXPECT_CALL(*client_write_buffer_, drain(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
 
   disconnect(true);
@@ -924,6 +927,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
   disconnect(true);
 }
 

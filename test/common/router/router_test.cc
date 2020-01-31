@@ -233,7 +233,7 @@ public:
   }
 
   void setNumPreviousRedirect(uint32_t num_previous_redirects) {
-    callbacks_.streamInfo().filterState().setData(
+    callbacks_.streamInfo().filterState()->setData(
         "num_internal_redirects",
         std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
         StreamInfo::FilterState::StateType::Mutable,
@@ -305,9 +305,9 @@ TEST_F(RouterTest, UpdateFilterState) {
   ON_CALL(callbacks_.stream_info_, filterState())
       .WillByDefault(ReturnRef(stream_info.filterState()));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
-  stream_info.filterState().setData(Network::UpstreamServerName::key(),
-                                    std::make_unique<Network::UpstreamServerName>("dummy"),
-                                    StreamInfo::FilterState::StateType::Mutable);
+  stream_info.filterState()->setData(Network::UpstreamServerName::key(),
+                                     std::make_unique<Network::UpstreamServerName>("dummy"),
+                                     StreamInfo::FilterState::StateType::Mutable);
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
@@ -316,7 +316,7 @@ TEST_F(RouterTest, UpdateFilterState) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ("host",
             stream_info.filterState()
-                .getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
+                ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
                 .value());
   EXPECT_CALL(cancellable_, cancel());
   router_.onDestroy();
@@ -840,9 +840,9 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
       /* host_address_header */ absl::nullopt,
       /* do_not_forward */ false,
       /* not_forwarded_header */ absl::nullopt);
-  callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly,
-                                                StreamInfo::FilterState::LifeSpan::FilterChain);
+  callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
+                                                 StreamInfo::FilterState::StateType::ReadOnly,
+                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -892,9 +892,9 @@ void RouterTestBase::testAppendUpstreamHost(
       /* host_address_header */ host_address_header_name,
       /* do_not_forward */ false,
       /* not_forwarded_header */ absl::nullopt);
-  callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly,
-                                                StreamInfo::FilterState::LifeSpan::FilterChain);
+  callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
+                                                 StreamInfo::FilterState::StateType::ReadOnly,
+                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -964,9 +964,9 @@ void RouterTestBase::testDoNotForward(
       /* host_address_header */ absl::nullopt,
       /* do_not_forward */ true,
       /* not_forwarded_header */ not_forwarded_header_name);
-  callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly,
-                                                StreamInfo::FilterState::LifeSpan::FilterChain);
+  callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
+                                                 StreamInfo::FilterState::StateType::ReadOnly,
+                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "204"},
@@ -997,9 +997,9 @@ TEST_F(RouterTest, AllDebugConfig) {
       /* host_address_header */ absl::nullopt,
       /* do_not_forward */ true,
       /* not_forwarded_header */ absl::nullopt);
-  callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly,
-                                                StreamInfo::FilterState::LifeSpan::FilterChain);
+  callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
+                                                 StreamInfo::FilterState::StateType::ReadOnly,
+                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
 
   Http::TestHeaderMapImpl response_headers{{":status", "204"},
@@ -3411,7 +3411,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   router_.onDestroy();
   EXPECT_EQ(3, callbacks_.streamInfo()
                    .filterState()
-                   .getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
+                   ->getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
                    .value());
 }
 
@@ -4528,7 +4528,7 @@ TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
 }
 
 TEST_F(RouterTest, ApplicationProtocols) {
-  callbacks_.streamInfo().filterState().setData(
+  callbacks_.streamInfo().filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);

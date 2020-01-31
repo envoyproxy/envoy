@@ -168,10 +168,10 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
 
 RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
-  if (connection.streamInfo().filterState().hasData<PerConnectionCluster>(
+  if (connection.streamInfo().filterState()->hasData<PerConnectionCluster>(
           PerConnectionCluster::key())) {
     const PerConnectionCluster& per_connection_cluster =
-        connection.streamInfo().filterState().getDataReadOnly<PerConnectionCluster>(
+        connection.streamInfo().filterState()->getDataReadOnly<PerConnectionCluster>(
             PerConnectionCluster::key());
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute

@@ -7,7 +7,9 @@
 
 #include "envoy/thread/thread.h"
 
+#include "common/common/base_logger.h"
 #include "common/common/fmt.h"
+#include "common/common/logger_impl.h"
 #include "common/common/macros.h"
 #include "common/common/non_copyable.h"
 
@@ -72,39 +74,12 @@ enum class Id {
 // clang-format on
 
 /**
- * Logger wrapper for a spdlog logger.
+ * Logger that uses the DelegatingLogSink.
  */
-class Logger {
-public:
-  /* This is simple mapping between Logger severity levels and spdlog severity levels.
-   * The only reason for this mapping is to go around the fact that spdlog defines level as err
-   * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
-   * fine spdlog::info corresponds to LOGGER.info method.
-   */
-  using Levels = enum {
-    trace = spdlog::level::trace,       // NOLINT(readability-identifier-naming)
-    debug = spdlog::level::debug,       // NOLINT(readability-identifier-naming)
-    info = spdlog::level::info,         // NOLINT(readability-identifier-naming)
-    warn = spdlog::level::warn,         // NOLINT(readability-identifier-naming)
-    error = spdlog::level::err,         // NOLINT(readability-identifier-naming)
-    critical = spdlog::level::critical, // NOLINT(readability-identifier-naming)
-    off = spdlog::level::off            // NOLINT(readability-identifier-naming)
-  };
-
-  spdlog::string_view_t levelString() const {
-    return spdlog::level::level_string_views[logger_->level()];
-  }
-  std::string name() const { return logger_->name(); }
-  void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
-  spdlog::level::level_enum level() const { return logger_->level(); }
-
-  static const char* DEFAULT_LOG_FORMAT;
-
+class StandardLogger : public Logger {
 private:
-  Logger(const std::string& name);
+  StandardLogger(const std::string& name);
 
-  std::shared_ptr<spdlog::logger> logger_; // Use shared_ptr here to allow static construction
-                                           // of constant vector below.
   friend class Registry;
 };
 

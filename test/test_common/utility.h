@@ -506,6 +506,11 @@ public:
   static bool gaugesZeroed(
       const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges);
 
+  /**
+   * Returns the members of gauges that are not zero. Uses the same regex filter as gaugesZeroed().
+   */
+  static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
+
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            bool preserve_original_type = false) {

@@ -78,7 +78,7 @@ public:
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD(void, setDynamicMetadata,
               (const std::string&, const std::string&, const std::string&));
-  MOCK_METHOD(FilterState&, filterState, ());
+  MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(void, setRequestedServerName, (const absl::string_view));
   MOCK_METHOD(const std::string&, requestedServerName, (), (const));
@@ -103,7 +103,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   envoy::config::core::v3::Metadata metadata_;
-  FilterStateImpl filter_state_;
+  FilterStateSharedPtr filter_state_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
