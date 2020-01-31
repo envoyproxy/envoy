@@ -24,7 +24,8 @@ DnsResolverImpl::DnsResolverImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const bool use_tcp_for_dns_lookups)
     : dispatcher_(dispatcher),
-      timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })), use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups) {
+      timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
+      use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups) {
   ares_options options{};
   int optmask = 0;
 
@@ -76,8 +77,14 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
                                                                    ares_addrinfo* addrinfo) {
-  if (status == ARES_ECONNREFUSED) {
+  // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
+  // broken. Mark the channel dirty so that it is destroyed and reinitialized on a subsequest call
+  // to DnsResolver::resolve(). The optimal solution would be for c-ares to reinitialize the
+  // channel, and not have Envoy track side effects.
+  // context: https://github.com/envoyproxy/envoy/issues/4543.
+  if (status == ARES_ECONNREFUSED && !fallback_if_failed_) {
     parent_.dirty_channel_ = true;
+    return;
   }
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
@@ -208,19 +215,20 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getHostByName followed by a synchronous IPv4
   // resolution.
-    if (dirty_channel_) {
+
+  // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for why this is done.
+  if (dirty_channel_) {
     ares_destroy(channel_);
 
-      ares_options options{};
-  int optmask = 0;
+    ares_options options{};
+    int optmask = 0;
 
-  if (use_tcp_for_dns_lookups_) {
-    optmask |= ARES_OPT_FLAGS;
-    options.flags |= ARES_FLAG_USEVC;
-  }
+    if (use_tcp_for_dns_lookups_) {
+      optmask |= ARES_OPT_FLAGS;
+      options.flags |= ARES_FLAG_USEVC;
+    }
 
-  initializeChannel(&options, optmask);
-
+    initializeChannel(&options, optmask);
   }
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));

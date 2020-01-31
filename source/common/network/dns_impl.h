@@ -39,9 +39,10 @@ private:
   friend class DnsResolverImplPeer;
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
-    PendingResolution(DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
-                      const std::string& dns_name)
-        : parent_(parent), callback_(callback), dispatcher_(dispatcher), channel_(channel), dns_name_(dns_name) {}
+    PendingResolution(DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
+                      ares_channel channel, const std::string& dns_name)
+        : parent_(parent), callback_(callback), dispatcher_(dispatcher), channel_(channel),
+          dns_name_(dns_name) {}
 
     void cancel() override {
       // c-ares only supports channel-wide cancellation, so we just allow the
