@@ -38,7 +38,7 @@ rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = FilterConfig::create(proto_config, "", context);
+  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(
@@ -85,7 +85,7 @@ rules:
 
     JwtAuthentication proto_config;
     TestUtility::loadFromYaml(config, proto_config);
-    auto filter_conf = FilterConfig::create(proto_config, "", context);
+    auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
   }
 
   // even though filter_conf is now de-allocated, using a reference to it might still work, as its
@@ -125,7 +125,7 @@ filter_state_rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = FilterConfig::create(proto_config, "", context);
+  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
 
   // Empty filter_state
   StreamInfo::FilterStateImpl filter_state1(StreamInfo::FilterState::LifeSpan::FilterChain);

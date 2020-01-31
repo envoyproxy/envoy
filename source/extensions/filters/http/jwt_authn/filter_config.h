@@ -55,23 +55,41 @@ struct JwtAuthnFilterStats {
 };
 
 /**
+ * The filter config interface. It is an interface so that we can mock it in tests.
+ */
+class FilterConfig {
+public:
+  virtual ~FilterConfig() = default;
+
+  virtual JwtAuthnFilterStats& stats() PURE;
+
+  virtual bool bypassCorsPreflightRequest() const PURE;
+
+  // Finds the matcher that matched the header
+  virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
+                                       const StreamInfo::FilterState& filter_state) const PURE;
+};
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
+/**
  * The filter config object to hold config and relevant objects.
  */
-class FilterConfig : public Logger::Loggable<Logger::Id::jwt>,
-                     public AuthFactory,
-                     public std::enable_shared_from_this<FilterConfig> {
+class FilterConfigImpl : public Logger::Loggable<Logger::Id::jwt>,
+                         public FilterConfig,
+                         public AuthFactory,
+                         public std::enable_shared_from_this<FilterConfigImpl> {
 public:
-  ~FilterConfig() override = default;
+  ~FilterConfigImpl() override = default;
 
-  static std::shared_ptr<FilterConfig>
+  // Finds the matcher that matched the header
+  static std::shared_ptr<FilterConfigImpl>
   create(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
          const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-    std::shared_ptr<FilterConfig> ptr(new FilterConfig(proto_config, stats_prefix, context));
+    std::shared_ptr<FilterConfigImpl> ptr(
+        new FilterConfigImpl(proto_config, stats_prefix, context));
     ptr->init();
     return ptr;
   }
-
-  JwtAuthnFilterStats& stats() { return stats_; }
 
   // Get per-thread cache object.
   ThreadLocalCache& getCache() const { return tls_->getTyped<ThreadLocalCache>(); }
@@ -79,9 +97,14 @@ public:
   Upstream::ClusterManager& cm() const { return cm_; }
   TimeSource& timeSource() const { return time_source_; }
 
-  // Finds the matcher that matched the header
+  // FilterConfig:
+
+  JwtAuthnFilterStats& stats() override { return stats_; }
+
+  bool bypassCorsPreflightRequest() const override { return proto_config_.bypass_cors_preflight(); }
+
   virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
-                                       const StreamInfo::FilterState& filter_state) const {
+                                       const StreamInfo::FilterState& filter_state) const override {
     for (const auto& pair : rule_pairs_) {
       if (pair.matcher_->matches(headers)) {
         return pair.verifier_.get();
@@ -108,18 +131,16 @@ public:
                                  timeSource());
   }
 
-  bool bypassCorsPreflightRequest() { return proto_config_.bypass_cors_preflight(); }
-
 private:
-  FilterConfig(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-               const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
+  FilterConfigImpl(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
+                   const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : proto_config_(std::move(proto_config)),
         stats_(generateStats(stats_prefix, context.scope())),
         tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
         time_source_(context.dispatcher().timeSource()), api_(context.api()) {}
 
   void init() {
-    ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
+    ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
     // note: `this` and `context` have a a lifetime of the listener.
     // that may be shorter of the tls callback if the listener is torn shortly after it is created.
@@ -173,7 +194,6 @@ private:
   TimeSource& time_source_;
   Api::Api& api_;
 };
-using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 } // namespace JwtAuthn
 } // namespace HttpFilters
