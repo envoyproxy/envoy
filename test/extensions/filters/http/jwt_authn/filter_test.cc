@@ -36,7 +36,7 @@ JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
 class MockFilterConfig : public FilterConfig {
 public:
   MockFilterConfig() : stats_(generateMockStats(stats_store_)) {
-    ON_CALL(*this, bypassCorsPreflightRequest()).WillByDefault(Return(bypass_cors_preflight_));
+    ON_CALL(*this, bypassCorsPreflightRequest()).WillByDefault(Return(true));
     ON_CALL(*this, findVerifier(_, _)).WillByDefault(Return(nullptr));
     ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   }
@@ -47,7 +47,6 @@ public:
   MOCK_METHOD(bool, bypassCorsPreflightRequest, (), (const));
   MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
 
-  bool bypass_cors_preflight_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   JwtAuthnFilterStats stats_;
 };
@@ -55,7 +54,7 @@ public:
 class FilterTest : public testing::Test {
 public:
   void SetUp() override {
-    mock_config_ = ::std::make_shared<NiceMock<MockFilterConfig>>();
+    mock_config_ = ::std::make_shared<NiceMockz<MockFilterConfig>>();
     mock_config_->bypass_cors_preflight_ = true;
 
     mock_verifier_ = std::make_unique<MockVerifier>();
