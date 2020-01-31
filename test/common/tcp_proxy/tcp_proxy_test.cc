@@ -1694,6 +1694,22 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamFlushReceiveUpstreamData)) 
   upstream_callbacks_->onUpstreamData(buffer, false);
 }
 
+// Tests that downstream connection can access upstream connections filter state.
+TEST_F(TcpProxyTest, ShareFilterState) {
+  setup(1);
+
+  upstream_connections_.at(0)->streamInfo().filterState()->setData(
+      "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+      StreamInfo::FilterState::StateType::Mutable,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+  raiseEventUpstreamConnected(0);
+  EXPECT_EQ("filter_state_cluster",
+            filter_callbacks_.connection_.streamInfo()
+                .upstreamFilterState()
+                ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
+                .value());
+}
+
 class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() = default;
