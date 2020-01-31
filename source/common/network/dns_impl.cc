@@ -81,7 +81,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   // broken. Mark the channel dirty so that it is destroyed and reinitialized on a subsequest call
   // to DnsResolver::resolve(). The optimal solution would be for c-ares to reinitialize the
   // channel, and not have Envoy track side effects.
-  // context: https://github.com/envoyproxy/envoy/issues/4543.
+  // context: https://github.com/envoyproxy/envoy/issues/4543 and
+  // https://github.com/c-ares/c-ares/issues/301.
   if (status == ARES_ECONNREFUSED && !fallback_if_failed_) {
     parent_.dirty_channel_ = true;
     return;
