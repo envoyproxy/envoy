@@ -8,6 +8,7 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/stats/scope.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
@@ -48,6 +49,14 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
 }
 
 } // namespace
+
+int ContextImpl::sslExtendedSocketInfoIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_context_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_context_index >= 0, "");
+    return ssl_context_index;
+  }());
+}
 
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
                          TimeSource& time_source)
@@ -98,6 +107,20 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   int verify_mode = SSL_VERIFY_NONE;
+  int verify_mode_validation_context = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+
+  if (config.certificateValidationContext() != nullptr) {
+    envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+        TrustChainVerification verification =
+            config.certificateValidationContext()->trustChainVerification();
+    if (verification == envoy::extensions::transport_sockets::tls::v3::
+                            CertificateValidationContext::ACCEPT_UNTRUSTED) {
+      verify_mode = SSL_VERIFY_PEER; // Ensure client-certs will be requested even if we have
+                                     // nothing to verify against
+      verify_mode_validation_context = SSL_VERIFY_PEER;
+    }
+  }
+
   if (config.certificateValidationContext() != nullptr &&
       !config.certificateValidationContext()->caCert().empty()) {
     ca_file_path_ = config.certificateValidationContext()->caCertPath();
@@ -183,7 +206,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   if (cert_validation_config != nullptr) {
     if (!cert_validation_config->verifySubjectAltNameList().empty()) {
       verify_subject_alt_name_list_ = cert_validation_config->verifySubjectAltNameList();
-      verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+      verify_mode = verify_mode_validation_context;
     }
 
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
@@ -191,7 +214,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
            cert_validation_config->subjectAltNameMatchers()) {
         subject_alt_name_matchers_.push_back(Matchers::StringMatcherImpl(matcher));
       }
-      verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+      verify_mode = verify_mode_validation_context;
     }
 
     if (!cert_validation_config->verifyCertificateHashList().empty()) {
@@ -207,7 +230,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         }
         verify_certificate_hash_list_.push_back(decoded);
       }
-      verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+      verify_mode = verify_mode_validation_context;
     }
 
     if (!cert_validation_config->verifyCertificateSpkiList().empty()) {
@@ -218,7 +241,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         }
         verify_certificate_spki_list_.emplace_back(decoded.begin(), decoded.end());
       }
-      verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+      verify_mode = verify_mode_validation_context;
     }
   }
 
@@ -386,6 +409,13 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
   }
 
+  if (config.certificateValidationContext() != nullptr) {
+    allow_untrusted_certificate_ =
+        config.certificateValidationContext()->trustChainVerification() ==
+        envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+            ACCEPT_UNTRUSTED;
+  }
+
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 
   // To enumerate the required builtin ciphers, curves, algorithms, and
@@ -478,41 +508,69 @@ int ContextImpl::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* ctx
 
 int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
+  SSL* ssl = reinterpret_cast<SSL*>(
+      X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  Envoy::Ssl::SslExtendedSocketInfo* sslExtendedInfo =
+      reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+          SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
 
   if (impl->verify_trusted_ca_) {
     int ret = X509_verify_cert(store_ctx);
+    if (sslExtendedInfo) {
+      sslExtendedInfo->setCertificateValidationStatus(
+          ret == 1 ? Envoy::Ssl::ClientValidationStatus::Validated
+                   : Envoy::Ssl::ClientValidationStatus::Failed);
+    }
+
     if (ret <= 0) {
       impl->stats_.fail_verify_error_.inc();
-      return ret;
+      return impl->allow_untrusted_certificate_ ? 1 : ret;
     }
   }
 
-  SSL* ssl = reinterpret_cast<SSL*>(
-      X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
 
   const Network::TransportSocketOptions* transport_socket_options =
       static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
-  return impl->verifyCertificate(
+
+  Envoy::Ssl::ClientValidationStatus validated = impl->verifyCertificate(
       cert.get(),
       transport_socket_options &&
               !transport_socket_options->verifySubjectAltNameListOverride().empty()
           ? transport_socket_options->verifySubjectAltNameListOverride()
           : impl->verify_subject_alt_name_list_,
       impl->subject_alt_name_matchers_);
+
+  if (sslExtendedInfo) {
+    if (sslExtendedInfo->certificateValidationStatus() ==
+        Envoy::Ssl::ClientValidationStatus::NotValidated) {
+      sslExtendedInfo->setCertificateValidationStatus(validated);
+    } else if (validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
+      sslExtendedInfo->setCertificateValidationStatus(validated);
+    }
+  }
+
+  return impl->allow_untrusted_certificate_
+             ? 1
+             : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
 }
 
-int ContextImpl::verifyCertificate(
+Envoy::Ssl::ClientValidationStatus ContextImpl::verifyCertificate(
     X509* cert, const std::vector<std::string>& verify_san_list,
     const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers) {
-  if (!verify_san_list.empty() && !verifySubjectAltName(cert, verify_san_list)) {
-    stats_.fail_verify_san_.inc();
-    return 0;
+  Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
+
+  if (!verify_san_list.empty()) {
+    if (!verifySubjectAltName(cert, verify_san_list)) {
+      stats_.fail_verify_san_.inc();
+      return Envoy::Ssl::ClientValidationStatus::Failed;
+    }
+    validated = Envoy::Ssl::ClientValidationStatus::Validated;
   }
 
   if (!subject_alt_name_matchers.empty() && !matchSubjectAltName(cert, subject_alt_name_matchers)) {
     stats_.fail_verify_san_.inc();
-    return 0;
+    return Envoy::Ssl::ClientValidationStatus::Failed;
   }
 
   if (!verify_certificate_hash_list_.empty() || !verify_certificate_spki_list_.empty()) {
@@ -525,11 +583,13 @@ int ContextImpl::verifyCertificate(
 
     if (!valid_certificate_hash && !valid_certificate_spki) {
       stats_.fail_verify_cert_hash_.inc();
-      return 0;
+      return Envoy::Ssl::ClientValidationStatus::Failed;
     }
+
+    validated = Envoy::Ssl::ClientValidationStatus::Validated;
   }
 
-  return 1;
+  return validated;
 }
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
