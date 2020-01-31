@@ -21,10 +21,9 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Runtime::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info)
-    : dispatcher_(dispatcher), local_info_(local_info),
-      grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
+    : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
-      transport_api_version_(transport_api_version) {}
+      local_info_(local_info), transport_api_version_(transport_api_version) {}
 
 void NewGrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
 

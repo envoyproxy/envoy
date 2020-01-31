@@ -119,7 +119,6 @@ private:
   // of subscriptions were activated.
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
 
-  Event::Dispatcher& dispatcher_;
   const LocalInfo::LocalInfo& local_info_;
 
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
