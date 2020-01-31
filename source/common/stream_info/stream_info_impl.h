@@ -216,7 +216,7 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  FilterState& filterState() override { return *filter_state_; }
+  const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
 
   void setRequestedServerName(absl::string_view requested_server_name) override {
@@ -261,7 +261,7 @@ struct StreamInfoImpl : public StreamInfo {
   bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
-  std::shared_ptr<FilterStateImpl> filter_state_;
+  FilterStateSharedPtr filter_state_;
   std::string route_name_;
 
 private:

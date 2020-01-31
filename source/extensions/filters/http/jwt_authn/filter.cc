@@ -59,7 +59,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
 
   // Verify the JWT token, onComplete() will be called when completed.
   const auto* verifier =
-      config_->findVerifier(headers, decoder_callbacks_->streamInfo().filterState());
+      config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
   if (!verifier) {
     onComplete(Status::Ok);
   } else {

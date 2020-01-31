@@ -233,7 +233,7 @@ private:
   // ClientHello details.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
 
-  SessionContextID generateHashForSessionContexId(const std::vector<std::string>& server_names);
+  SessionContextID generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
 };

@@ -14,19 +14,18 @@ namespace Crypto {
 
 std::vector<uint8_t> UtilityImpl::getSha256Digest(const Buffer::Instance& buffer) {
   std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
-  EVP_MD_CTX* ctx(EVP_MD_CTX_new());
-  auto rc = EVP_DigestInit(ctx, EVP_sha256());
+  bssl::ScopedEVP_MD_CTX ctx;
+  auto rc = EVP_DigestInit(ctx.get(), EVP_sha256());
   RELEASE_ASSERT(rc == 1, "Failed to init digest context");
   const auto num_slices = buffer.getRawSlices(nullptr, 0);
   absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
   for (const auto& slice : slices) {
-    rc = EVP_DigestUpdate(ctx, slice.mem_, slice.len_);
+    rc = EVP_DigestUpdate(ctx.get(), slice.mem_, slice.len_);
     RELEASE_ASSERT(rc == 1, "Failed to update digest");
   }
-  rc = EVP_DigestFinal(ctx, digest.data(), nullptr);
+  rc = EVP_DigestFinal(ctx.get(), digest.data(), nullptr);
   RELEASE_ASSERT(rc == 1, "Failed to finalize digest");
-  EVP_MD_CTX_free(ctx);
   return digest;
 }
 
