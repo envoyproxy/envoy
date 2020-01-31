@@ -20,7 +20,7 @@ ImmutableConfigProviderBase::~ImmutableConfigProviderBase() {
 }
 
 ConfigSubscriptionCommonBase::~ConfigSubscriptionCommonBase() {
-  init_target_.ready();
+  local_init_target_.ready();
   config_provider_manager_.unbindSubscription(manager_identifier_);
 }
 

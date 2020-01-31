@@ -96,8 +96,8 @@ public:
       const uint64_t manager_identifier, const std::string& name,
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder,
-      Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
-      const std::string& stat_prefix, envoy::config::core::v3::ConfigSource rds_config_source,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      envoy::config::core::v3::ConfigSource rds_config_source,
       RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
@@ -173,12 +173,6 @@ private:
   ScopedRouteMap scoped_route_map_;
   // For creating RDS subscriptions.
   Server::Configuration::ServerFactoryContext& factory_context_;
-  // Target added to factory context's initManager.
-  Init::TargetImpl parent_init_target_;
-  // Watcher that marks parent_init_target_ ready when the local init manager is ready.
-  Init::WatcherImpl local_init_watcher_;
-  // Local manager that tracks the subscription's sub-resources(RDS subscriptions) initialization.
-  Init::ManagerImpl local_init_manager_;
 
   // RdsRouteConfigProvider by scope name.
   absl::flat_hash_map<std::string, std::unique_ptr<RdsRouteConfigProviderHelper>>

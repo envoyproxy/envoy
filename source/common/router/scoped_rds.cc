@@ -92,26 +92,18 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const uint64_t manager_identifier, const std::string& name,
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
         ScopeKeyBuilder& scope_key_builder,
-    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
-    const std::string& stat_prefix, envoy::config::core::v3::ConfigSource rds_config_source,
+    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    envoy::config::core::v3::ConfigSource rds_config_source,
     RouteConfigProviderManager& route_config_provider_manager,
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
-      factory_context_(factory_context),
-      parent_init_target_(fmt::format("SRDS subcription {}", name),
-                          [this]() { local_init_manager_.initialize(local_init_watcher_); }),
-      local_init_watcher_(fmt::format("SRDS watcher {}", name),
-                          [this]() { parent_init_target_.ready(); }),
-      local_init_manager_(fmt::format("SRDS subcription local init manager {}", name)), name_(name),
-      scope_key_builder_(scope_key_builder),
+      factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
-
-  init_manager.add(parent_init_target_);
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(),
@@ -238,8 +230,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // NOTE: This should be defined after noop_init_manager as it depends on the
   // noop_init_manager.
   std::unique_ptr<Cleanup> resume_rds;
-  // if local_init_manager is initialized, the parent init manager may have gone away.
-  if (local_init_manager_.state() == Init::Manager::State::Initialized) {
+  // if local init manager is initialized, the parent init manager may have gone away.
+  if (localInitManager().state() == Init::Manager::State::Initialized) {
     noop_init_manager =
         std::make_unique<Init::ManagerImpl>(fmt::format("SRDS {}:{}", name_, version_info));
     // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
@@ -274,7 +266,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       to_be_removed_rds_providers = removeScopes(removed_resources, version_info);
   bool any_applied =
       addOrUpdateScopes(added_resources,
-                        (noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager),
+                        (noop_init_manager == nullptr ? localInitManager() : *noop_init_manager),
                         version_info, exception_msgs) ||
       !to_be_removed_rds_providers.empty();
   ConfigSubscriptionCommonBase::onConfigUpdate();
@@ -420,7 +412,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
   ScopedRdsConfigSubscriptionSharedPtr subscription =
       ConfigProviderManagerImplBase::getSubscription<ScopedRdsConfigSubscription>(
           config_source_proto, init_manager,
-          [&config_source_proto, &factory_context, &init_manager, &stat_prefix,
+          [&config_source_proto, &factory_context, &stat_prefix,
            &typed_optarg](const uint64_t manager_identifier,
                           ConfigProviderManagerImplBase& config_provider_manager)
               -> Envoy::Config::ConfigSubscriptionCommonBaseSharedPtr {
@@ -429,7 +421,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                 config_source_proto);
             return std::make_shared<ScopedRdsConfigSubscription>(
                 scoped_rds_config_source, manager_identifier, typed_optarg.scoped_routes_name_,
-                typed_optarg.scope_key_builder_, factory_context, init_manager, stat_prefix,
+                typed_optarg.scope_key_builder_, factory_context, stat_prefix,
                 typed_optarg.rds_config_source_,
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager)
                     .route_config_provider_manager(),

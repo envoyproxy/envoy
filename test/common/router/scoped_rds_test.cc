@@ -293,10 +293,9 @@ key:
     - string_key: x-bar-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
+  init_watcher_.expectReady().Times(1); // Only the SRDS parent_init_target_.
   context_init_manager_.initialize(init_watcher_);
-  init_watcher_.expectReady().Times(
-      2); // SRDS parent_init_target_.ready() and ConfigSubscriptionCommonBase::init_target_.ready()
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
@@ -350,9 +349,7 @@ key:
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
 TEST_F(ScopedRdsTest, MultipleResourcesDelta) {
   setup();
-  init_watcher_.expectReady().Times(2); // SRDS parent_init_target_.ready() and
-                                        //  ConfigSubscriptionCommonBase::init_target_.ready()
-
+  init_watcher_.expectReady().Times(1);
   const std::string config_yaml = R"EOF(
 name: foo_scope
 route_configuration_name: foo_routes
@@ -448,6 +445,8 @@ key:
     - string_key: x-foo-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
+  init_watcher_.expectReady().Times(0); // The onConfigUpdate will simply throw an exception.
+  context_init_manager_.initialize(init_watcher_);
   EXPECT_THROW_WITH_REGEX(
       srds_subscription_->onConfigUpdate(resources, "1"), EnvoyException,
       ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
@@ -461,8 +460,6 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-  init_watcher_.expectReady().Times(1); // SRDS subscription::parent_init_target_.
-  context_init_manager_.initialize(init_watcher_);
   EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
 }
@@ -488,8 +485,7 @@ key:
     - string_key: x-foo-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
-  init_watcher_.expectReady().Times(
-      2); // Just SRDS subscription::init_target_ and the first scope's RDS subscription.
+  init_watcher_.expectReady().Times(1); // Partial success gets the subscription ready.
   context_init_manager_.initialize(init_watcher_);
 
   EXPECT_THROW_WITH_REGEX(
@@ -547,7 +543,7 @@ key:
                   ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
                   ->name(),
               "");
-  init_watcher_.expectReady().Times(2); // SRDS init_target_ and local_init_target_.
+  init_watcher_.expectReady().Times(1);
   context_init_manager_.initialize(init_watcher_);
   pushRdsConfig({"foo_routes", "bar_routes"}, "111");
   EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
@@ -640,8 +636,8 @@ key:
 // Tests that only one resource is provided during a config update.
 TEST_F(ScopedRdsTest, InvalidDuplicateResourceSotw) {
   setup();
-  init_watcher_.expectReady().Times(1); // The Subscription::local_init_target_ will be ready as no
-                                        // targets were added into the local_init_manager_.
+  init_watcher_.expectReady().Times(
+      0); // parent_init_target_ ready will be called by onConfigUpdateFailed
   context_init_manager_.initialize(init_watcher_);
 
   const std::string config_yaml = R"EOF(
@@ -661,9 +657,7 @@ key:
 // Tests that only one resource is provided during a config update.
 TEST_F(ScopedRdsTest, InvalidDuplicateResourceDelta) {
   setup();
-  init_watcher_.expectReady().Times(
-      2); // SRDS onConfigUpdate breaks, but first foo_routes will
-          // kick start if it's initialized post-Server/LDS initialization.
+  init_watcher_.expectReady().Times(0);
   context_init_manager_.initialize(init_watcher_);
 
   const std::string config_yaml = R"EOF(
@@ -708,7 +702,7 @@ TEST_F(ScopedRdsTest, ConfigUpdateFailure) {
 // config.
 TEST_F(ScopedRdsTest, ConfigDump) {
   setup();
-  init_watcher_.expectReady().Times(2); // SRDS init_target and local_init_target_.
+  init_watcher_.expectReady().Times(1);
   context_init_manager_.initialize(init_watcher_);
   auto message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
