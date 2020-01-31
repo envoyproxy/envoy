@@ -750,7 +750,6 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   HashedValue hv1(v1), hv2(v2);
 
   NiceMock<Network::MockConnection> connection;
-  EXPECT_NE(nullptr, connection.stream_info_.filterState());
   connection.stream_info_.filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
       StreamInfo::FilterState::StateType::Mutable,
