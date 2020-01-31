@@ -187,7 +187,7 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
-bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key, bool default_value) const {
+bool SnapshotImpl::deprecatedFeatureEnabled(absl::string_view key, bool default_value) const {
   // If the value is not explicitly set as a runtime boolean, trust the proto annotations passed as
   // default_value.
   if (!getBoolean(key, default_value)) {
@@ -211,12 +211,12 @@ bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
   return getBoolean(key, RuntimeFeaturesDefaults::get().enabledByDefault(key));
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
+bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value,
                                   uint64_t random_value, uint64_t num_buckets) const {
   return random_value % num_buckets < std::min(getInteger(key, default_value), num_buckets);
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value) const {
+bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value) const {
   // Avoid PRNG if we know we don't need it.
   uint64_t cutoff = std::min(getInteger(key, default_value), static_cast<uint64_t>(100));
   if (cutoff == 0) {
@@ -228,12 +228,12 @@ bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value
   }
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
+bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value,
                                   uint64_t random_value) const {
   return featureEnabled(key, default_value, random_value, 100);
 }
 
-const std::string& SnapshotImpl::get(const std::string& key) const {
+const std::string& SnapshotImpl::get(absl::string_view key) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = values_.find(key);
   if (entry == values_.end()) {
@@ -243,12 +243,12 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
   }
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key,
+bool SnapshotImpl::featureEnabled(absl::string_view key,
                                   const envoy::type::v3::FractionalPercent& default_value) const {
   return featureEnabled(key, default_value, generator_.random());
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key,
+bool SnapshotImpl::featureEnabled(absl::string_view key,
                                   const envoy::type::v3::FractionalPercent& default_value,
                                   uint64_t random_value) const {
   const auto& entry = values_.find(key);
@@ -275,7 +275,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
 }
 
-uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
+uint64_t SnapshotImpl::getInteger(absl::string_view key, uint64_t default_value) const {
   ASSERT(!isRuntimeFeature(key));
   auto entry = values_.find(key);
   if (entry == values_.end() || !entry->second.uint_value_) {
@@ -285,7 +285,7 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
-double SnapshotImpl::getDouble(const std::string& key, double default_value) const {
+double SnapshotImpl::getDouble(absl::string_view key, double default_value) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = values_.find(key);
   if (entry == values_.end() || !entry->second.double_value_) {
