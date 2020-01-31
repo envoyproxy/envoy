@@ -24,11 +24,11 @@ DnsResolverImpl::DnsResolverImpl(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const bool use_tcp_for_dns_lookups)
     : dispatcher_(dispatcher),
-      timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
+      timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })), use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups) {
   ares_options options{};
   int optmask = 0;
 
-  if (use_tcp_for_dns_lookups) {
+  if (use_tcp_for_dns_lookups_) {
     optmask |= ARES_OPT_FLAGS;
     options.flags |= ARES_FLAG_USEVC;
   }
@@ -70,11 +70,15 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
-  ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
+  int status = ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
+  ENVOY_LOG(error, "ARES CHANNEL INIT {}", status);
 }
 
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
                                                                    ares_addrinfo* addrinfo) {
+  if (status == ARES_ECONNREFUSED) {
+    parent_.dirty_channel_ = true;
+  }
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
@@ -171,6 +175,7 @@ void DnsResolverImpl::updateAresTimer() {
 }
 
 void DnsResolverImpl::onEventCallback(int fd, uint32_t events) {
+  ENVOY_LOG(error, "onEventCallback");
   const ares_socket_t read_fd = events & Event::FileReadyType::Read ? fd : ARES_SOCKET_BAD;
   const ares_socket_t write_fd = events & Event::FileReadyType::Write ? fd : ARES_SOCKET_BAD;
   ares_process_fd(channel_, read_fd, write_fd);
@@ -203,8 +208,22 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getHostByName followed by a synchronous IPv4
   // resolution.
+    if (dirty_channel_) {
+    ares_destroy(channel_);
+
+      ares_options options{};
+  int optmask = 0;
+
+  if (use_tcp_for_dns_lookups_) {
+    optmask |= ARES_OPT_FLAGS;
+    options.flags |= ARES_FLAG_USEVC;
+  }
+
+  initializeChannel(&options, optmask);
+
+  }
   std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(callback, dispatcher_, channel_, dns_name));
+      new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
   if (dns_lookup_family == DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }
