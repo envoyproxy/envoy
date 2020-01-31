@@ -523,14 +523,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
       upstream_http_protocol_options.value().auto_sni()) {
     const auto parsed_authority =
         Http::Utility::parseAuthority(headers.Host()->value().getStringView());
-    const StreamInfo::FilterStateSharedPtr& filterState = callbacks_->streamInfo().filterState();
     if (!parsed_authority.is_ip_address_) {
       // TODO: Add SAN verification here and use it from dynamic_forward_proxy
       // Update filter state with the host/authority to use for setting SNI in the transport
       // socket options. This is referenced during the getConnPool() call below.
-      filterState->setData(Network::UpstreamServerName::key(),
-                           std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
-                           StreamInfo::FilterState::StateType::Mutable);
+      callbacks_->streamInfo().filterState()->setData(
+          Network::UpstreamServerName::key(),
+          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::StateType::Mutable);
     }
   }
 
@@ -1370,13 +1370,15 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
+
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(
-          *downstream_headers_, *callbacks_->streamInfo().filterState(),
-          route_entry_->maxInternalRedirects(), *location, *callbacks_->connection()) &&
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, *filter_state,
+                                               route_entry_->maxInternalRedirects(), *location,
+                                               *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;

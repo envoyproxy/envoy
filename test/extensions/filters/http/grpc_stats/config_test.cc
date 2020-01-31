@@ -66,7 +66,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_NE(nullptr, stream_info_.filterState());
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
@@ -91,7 +90,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_NE(nullptr, stream_info_.filterState());
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
@@ -114,7 +112,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_NE(nullptr, stream_info_.filterState());
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
@@ -142,7 +139,6 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                 ->statsScope()
                 .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
                 .value());
-  EXPECT_NE(nullptr, stream_info_.filterState());
   const auto& data = stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>(
       HttpFilterNames::get().GrpcStats);
   EXPECT_EQ(2U, data.request_message_count);

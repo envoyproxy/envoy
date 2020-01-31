@@ -1776,7 +1776,6 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
   initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_NE(nullptr, stream_info.filterState());
   stream_info.filterState()->setData("envoy.tcp_proxy.cluster",
                                      std::make_unique<PerConnectionCluster>("filter_state_cluster"),
                                      StreamInfo::FilterState::StateType::Mutable,
@@ -1798,7 +1797,6 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_NE(nullptr, stream_info.filterState());
   stream_info.filterState()->setData("envoy.network.upstream_server_name",
                                      std::make_unique<UpstreamServerName>("www.example.com"),
                                      StreamInfo::FilterState::StateType::ReadOnly,
@@ -1834,7 +1832,6 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_NE(nullptr, stream_info.filterState());
   stream_info.filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
