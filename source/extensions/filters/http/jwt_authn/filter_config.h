@@ -36,8 +36,8 @@ public:
   JwksCache& getJwksCache() { return *jwks_cache_; }
 
 private:
-  // copy of the config, to ensure it exists throught out the lifetime of this object, as
-  // jwks_cache_ holds references to it.
+  // copy of the config, to ensure it exists through out the lifetime of this object, as jwks_cache_
+  // holds references to it.
   envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication config_;
   // The JwksCache object.
   JwksCachePtr jwks_cache_;
