@@ -55,7 +55,6 @@ class FilterTest : public testing::Test {
 public:
   void SetUp() override {
     mock_config_ = ::std::make_shared<NiceMockz<MockFilterConfig>>();
-    mock_config_->bypass_cors_preflight_ = true;
 
     mock_verifier_ = std::make_unique<MockVerifier>();
     filter_ = std::make_unique<Filter>(mock_config_);
