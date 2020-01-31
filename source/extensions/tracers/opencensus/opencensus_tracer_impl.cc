@@ -266,16 +266,17 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
   if (oc_config.stackdriver_exporter_enabled()) {
     ::opencensus::exporters::trace::StackdriverOptions opts;
     opts.project_id = oc_config.stackdriver_project_id();
+    auto google_default_cred = grpc::GoogleDefaultCredentials();
     if (!oc_config.stackdriver_address().empty()) {
       auto channel =
           grpc::CreateChannel(oc_config.stackdriver_address(), grpc::InsecureChannelCredentials());
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     } else if (oc_config.has_stackdriver_call_credentials() &&
-               oc_config.stackdriver_call_credentials().has_sts_service()) {
+               oc_config.stackdriver_call_credentials().has_sts_service() &&
+               google_default_cred != nullptr) {
       // If call credential is provided and is STS service, create a stub with that credential.
       auto call_creds = getStackdriverCallCredential(oc_config);
-      auto channel_creds =
-          grpc::CompositeChannelCredentials(grpc::GoogleDefaultCredentials(), call_creds);
+      auto channel_creds = grpc::CompositeChannelCredentials(google_default_cred, call_creds);
       auto channel = grpc::CreateChannel(GoogleStackdriverTraceAddress, channel_creds);
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     }
