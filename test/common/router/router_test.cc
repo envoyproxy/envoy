@@ -340,7 +340,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterState) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
   EXPECT_EQ("host", stream_info.filterState()
-                        .getDataReadOnly<Network::UpstreamSubjectAltNames>(
+                        ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
                             Network::UpstreamSubjectAltNames::key())
                         .value()[0]);
   EXPECT_CALL(cancellable_, cancel());
