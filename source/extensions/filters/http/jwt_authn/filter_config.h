@@ -27,14 +27,18 @@ class ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
 public:
   // Load the config from envoy config.
   ThreadLocalCache(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-                   TimeSource& time_source, Api::Api& api) {
-    jwks_cache_ = JwksCache::create(config, time_source, api);
+                   TimeSource& time_source, Api::Api& api)
+      : config_(config) {
+    jwks_cache_ = JwksCache::create(config_, time_source, api);
   }
 
   // Get the JwksCache object.
   JwksCache& getJwksCache() { return *jwks_cache_; }
 
 private:
+  // copy of the config, to ensure it exists throught out the lifetime of this object, as
+  // jwks_cache_ holds references to it.
+  envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication config_;
   // The JwksCache object.
   JwksCachePtr jwks_cache_;
 };
