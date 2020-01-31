@@ -30,8 +30,6 @@ public:
     getListenSocketsForChild(const envoy::HotRestartMessage::Request& request);
     // 'stats' is a field in the reply protobuf to be sent to the child, which we should populate.
     void exportStatsToChild(envoy::HotRestartMessage::Reply::Stats* stats);
-    void recordDynamics(envoy::HotRestartMessage::Reply::Stats* stats, const std::string& name,
-                        Stats::StatName stat_name);
     void drainListeners();
 
   private:

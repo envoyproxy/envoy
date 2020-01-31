@@ -2,7 +2,6 @@
 
 #include "envoy/server/instance.h"
 
-#include "common/stats/symbol_table_impl.h"
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 
@@ -118,9 +117,7 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
   for (const auto& gauge : server_->stats().gauges()) {
     if (gauge->used()) {
-      const std::string name = gauge->name();
-      (*stats->mutable_gauges())[name] = gauge->value();
-      recordDynamics(stats, name, gauge->statName());
+      (*stats->mutable_gauges())[gauge->name()] = gauge->value();
     }
   }
 
@@ -130,33 +127,12 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
       // latching) by the time it begins exporting to the hot restart child.
       uint64_t latched_value = counter->latch();
       if (latched_value > 0) {
-        const std::string name = counter->name();
-        (*stats->mutable_counter_deltas())[name] = latched_value;
-        recordDynamics(stats, name, counter->statName());
+        (*stats->mutable_counter_deltas())[counter->name()] = latched_value;
       }
     }
   }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
   stats->set_num_connections(server_->listenerManager().numConnections());
-}
-
-void HotRestartingParent::Internal::recordDynamics(HotRestartMessage::Reply::Stats* stats,
-                                                   const std::string& name,
-                                                   Stats::StatName stat_name) {
-  HotRestartMessage::Reply::RepeatedInt32 dynamic_indices;
-  uint32_t index = 0;
-  auto record_dynamic = [&dynamic_indices, &index](absl::string_view str) {
-                          for (auto segment : absl::StrSplit(str, '.')) {
-                            UNREFERENCED_PARAMETER(segment);
-                            dynamic_indices.add_index(index);
-                            ++index;
-                          }
-                        };
-  Stats::SymbolTableImpl::Encoding::decodeTokens(
-      stat_name.data(), stat_name.dataSize(), [&index](Stats::Symbol) { ++index; }, record_dynamic);
-  if (dynamic_indices.index_size() > 0) {
-    (*stats->mutable_dynamics())[name] = dynamic_indices;
-  }
 }
 
 void HotRestartingParent::Internal::drainListeners() { server_->drainListeners(); }
