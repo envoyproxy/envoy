@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.listener.original_src.v
 option java_outer_classname = "OriginalSrcProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.listener.original_src.v3alpha";
+    "envoy.extensions.filters.listener.original_src.v3";
 
 // [#protodoc-title: Original Src Filter]
 // Use the Original source address on upstream connections.

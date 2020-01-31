@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -38,6 +38,8 @@ public:
    *
    * @param prev_message previous version message input.
    * @param next_message next version message to generate.
+   *
+   * @throw EnvoyException if a Protobuf (de)serialization error occurs.
    */
   static void upgrade(const Protobuf::Message& prev_message, Protobuf::Message& next_message);
 
@@ -53,6 +55,8 @@ public:
    * @param message message input.
    * @return DynamicMessagePtr with the downgraded message (and associated
    *         factory state).
+   *
+   * @throw EnvoyException if a Protobuf (de)serialization error occurs.
    */
   static DynamicMessagePtr downgrade(const Protobuf::Message& message);
 
@@ -74,7 +78,7 @@ public:
    * @return std::string JSON representation.
    */
   static std::string getJsonStringFromMessage(const Protobuf::Message& message,
-                                              envoy::config::core::v3alpha::ApiVersion api_version);
+                                              envoy::config::core::v3::ApiVersion api_version);
 
   /**
    * Modify a v3 message to make it suitable for sending as a gRPC message. This
@@ -85,7 +89,7 @@ public:
    * @param api_version target API version.
    */
   static void prepareMessageForGrpcWire(Protobuf::Message& message,
-                                        envoy::config::core::v3alpha::ApiVersion api_version);
+                                        envoy::config::core::v3::ApiVersion api_version);
 
   /**
    * For a message that may have been upgraded, recover the original message.
@@ -94,6 +98,8 @@ public:
    * @param upgraded_message upgraded message input.
    *
    * @return DynamicMessagePtr original message (as a dynamic message).
+   *
+   * @throw EnvoyException if a Protobuf (de)serialization error occurs.
    */
   static DynamicMessagePtr recoverOriginal(const Protobuf::Message& upgraded_message);
 

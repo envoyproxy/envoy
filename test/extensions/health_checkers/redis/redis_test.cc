@@ -1,8 +1,8 @@
 #include <memory>
 
 #include "envoy/api/api.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "extensions/health_checkers/redis/redis.h"
 #include "extensions/health_checkers/redis/utility.h"
@@ -161,7 +161,7 @@ public:
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
   }
 
-  MOCK_METHOD0(create_, Extensions::NetworkFilters::Common::Redis::Client::Client*());
+  MOCK_METHOD(Extensions::NetworkFilters::Common::Redis::Client::Client*, create_, ());
 
   void expectSessionCreate() {
     interval_timer_ = new Event::MockTimer(&dispatcher_);

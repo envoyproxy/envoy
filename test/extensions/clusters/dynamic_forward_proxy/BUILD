@@ -26,7 +26,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/clusters/dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

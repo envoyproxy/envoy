@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/type/tracing/v2/custom_tag.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
@@ -125,7 +125,7 @@ protected:
 
   void expectSetCustomTags(const std::vector<CustomTagCase>& cases) {
     for (const CustomTagCase& cas : cases) {
-      envoy::type::tracing::v2::CustomTag custom_tag;
+      envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
       config.custom_tags_.emplace(custom_tag.tag(), HttpTracerUtility::createCustomTag(custom_tag));
       if (cas.set) {
@@ -353,8 +353,8 @@ ree:
   NiceMock<Router::MockRouteEntry> route_entry;
   EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(&route_entry));
   (*route_entry.metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
-  std::shared_ptr<envoy::config::core::v3alpha::Metadata> host_metadata =
-      std::make_shared<envoy::config::core::v3alpha::Metadata>();
+  std::shared_ptr<envoy::config::core::v3::Metadata> host_metadata =
+      std::make_shared<envoy::config::core::v3::Metadata>();
   (*host_metadata->mutable_filter_metadata())["m.host"].MergeFrom(fake_struct);
   (*stream_info.host_->cluster_.metadata_.mutable_filter_metadata())["m.cluster"].MergeFrom(
       fake_struct);

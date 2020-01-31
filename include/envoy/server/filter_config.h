@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
@@ -17,6 +17,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/process_context.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -121,15 +122,20 @@ public:
   virtual ServerFactoryContext& getServerFactoryContext() const PURE;
 
   /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+
+  /**
    * @return AccessLogManager for use by the entire server.
    */
   virtual AccessLog::AccessLogManager& accessLogManager() PURE;
 
   /**
-   * @return envoy::config::core::v3alpha::TrafficDirection the direction of the traffic relative to
+   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
    * the local proxy.
    */
-  virtual envoy::config::core::v3alpha::TrafficDirection direction() const PURE;
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -168,10 +174,10 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return const envoy::config::core::v3alpha::Metadata& the config metadata associated with this
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
    * listener.
    */
-  virtual const envoy::config::core::v3alpha::Metadata& listenerMetadata() const PURE;
+  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.
@@ -189,10 +195,10 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return OptProcessContextRef an optional reference to the
+   * @return ProcessContextOptRef an optional reference to the
    * process context. Will be unset when running in validation mode.
    */
-  virtual OptProcessContextRef processContext() PURE;
+  virtual ProcessContextOptRef processContext() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration

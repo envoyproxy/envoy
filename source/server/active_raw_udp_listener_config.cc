@@ -19,7 +19,7 @@ ActiveRawUdpListenerFactory::createActiveUdpListener(Network::ConnectionHandler&
 }
 
 ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::listener::v3alpha::ActiveRawUdpListenerConfig>();
+  return std::make_unique<envoy::config::listener::v3::ActiveRawUdpListenerConfig>();
 }
 
 Network::ActiveUdpListenerFactoryPtr

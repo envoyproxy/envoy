@@ -1,6 +1,6 @@
 #include "common/config/new_grpc_mux_impl.h"
 
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
@@ -16,7 +16,7 @@ namespace Config {
 NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Event::Dispatcher& dispatcher,
                                const Protobuf::MethodDescriptor& service_method,
-                               envoy::config::core::v3alpha::ApiVersion transport_api_version,
+                               envoy::config::core::v3::ApiVersion transport_api_version,
                                Runtime::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info)
@@ -24,26 +24,6 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
       grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       transport_api_version_(transport_api_version) {}
-
-Watch* NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
-                                        const std::set<std::string>& resources,
-                                        SubscriptionCallbacks& callbacks,
-                                        std::chrono::milliseconds init_fetch_timeout) {
-  if (watch == nullptr) {
-    return addWatch(type_url, resources, callbacks, init_fetch_timeout);
-  } else {
-    updateWatch(type_url, watch, resources);
-    return watch;
-  }
-}
-
-void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
-  updateWatch(type_url, watch, {});
-  auto entry = subscriptions_.find(type_url);
-  RELEASE_ASSERT(entry != subscriptions_.end(),
-                 fmt::format("removeWatch() called for non-existent subscription {}.", type_url));
-  entry->second->watch_map_.removeWatch(watch);
-}
 
 void NewGrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
 
@@ -57,7 +37,7 @@ bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
 }
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>&& message) {
+    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
@@ -117,16 +97,12 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
 }
 
 // TODO(fredlas) to be removed from the GrpcMux interface very soon.
-GrpcMuxWatchPtr NewGrpcMuxImpl::subscribe(const std::string&, const std::set<std::string>&,
-                                          GrpcMuxCallbacks&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
-
 void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
-Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                                SubscriptionCallbacks& callbacks,
-                                std::chrono::milliseconds init_fetch_timeout) {
+GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
+                                         const std::set<std::string>& resources,
+                                         SubscriptionCallbacks& callbacks,
+                                         std::chrono::milliseconds init_fetch_timeout) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
@@ -137,7 +113,7 @@ Watch* NewGrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std:
   Watch* watch = entry->second->watch_map_.addWatch(callbacks);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
   updateWatch(type_url, watch, resources);
-  return watch;
+  return std::make_unique<WatchImpl>(type_url, watch, *this);
 }
 
 // Updates the list of resource names watched by the given watch. If an added name is new across
@@ -155,6 +131,14 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
+}
+
+void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
+  updateWatch(type_url, watch, {});
+  auto entry = subscriptions_.find(type_url);
+  ASSERT(entry != subscriptions_.end(),
+         fmt::format("removeWatch() called for non-existent subscription {}.", type_url));
+  entry->second->watch_map_.removeWatch(watch);
 }
 
 void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
@@ -183,7 +167,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
     }
-    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest request;
+    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
     // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
     if (!pausable_ack_queue_.empty()) {
       // Because ACKs take precedence over plain requests, if there is anything in the queue, it's

@@ -1,7 +1,7 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/filters/http/buffer/v3alpha/buffer.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/common/assert.h"
@@ -20,12 +20,12 @@ namespace HttpFilters {
 namespace BufferFilter {
 
 BufferFilterSettings::BufferFilterSettings(
-    const envoy::extensions::filters::http::buffer::v3alpha::Buffer& proto_config)
+    const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config)
     : disabled_(false),
       max_request_bytes_(static_cast<uint64_t>(proto_config.max_request_bytes().value())) {}
 
 BufferFilterSettings::BufferFilterSettings(
-    const envoy::extensions::filters::http::buffer::v3alpha::BufferPerRoute& proto_config)
+    const envoy::extensions::filters::http::buffer::v3::BufferPerRoute& proto_config)
     : disabled_(proto_config.disabled()),
       max_request_bytes_(
           proto_config.has_buffer()
@@ -33,7 +33,7 @@ BufferFilterSettings::BufferFilterSettings(
               : 0) {}
 
 BufferFilterConfig::BufferFilterConfig(
-    const envoy::extensions::filters::http::buffer::v3alpha::Buffer& proto_config)
+    const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config)
     : settings_(proto_config) {}
 
 BufferFilter::BufferFilter(BufferFilterConfigSharedPtr config)
@@ -100,10 +100,7 @@ void BufferFilter::maybeAddContentLength() {
   // request_headers_ is initialized iff plugin is enabled.
   if (request_headers_ != nullptr && request_headers_->ContentLength() == nullptr) {
     ASSERT(!settings_->disabled());
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.buffer_filter_populate_content_length")) {
-      request_headers_->setContentLength(content_length_);
-    }
+    request_headers_->setContentLength(content_length_);
   }
 }
 

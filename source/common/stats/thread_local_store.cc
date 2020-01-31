@@ -234,6 +234,11 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
+ThreadLocalStoreImpl::TlsCacheEntry&
+ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
+  return scope_cache_[scope_id];
+}
+
 void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) { scope_cache_.erase(scope_id); }
 
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
@@ -248,12 +253,9 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
   }
 }
 
-std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
-
 ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
-    : scope_id_(next_scope_id_++), parent_(parent),
+    : scope_id_(parent.next_scope_id_++), parent_(parent),
       prefix_(Utility::sanitizeStatsName(prefix), parent.symbolTable()),
-      // central_cache_(std::make_shared<CentralCacheEntry>(parent.symbolTable())) {}
       central_cache_(new CentralCacheEntry(parent.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
@@ -389,7 +391,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
   StatRefMap<Counter>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
+    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().insertScope(this->scope_id_);
     tls_cache = &entry.counters_;
     tls_rejected_stats = &entry.rejected_stats_;
   }
@@ -510,15 +512,15 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   return **central_ref;
 }
 
-OptionalCounter ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
+CounterOptConstRef ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
   return findStatLockHeld<Counter>(name, central_cache_->counters_);
 }
 
-OptionalGauge ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
+GaugeOptConstRef ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
   return findStatLockHeld<Gauge>(name, central_cache_->gauges_);
 }
 
-OptionalHistogram ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
+HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
   auto iter = central_cache_->histograms_.find(name);
   if (iter == central_cache_->histograms_.end()) {
     return absl::nullopt;

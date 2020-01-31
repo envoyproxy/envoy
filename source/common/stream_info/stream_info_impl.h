@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "envoy/common/time.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -209,10 +209,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  envoy::config::core::v3alpha::Metadata& dynamicMetadata() override { return metadata_; };
-  const envoy::config::core::v3alpha::Metadata& dynamicMetadata() const override {
-    return metadata_;
-  };
+  envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
+  const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
@@ -262,7 +260,7 @@ struct StreamInfoImpl : public StreamInfo {
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
-  envoy::config::core::v3alpha::Metadata metadata_{};
+  envoy::config::core::v3::Metadata metadata_{};
   std::shared_ptr<FilterStateImpl> filter_state_;
   std::string route_name_;
 

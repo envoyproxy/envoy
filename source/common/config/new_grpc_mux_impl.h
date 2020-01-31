@@ -4,7 +4,7 @@
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/logger.h"
 #include "common/config/api_version.h"
@@ -24,20 +24,19 @@ namespace Config {
 // starting/stopping/pausing of the subscriptions.
 class NewGrpcMuxImpl
     : public GrpcMux,
-      public GrpcStreamCallbacks<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>,
+      public GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse>,
       Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                  const Protobuf::MethodDescriptor& service_method,
-                 envoy::config::core::v3alpha::ApiVersion transport_api_version,
+                 envoy::config::core::v3::ApiVersion transport_api_version,
                  Runtime::RandomGenerator& random, Stats::Scope& scope,
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
-  Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
-                          const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                          std::chrono::milliseconds init_fetch_timeout) override;
-  void removeWatch(const std::string& type_url, Watch* watch) override;
+  GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                           SubscriptionCallbacks& callbacks,
+                           std::chrono::milliseconds init_fetch_timeout) override;
 
   // TODO(fredlas) PR #8478 will remove this.
   bool isDelta() const override { return true; }
@@ -46,8 +45,7 @@ public:
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
   void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>&& message)
-      override;
+      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message) override;
 
   void onStreamEstablished() override;
 
@@ -57,9 +55,7 @@ public:
 
   void kickOffAck(UpdateAck ack);
 
-  // TODO(fredlas) remove these two from the GrpcMux interface.
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override;
+  // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
   struct SubscriptionStuff {
@@ -82,8 +78,31 @@ public:
   }
 
 private:
-  Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                  SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout);
+  class WatchImpl : public GrpcMuxWatch {
+  public:
+    WatchImpl(const std::string& type_url, Watch* watch, NewGrpcMuxImpl& parent)
+        : type_url_(type_url), watch_(watch), parent_(parent) {}
+
+    ~WatchImpl() { remove(); }
+
+    void remove() {
+      if (watch_) {
+        parent_.removeWatch(type_url_, watch_);
+        watch_ = nullptr;
+      }
+    }
+
+    void update(const std::set<std::string>& resources) override {
+      parent_.updateWatch(type_url_, watch_, resources);
+    }
+
+  private:
+    const std::string type_url_;
+    Watch* watch_;
+    NewGrpcMuxImpl& parent_;
+  };
+
+  void removeWatch(const std::string& type_url, Watch* watch);
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
@@ -122,10 +141,10 @@ private:
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
-  GrpcStream<envoy::service::discovery::v3alpha::DeltaDiscoveryRequest,
-             envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>
+  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+             envoy::service::discovery::v3::DeltaDiscoveryResponse>
       grpc_stream_;
-  const envoy::config::core::v3alpha::ApiVersion transport_api_version_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;

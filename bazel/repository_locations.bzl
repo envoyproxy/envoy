@@ -216,12 +216,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"],
     ),
     com_google_googletest = dict(
-        sha256 = "cbd251a40485fddd44cdf641af6df2953d45695853af6d68aeb11c7efcde6771",
-        strip_prefix = "googletest-d7003576dd133856432e2e07340f45926242cc3a",
-        # 2019-07-16
-        # TODO(akonradi): Switch this back to a released version later than 1.8.1 once there is
-        # one available.
-        urls = ["https://github.com/google/googletest/archive/d7003576dd133856432e2e07340f45926242cc3a.tar.gz"],
+        sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
+        strip_prefix = "googletest-release-1.10.0",
+        urls = ["https://github.com/google/googletest/archive/release-1.10.0.tar.gz"],
     ),
     com_google_protobuf = dict(
         sha256 = "d7cfd31620a352b2ee8c1ed883222a0d77e44346643458e062e86b1d069ace3e",
@@ -266,8 +263,8 @@ REPOSITORY_LOCATIONS = dict(
     com_googlesource_chromium_v8 = dict(
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "7c897863d31569b4a4e16277d94415f1c42f3e130c1ff3573b048b76b15b635f",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-7.9.317.14.tar.gz"],
+        sha256 = "e46ebfd9752b54c13653ee4dd5af8533cb6722d938ba9496f034bc58391edb38",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz
@@ -305,14 +302,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/protocolbuffers/upb/archive/8a3ae1ef3e3e3f26b45dec735c5776737fc7247f.tar.gz"],
     ),
     kafka_source = dict(
-        sha256 = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1",  # 2.2.0-rc2
-        strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
-        urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
+        sha256 = "feaa32e5c42acf42bd587f8f0b1ccce679db227620da97eed013f4c44a44f64d",
+        strip_prefix = "kafka-2.3.1/clients/src/main/resources/common/message",
+        urls = ["https://github.com/apache/kafka/archive/2.3.1.zip"],
     ),
     kafka_server_binary = dict(
-        sha256 = "a009624fae678fa35968f945e18e45fbea9a30fa8080d5dcce7fdea726120027",
-        strip_prefix = "kafka_2.12-2.2.0",
-        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.2.0/kafka_2.12-2.2.0.tgz"],
+        sha256 = "5a3ddd4148371284693370d56f6f66c7a86d86dd96c533447d2a94d176768d2e",
+        strip_prefix = "kafka_2.12-2.3.1",
+        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.3.1/kafka_2.12-2.3.1.tgz"],
     ),
     kafka_python_client = dict(
         sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",

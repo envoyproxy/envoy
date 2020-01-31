@@ -8,13 +8,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/address_impl.h"
@@ -29,6 +28,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "ares.h"
 #include "ares_dns.h"
 #include "gtest/gtest.h"
@@ -166,7 +166,7 @@ private:
         // The response begins with the initial part of the request
         // (including the question section).
         const size_t response_base_len = HFIXEDSZ + name_len + QFIXEDSZ;
-        STACK_ARRAY(response_buf, unsigned char, response_base_len);
+        absl::FixedArray<unsigned char> response_buf(response_base_len);
         unsigned char* response_base = response_buf.begin();
         memcpy(response_base, request, response_base_len);
         DNS_HEADER_SET_QR(response_base, 1);
@@ -394,7 +394,7 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
 }
 
 TEST_F(DnsImplConstructor, BadCustomResolvers) {
-  envoy::config::core::v3alpha::Address pipe_address;
+  envoy::config::core::v3::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("foo");
   auto pipe_instance = Network::Utility::protobufAddressToAddress(pipe_address);
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}, false), EnvoyException,

@@ -6,6 +6,7 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     deps = [
+        "//envoy/annotations:pkg",
         "//envoy/api/v2/core:pkg",
         "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",
     ],

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/utility.h"
@@ -36,7 +36,6 @@ public:
   DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
                         SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                         std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
-  ~DeltaSubscriptionImpl() override;
 
   void pause();
   void resume();
@@ -49,11 +48,10 @@ public:
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void
-  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-                     added_resources,
-                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                 const std::string& system_version_info) override;
+  void onConfigUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
 
@@ -67,7 +65,7 @@ private:
   // NOTE: if another subscription of the same type_url has already been started, this value will be
   // ignored in favor of the other subscription's.
   std::chrono::milliseconds init_fetch_timeout_;
-  Watch* watch_{};
+  GrpcMuxWatchPtr watch_;
   const bool is_aggregated_;
 };
 

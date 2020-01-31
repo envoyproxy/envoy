@@ -7,17 +7,17 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/init/manager.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
-#include "envoy/service/runtime/v3alpha/rtds.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -81,7 +81,7 @@ public:
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
-  bool deprecatedFeatureEnabled(const std::string& key) const override;
+  bool deprecatedFeatureEnabled(const std::string& key, bool default_value) const override;
   bool runtimeFeatureEnabled(absl::string_view key) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
                       uint64_t num_buckets) const override;
@@ -89,9 +89,9 @@ public:
   bool featureEnabled(const std::string& key, uint64_t default_value,
                       uint64_t random_value) const override;
   bool featureEnabled(const std::string& key,
-                      const envoy::type::v3alpha::FractionalPercent& default_value) const override;
+                      const envoy::type::v3::FractionalPercent& default_value) const override;
   bool featureEnabled(const std::string& key,
-                      const envoy::type::v3alpha::FractionalPercent& default_value,
+                      const envoy::type::v3::FractionalPercent& default_value,
                       uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
@@ -203,30 +203,29 @@ class LoaderImpl;
 
 struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger::Id::runtime> {
   RtdsSubscription(LoaderImpl& parent,
-                   const envoy::config::bootstrap::v3alpha::RuntimeLayer::RtdsLayer& rtds_layer,
+                   const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string&) override;
-  void
-  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-                     added_resources,
-                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                 const std::string&) override;
+  void onConfigUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::service::runtime::v3alpha::Runtime>(resource).name();
+    return MessageUtil::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
   }
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
-  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
+  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
 
   LoaderImpl& parent_;
-  const envoy::config::core::v3alpha::ConfigSource config_source_;
+  const envoy::config::core::v3::ConfigSource config_source_;
   Stats::Store& store_;
   Config::SubscriptionPtr subscription_;
   std::string resource_name_;
@@ -246,7 +245,7 @@ using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
 class LoaderImpl : public Loader, Logger::Loggable<Logger::Id::runtime> {
 public:
   LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-             const envoy::config::bootstrap::v3alpha::LayeredRuntime& config,
+             const envoy::config::bootstrap::v3::LayeredRuntime& config,
              const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
              Stats::Store& store, RandomGenerator& generator,
              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
@@ -270,7 +269,7 @@ private:
   RuntimeStats stats_;
   AdminLayerPtr admin_layer_;
   ThreadLocal::SlotPtr tls_;
-  const envoy::config::bootstrap::v3alpha::LayeredRuntime config_;
+  const envoy::config::bootstrap::v3::LayeredRuntime config_;
   const std::string service_cluster_;
   Filesystem::WatcherPtr watcher_;
   Api::Api& api_;

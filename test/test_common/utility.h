@@ -12,8 +12,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
-#include "envoy/type/matcher/v3alpha/string.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
@@ -461,17 +461,13 @@ public:
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
-  static void renameFile(const std::string& old_name, const std::string& new_name);
-  static void createDirectory(const std::string& name);
-  static void createSymlink(const std::string& target, const std::string& link);
-
   /**
    * Return a prefix string matcher.
    * @param string prefix.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::v3alpha::StringMatcher createPrefixMatcher(std::string str) {
-    envoy::type::matcher::v3alpha::StringMatcher matcher;
+  static const envoy::type::matcher::v3::StringMatcher createPrefixMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix(str);
     return matcher;
   }
@@ -481,8 +477,8 @@ public:
    * @param string exact.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::v3alpha::StringMatcher createExactMatcher(std::string str) {
-    envoy::type::matcher::v3alpha::StringMatcher matcher;
+  static const envoy::type::matcher::v3::StringMatcher createExactMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(str);
     return matcher;
   }
@@ -492,8 +488,8 @@ public:
    * @param string exact.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::v3alpha::StringMatcher createRegexMatcher(std::string str) {
-    envoy::type::matcher::v3alpha::StringMatcher matcher;
+  static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_hidden_envoy_deprecated_regex(str);
     return matcher;
   }
@@ -509,6 +505,11 @@ public:
   static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
   static bool gaugesZeroed(
       const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges);
+
+  /**
+   * Returns the members of gauges that are not zero. Uses the same regex filter as gaugesZeroed().
+   */
+  static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
@@ -614,23 +615,6 @@ private:
   Thread::CondVar cv_;
   Thread::MutexBasicLockable mutex_;
   bool ready_{false};
-};
-
-/**
- * A utility class for atomically updating a file using symbolic link swap.
- */
-class AtomicFileUpdater {
-public:
-  AtomicFileUpdater(const std::string& filename);
-
-  void update(const std::string& contents);
-
-private:
-  const std::string link_;
-  const std::string new_link_;
-  const std::string target1_;
-  const std::string target2_;
-  bool use_target1_;
 };
 
 namespace Http {
@@ -768,9 +752,9 @@ MATCHER_P(RepeatedProtoEq, expected, "") {
 }
 
 MATCHER_P(Percent, rhs, "") {
-  envoy::type::v3alpha::FractionalPercent expected;
+  envoy::type::v3::FractionalPercent expected;
   expected.set_numerator(rhs);
-  expected.set_denominator(envoy::type::v3alpha::FractionalPercent::HUNDRED);
+  expected.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
 

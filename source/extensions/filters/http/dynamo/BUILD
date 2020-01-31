@@ -49,7 +49,7 @@ envoy_cc_extension(
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/dynamo/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/dynamo/v3:pkg_cc_proto",
     ],
 )
 

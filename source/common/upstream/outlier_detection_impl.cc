@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/cluster/v3alpha/outlier_detection.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/cluster/v3/outlier_detection.pb.h"
 #include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
@@ -24,7 +24,7 @@ namespace Upstream {
 namespace Outlier {
 
 DetectorSharedPtr DetectorImplFactory::createForCluster(
-    Cluster& cluster, const envoy::config::cluster::v3alpha::Cluster& cluster_config,
+    Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
   if (cluster_config.has_outlier_detection()) {
 
@@ -207,7 +207,7 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
   resetConsecutiveLocalOriginFailure();
 }
 
-DetectorConfig::DetectorConfig(const envoy::config::cluster::v3alpha::OutlierDetection& config)
+DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetection& config)
     : interval_ms_(
           static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(config, interval, DEFAULT_INTERVAL_MS))),
       base_ejection_time_ms_(static_cast<uint64_t>(
@@ -253,7 +253,7 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3alpha::OutlierDet
                                           DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
-                           const envoy::config::cluster::v3alpha::OutlierDetection& config,
+                           const envoy::config::cluster::v3::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                            TimeSource& time_source, EventLoggerSharedPtr event_logger)
     : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
@@ -276,7 +276,7 @@ DetectorImpl::~DetectorImpl() {
 
 std::shared_ptr<DetectorImpl>
 DetectorImpl::create(const Cluster& cluster,
-                     const envoy::config::cluster::v3alpha::OutlierDetection& config,
+                     const envoy::config::cluster::v3::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(

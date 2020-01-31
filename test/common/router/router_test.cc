@@ -2,9 +2,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -61,7 +61,7 @@ using testing::StartsWith;
 namespace Envoy {
 namespace Router {
 
-class TestFilter : public Filter {
+class RouterTestFilter : public Filter {
 public:
   using Filter::Filter;
   // Filter
@@ -243,10 +243,10 @@ public:
   void enableHedgeOnPerTryTimeout() {
     callbacks_.route_->route_entry_.hedge_policy_.hedge_on_per_try_timeout_ = true;
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_ =
-        envoy::type::v3alpha::FractionalPercent{};
+        envoy::type::v3::FractionalPercent{};
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_numerator(0);
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_denominator(
-        envoy::type::v3alpha::FractionalPercent::HUNDRED);
+        envoy::type::v3::FractionalPercent::HUNDRED);
   }
 
   void testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name);
@@ -256,7 +256,7 @@ public:
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
-  envoy::config::core::v3alpha::Locality upstream_locality_;
+  envoy::config::core::v3::Locality upstream_locality_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -267,7 +267,7 @@ public:
   MockShadowWriter* shadow_writer_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   FilterConfig config_;
-  TestFilter router_;
+  RouterTestFilter router_;
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
   Network::Address::InstanceConstSharedPtr host_address_{
@@ -298,8 +298,7 @@ public:
 
 TEST_F(RouterTest, UpdateFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  auto dummy_option =
-      absl::make_optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>();
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(dummy_option));
@@ -1481,37 +1480,7 @@ TEST_F(RouterTest, GrpcOkTrailersOnly) {
 }
 
 // Validate gRPC AlreadyExists response stats are sane when response is trailers only.
-TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnlyRuntimeGuard) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.outlier_detection_support_for_grpc_status", "false"}});
-  NiceMock<Http::MockStreamEncoder> encoder1;
-  Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
-        return nullptr;
-      }));
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "20S"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  Http::HeaderMapPtr response_headers(
-      new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "6"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-}
-
-// Validate gRPC AlreadyExists response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.outlier_detection_support_for_grpc_status", "true"}});
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -1535,38 +1504,7 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
 }
 
 // Validate gRPC Unavailable response stats are sane when response is trailers only.
-TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCodeRuntimeGuard) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.outlier_detection_support_for_grpc_status", "false"}});
-  NiceMock<Http::MockStreamEncoder> encoder1;
-  Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
-        return nullptr;
-      }));
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "20S"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  Http::HeaderMapPtr response_headers(
-      new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "14"}});
-  // Outlier detector will use the gRPC response status code.
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Validate gRPC Unavailable response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCode) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.outlier_detection_support_for_grpc_status", "true"}});
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -1591,37 +1529,7 @@ TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCode) {
 }
 
 // Validate gRPC Internal response stats are sane when response is trailers only.
-TEST_F(RouterTest, GrpcInternalTrailersOnlyRuntimeGuard) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.outlier_detection_support_for_grpc_status", "false"}});
-  NiceMock<Http::MockStreamEncoder> encoder1;
-  Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
-        return nullptr;
-      }));
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "20S"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  Http::HeaderMapPtr response_headers(
-      new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "13"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Validate gRPC Internal response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcInternalTrailersOnly) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.outlier_detection_support_for_grpc_status", "true"}});
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -3206,62 +3114,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
 }
 
 // Validate gRPC Cancelled response stats are sane when retry is taking effect.
-TEST_F(RouterTest, RetryUpstreamGrpcCancelledRuntimeGuard) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.outlier_detection_support_for_grpc_status", "false"}});
-  NiceMock<Http::MockStreamEncoder> encoder1;
-  Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
-        return nullptr;
-      }));
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers{{"x-envoy-retry-grpc-on", "cancelled"},
-                                  {"x-envoy-internal", "true"},
-                                  {"content-type", "application/grpc"},
-                                  {"grpc-timeout", "20S"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  // gRPC with status "cancelled" (1)
-  router_.retry_state_->expectHeadersRetry();
-  Http::HeaderMapPtr response_headers1(
-      new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "1"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  response_decoder->decodeHeaders(std::move(response_headers1), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-
-  // We expect the grpc-status to result in a retried request.
-  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
-  NiceMock<Http::MockStreamEncoder> encoder2;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
-        return nullptr;
-      }));
-  router_.retry_state_->callback_();
-
-  // Normal response.
-  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-  Http::HeaderMapPtr response_headers(
-      new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
-}
-
-// Validate gRPC Cancelled response stats are sane when retry is taking effect.
 TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.outlier_detection_support_for_grpc_status", "true"}});
   NiceMock<Http::MockStreamEncoder> encoder1;
   Http::StreamDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -4505,14 +4358,13 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
   }
   // Use default value instead of runtime key.
   {
-    envoy::type::v3alpha::FractionalPercent fractional_percent;
+    envoy::type::v3::FractionalPercent fractional_percent;
     fractional_percent.set_numerator(5);
-    fractional_percent.set_denominator(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND);
+    fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
     TestShadowPolicy policy("cluster", "foo", fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(
-        runtime.snapshot_,
-        featureEnabled("foo", Matcher<const envoy::type::v3alpha::FractionalPercent&>(_), 3))
+    EXPECT_CALL(runtime.snapshot_,
+                featureEnabled("foo", Matcher<const envoy::type::v3::FractionalPercent&>(_), 3))
         .WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
   }

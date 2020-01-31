@@ -1,5 +1,7 @@
 #include "common/config/version_converter.h"
 
+#include "envoy/common/exception.h"
+
 #include "common/common/assert.h"
 #include "common/config/api_type_oracle.h"
 #include "common/protobuf/well_known.h"
@@ -53,15 +55,15 @@ void traverseMutableMessage(ProtoVisitor& visitor, Protobuf::Message& message, c
   }
 }
 
-// Reinterpret a Protobuf message as another Protobuf message by converting to
-// wire format and back. This only works for messages that can be effectively
-// duck typed this way, e.g. with a subtype relationship modulo field name.
+// Reinterpret a Protobuf message as another Protobuf message by converting to wire format and back.
+// This only works for messages that can be effectively duck typed this way, e.g. with a subtype
+// relationship modulo field name.
 void wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
-  // This should always succeed, since we should be supplying compatible
-  // messages here, but provide a RELEASE_ASSERT as this is off critical path
-  // and we want to learn if it fails.
-  RELEASE_ASSERT(dst.ParseFromString(src.SerializeAsString()),
-                 "Unable to deserialize during wireCast()");
+  // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
+  // this can fail.
+  if (!dst.ParseFromString(src.SerializeAsString())) {
+    throw EnvoyException("Unable to deserialize during wireCast()");
+  }
 }
 
 // Create a new dynamic message based on some message wire cast to the target
@@ -115,7 +117,7 @@ void annotateWithOriginalType(const Protobuf::Descriptor& prev_descriptor,
       // ClusterManagerImpl with type erasure, but protobuf doesn't free up memory
       // as expected, we probably need some arena level trick to address this.
       if (prev_descriptor.full_name() == "envoy.api.v2.Cluster" &&
-          (field.name() == "hosts" || field.name() == "load_assignment")) {
+          (field.name() == "hidden_envoy_deprecated_hosts" || field.name() == "load_assignment")) {
         // This will cause the sub-message visit to abort early.
         return field.message_type();
       }
@@ -170,17 +172,18 @@ DynamicMessagePtr VersionConverter::recoverOriginal(const Protobuf::Message& upg
 }
 
 DynamicMessagePtr VersionConverter::downgrade(const Protobuf::Message& message) {
-  const Protobuf::Descriptor* prev_desc = ApiTypeOracle::getEarlierVersionDescriptor(message);
+  const Protobuf::Descriptor* prev_desc =
+      ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   return createForDescriptorWithCast(message, prev_desc);
 }
 
 std::string
 VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
-                                           envoy::config::core::v3alpha::ApiVersion api_version) {
+                                           envoy::config::core::v3::ApiVersion api_version) {
   DynamicMessagePtr dynamic_message;
   switch (api_version) {
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2: {
+  case envoy::config::core::v3::ApiVersion::AUTO:
+  case envoy::config::core::v3::ApiVersion::V2: {
     // TODO(htuch): this works as long as there are no new fields in the v3+
     // DiscoveryRequest. When they are added, we need to do a full v2 conversion
     // and also discard unknown fields. Tracked at
@@ -188,7 +191,7 @@ VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
     dynamic_message = downgrade(message);
     break;
   }
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA: {
+  case envoy::config::core::v3::ApiVersion::V3: {
     // We need to scrub the hidden fields.
     dynamic_message = std::make_unique<DynamicMessage>();
     dynamic_message->msg_.reset(message.New());
@@ -210,13 +213,13 @@ VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
   return json;
 }
 
-void VersionConverter::prepareMessageForGrpcWire(
-    Protobuf::Message& message, envoy::config::core::v3alpha::ApiVersion api_version) {
+void VersionConverter::prepareMessageForGrpcWire(Protobuf::Message& message,
+                                                 envoy::config::core::v3::ApiVersion api_version) {
   // TODO(htuch): this works as long as there are no new fields in the v3+
   // DiscoveryRequest. When they are added, we need to do a full v2 conversion
   // and also discard unknown fields. Tracked at
   // https://github.com/envoyproxy/envoy/issues/9619.
-  if (api_version == envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {
+  if (api_version == envoy::config::core::v3::ApiVersion::V3) {
     VersionUtil::scrubHiddenEnvoyDeprecated(message);
   }
   eraseOriginalTypeInformation(message);

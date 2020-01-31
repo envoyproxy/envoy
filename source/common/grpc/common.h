@@ -55,6 +55,20 @@ public:
                                                           bool allow_user_defined = false);
 
   /**
+   * Returns the GrpcStatus code from the set of trailers, headers, and StreamInfo, if present.
+   * @param trailers the trailers to parse for a status code
+   * @param headers the headers to parse if no status code was found in the trailers
+   * @param info the StreamInfo to check for HTTP response code if no code was found in the trailers
+   * or headers
+   * @return absl::optional<Status::GrpcStatus> the parsed status code or absl::nullopt if no status
+   * is found
+   */
+  static absl::optional<Status::GrpcStatus> getGrpcStatus(const Http::HeaderMap& trailers,
+                                                          const Http::HeaderMap& headers,
+                                                          const StreamInfo::StreamInfo& info,
+                                                          bool allow_user_defined = false);
+
+  /**
    * Returns the grpc-message from a given set of trailers, if present.
    * @param trailers the trailers to parse.
    * @return std::string the gRPC status message or empty string if grpc-message is not present in

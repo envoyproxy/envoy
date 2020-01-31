@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"
@@ -362,7 +362,6 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(1UL, store_->counters().size());
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(TestUtility::findByName(store_->counters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_, _));
@@ -531,7 +530,7 @@ TEST_F(LookupWithStatNameTest, NotFound) {
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  envoy::config::metrics::v3alpha::StatsConfig stats_config_;
+  envoy::config::metrics::v3::StatsConfig stats_config_;
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
@@ -840,7 +839,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   EXPECT_EQ("h1", store_->histograms()[0]->name());
 
   // Will effectively block all stats, and remove all the non-matching stats.
-  envoy::config::metrics::v3alpha::StatsConfig stats_config;
+  envoy::config::metrics::v3::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
@@ -895,7 +894,7 @@ protected:
     store_->addSink(sink_);
 
     // Use a tag producer that will produce tags.
-    envoy::config::metrics::v3alpha::StatsConfig stats_config;
+    envoy::config::metrics::v3::StatsConfig stats_config;
     store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
   }
 
@@ -921,9 +920,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
   init(true);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 14892880); // Oct 28, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 15 * million_);
+      100, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 1358576); // Jan 23, 2020
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.4 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
@@ -931,9 +930,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17121392); // Oct 28, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million_);
+      100, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 1498128); // Jan 23, 2020
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.6 * million_);
 }
 
 // Tests how much memory is consumed allocating 100k stats.
@@ -941,9 +940,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   init(false);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 8017968); // Oct 28, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 9 * million_);
+      100, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 689648); // Jan 23, 2020
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.75 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
@@ -951,9 +950,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 10246480); // Oct 28, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 11 * million_);
+      100, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 829200); // Jan 23, 2020
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.9 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

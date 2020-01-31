@@ -12,19 +12,18 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/codec.h"
-#include "envoy/service/runtime/v3alpha/rtds.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
-#include "common/common/stack_array.h"
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/resources.h"
@@ -38,6 +37,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
@@ -100,9 +100,9 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
   // containing 10 bytes while rhs has ten slices containing one byte each.
   uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
   uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
-  STACK_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
+  absl::FixedArray<Buffer::RawSlice> lhs_slices(lhs_num_slices);
   lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
-  STACK_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
+  absl::FixedArray<Buffer::RawSlice> rhs_slices(rhs_num_slices);
   rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
   size_t rhs_slice = 0;
   size_t rhs_offset = 0;
@@ -202,25 +202,23 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
 
 std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return TestUtility::anyConvert<envoy::config::listener::v3alpha::Listener>(resource).name();
+    return TestUtility::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return TestUtility::anyConvert<envoy::config::route::v3alpha::RouteConfiguration>(resource)
-        .name();
+    return TestUtility::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return TestUtility::anyConvert<envoy::config::cluster::v3alpha::Cluster>(resource).name();
+    return TestUtility::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return TestUtility::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
-               resource)
+    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
         .cluster_name();
   }
   if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
-    return TestUtility::anyConvert<envoy::config::route::v3alpha::VirtualHost>(resource).name();
+    return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Runtime) {
-    return TestUtility::anyConvert<envoy::service::runtime::v3alpha::Runtime>(resource).name();
+    return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
   }
   throw EnvoyException(
       absl::StrCat("xdsResourceName does not know about type URL ", resource.type_url()));
@@ -244,43 +242,6 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
   std::transform(tokens_sv.begin(), tokens_sv.end(), std::back_inserter(ret),
                  [](absl::string_view sv) { return std::string(sv); });
   return ret;
-}
-
-void TestUtility::renameFile(const std::string& old_name, const std::string& new_name) {
-#ifdef WIN32
-  // use MoveFileEx, since ::rename will not overwrite an existing file. See
-  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
-  const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
-  ASSERT_NE(0, rc);
-#else
-  const int rc = ::rename(old_name.c_str(), new_name.c_str());
-  ASSERT_EQ(0, rc);
-#endif
-};
-
-void TestUtility::createDirectory(const std::string& name) {
-#ifdef WIN32
-  ::_mkdir(name.c_str());
-#else
-  ::mkdir(name.c_str(), S_IRWXU);
-#endif
-}
-
-void TestUtility::createSymlink(const std::string& target, const std::string& link) {
-#ifdef WIN32
-  const DWORD attributes = ::GetFileAttributes(target.c_str());
-  ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
-  int flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
-  if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
-    flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
-  }
-
-  const BOOLEAN rc = ::CreateSymbolicLink(link.c_str(), target.c_str(), flags);
-  ASSERT_NE(rc, 0);
-#else
-  const int rc = ::symlink(target.c_str(), link.c_str());
-  ASSERT_EQ(rc, 0);
-#endif
 }
 
 // static
@@ -311,16 +272,22 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
 }
 
 // static
-bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
-  // Returns true if all gauges are 0 except the circuit_breaker remaining resource
+std::string TestUtility::nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges) {
+  // Returns all gauges that are 0 except the circuit_breaker remaining resource
   // gauges which default to the resource max.
   std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+  std::string non_zero;
   for (const Stats::GaugeSharedPtr& gauge : gauges) {
     if (!std::regex_match(gauge->name(), omitted) && gauge->value() != 0) {
-      return false;
+      non_zero.append(fmt::format("{}: {}; ", gauge->name(), gauge->value()));
     }
   }
-  return true;
+  return non_zero;
+}
+
+// static
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
+  return nonZeroedGauges(gauges).empty();
 }
 
 // static
@@ -361,27 +328,6 @@ void ConditionalInitializer::wait() {
   while (!ready_) {
     cv_.wait(mutex_);
   }
-}
-
-AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
-    : link_(filename), new_link_(absl::StrCat(filename, ".new")),
-      target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
-      use_target1_(true) {
-  unlink(link_.c_str());
-  unlink(new_link_.c_str());
-  unlink(target1_.c_str());
-  unlink(target2_.c_str());
-}
-
-void AtomicFileUpdater::update(const std::string& contents) {
-  const std::string target = use_target1_ ? target1_ : target2_;
-  use_target1_ = !use_target1_;
-  {
-    std::ofstream file(target, std::ios_base::binary);
-    file << contents;
-  }
-  TestUtility::createSymlink(target, new_link_);
-  TestUtility::renameFile(new_link_, link_);
 }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;

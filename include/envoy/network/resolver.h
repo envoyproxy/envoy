@@ -6,7 +6,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/network/address.h"
 
@@ -27,7 +27,7 @@ public:
    * @return InstanceConstSharedPtr appropriate Address::Instance.
    */
   virtual InstanceConstSharedPtr
-  resolve(const envoy::config::core::v3alpha::SocketAddress& socket_address) PURE;
+  resolve(const envoy::config::core::v3::SocketAddress& socket_address) PURE;
 
   std::string category() const override { return "envoy.resolvers"; }
 };

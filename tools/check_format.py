@@ -46,6 +46,7 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
+    "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
     "./test/common/config/version_converter_test.cc",
@@ -163,13 +164,33 @@ UNOWNED_EXTENSIONS = {
 # yapf: enable
 
 
-# Map a line transformation function across each line of a file.
-# .bak temporaries.
-def replaceLines(path, line_xform):
+# Map a line transformation function across each line of a file,
+# writing the result lines as requested.
+# If there is a clang format nesting or mismatch error, return the first occurrence
+def evaluateLines(path, line_xform, write=True):
+  error_message = None
+  format_flag = True
+  output_lines = []
+  for line_number, line in enumerate(readLines(path)):
+    if line.find("// clang-format off") != -1:
+      if not format_flag and error_message is None:
+        error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested off")
+      format_flag = False
+    if line.find("// clang-format on") != -1:
+      if format_flag and error_message is None:
+        error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested on")
+      format_flag = True
+    if format_flag:
+      output_lines.append(line_xform(line, line_number))
+    else:
+      output_lines.append(line)
   # We used to use fileinput in the older Python 2.7 script, but this doesn't do
   # inplace mode and UTF-8 in Python 3, so doing it the manual way.
-  output_lines = [line_xform(line) for line in readLines(path)]
-  pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
+  if write:
+    pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
+  if not format_flag and error_message is None:
+    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format remains off")
+  return error_message
 
 
 # Obtain all the lines in a given file.
@@ -217,7 +238,7 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 8.x.x "
+        "Command {} not found. If you have clang-format in version 9.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
@@ -237,13 +258,13 @@ def checkTools():
                               "users".format(path))
     else:
 
-      error_messages.append(
-          "Command {} not found. If you have buildifier installed, but the binary "
-          "name is different or it's not available in $GOPATH/bin, please use "
-          "{} environment variable to specify the path. Example:\n"
-          "    export {}=/opt/bin/buildifier\n"
-          "If you don't have buildifier installed, you can install it by:\n"
-          "    go get -u github.com/bazelbuild/buildtools/{}".format(path, var, var, name))
+      error_messages.append("Command {} not found. If you have {} installed, but the binary "
+                            "name is different or it's not available in $GOPATH/bin, please use "
+                            "{} environment variable to specify the path. Example:\n"
+                            "    export {}=`which {}`\n"
+                            "If you don't have {} installed, you can install it by:\n"
+                            "    go get -u github.com/bazelbuild/buildtools/{}".format(
+                                path, name, var, var, name, name, name))
 
   checkBazelTool('buildifier', BUILDIFIER_PATH, 'BUILDIFIER_BIN')
   checkBazelTool('buildozer', BUILDOZER_PATH, 'BUILDOZER_BIN')
@@ -408,19 +429,24 @@ def checkFileContents(file_path, checker):
     # notes have a different format.
     checkCurrentReleaseNotes(file_path, error_messages)
 
-  for line_number, line in enumerate(readLines(file_path)):
+  def checkFormatErrors(line, line_number):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
     checker(line, file_path, reportError)
+
+  evaluate_failure = evaluateLines(file_path, checkFormatErrors, False)
+  if evaluate_failure is not None:
+    error_messages.append(evaluate_failure)
+
   return error_messages
 
 
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 
 
-def fixSourceLine(line):
+def fixSourceLine(line, line_number):
   # Strip double space after '.'  This may prove overenthusiastic and need to
   # be restricted to comments and metadata files but works for now.
   line = re.sub(DOT_MULTI_SPACE_REGEX, ". ", line)
@@ -605,7 +631,7 @@ def checkBuildLine(line, file_path, reportError):
     reportError("Superfluous '@envoy//' prefix")
 
 
-def fixBuildLine(file_path, line):
+def fixBuildLine(file_path, line, line_number):
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
       not isExternalBuildFile(file_path)):
     line = line.replace("@envoy//", "//")
@@ -613,7 +639,7 @@ def fixBuildLine(file_path, line):
 
 
 def fixBuildPath(file_path):
-  replaceLines(file_path, functools.partial(fixBuildLine, file_path))
+  evaluateLines(file_path, functools.partial(fixBuildLine, file_path))
 
   error_messages = []
 
@@ -653,7 +679,7 @@ def checkBuildPath(file_path):
 
 
 def fixSourcePath(file_path):
-  replaceLines(file_path, fixSourceLine)
+  evaluateLines(file_path, fixSourceLine)
 
   error_messages = []
 

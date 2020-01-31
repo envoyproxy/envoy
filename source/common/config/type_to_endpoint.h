@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 
 #include "common/protobuf/protobuf.h"
 

@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/router/v3alpha/router.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -189,7 +189,7 @@ public:
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
-               const envoy::extensions::filters::http::router::v3alpha::Router& config)
+               const envoy::extensions::filters::http::router::v3::Router& config)
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
@@ -565,7 +565,7 @@ private:
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  std::unique_ptr<Stats::StatNameManagedStorage> alt_stat_prefix_;
+  std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;

@@ -1,9 +1,8 @@
 #include <memory>
 
-#include "envoy/extensions/filters/http/gzip/v3alpha/gzip.pb.h"
+#include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "common/common/hex.h"
-#include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
@@ -15,6 +14,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "gtest/gtest.h"
 
 using testing::Return;
@@ -66,7 +66,7 @@ protected:
   // GzipFilterTest Helpers
   void setUpFilter(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    envoy::extensions::filters::http::gzip::v3alpha::Gzip gzip;
+    envoy::extensions::filters::http::gzip::v3::Gzip gzip;
     TestUtility::loadFromJson(json, gzip);
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
     filter_ = std::make_unique<GzipFilter>(config_);
@@ -119,7 +119,7 @@ protected:
 
   void expectValidFinishedBuffer(const uint32_t content_length) {
     uint64_t num_comp_slices = data_.getRawSlices(nullptr, 0);
-    STACK_ARRAY(compressed_slices, Buffer::RawSlice, num_comp_slices);
+    absl::FixedArray<Buffer::RawSlice> compressed_slices(num_comp_slices);
     data_.getRawSlices(compressed_slices.begin(), num_comp_slices);
 
     const std::string header_hex_str = Hex::encode(

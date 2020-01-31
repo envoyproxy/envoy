@@ -1,7 +1,7 @@
 #include "extensions/transport_sockets/tls/config.h"
 
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.validate.h"
 
 #include "common/protobuf/utility.h"
 
@@ -18,15 +18,15 @@ Network::TransportSocketFactoryPtr UpstreamSslSocketFactory::createTransportSock
     Server::Configuration::TransportSocketFactoryContext& context) {
   auto client_config = std::make_unique<ClientContextConfigImpl>(
       MessageUtil::downcastAndValidate<
-          const envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext&>(
+          const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&>(
           message, context.messageValidationVisitor()),
       context);
-  return std::make_unique<ClientSslSocketFactory>(
-      std::move(client_config), context.sslContextManager(), context.statsScope());
+  return std::make_unique<ClientSslSocketFactory>(std::move(client_config),
+                                                  context.sslContextManager(), context.scope());
 }
 
 ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext>();
+  return std::make_unique<envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext>();
 }
 
 REGISTER_FACTORY(UpstreamSslSocketFactory,
@@ -37,16 +37,15 @@ Network::TransportSocketFactoryPtr DownstreamSslSocketFactory::createTransportSo
     const std::vector<std::string>& server_names) {
   auto server_config = std::make_unique<ServerContextConfigImpl>(
       MessageUtil::downcastAndValidate<
-          const envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext&>(
+          const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext&>(
           message, context.messageValidationVisitor()),
       context);
   return std::make_unique<ServerSslSocketFactory>(
-      std::move(server_config), context.sslContextManager(), context.statsScope(), server_names);
+      std::move(server_config), context.sslContextManager(), context.scope(), server_names);
 }
 
 ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
-  return std::make_unique<
-      envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext>();
+  return std::make_unique<envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>();
 }
 
 REGISTER_FACTORY(DownstreamSslSocketFactory,

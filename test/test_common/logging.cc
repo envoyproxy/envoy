@@ -21,7 +21,7 @@ LogLevelSetter::~LogLevelSetter() {
   ASSERT(prev_level == previous_levels_.end());
 }
 
-LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkPtr log_sink)
+LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
     : Logger::SinkDelegate(log_sink) {}
 LogRecordingSink::~LogRecordingSink() = default;
 
