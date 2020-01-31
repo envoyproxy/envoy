@@ -44,6 +44,10 @@ private:
   // the scope will drop exactly those stats whose names have not already been accessed through
   // another store/scope.
   ScopePtr temp_scope_;
+
+  Store& store_;
+  absl::flat_hash_map<std::string, uint64_t> counter_deltas_;
+  absl::flat_hash_map<std::string, uint64_t> gauge_values_;
 };
 
 } // namespace Stats

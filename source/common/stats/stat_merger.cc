@@ -3,12 +3,35 @@
 namespace Envoy {
 namespace Stats {
 
-StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
+StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")),
+                                                     store_(target_store) {}
 
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
-  for (const auto& counter : counter_deltas) {
-    temp_scope_->counter(counter.first).add(counter.second);
+  absl::flat_hash_map<std::string, CounterSharedPtr> name_to_counter_map;
+  for (const CounterSharedPtr& counter : store_.counters()) {
+    name_to_counter_map[counter->name()] = counter;
   }
+
+  // Combine the incoming deltas with any leftover from the previous call to mergeCounters.
+  for (const auto& counter : counter_deltas) {
+    counter_deltas_[counter.first] += counter.second;
+  }
+
+  // Iterate over the combined deltas, applying them to the active counters in
+  // name_to_counter_map.  If there is no match, e.g. because the child process
+  // has not populated the stats being sent yet, then we save them for the next
+  // iteration of mergeCounters in 'unmatched', which we'll swap into the data
+  // structure afterward, so we don't modify a map we are iterating over.
+  absl::flat_hash_map<std::string, uint64_t> unmatched;
+  for (const auto& counter : counter_deltas_) {
+    auto iter = name_to_counter_map.find(counter.first);
+    if (iter == name_to_counter_map.end()) {
+      unmatched[counter.first] = counter.second;
+    } else {
+      iter->second->add(counter.second);
+    }
+  }
+  counter_deltas_.swap(unmatched);
 }
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
