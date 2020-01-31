@@ -58,7 +58,7 @@ void AutonomousStream::sendResponse() {
   int32_t response_body_length = 10;
   HeaderToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
 
-  encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  encodeHeaders(upstream_.responseHeaders(), false);
   encodeData(response_body_length, true);
 }
 
@@ -107,6 +107,18 @@ void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
 std::unique_ptr<Http::TestHeaderMapImpl> AutonomousUpstream::lastRequestHeaders() {
   Thread::LockGuard lock(headers_lock_);
   return std::move(last_request_headers_);
+}
+
+void AutonomousUpstream::setResponseHeaders(
+    std::unique_ptr<Http::TestHeaderMapImpl>&& response_headers) {
+  Thread::LockGuard lock(headers_lock_);
+  response_headers_ = std::move(response_headers);
+}
+
+Http::TestHeaderMapImpl AutonomousUpstream::responseHeaders() {
+  Thread::LockGuard lock(headers_lock_);
+  Http::TestHeaderMapImpl return_headers = *response_headers_;
+  return return_headers;
 }
 
 } // namespace Envoy
