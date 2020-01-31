@@ -47,7 +47,7 @@ func startCollectingStats(server server.Server, cluster string, upstreamClusters
 	go func() {
 		for range ticker.C {
 			server.SendResponse(cluster, upstreamClusters, frequency)
-			counter++
+			return
 		}
 	}()
 }
@@ -56,6 +56,7 @@ type callbacks struct {
 }
 
 func (c *callbacks) OnStreamOpen(ctx context.Context, streamID int64) error {
+    return  nil
 }
 
 func (c *callbacks) OnStreamClosed(streamID int64) {

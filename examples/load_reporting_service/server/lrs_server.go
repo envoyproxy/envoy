@@ -73,7 +73,6 @@ func (s *server) process(stream stream, reqCh <-chan *gcpLoadStats.LoadStatsRequ
 			log.Print("Connection ended")
 			return nil
 		case req, more := <-reqCh:
-			log.Printf("Got response from cluster `%s`", req.Node.Cluster)
 			// input stream ended or errored out
 			if !more {
 				return nil
@@ -139,7 +138,7 @@ func (s *server) SendResponse(cluster string, upstreamClusters []string, frequen
 		return
 	}
 
-	log.Printf("Creating LRS response with frequency (in secs) as %d", frequency)
+	log.Printf("Creating LRS response with frequency - %d secs", frequency)
 	err := clusterDetails.stream.Send(&gcpLoadStats.LoadStatsResponse{
 		Clusters:                  upstreamClusters,
 		LoadReportingInterval:     &duration.Duration{Seconds: frequency},
