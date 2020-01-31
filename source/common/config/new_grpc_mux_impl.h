@@ -119,8 +119,6 @@ private:
   // of subscriptions were activated.
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
 
-  const LocalInfo::LocalInfo& local_info_;
-
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue. See class for
   // description of how it interacts with pause() and resume().
@@ -136,7 +134,10 @@ private:
   GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
              envoy::service::discovery::v3::DeltaDiscoveryResponse>
       grpc_stream_;
+
   const envoy::config::core::v3::ApiVersion transport_api_version_;
+
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;
