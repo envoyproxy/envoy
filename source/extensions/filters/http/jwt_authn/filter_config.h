@@ -66,7 +66,7 @@ public:
   static std::shared_ptr<FilterConfig>
   create(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
          const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-    auto ptr = std::shared_ptr<FilterConfig>(new FilterConfig(proto_config, stats_prefix, context));
+    std::shared_ptr<FilterConfig> ptr(new FilterConfig(proto_config, stats_prefix, context));
     ptr->init();
     return ptr;
   }
