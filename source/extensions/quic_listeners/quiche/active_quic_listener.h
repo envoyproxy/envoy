@@ -48,7 +48,7 @@ public:
 
 private:
   friend class ActiveQuicListenerPeer;
-
+  // todo (nezdolik) Propagate shutdown signal from udp listener to quick listener
   Network::UdpListenerPtr udp_listener_;
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;

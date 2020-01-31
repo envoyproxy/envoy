@@ -41,7 +41,9 @@ message ActiveQuicListenerConfig {
   enum QuicShutDownMode {
     // Stop accepting connections and reading packets, send resets to active sessions.
     GRACEFUL_SHUTDOWN = 0;
-    // Stop processing new packets and terminate sessions immediately.
+
+    // Stop accepting connections and reading packets, terminate sessions and close connections
+    // immediately.
     HARD_SHUTDOWN = 1;
   }
 

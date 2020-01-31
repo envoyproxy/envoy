@@ -7,8 +7,6 @@ import "google/protobuf/struct.proto";
 
 import "udpa/annotations/versioning.proto";
 
-import "validate/validate.proto";
-
 option java_package = "io.envoyproxy.envoy.config.listener.v3alpha";
 option java_outer_classname = "UdpListenerConfigProto";
 option java_multiple_files = true;
@@ -39,18 +37,4 @@ message UdpListenerConfig {
 message ActiveRawUdpListenerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.ActiveRawUdpListenerConfig";
-
-  enum UdpShutDownMode {
-    // Stop reading new datagrams and send public resets to active sessions.
-    GRACEFUL_SHUTDOWN = 0;
-    // Stop processing new datagrams and destroy sessions immediately.
-    HARD_SHUTDOWN = 1;
-  }
-
-  UdpShutDownMode shutdown_mode = 1 [(validate.rules).enum = {defined_only: true}];
-
-  // If set to false, listener will stop reading new datagrams and shutdown active sessions.
-  // Shutdown type is configured with
-  // :ref:`shutdown_mode<envoy_api_field_ActiveRawUdpListenerConfig.shutdown_mode>`.
-  bool enabled = 2;
 }
