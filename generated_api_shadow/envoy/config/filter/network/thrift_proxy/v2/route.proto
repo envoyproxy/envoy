@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.filter.network.thrift_proxy.v2alpha1;
+package envoy.config.filter.network.thrift_proxy.v2;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route_components.proto";
@@ -10,7 +10,7 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.filter.network.thrift_proxy.v2alpha1";
+option java_package = "io.envoyproxy.envoy.config.filter.network.thrift_proxy.v2";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
@@ -51,15 +51,15 @@ message RouteMatch {
   }
 
   // Inverts whatever matching is done in the :ref:`method_name
-  // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.method_name>` or
+  // <envoy_api_field_config.filter.network.thrift_proxy.v2.RouteMatch.method_name>` or
   // :ref:`service_name
-  // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.service_name>` fields.
+  // <envoy_api_field_config.filter.network.thrift_proxy.v2.RouteMatch.service_name>` fields.
   // Cannot be combined with wildcard matching as that would result in routes never being matched.
   //
   // .. note::
   //
   //   This does not invert matching done as part of the :ref:`headers field
-  //   <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.headers>` field. To
+  //   <envoy_api_field_config.filter.network.thrift_proxy.v2.RouteMatch.headers>` field. To
   //   invert header matching, see :ref:`invert_match
   //   <envoy_api_field_route.HeaderMatcher.invert_match>`.
   bool invert = 3;
@@ -97,7 +97,7 @@ message RouteAction {
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
   // the upstream cluster with metadata matching what is set in this field will be considered.
   // Note that this will be merged with what's provided in :ref:`WeightedCluster.metadata_match
-  // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.ClusterWeight.metadata_match>`,
+  // <envoy_api_field_config.filter.network.thrift_proxy.v2.WeightedCluster.ClusterWeight.metadata_match>`,
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
   api.v2.core.Metadata metadata_match = 3;
@@ -128,7 +128,7 @@ message WeightedCluster {
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field, combined with what's
     // provided in :ref:`RouteAction's metadata_match
-    // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteAction.metadata_match>`,
+    // <envoy_api_field_config.filter.network.thrift_proxy.v2.RouteAction.metadata_match>`,
     // will be considered. Values here will take precedence. Keys and values should be provided
     // under the "envoy.lb" metadata key.
     api.v2.core.Metadata metadata_match = 3;

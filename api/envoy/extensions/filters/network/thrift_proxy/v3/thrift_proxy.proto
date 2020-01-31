@@ -60,7 +60,7 @@ enum ProtocolType {
 // [#next-free-field: 6]
 message ThriftProxy {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy";
+      "envoy.config.filter.network.thrift_proxy.v2.ThriftProxy";
 
   // Supplies the type of transport that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_TRANSPORT<envoy_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`.
@@ -86,7 +86,7 @@ message ThriftProxy {
 // ThriftFilter configures a Thrift filter.
 message ThriftFilter {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftFilter";
+      "envoy.config.filter.network.thrift_proxy.v2.ThriftFilter";
 
   reserved 2;
 
@@ -113,7 +113,7 @@ message ThriftFilter {
 // keyed by the name `envoy.filters.network.thrift_proxy`.
 message ThriftProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProtocolOptions";
+      "envoy.config.filter.network.thrift_proxy.v2.ThriftProtocolOptions";
 
   // Supplies the type of transport that the Thrift proxy should use for upstream connections.
   // Selecting
