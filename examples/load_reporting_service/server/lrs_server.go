@@ -11,9 +11,6 @@ import (
 	gcpLoadStats "github.com/envoyproxy/go-control-plane/envoy/service/load_stats/v2"
 )
 
-/*var EnableStatsClusters []string
-var EnabledClusters []string
-*/
 type NodeMetadata struct {
 	stream stream
 	node   *core.Node
@@ -70,28 +67,23 @@ func (s *server) process(stream stream, reqCh <-chan *gcpLoadStats.LoadStatsRequ
 		}
 	}
 
-	//var response chan *gcpLoadStats.LoadStatsResponse
-
 	for {
 		select {
 		case <-s.ctx.Done():
 			log.Print("Connection ended")
 			return nil
-		/*case resp := <- response:
-		if s.callbacks != nil {
-			s.callbacks.OnStreamResponse(streamID, resp)
-		}
-		log.Print("Sending response with load stats frequency (in secs) of ", resp.LoadReportingInterval.Seconds)
-		err := stream.Send(resp)
-		if err != nil{
-			log.Panicf("Unable to send response - %s", err)
-		}*/
 		case req, more := <-reqCh:
 			log.Printf("Got response from cluster `%s`", req.Node.Cluster)
 			// input stream ended or errored out
 			if !more {
 				return nil
 			}
+
+			if s.callbacks != nil {
+                if err := s.callbacks.OnStreamRequest(streamID, req); err != nil {
+                    return err
+                }
+            }
 
 			clusterName := req.GetNode().GetCluster()
 			if _, exist := s.lrsCache[clusterName]; !exist {
@@ -105,12 +97,6 @@ func (s *server) process(stream stream, reqCh <-chan *gcpLoadStats.LoadStatsRequ
 					if len(req.ClusterStats[i].UpstreamLocalityStats) > 0 {
 						log.Printf("Got stats from cluster `%s` - %s", req.Node.Cluster, req.GetClusterStats()[i])
 					}
-				}
-			}
-
-			if s.callbacks != nil {
-				if err := s.callbacks.OnStreamRequest(streamID, req); err != nil {
-					return err
 				}
 			}
 		}
@@ -137,7 +123,6 @@ func (s *server) handler(stream stream) error {
 	}()
 
 	err := s.process(stream, reqCh)
-
 	atomic.StoreInt32(&reqStop, 1)
 
 	return err
@@ -146,36 +131,6 @@ func (s *server) handler(stream stream) error {
 func (s *server) StreamLoadStats(stream gcpLoadStats.LoadReportingService_StreamLoadStatsServer) error {
 	return s.handler(stream)
 }
-
-/*func (s *server) ClustersConnected(request *gcpLoadStats.LoadStatsRequest) chan *gcpLoadStats.LoadStatsResponse{
-	responseChan := make(chan *gcpLoadStats.LoadStatsResponse, 1)
-
-	for _, alreadyEnabledCluster := range EnabledClusters{
-		if request.GetNode().GetCluster() == alreadyEnabledCluster{
-			return responseChan
-		}
-	}
-
-	var removeClusterIndex []int
-	for index, cluster := range EnableStatsClusters{
-		if request.GetNode().GetCluster() == cluster{
-			responseChan <- &gcpLoadStats.LoadStatsResponse{
-				Clusters: []string{cluster},
-				LoadReportingInterval: &duration.Duration{Seconds: 7},
-				ReportEndpointGranularity: false,
-			}
-
-			removeClusterIndex = append(removeClusterIndex, index)
-			EnabledClusters = append(EnabledClusters, cluster)
-		}
-	}
-
-	for _, ClusterIndex := range removeClusterIndex{
-		EnableStatsClusters = append(EnableStatsClusters[:ClusterIndex], EnableStatsClusters[ClusterIndex+1:]...)
-	}
-
-	return responseChan
-}*/
 
 func (s *server) SendResponse(cluster string, upstreamClusters []string, frequency int64) {
 	clusterDetails, exist := s.lrsCache[cluster]

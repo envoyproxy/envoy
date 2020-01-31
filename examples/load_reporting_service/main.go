@@ -18,7 +18,7 @@ func main() {
 
 	// Start gRPC server
 	g.Go(func() error {
-		address := "127.0.0.1:18000"
+		address := ":18000"
 		lis, err := net.Listen("tcp", address)
 		if err != nil {
 			panic(err)
@@ -42,13 +42,10 @@ func main() {
 }
 
 func startCollectingStats(server server.Server, cluster string, upstreamClusters []string, frequency int64) {
+    // Send LoadStatsResponse after 10 seconds to initiate the Load Reporting
 	ticker := time.NewTicker(time.Duration(10) * time.Second)
-	counter := 0
 	go func() {
 		for range ticker.C {
-			if counter == 2 {
-				return
-			}
 			server.SendResponse(cluster, upstreamClusters, frequency)
 			counter++
 		}
@@ -59,8 +56,6 @@ type callbacks struct {
 }
 
 func (c *callbacks) OnStreamOpen(ctx context.Context, streamID int64) error {
-	log.Printf("Stream open from cluster %s", ctx)
-	return nil
 }
 
 func (c *callbacks) OnStreamClosed(streamID int64) {
