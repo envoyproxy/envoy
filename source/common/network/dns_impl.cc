@@ -78,7 +78,7 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
                                                                    ares_addrinfo* addrinfo) {
   // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
-  // broken. Mark the channel dirty so that it is destroyed and reinitialized on a subsequest call
+  // broken. Mark the channel dirty so that it is destroyed and reinitialized on a subsequent call
   // to DnsResolver::resolve(). The optimal solution would be for c-ares to reinitialize the
   // channel, and not have Envoy track side effects.
   // context: https://github.com/envoyproxy/envoy/issues/4543 and
