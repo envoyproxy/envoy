@@ -31,6 +31,84 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+namespace Http2 {
+namespace Utility {
+
+const uint32_t OptionsLimits::MIN_HPACK_TABLE_SIZE;
+const uint32_t OptionsLimits::DEFAULT_HPACK_TABLE_SIZE;
+const uint32_t OptionsLimits::MAX_HPACK_TABLE_SIZE;
+const uint32_t OptionsLimits::MIN_MAX_CONCURRENT_STREAMS;
+const uint32_t OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS;
+const uint32_t OptionsLimits::MAX_MAX_CONCURRENT_STREAMS;
+const uint32_t OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE;
+const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
+const uint32_t OptionsLimits::MAX_INITIAL_CONNECTION_WINDOW_SIZE;
+const uint32_t OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES;
+const uint32_t OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
+const uint32_t OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
+
+envoy::config::core::v3::Http2ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
+  envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
+  if (!options_clone.has_hpack_table_size()) {
+    options_clone.mutable_hpack_table_size()->set_value(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
+  }
+  ASSERT(options_clone.hpack_table_size().value() <= OptionsLimits::MAX_HPACK_TABLE_SIZE);
+  if (!options_clone.has_max_concurrent_streams()) {
+    options_clone.mutable_max_concurrent_streams()->set_value(
+        OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+  }
+  ASSERT(
+      options_clone.max_concurrent_streams().value() >= OptionsLimits::MIN_MAX_CONCURRENT_STREAMS &&
+      options_clone.max_concurrent_streams().value() <= OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
+  if (!options_clone.has_initial_stream_window_size()) {
+    options_clone.mutable_initial_stream_window_size()->set_value(
+        OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  }
+  ASSERT(options_clone.initial_stream_window_size().value() >=
+             OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE &&
+         options_clone.initial_stream_window_size().value() <=
+             OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE);
+  if (!options_clone.has_initial_connection_window_size()) {
+    options_clone.mutable_initial_connection_window_size()->set_value(
+        OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  }
+  ASSERT(options_clone.initial_connection_window_size().value() >=
+             OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE &&
+         options_clone.initial_connection_window_size().value() <=
+             OptionsLimits::MAX_INITIAL_CONNECTION_WINDOW_SIZE);
+  if (!options_clone.has_max_outbound_frames()) {
+    options_clone.mutable_max_outbound_frames()->set_value(
+        OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES);
+  }
+  if (!options_clone.has_max_outbound_control_frames()) {
+    options_clone.mutable_max_outbound_control_frames()->set_value(
+        OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
+  }
+  if (!options_clone.has_max_consecutive_inbound_frames_with_empty_payload()) {
+    options_clone.mutable_max_consecutive_inbound_frames_with_empty_payload()->set_value(
+        OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD);
+  }
+  if (!options_clone.has_max_inbound_priority_frames_per_stream()) {
+    options_clone.mutable_max_inbound_priority_frames_per_stream()->set_value(
+        OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM);
+  }
+  if (!options_clone.has_max_inbound_window_update_frames_per_data_frame_sent()) {
+    options_clone.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(
+        OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
+  }
+
+  return options_clone;
+}
+
+} // namespace Utility
+} // namespace Http2
+
 namespace Http {
 
 static const char kDefaultPath[] = "/";
@@ -238,38 +316,6 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
-}
-
-Http2Settings
-Utility::parseHttp2Settings(const envoy::config::core::v3::Http2ProtocolOptions& config) {
-  Http2Settings ret;
-  ret.hpack_table_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config, hpack_table_size, Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
-  ret.max_concurrent_streams_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config, max_concurrent_streams, Http::Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
-  ret.initial_stream_window_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config, initial_stream_window_size, Http::Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
-  ret.initial_connection_window_size_ =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
-                                      Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
-  ret.max_outbound_frames_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config, max_outbound_frames, Http::Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
-  ret.max_outbound_control_frames_ =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_outbound_control_frames,
-                                      Http::Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
-  ret.max_consecutive_inbound_frames_with_empty_payload_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config, max_consecutive_inbound_frames_with_empty_payload,
-      Http::Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD);
-  ret.max_inbound_priority_frames_per_stream_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config, max_inbound_priority_frames_per_stream,
-      Http::Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM);
-  ret.max_inbound_window_update_frames_per_data_frame_sent_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      config, max_inbound_window_update_frames_per_data_frame_sent,
-      Http::Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT);
-  ret.allow_connect_ = config.allow_connect();
-  ret.allow_metadata_ = config.allow_metadata();
-  ret.stream_error_on_invalid_http_messaging_ = config.stream_error_on_invalid_http_messaging();
-  return ret;
 }
 
 Http1Settings

@@ -38,6 +38,7 @@ namespace Http2 {
 
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
+namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class Http2CodecImplTestFixture {
 public:
@@ -62,13 +63,13 @@ public:
   virtual ~Http2CodecImplTestFixture() = default;
 
   virtual void initialize() {
-    Http2SettingsFromTuple(client_http2settings_, client_settings_);
-    Http2SettingsFromTuple(server_http2settings_, server_settings_);
+    Http2OptionsFromTuple(client_http2_options_, client_settings_);
+    Http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
-        client_connection_, client_callbacks_, stats_store_, client_http2settings_,
+        client_connection_, client_callbacks_, stats_store_, client_http2_options_,
         max_request_headers_kb_, max_response_headers_count_);
     server_ = std::make_unique<TestServerConnectionImpl>(
-        server_connection_, server_callbacks_, stats_store_, server_http2settings_,
+        server_connection_, server_callbacks_, stats_store_, server_http2_options_,
         max_request_headers_kb_, max_request_headers_count_);
 
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -96,20 +97,22 @@ public:
         }));
   }
 
-  void Http2SettingsFromTuple(Http2Settings& setting, const Http2SettingsTuple& tp) {
-    setting.hpack_table_size_ = ::testing::get<0>(tp);
-    setting.max_concurrent_streams_ = ::testing::get<1>(tp);
-    setting.initial_stream_window_size_ = ::testing::get<2>(tp);
-    setting.initial_connection_window_size_ = ::testing::get<3>(tp);
-    setting.allow_metadata_ = allow_metadata_;
-    setting.stream_error_on_invalid_http_messaging_ = stream_error_on_invalid_http_messaging_;
-    setting.max_outbound_frames_ = max_outbound_frames_;
-    setting.max_outbound_control_frames_ = max_outbound_control_frames_;
-    setting.max_consecutive_inbound_frames_with_empty_payload_ =
-        max_consecutive_inbound_frames_with_empty_payload_;
-    setting.max_inbound_priority_frames_per_stream_ = max_inbound_priority_frames_per_stream_;
-    setting.max_inbound_window_update_frames_per_data_frame_sent_ =
-        max_inbound_window_update_frames_per_data_frame_sent_;
+  void Http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
+                             const Http2SettingsTuple& tp) {
+    options.mutable_hpack_table_size()->set_value(::testing::get<0>(tp));
+    options.mutable_max_concurrent_streams()->set_value(::testing::get<1>(tp));
+    options.mutable_initial_stream_window_size()->set_value(::testing::get<2>(tp));
+    options.mutable_initial_connection_window_size()->set_value(::testing::get<3>(tp));
+    options.set_allow_metadata(allow_metadata_);
+    options.set_stream_error_on_invalid_http_messaging(stream_error_on_invalid_http_messaging_);
+    options.mutable_max_outbound_frames()->set_value(max_outbound_frames_);
+    options.mutable_max_outbound_control_frames()->set_value(max_outbound_control_frames_);
+    options.mutable_max_consecutive_inbound_frames_with_empty_payload()->set_value(
+        max_consecutive_inbound_frames_with_empty_payload_);
+    options.mutable_max_inbound_priority_frames_per_stream()->set_value(
+        max_inbound_priority_frames_per_stream_);
+    options.mutable_max_inbound_window_update_frames_per_data_frame_sent()->set_value(
+        max_inbound_window_update_frames_per_data_frame_sent_);
   }
 
   // corruptMetadataFramePayload assumes data contains at least 10 bytes of the beginning of a
@@ -136,12 +139,12 @@ public:
   bool allow_metadata_ = false;
   bool stream_error_on_invalid_http_messaging_ = false;
   Stats::IsolatedStoreImpl stats_store_;
-  Http2Settings client_http2settings_;
+  envoy::config::core::v3::Http2ProtocolOptions client_http2_options_;
   NiceMock<Network::MockConnection> client_connection_;
   MockConnectionCallbacks client_callbacks_;
   std::unique_ptr<TestClientConnectionImpl> client_;
   ConnectionWrapper client_wrapper_;
-  Http2Settings server_http2settings_;
+  envoy::config::core::v3::Http2ProtocolOptions server_http2_options_;
   NiceMock<Network::MockConnection> server_connection_;
   MockServerConnectionCallbacks server_callbacks_;
   std::unique_ptr<TestServerConnectionImpl> server_;
@@ -157,14 +160,15 @@ public:
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   uint32_t max_response_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
-  uint32_t max_outbound_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
-  uint32_t max_outbound_control_frames_ = Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
+  uint32_t max_outbound_frames_ = CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES;
+  uint32_t max_outbound_control_frames_ =
+      CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
   uint32_t max_consecutive_inbound_frames_with_empty_payload_ =
-      Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+      CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
   uint32_t max_inbound_priority_frames_per_stream_ =
-      Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+      CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
   uint32_t max_inbound_window_update_frames_per_data_frame_sent_ =
-      Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
+      CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
@@ -185,7 +189,7 @@ protected:
     nghttp2_priority_spec spec = {0, 10, 0};
     // HTTP/2 codec adds 1 to the number of active streams when computing PRIORITY frames limit
     constexpr uint32_t max_allowed =
-        2 * Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
+        2 * CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
       EXPECT_EQ(0, nghttp2_submit_priority(client_->session(), NGHTTP2_FLAG_NONE, 1, &spec));
     }
@@ -210,7 +214,9 @@ protected:
     // See the limit formula in the
     // `Envoy::Http::Http2::ServerConnectionImpl::checkInboundFrameLimits()' method.
     constexpr uint32_t max_allowed =
-        1 + 2 * (Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT + 1);
+        1 + 2 * (CommonUtility::OptionsLimits::
+                     DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT +
+                 1);
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
       EXPECT_EQ(0, nghttp2_submit_window_update(client_->session(), NGHTTP2_FLAG_NONE, 1, 1));
     }
@@ -228,7 +234,7 @@ protected:
     // To make this work, send raw bytes representing empty DATA frames bypassing client codec.
     Http2Frame emptyDataFrame = Http2Frame::makeEmptyDataFrame(0);
     constexpr uint32_t max_allowed =
-        Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
+        CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
       data.add(emptyDataFrame.data(), emptyDataFrame.size());
     }
@@ -924,13 +930,13 @@ class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 // TODO(PiotrSikora): add tests that exercise both scenarios: before and after receiving
 // the HTTP/2 SETTINGS frame.
 TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
-  Http2SettingsFromTuple(client_http2settings_, ::testing::get<0>(GetParam()));
-  Http2SettingsFromTuple(server_http2settings_, ::testing::get<1>(GetParam()));
+  Http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
+  Http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(
-      client_connection_, client_callbacks_, stats_store_, client_http2settings_,
+      client_connection_, client_callbacks_, stats_store_, client_http2_options_,
       max_request_headers_kb_, max_response_headers_count_);
   server_ = std::make_unique<TestServerConnectionImpl>(
-      server_connection_, server_callbacks_, stats_store_, server_http2settings_,
+      server_connection_, server_callbacks_, stats_store_, server_http2_options_,
       max_request_headers_kb_, max_request_headers_count_);
 
   for (int i = 0; i < 101; ++i) {
@@ -951,10 +957,11 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
 }
 
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
-  ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
-                     ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
-                     ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE),             \
-                     ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE))
+  ::testing::Combine(                                                                              \
+      ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE),                   \
+      ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS),             \
+      ::testing::Values(CommonUtility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE),             \
+      ::testing::Values(CommonUtility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE))
 
 // Deferred reset tests use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
@@ -968,10 +975,11 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowContro
 
 // we separate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
-  ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
-                     ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
-                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),         \
-                     ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE))
+  ::testing::Combine(                                                                              \
+      ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE),                   \
+      ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS),             \
+      ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),         \
+      ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE))
 
 // Stream limit test only uses the default values because not all combinations of
 // edge settings allow for the number of streams needed by the test.
@@ -985,13 +993,14 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
 
 #define HTTP2SETTINGS_EDGE_COMBINE                                                                 \
   ::testing::Combine(                                                                              \
-      ::testing::Values(Http2Settings::MIN_HPACK_TABLE_SIZE, Http2Settings::MAX_HPACK_TABLE_SIZE), \
-      ::testing::Values(Http2Settings::MIN_MAX_CONCURRENT_STREAMS,                                 \
-                        Http2Settings::MAX_MAX_CONCURRENT_STREAMS),                                \
-      ::testing::Values(Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE,                             \
-                        Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE),                            \
-      ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
-                        Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
+      ::testing::Values(CommonUtility::OptionsLimits::MIN_HPACK_TABLE_SIZE,                        \
+                        CommonUtility::OptionsLimits::MAX_HPACK_TABLE_SIZE),                       \
+      ::testing::Values(CommonUtility::OptionsLimits::MIN_MAX_CONCURRENT_STREAMS,                  \
+                        CommonUtility::OptionsLimits::MAX_MAX_CONCURRENT_STREAMS),                 \
+      ::testing::Values(CommonUtility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,              \
+                        CommonUtility::OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE),             \
+      ::testing::Values(CommonUtility::OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE,          \
+                        CommonUtility::OptionsLimits::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
 // Make sure we have coverage for high and low values for various  combinations and permutations
 // of HTTP settings in at least one test fixture.
@@ -1243,7 +1252,8 @@ TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
             nghttp2_session_get_hd_inflate_dynamic_table_size(server_->session()));
 
   // Verify that headers are compressed only when both client and server advertise table size > 0:
-  if (client_http2settings_.hpack_table_size_ && server_http2settings_.hpack_table_size_) {
+  if (client_http2_options_.hpack_table_size().value() &&
+      server_http2_options_.hpack_table_size().value()) {
     EXPECT_NE(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_->session()));
     EXPECT_NE(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_->session()));
   } else {
@@ -1262,7 +1272,8 @@ TEST_P(Http2CodecImplTest, PingFlood) {
   request_encoder_->encodeHeaders(request_headers, false);
 
   // Send one frame above the outbound control queue size limit
-  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1; ++i) {
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1;
+       ++i) {
     EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
   }
 
@@ -1275,7 +1286,7 @@ TEST_P(Http2CodecImplTest, PingFlood) {
       }));
 
   EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
-  EXPECT_EQ(ack_count, Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
+  EXPECT_EQ(ack_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
 }
 
@@ -1290,12 +1301,13 @@ TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
   request_encoder_->encodeHeaders(request_headers, false);
 
   // Send one frame above the outbound control queue size limit
-  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1; ++i) {
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1;
+       ++i) {
     EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
   }
 
   EXPECT_CALL(server_connection_, write(_, _))
-      .Times(Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1);
+      .Times(CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1);
   EXPECT_NO_THROW(client_->sendPendingFrames());
 }
 
@@ -1359,7 +1371,7 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
       }));
 
   TestHeaderMapImpl response_headers{{":status", "200"}};
-  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1; ++i) {
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1; ++i) {
     EXPECT_NO_THROW(response_encoder_->encodeHeaders(response_headers, false));
   }
   // Presently flood mitigation is done only when processing downstream data
@@ -1367,7 +1379,7 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
   EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
 
-  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
 }
 
@@ -1391,7 +1403,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   TestHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
-  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
     Buffer::OwnedImpl data("0");
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
   }
@@ -1400,7 +1412,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
   EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
 
-  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
 }
 
@@ -1416,14 +1428,14 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
 
   // +2 is to account for HEADERS and PING ACK, that is used to trigger mitigation
   EXPECT_CALL(server_connection_, write(_, _))
-      .Times(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 2);
+      .Times(CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 2);
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false)).Times(1);
   EXPECT_CALL(response_decoder_, decodeData(_, false))
-      .Times(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
+      .Times(CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES);
   TestHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
-  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
     Buffer::OwnedImpl data("0");
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
   }
@@ -1495,7 +1507,7 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   TestHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
-  for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
     Buffer::OwnedImpl data("0");
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
   }
@@ -1503,7 +1515,7 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
   EXPECT_THROW(client_->sendPendingFrames(), FrameFloodException);
 
-  EXPECT_EQ(frame_count, Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES);
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
 }
 
@@ -1542,7 +1554,9 @@ TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
   Buffer::OwnedImpl data;
   emptyDataFlood(data);
   EXPECT_CALL(request_decoder_, decodeData(_, false))
-      .Times(Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD + 1);
+      .Times(
+          CommonUtility::OptionsLimits::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD +
+          1);
   EXPECT_NO_THROW(server_wrapper_.dispatch(data, *server_));
 }
 

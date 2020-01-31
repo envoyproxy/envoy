@@ -225,6 +225,19 @@ message Http2ProtocolOptions {
   //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12;
+
+  // Defines a parameter to be sent in the SETTINGS frame.
+  // See `RFC7540, sec. 6.5.1 <https://tools.ietf.org/html/rfc7540#section-6.5.1>`_ for details.
+  message SettingsParameter {
+    // The 16 bit parameter identifier.
+    google.protobuf.UInt32Value identifier = 1 [(validate.rules).uint32 = {gte: 1 lte: 65536}];
+
+    // The 32 bit parameter value.
+    google.protobuf.UInt32Value value = 2;
+  }
+
+  // TODO(AndresGuedez)
+  repeated SettingsParameter custom_settings_parameters = 13;
 }
 
 // [#not-implemented-hide:]

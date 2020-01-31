@@ -55,7 +55,7 @@ public:
   // Writes the data using the Http::Connection's nghttp2 session.
   void write(const Frame& frame, Http::Connection& connection);
 
-  Http2Settings settings_;
+  envoy::config::core::v3::Http2ProtocolOptions options_;
   Stats::IsolatedStoreImpl stats_store_;
   const std::string injector_name_;
 };
