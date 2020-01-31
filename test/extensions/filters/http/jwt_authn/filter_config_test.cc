@@ -38,17 +38,17 @@ rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  FilterConfig filter_conf(proto_config, "", context);
+  auto filter_conf = FilterConfig::create(proto_config, "", context);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filter_conf.findVerifier(
+  EXPECT_TRUE(filter_conf->findVerifier(
                   Http::TestHeaderMapImpl{
                       {":method", "GET"},
                       {":path", "/path1"},
                   },
                   filter_state) != nullptr);
 
-  EXPECT_TRUE(filter_conf.findVerifier(
+  EXPECT_TRUE(filter_conf->findVerifier(
                   Http::TestHeaderMapImpl{
                       {":method", "GET"},
                       {":path", "/path2"},
@@ -73,7 +73,6 @@ rules:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   // make sure that the thread callbacks are not invoked inline.
   server_context.thread_local_.defer_data = true;
-  void* filter_conf_void;
   {
     // scope in all the things that the filter depends on, so they are destroyed as we leave the
     // scope.
@@ -86,13 +85,12 @@ rules:
 
     JwtAuthentication proto_config;
     TestUtility::loadFromYaml(config, proto_config);
-    std::unique_ptr<FilterConfig> filter_conf(new FilterConfig(proto_config, "", context));
-    filter_conf_void = filter_conf.get();
+    auto filter_conf = FilterConfig::create(proto_config, "", context);
   }
 
-  // simulate the heap space being re-claimed. while this is bit hacky,
-  // the test passes otherwise as a false positive.
-  memset(filter_conf_void, 0, sizeof(FilterConfig));
+  // even though filter_conf is now de-allocated, using a reference to it might still work, as its
+  // memory was not cleared. This leads to a false positive in this test when run normally. The
+  // test should fail under asan if the code uses invalid reference.
 
   // make sure the filter scheduled a callback
   EXPECT_EQ(1, server_context.thread_local_.deferred_data_.size());
@@ -127,32 +125,32 @@ filter_state_rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  FilterConfig filter_conf(proto_config, "", context);
+  auto filter_conf = FilterConfig::create(proto_config, "", context);
 
   // Empty filter_state
   StreamInfo::FilterStateImpl filter_state1(StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state1) == nullptr);
+  EXPECT_TRUE(filter_conf->findVerifier(Http::TestHeaderMapImpl(), filter_state1) == nullptr);
 
   // Wrong selector
   StreamInfo::FilterStateImpl filter_state2(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state2.setData(
       "jwt_selector", std::make_unique<Router::StringAccessorImpl>("wrong_selector"),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state2) == nullptr);
+  EXPECT_TRUE(filter_conf->findVerifier(Http::TestHeaderMapImpl(), filter_state2) == nullptr);
 
   // correct selector
   StreamInfo::FilterStateImpl filter_state3(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state3.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector1"),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state3) != nullptr);
+  EXPECT_TRUE(filter_conf->findVerifier(Http::TestHeaderMapImpl(), filter_state3) != nullptr);
 
   // correct selector
   StreamInfo::FilterStateImpl filter_state4(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state4.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector2"),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state4) != nullptr);
+  EXPECT_TRUE(filter_conf->findVerifier(Http::TestHeaderMapImpl(), filter_state4) != nullptr);
 }
 
 } // namespace

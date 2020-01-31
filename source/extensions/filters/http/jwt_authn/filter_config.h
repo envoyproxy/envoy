@@ -27,18 +27,14 @@ class ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
 public:
   // Load the config from envoy config.
   ThreadLocalCache(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
-                   TimeSource& time_source, Api::Api& api)
-      : config_(config) {
-    jwks_cache_ = JwksCache::create(config_, time_source, api);
+                   TimeSource& time_source, Api::Api& api) {
+    jwks_cache_ = JwksCache::create(config, time_source, api);
   }
 
   // Get the JwksCache object.
   JwksCache& getJwksCache() { return *jwks_cache_; }
 
 private:
-  // copy of the config, to ensure it exists through out the lifetime of this object, as jwks_cache_
-  // holds references to it.
-  envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication config_;
   // The JwksCache object.
   JwksCachePtr jwks_cache_;
 };
@@ -61,43 +57,18 @@ struct JwtAuthnFilterStats {
 /**
  * The filter config object to hold config and relevant objects.
  */
-class FilterConfig : public Logger::Loggable<Logger::Id::jwt>, public AuthFactory {
+class FilterConfig : public Logger::Loggable<Logger::Id::jwt>,
+                     public AuthFactory,
+                     public std::enable_shared_from_this<FilterConfig> {
 public:
   ~FilterConfig() override = default;
 
-  FilterConfig(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
-               const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
-      : proto_config_(std::move(proto_config)),
-        stats_(generateStats(stats_prefix, context.scope())),
-        tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
-        time_source_(context.dispatcher().timeSource()), api_(context.api()) {
-    ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
-
-    // note: `this` and `context` has a a lifetime of the listener.
-    // that may be shorter of the tls callback if the listener is torn shortly after it is created.
-    // context.dispatcher().timeSource() and context.api() are from the server context who's
-    // lifetime is longer. so we use them explicitly.
-    // we copy over the proto as we can't guarantee its lifetime otherwise
-    auto& timeSource = context.dispatcher().timeSource();
-    auto& api = context.api();
-    auto proto_config_copy = proto_config_;
-    tls_->set([proto_config_copy, &timeSource,
-               &api](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalCache>(proto_config_copy, timeSource, api);
-    });
-
-    for (const auto& rule : proto_config_.rules()) {
-      rule_pairs_.emplace_back(Matcher::create(rule),
-                               Verifier::create(rule.requires(), proto_config_.providers(), *this));
-    }
-
-    if (proto_config_.has_filter_state_rules()) {
-      filter_state_name_ = proto_config_.filter_state_rules().name();
-      for (const auto& it : proto_config_.filter_state_rules().requires()) {
-        filter_state_verifiers_.emplace(
-            it.first, Verifier::create(it.second, proto_config_.providers(), *this));
-      }
-    }
+  static std::shared_ptr<FilterConfig>
+  create(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
+         const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    auto ptr = std::shared_ptr<FilterConfig>(new FilterConfig(proto_config, stats_prefix, context));
+    ptr->init();
+    return ptr;
   }
 
   JwtAuthnFilterStats& stats() { return stats_; }
@@ -140,6 +111,39 @@ public:
   bool bypassCorsPreflightRequest() { return proto_config_.bypass_cors_preflight(); }
 
 private:
+  FilterConfig(envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication proto_config,
+               const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
+      : proto_config_(std::move(proto_config)),
+        stats_(generateStats(stats_prefix, context.scope())),
+        tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
+        time_source_(context.dispatcher().timeSource()), api_(context.api()) {}
+
+  void init() {
+    ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
+
+    // note: `this` and `context` have a a lifetime of the listener.
+    // that may be shorter of the tls callback if the listener is torn shortly after it is created.
+    // we use a shared pointer to make sure this object outlives the tls callbacks.
+    auto thiz = shared_from_this();
+    tls_->set([thiz](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<ThreadLocalCache>(thiz->proto_config_, thiz->time_source_,
+                                                thiz->api_);
+    });
+
+    for (const auto& rule : proto_config_.rules()) {
+      rule_pairs_.emplace_back(Matcher::create(rule),
+                               Verifier::create(rule.requires(), proto_config_.providers(), *this));
+    }
+
+    if (proto_config_.has_filter_state_rules()) {
+      filter_state_name_ = proto_config_.filter_state_rules().name();
+      for (const auto& it : proto_config_.filter_state_rules().requires()) {
+        filter_state_verifiers_.emplace(
+            it.first, Verifier::create(it.second, proto_config_.providers(), *this));
+      }
+    }
+  }
+
   JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     const std::string final_prefix = prefix + "jwt_authn.";
     return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
