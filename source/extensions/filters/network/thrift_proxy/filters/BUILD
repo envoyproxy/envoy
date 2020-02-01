@@ -55,6 +55,6 @@ envoy_cc_library(
     name = "pass_through_filter_lib",
     hdrs = ["pass_through_filter.h"],
     deps = [
-        ":filter_interface"
-    ]
+        ":filter_interface",
+    ],
 )

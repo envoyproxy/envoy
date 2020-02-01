@@ -80,7 +80,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "limiter error"),
           false);
-      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
+      decoder_callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::RateLimitServiceError);
       return;
     }
     cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
@@ -117,7 +118,8 @@ void Filter::populateRateLimitDescriptors(
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   metadata, *decoder_callbacks_->streamInfo().downstreamRemoteAddress());
+                                   metadata,
+                                   *decoder_callbacks_->streamInfo().downstreamRemoteAddress());
   }
 }
 

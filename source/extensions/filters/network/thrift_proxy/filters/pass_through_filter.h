@@ -11,7 +11,8 @@ namespace ThriftProxy {
 namespace ThriftFilters {
 
 /**
- * Pass through Thrift decoder filter. Continue at each decoding state within the series of transitions.
+ * Pass through Thrift decoder filter. Continue at each decoding state within the series of
+ * transitions.
  */
 class PassThroughDecoderFilter : public DecoderFilter {
 public:
