@@ -5,4 +5,4 @@ Thrift filters
   :glob:
   :maxdepth: 2
 
-  */v2alpha1/*
+  */v2/*
