@@ -26,15 +26,8 @@ DnsResolverImpl::DnsResolverImpl(
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups) {
-  ares_options options{};
-  int optmask = 0;
 
-  if (use_tcp_for_dns_lookups_) {
-    optmask |= ARES_OPT_FLAGS;
-    options.flags |= ARES_FLAG_USEVC;
-  }
-
-  initializeChannel(&options, optmask);
+  initializeChannel();
 
   if (!resolvers.empty()) {
     std::vector<std::string> resolver_addrs;
@@ -66,7 +59,15 @@ DnsResolverImpl::~DnsResolverImpl() {
   ares_destroy(channel_);
 }
 
-void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
+void DnsResolverImpl::initializeChannel() {
+  ares_options options{};
+  int optmask = 0;
+
+  if (use_tcp_for_dns_lookups_) {
+    optmask |= ARES_OPT_FLAGS;
+    options.flags |= ARES_FLAG_USEVC;
+  }
+
   options->sock_state_cb = [](void* arg, int fd, int read, int write) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
@@ -83,6 +84,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   // channel, and not have Envoy track side effects.
   // context: https://github.com/envoyproxy/envoy/issues/4543 and
   // https://github.com/c-ares/c-ares/issues/301.
+  //
+  // n.b: the channel cannot be destroyed and reinitialized here because that leads to a c-ares
+  // segfault.
   if (status == ARES_ECONNREFUSED && !fallback_if_failed_) {
     parent_.dirty_channel_ = true;
     return;
@@ -183,7 +187,6 @@ void DnsResolverImpl::updateAresTimer() {
 }
 
 void DnsResolverImpl::onEventCallback(int fd, uint32_t events) {
-  ENVOY_LOG(error, "onEventCallback");
   const ares_socket_t read_fd = events & Event::FileReadyType::Read ? fd : ARES_SOCKET_BAD;
   const ares_socket_t write_fd = events & Event::FileReadyType::Write ? fd : ARES_SOCKET_BAD;
   ares_process_fd(channel_, read_fd, write_fd);
@@ -219,17 +222,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 
   // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for why this is done.
   if (dirty_channel_) {
+    dirty_channel_ = false;
     ares_destroy(channel_);
-
-    ares_options options{};
-    int optmask = 0;
-
-    if (use_tcp_for_dns_lookups_) {
-      optmask |= ARES_OPT_FLAGS;
-      options.flags |= ARES_FLAG_USEVC;
-    }
-
-    initializeChannel(&options, optmask);
+    initializeChannel();
   }
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
