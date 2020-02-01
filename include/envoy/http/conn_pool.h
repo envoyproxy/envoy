@@ -60,7 +60,7 @@ public:
    *             connection pools the description may be different each time this is called.
    * @param info supplies the stream info object associated with the upstream connection.
    */
-  virtual void onPoolReady(Http::StreamEncoder& encoder,
+  virtual void onPoolReady(RequestStreamEncoder& encoder,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const StreamInfo::StreamInfo& info) PURE;
 };
@@ -119,7 +119,8 @@ public:
    * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
    *          the callbacks are called.
    */
-  virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks) PURE;
+  virtual Cancellable* newStream(Http::ResponseStreamDecoder& response_decoder,
+                                 Callbacks& callbacks) PURE;
 
   /**
    * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.

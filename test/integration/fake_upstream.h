@@ -43,7 +43,7 @@ class FakeHttpConnection;
 /**
  * Provides a fake HTTP stream for integration testing.
  */
-class FakeStream : public Http::StreamDecoder,
+class FakeStream : public Http::RequestStreamDecoder,
                    public Http::StreamCallbacks,
                    Logger::Loggable<Logger::Id::testing> {
 public:
@@ -430,7 +430,8 @@ public:
                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Http::ServerConnectionCallbacks
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
+  Http::RequestStreamDecoder& newStream(Http::ResponseStreamEncoder& response_encoder,
+                                        bool) override;
   void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:

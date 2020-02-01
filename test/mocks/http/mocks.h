@@ -54,8 +54,8 @@ public:
   ~MockServerConnectionCallbacks() override;
 
   // Http::ServerConnectionCallbacks
-  MOCK_METHOD(StreamDecoder&, newStream,
-              (StreamEncoder & response_encoder, bool is_internally_created));
+  MOCK_METHOD(RequestStreamDecoder&, newStream,
+              (ResponseStreamEncoder & response_encoder, bool is_internally_created));
 };
 
 class MockStreamCallbacks : public StreamCallbacks {
@@ -101,7 +101,7 @@ public:
   MOCK_METHOD(void, onUnderlyingConnectionBelowWriteBufferLowWatermark, ());
 
   // Http::ClientConnection
-  MOCK_METHOD(StreamEncoder&, newStream, (StreamDecoder & response_decoder));
+  MOCK_METHOD(RequestStreamEncoder&, newStream, (ResponseStreamDecoder & response_decoder));
 };
 
 class MockFilterChainFactory : public FilterChainFactory {

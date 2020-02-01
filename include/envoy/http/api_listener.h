@@ -20,10 +20,11 @@ public:
    *                         response are backed by the same Stream object.
    * @param is_internally_created indicates if this stream was originated by a
    *   client, or was created by Envoy, by example as part of an internal redirect.
-   * @return StreamDecoder& supplies the decoder callbacks to fire into for stream decoding events.
+   * @return ResponseStreamDecoder& supplies the decoder callbacks to fire into for stream
+   *   decoding events.
    */
-  virtual StreamDecoder& newStream(StreamEncoder& response_encoder,
-                                   bool is_internally_created = false) PURE;
+  virtual RequestStreamDecoder& newStream(ResponseStreamEncoder& response_encoder,
+                                          bool is_internally_created = false) PURE;
 };
 
 using ApiListenerPtr = std::unique_ptr<ApiListener>;

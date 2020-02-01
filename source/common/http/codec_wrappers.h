@@ -6,9 +6,9 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Wrapper for StreamDecoder that just forwards to an "inner" decoder.
+ * Wrapper for ResponseStreamDecoder that just forwards to an "inner" decoder.
  */
-class StreamDecoderWrapper : public StreamDecoder {
+class ResponseStreamDecoderWrapper : public ResponseStreamDecoder {
 public:
   // StreamDecoder
   void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
@@ -50,7 +50,7 @@ public:
   }
 
 protected:
-  StreamDecoderWrapper(StreamDecoder& inner) : inner_(inner) {}
+  ResponseStreamDecoderWrapper(ResponseStreamDecoder& inner) : inner_(inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when a decode is complete. This is called
@@ -59,13 +59,13 @@ protected:
   virtual void onPreDecodeComplete() PURE;
   virtual void onDecodeComplete() PURE;
 
-  StreamDecoder& inner_;
+  ResponseStreamDecoder& inner_;
 };
 
 /**
- * Wrapper for StreamEncoder that just forwards to an "inner" encoder.
+ * Wrapper for RequestStreamEncoder that just forwards to an "inner" encoder.
  */
-class StreamEncoderWrapper : public StreamEncoder {
+class RequestStreamEncoderWrapper : public RequestStreamEncoder {
 public:
   // StreamEncoder
   void encode100ContinueHeaders(const HeaderMap& headers) override {
@@ -98,7 +98,7 @@ public:
   Stream& getStream() override { return inner_.getStream(); }
 
 protected:
-  StreamEncoderWrapper(StreamEncoder& inner) : inner_(inner) {}
+  RequestStreamEncoderWrapper(RequestStreamEncoder& inner) : inner_(inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when an encode is complete. This is called at
@@ -106,7 +106,7 @@ protected:
    */
   virtual void onEncodeComplete() PURE;
 
-  StreamEncoder& inner_;
+  RequestStreamEncoder& inner_;
 };
 
 } // namespace Http

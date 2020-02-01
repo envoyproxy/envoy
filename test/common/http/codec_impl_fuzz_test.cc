@@ -90,7 +90,8 @@ public:
     // The request encode and response decoder belong to the client, the
     // response encoder and request decoder belong to the server.
     StreamEncoder* encoder_;
-    NiceMock<MockStreamDecoder> decoder_;
+    NiceMock<MockResponseStreamDecoder> response_decoder_;
+    NiceMock<MockRequestStreamDecoder> request_decoder_;
     NiceMock<MockStreamCallbacks> stream_callbacks_;
     StreamState stream_state_;
     bool local_closed_{false};
@@ -115,7 +116,7 @@ public:
   } request_, response_;
 
   HttpStream(ClientConnection& client, const TestHeaderMapImpl& request_headers, bool end_stream) {
-    request_.encoder_ = &client.newStream(response_.decoder_);
+    request_.encoder_ = &client.newStream(response_.response_decoder_);
     ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
           ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
@@ -126,30 +127,28 @@ public:
           ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
           resetStream();
         }));
-    ON_CALL(request_.decoder_, decodeHeaders_(_, true)).WillByDefault(InvokeWithoutArgs([this] {
+    ON_CALL(request_.request_decoder_, decodeHeaders_(_, true))
+        .WillByDefault(InvokeWithoutArgs([this] {
+          // The HTTP/1 codec needs this to cleanup any latent stream resources.
+          response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+          request_.closeRemote();
+        }));
+    ON_CALL(request_.request_decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
       // The HTTP/1 codec needs this to cleanup any latent stream resources.
       response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
-    ON_CALL(request_.decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
+    ON_CALL(request_.request_decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
       // The HTTP/1 codec needs this to cleanup any latent stream resources.
       response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
-    ON_CALL(request_.decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
-      // The HTTP/1 codec needs this to cleanup any latent stream resources.
-      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-      request_.closeRemote();
-    }));
-    ON_CALL(response_.decoder_, decodeHeaders_(_, true)).WillByDefault(InvokeWithoutArgs([this] {
-      response_.closeRemote();
-    }));
-    ON_CALL(response_.decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
-      response_.closeRemote();
-    }));
-    ON_CALL(response_.decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
-      response_.closeRemote();
-    }));
+    ON_CALL(response_.response_decoder_, decodeHeaders_(_, true))
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+    ON_CALL(response_.response_decoder_, decodeData(_, true))
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+    ON_CALL(response_.response_decoder_, decodeTrailers_(_))
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
     if (!end_stream) {
       request_.encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
@@ -401,10 +400,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   std::list<HttpStreamPtr> pending_streams;
   std::list<HttpStreamPtr> streams;
   // For new streams when we aren't expecting one (e.g. as a result of a mutation).
-  NiceMock<MockStreamDecoder> orphan_request_decoder;
+  NiceMock<MockRequestStreamDecoder> orphan_request_decoder;
 
   ON_CALL(server_callbacks, newStream(_, _))
-      .WillByDefault(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillByDefault(Invoke([&](ResponseStreamEncoder& encoder, bool) -> RequestStreamDecoder& {
         if (pending_streams.empty()) {
           return orphan_request_decoder;
         }
@@ -414,7 +413,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         stream->response_.encoder_ = &encoder;
         encoder.getStream().addCallbacks(stream->response_.stream_callbacks_);
         stream->stream_index_ = streams.size() - 1;
-        return stream->request_.decoder_;
+        return stream->request_.request_decoder_;
       }));
 
   const auto client_server_buf_drain = [&client_write_buf, &server_write_buf] {

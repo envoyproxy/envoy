@@ -86,8 +86,8 @@ public:
   void onGoAway() override;
 
   // Http::ServerConnectionCallbacks
-  StreamDecoder& newStream(StreamEncoder& response_encoder,
-                           bool is_internally_created = false) override;
+  RequestStreamDecoder& newStream(ResponseStreamEncoder& response_encoder,
+                                  bool is_internally_created = false) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -438,7 +438,7 @@ private:
   struct ActiveStream : LinkedObject<ActiveStream>,
                         public Event::DeferredDeletable,
                         public StreamCallbacks,
-                        public StreamDecoder,
+                        public RequestStreamDecoder,
                         public FilterChainFactoryCallbacks,
                         public Tracing::Config,
                         public ScopeTrackedObject {
@@ -654,7 +654,7 @@ private:
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
-    StreamEncoder* response_encoder_{};
+    ResponseStreamEncoder* response_encoder_{};
     HeaderMapPtr continue_headers_;
     HeaderMapPtr response_headers_;
     Buffer::WatermarkBufferPtr buffered_response_data_;

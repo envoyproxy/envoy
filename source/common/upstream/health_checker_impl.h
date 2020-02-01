@@ -69,7 +69,7 @@ public:
 
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
-                                        public Http::StreamDecoder,
+                                        public Http::ResponseStreamDecoder,
                                         public Http::StreamCallbacks {
     HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~HttpActiveHealthCheckSession() override;
@@ -288,7 +288,7 @@ public:
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
-                                        public Http::StreamDecoder,
+                                        public Http::ResponseStreamDecoder,
                                         public Http::StreamCallbacks {
     GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~GrpcActiveHealthCheckSession() override;

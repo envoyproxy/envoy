@@ -843,7 +843,7 @@ bool ClientConnectionImpl::cannotHaveBody() {
   }
 }
 
-StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) {
+RequestStreamEncoder& ClientConnectionImpl::newStream(ResponseStreamDecoder& response_decoder) {
   if (resetStreamCalled()) {
     throw CodecClientException("cannot create new streams after calling reset");
   }

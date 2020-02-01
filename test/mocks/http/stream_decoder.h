@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Http {
 
-class MockStreamDecoder : public StreamDecoder {
+class MockStreamDecoder : public virtual StreamDecoder {
 public:
   MockStreamDecoder();
   ~MockStreamDecoder() override;
@@ -28,6 +28,9 @@ public:
   MOCK_METHOD(void, decodeTrailers_, (HeaderMapPtr & trailers));
   MOCK_METHOD(void, decodeMetadata_, (MetadataMapPtr & metadata_map));
 };
+
+class MockRequestStreamDecoder : public MockStreamDecoder, public RequestStreamDecoder {};
+class MockResponseStreamDecoder : public MockStreamDecoder, public ResponseStreamDecoder {};
 
 } // namespace Http
 } // namespace Envoy

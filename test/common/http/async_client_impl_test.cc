@@ -71,7 +71,7 @@ public:
   MockAsyncClientCallbacks callbacks_;
   MockAsyncClientStreamCallbacks stream_callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<MockStreamEncoder> stream_encoder_;
+  NiceMock<MockRequestStreamEncoder> stream_encoder_;
   StreamDecoder* response_decoder_{};
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -405,7 +405,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
 
   // Start stream 2
   Buffer::InstancePtr body2{new Buffer::OwnedImpl("test body")};
-  NiceMock<MockStreamEncoder> stream_encoder2;
+  NiceMock<MockRequestStreamEncoder> stream_encoder2;
   StreamDecoder* response_decoder2{};
   MockAsyncClientStreamCallbacks stream_callbacks2;
 
@@ -459,7 +459,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
   // Send request 2.
   MessagePtr message2{new RequestMessageImpl()};
   HttpTestUtility::addDefaultHeaders(message2->headers());
-  NiceMock<MockStreamEncoder> stream_encoder2;
+  NiceMock<MockRequestStreamEncoder> stream_encoder2;
   StreamDecoder* response_decoder2{};
   MockAsyncClientCallbacks callbacks2;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -504,7 +504,7 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
 
   // Start stream
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
-  NiceMock<MockStreamEncoder> stream_encoder2;
+  NiceMock<MockRequestStreamEncoder> stream_encoder2;
   StreamDecoder* response_decoder2{};
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))

@@ -65,11 +65,12 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   }
 }
 
-ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, ActiveClient& parent)
-    : StreamEncoderWrapper(parent.codec_client_->newStream(*this)),
-      StreamDecoderWrapper(response_decoder), parent_(parent) {
+ConnPoolImpl::StreamWrapper::StreamWrapper(ResponseStreamDecoder& response_decoder,
+                                           ActiveClient& parent)
+    : RequestStreamEncoderWrapper(parent.codec_client_->newStream(*this)),
+      ResponseStreamDecoderWrapper(response_decoder), parent_(parent) {
 
-  StreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
+  RequestStreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
 }
 
 ConnPoolImpl::StreamWrapper::~StreamWrapper() {
@@ -99,7 +100,7 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end
     close_connection_ = true;
   }
 
-  StreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
+  ResponseStreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
 void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
@@ -121,7 +122,8 @@ bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
 }
 
-StreamEncoder& ConnPoolImpl::ActiveClient::newStreamEncoder(StreamDecoder& response_decoder) {
+RequestStreamEncoder&
+ConnPoolImpl::ActiveClient::newStreamEncoder(ResponseStreamDecoder& response_decoder) {
   ASSERT(!stream_wrapper_);
   stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, *this);
   return *stream_wrapper_;

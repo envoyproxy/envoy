@@ -254,8 +254,8 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 }
 
-StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
-                                                bool is_internally_created) {
+RequestStreamDecoder& ConnectionManagerImpl::newStream(ResponseStreamEncoder& response_encoder,
+                                                       bool is_internally_created) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
@@ -2297,7 +2297,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // decoder because the decoder callbacks are complete. It would be good to
   // null out that pointer but should not be necessary.
   HeaderMapPtr request_headers(std::move(parent_.request_headers_));
-  StreamEncoder* response_encoder = parent_.response_encoder_;
+  ResponseStreamEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
   response_encoder->getStream().removeCallbacks(parent_);
   // This functionally deletes the stream (via deferred delete) so do not

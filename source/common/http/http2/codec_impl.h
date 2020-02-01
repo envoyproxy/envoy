@@ -140,7 +140,7 @@ protected:
   /**
    * Base class for client and server side streams.
    */
-  struct StreamImpl : public StreamEncoder,
+  struct StreamImpl : public virtual StreamEncoder,
                       public Stream,
                       public LinkedObject<StreamImpl>,
                       public Event::DeferredDeletable,
@@ -158,6 +158,7 @@ protected:
                                nghttp2_data_provider* provider) PURE;
     void submitTrailers(const HeaderMap& trailers);
     void submitMetadata();
+    virtual StreamDecoder& decoder() PURE;
 
     // Http::StreamEncoder
     void encode100ContinueHeaders(const HeaderMap& headers) override;
@@ -209,7 +210,6 @@ protected:
 
     ConnectionImpl& parent_;
     HeaderMapImplPtr headers_;
-    StreamDecoder* decoder_{};
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
@@ -238,8 +238,10 @@ protected:
   /**
    * Client side stream (request).
    */
-  struct ClientStreamImpl : public StreamImpl {
-    using StreamImpl::StreamImpl;
+  struct ClientStreamImpl : public StreamImpl, public RequestStreamEncoder {
+    ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
+                     ResponseStreamDecoder& response_decoder)
+        : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -253,13 +255,18 @@ protected:
         Http::Utility::transformUpgradeResponseFromH2toH1(*headers_, upgrade_type_);
       }
     }
+    StreamDecoder& decoder() override { return response_decoder_; }
+
+    ResponseStreamDecoder& response_decoder_;
     std::string upgrade_type_;
   };
+
+  using ClientStreamImplPtr = std::unique_ptr<ClientStreamImpl>;
 
   /**
    * Server side stream (response).
    */
-  struct ServerStreamImpl : public StreamImpl {
+  struct ServerStreamImpl : public StreamImpl, public ResponseStreamEncoder {
     using StreamImpl::StreamImpl;
 
     // StreamImpl
@@ -278,7 +285,12 @@ protected:
         Http::Utility::transformUpgradeRequestFromH2toH1(*headers_);
       }
     }
+    StreamDecoder& decoder() override { return *request_decoder_; }
+
+    RequestStreamDecoder* request_decoder_{};
   };
+
+  using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
 
   ConnectionImpl* base() { return this; }
   StreamImpl* getStream(int32_t stream_id);
@@ -403,7 +415,7 @@ public:
                        const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
-  Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  RequestStreamEncoder& newStream(ResponseStreamDecoder& response_decoder) override;
 
 private:
   // ConnectionImpl

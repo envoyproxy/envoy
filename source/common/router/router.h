@@ -366,7 +366,7 @@ protected:
   RetryStatePtr retry_state_;
 
 private:
-  struct UpstreamRequest : public Http::StreamDecoder,
+  struct UpstreamRequest : public Http::ResponseStreamDecoder,
                            public Http::StreamCallbacks,
                            public Http::ConnectionPool::Callbacks,
                            public LinkedObject<UpstreamRequest> {
@@ -439,7 +439,7 @@ private:
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
                        absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
-    void onPoolReady(Http::StreamEncoder& request_encoder,
+    void onPoolReady(Http::RequestStreamEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host,
                      const StreamInfo::StreamInfo& info) override;
 

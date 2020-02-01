@@ -38,7 +38,8 @@ public:
   AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
                            Type type, AutonomousUpstream& upstream);
 
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
+  Http::RequestStreamDecoder& newStream(Http::ResponseStreamEncoder& response_encoder,
+                                        bool) override;
 
 private:
   AutonomousUpstream& upstream_;

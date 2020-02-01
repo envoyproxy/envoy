@@ -401,7 +401,7 @@ public:
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
-  MockStreamEncoder response_encoder_;
+  MockResponseStreamEncoder response_encoder_;
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
 };
@@ -437,7 +437,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
   // When dispatch is called on the codec, we pretend to get a new stream and then fire a headers
   // only request into it. Then we respond into the filter.
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
@@ -497,7 +497,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   // When dispatch is called on the codec, we pretend to get a new stream and then fire a headers
   // only request into it. Then we respond into the filter.
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -935,7 +935,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1002,7 +1002,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1066,7 +1066,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1146,7 +1146,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1227,7 +1227,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1283,7 +1283,7 @@ TEST_F(HttpConnectionManagerImplTest,
   EXPECT_CALL(random_, uuid()).Times(0);
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1339,7 +1339,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1383,7 +1383,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamDisconnectAccessLog) {
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1422,7 +1422,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1471,7 +1471,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1510,7 +1510,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1553,7 +1553,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1578,7 +1578,7 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
   setup(false, "");
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
     HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":method", "NOT_CONNECT"}}};
@@ -1702,7 +1702,7 @@ TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* idle_timer = setUpTimer();
     EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
@@ -2250,7 +2250,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
 TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
   setup(false, "");
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
     HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
@@ -2290,7 +2290,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
       .WillRepeatedly(Invoke(
           [&](HeaderMap&, bool) -> FilterHeadersStatus { return FilterHeadersStatus::Continue; }));
 
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(encoder, encodeHeaders(_, false))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(nullptr, headers.Connection());
@@ -2349,7 +2349,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder = &conn_manager_->newStream(encoder);
     HeaderMapPtr headers{
@@ -2462,7 +2462,7 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
 
   // Start the request
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder = &conn_manager_->newStream(encoder);
     HeaderMapPtr headers{
@@ -2503,7 +2503,7 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamDisconnect) {
   InSequence s;
   setup(false, "");
 
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     conn_manager_->newStream(encoder);
     data.drain(2);
@@ -2556,7 +2556,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAccessLog) {
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
     decoder = &conn_manager_->newStream(encoder);
     throw CodecProtocolException("protocol error");
@@ -2587,7 +2587,7 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
       }));
 
   StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -2683,7 +2683,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
 
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   StreamDecoder* decoder = nullptr;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder = &conn_manager_->newStream(encoder);
@@ -2752,7 +2752,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
 
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   StreamDecoder* decoder = nullptr;
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     decoder = &conn_manager_->newStream(encoder);
@@ -5070,7 +5070,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
 
   // Pretend to get a new stream and then fire a headers only request into it. Then we respond into
   // the filter.
-  NiceMock<MockStreamEncoder> encoder;
+  NiceMock<MockResponseStreamEncoder> encoder;
   StreamDecoder& decoder = conn_manager_->newStream(encoder);
   HeaderMapPtr headers{
       new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};

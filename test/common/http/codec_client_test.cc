@@ -91,14 +91,14 @@ TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   Http::StreamDecoder* inner_decoder;
-  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  NiceMock<MockRequestStreamEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+      .WillOnce(Invoke([&](ResponseStreamDecoder& decoder) -> RequestStreamEncoder& {
         inner_decoder = &decoder;
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  Http::MockResponseStreamDecoder outer_decoder;
   client_->newStream(outer_decoder);
 
   Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -108,14 +108,14 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
 
 TEST_F(CodecClientTest, BasicResponseWithBody) {
   Http::StreamDecoder* inner_decoder;
-  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  NiceMock<MockRequestStreamEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+      .WillOnce(Invoke([&](ResponseStreamDecoder& decoder) -> RequestStreamEncoder& {
         inner_decoder = &decoder;
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  Http::MockResponseStreamDecoder outer_decoder;
   client_->newStream(outer_decoder);
 
   Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
@@ -129,14 +129,14 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
 
 TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
   Http::StreamDecoder* inner_decoder;
-  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  NiceMock<MockRequestStreamEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+      .WillOnce(Invoke([&](ResponseStreamDecoder& decoder) -> RequestStreamEncoder& {
         inner_decoder = &decoder;
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  Http::MockResponseStreamDecoder outer_decoder;
   Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
@@ -151,14 +151,14 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
 
 TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
   Http::StreamDecoder* inner_decoder;
-  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  NiceMock<MockRequestStreamEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+      .WillOnce(Invoke([&](ResponseStreamDecoder& decoder) -> RequestStreamEncoder& {
         inner_decoder = &decoder;
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  Http::MockResponseStreamDecoder outer_decoder;
   Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
@@ -183,14 +183,14 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
 
 TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
   Http::StreamDecoder* inner_decoder;
-  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  NiceMock<MockRequestStreamEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+      .WillOnce(Invoke([&](ResponseStreamDecoder& decoder) -> RequestStreamEncoder& {
         inner_decoder = &decoder;
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  Http::MockResponseStreamDecoder outer_decoder;
   Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
@@ -207,14 +207,14 @@ TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
 
 TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   Http::StreamDecoder* inner_decoder;
-  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  NiceMock<MockRequestStreamEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+      .WillOnce(Invoke([&](ResponseStreamDecoder& decoder) -> RequestStreamEncoder& {
         inner_decoder = &decoder;
         return inner_encoder;
       }));
 
-  Http::MockStreamDecoder outer_decoder;
+  Http::MockResponseStreamDecoder outer_decoder;
   Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
@@ -334,7 +334,7 @@ public:
   void createNewStream() {
     Http::StreamDecoder* inner_decoder;
     EXPECT_CALL(*codec_, newStream(_))
-        .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+        .WillOnce(Invoke([&](ResponseStreamDecoder& decoder) -> RequestStreamEncoder& {
           inner_decoder = &decoder;
           return inner_encoder_;
         }));
@@ -365,8 +365,8 @@ protected:
   NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
   Network::ClientConnection* client_connection_{};
   NiceMock<Network::MockConnectionCallbacks> client_callbacks_;
-  NiceMock<Http::MockStreamEncoder> inner_encoder_;
-  NiceMock<Http::MockStreamDecoder> outer_decoder_;
+  NiceMock<MockRequestStreamEncoder> inner_encoder_;
+  NiceMock<MockResponseStreamDecoder> outer_decoder_;
 };
 
 // Send a block of data from upstream, and ensure it is received by the codec.

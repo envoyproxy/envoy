@@ -22,7 +22,7 @@ namespace Envoy {
 /**
  * A buffering response decoder used for testing.
  */
-class BufferingStreamDecoder : public Http::StreamDecoder, public Http::StreamCallbacks {
+class BufferingStreamDecoder : public Http::ResponseStreamDecoder, public Http::StreamCallbacks {
 public:
   BufferingStreamDecoder(std::function<void()> on_complete_cb) : on_complete_cb_(on_complete_cb) {}
 

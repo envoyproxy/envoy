@@ -41,7 +41,7 @@ class ConnectionImpl;
 /**
  * Base class for HTTP/1.1 request and response encoders.
  */
-class StreamEncoderImpl : public StreamEncoder,
+class StreamEncoderImpl : public virtual StreamEncoder,
                           public Stream,
                           Logger::Loggable<Logger::Id::http>,
                           public StreamCallbackHelper {
@@ -110,7 +110,7 @@ private:
 /**
  * HTTP/1.1 response encoder.
  */
-class ResponseStreamEncoderImpl : public StreamEncoderImpl {
+class ResponseStreamEncoderImpl : public StreamEncoderImpl, public ResponseStreamEncoder {
 public:
   ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
@@ -127,7 +127,7 @@ private:
 /**
  * HTTP/1.1 request encoder.
  */
-class RequestStreamEncoderImpl : public StreamEncoderImpl {
+class RequestStreamEncoderImpl : public StreamEncoderImpl, public RequestStreamEncoder {
 public:
   RequestStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
@@ -384,7 +384,7 @@ public:
                        const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
-  StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  RequestStreamEncoder& newStream(ResponseStreamDecoder& response_decoder) override;
 
 private:
   struct PendingResponse {

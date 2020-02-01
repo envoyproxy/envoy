@@ -73,6 +73,16 @@ public:
 };
 
 /**
+ * Stream encoder used for making a request (client to server).
+ */
+class RequestStreamEncoder : public virtual StreamEncoder {};
+
+/**
+ * Stream encoder used for making a response (server to client).
+ */
+class ResponseStreamEncoder : public virtual StreamEncoder {};
+
+/**
  * Decodes an HTTP stream. These are callbacks fired into a sink.
  */
 class StreamDecoder {
@@ -111,6 +121,16 @@ public:
    */
   virtual void decodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 };
+
+/**
+ * Stream decoder used for receiving a request (client to server).
+ */
+class RequestStreamDecoder : public virtual StreamDecoder {};
+
+/**
+ * Stream decoder used for receiving a response (server to client).
+ */
+class ResponseStreamDecoder : public virtual StreamDecoder {};
 
 /**
  * Stream reset reasons.
@@ -198,14 +218,14 @@ public:
    */
   virtual void readDisable(bool disable) PURE;
 
-  /*
+  /**
    * Return the number of bytes this stream is allowed to buffer, or 0 if there is no limit
    * configured.
    * @return uint32_t the stream's configured buffer limits.
    */
   virtual uint32_t bufferLimit() PURE;
 
-  /*
+  /**
    * @return string_view optionally return the reason behind codec level errors.
    *
    * This information is communicated via direct accessor rather than passed with the
@@ -214,7 +234,7 @@ public:
    */
   virtual absl::string_view responseDetails() { return ""; }
 
-  /*
+  /**
    * @return const Address::InstanceConstSharedPtr& the local address of the connection associated
    * with the stream.
    */
@@ -421,17 +441,17 @@ public:
    *                         response are backed by the same Stream object.
    * @param is_internally_created indicates if this stream was originated by a
    *   client, or was created by Envoy, by example as part of an internal redirect.
-   * @return StreamDecoder& supplies the decoder callbacks to fire into for stream decoding events.
+   * @return RequestStreamDecoder& supplies the decoder callbacks to fire into for stream decoding
+   *   events.
    */
-  virtual StreamDecoder& newStream(StreamEncoder& response_encoder,
-                                   bool is_internally_created = false) PURE;
+  virtual RequestStreamDecoder& newStream(ResponseStreamEncoder& response_encoder,
+                                          bool is_internally_created = false) PURE;
 };
 
 /**
  * A server side HTTP connection.
  */
 class ServerConnection : public virtual Connection {};
-
 using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
@@ -442,9 +462,9 @@ public:
   /**
    * Create a new outgoing request stream.
    * @param response_decoder supplies the decoder callbacks to fire response events into.
-   * @return StreamEncoder& supplies the encoder to write the request into.
+   * @return RequestStreamEncoder& supplies the encoder to write the request into.
    */
-  virtual StreamEncoder& newStream(StreamDecoder& response_decoder) PURE;
+  virtual RequestStreamEncoder& newStream(ResponseStreamDecoder& response_decoder) PURE;
 };
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;

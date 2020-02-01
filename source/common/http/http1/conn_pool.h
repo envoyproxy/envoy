@@ -35,10 +35,10 @@ public:
 protected:
   struct ActiveClient;
 
-  struct StreamWrapper : public StreamEncoderWrapper,
-                         public StreamDecoderWrapper,
+  struct StreamWrapper : public RequestStreamEncoderWrapper,
+                         public ResponseStreamDecoderWrapper,
                          public StreamCallbacks {
-    StreamWrapper(StreamDecoder& response_decoder, ActiveClient& parent);
+    StreamWrapper(ResponseStreamDecoder& response_decoder, ActiveClient& parent);
     ~StreamWrapper() override;
 
     // StreamEncoderWrapper
@@ -72,7 +72,7 @@ protected:
     // ConnPoolImplBase::ActiveClient
     bool hasActiveRequests() const override;
     bool closingWithIncompleteRequest() const override;
-    StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) override;
+    RequestStreamEncoder& newStreamEncoder(ResponseStreamDecoder& response_decoder) override;
 
     StreamWrapperPtr stream_wrapper_;
   };

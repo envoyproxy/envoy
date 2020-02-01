@@ -69,8 +69,8 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
                          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT),
       upstream_(upstream) {}
 
-Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,
-                                                         bool) {
+Http::RequestStreamDecoder&
+AutonomousHttpConnection::newStream(Http::ResponseStreamEncoder& response_encoder, bool) {
   auto stream =
       new AutonomousStream(*this, response_encoder, upstream_, upstream_.allow_incomplete_streams_);
   streams_.push_back(FakeStreamPtr{stream});

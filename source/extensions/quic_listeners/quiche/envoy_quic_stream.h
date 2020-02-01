@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Quic {
 
 // Base class for EnvoyQuicServer|ClientStream.
-class EnvoyQuicStream : public Http::StreamEncoder,
+class EnvoyQuicStream : public Http::ResponseStreamEncoder,
                         public Http::Stream,
                         public Http::StreamCallbackHelper,
                         protected Logger::Loggable<Logger::Id::quic_stream> {

@@ -1697,7 +1697,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
+void Filter::UpstreamRequest::onPoolReady(Http::RequestStreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host,
                                           const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.

@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Http {
 
-class MockStreamEncoder : public StreamEncoder {
+class MockStreamEncoder : public virtual StreamEncoder {
 public:
   MockStreamEncoder();
   ~MockStreamEncoder() override;
@@ -24,6 +24,9 @@ public:
 
   testing::NiceMock<MockStream> stream_;
 };
+
+class MockRequestStreamEncoder : public MockStreamEncoder, public RequestStreamEncoder {};
+class MockResponseStreamEncoder : public MockStreamEncoder, public ResponseStreamEncoder {};
 
 } // namespace Http
 } // namespace Envoy
