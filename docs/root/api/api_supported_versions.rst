@@ -1,7 +1,7 @@
 .. _api_supported_versions:
 
-Suported API versions
-=====================
+Supported API versions
+======================
 
 Envoy's APIs follow a :repo:`versioning scheme <api/API_VERSIONING.md>` in which Envoy supports
 multiple major API versions at any point in time. The following versions are currently supported:
