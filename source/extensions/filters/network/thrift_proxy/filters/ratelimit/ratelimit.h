@@ -73,6 +73,7 @@ public:
   ~Filter() override = default;
 
   // ThriftFilters::PassThroughDecoderFilter
+  void onDestroy() override;
   ThriftProxy::FilterStatus messageBegin(ThriftProxy::MessageMetadataSharedPtr) override;
 
   // RateLimit::RequestCallbacks
