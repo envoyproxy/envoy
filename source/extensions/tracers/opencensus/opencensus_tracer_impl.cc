@@ -250,7 +250,6 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
   if (oc_config.stackdriver_exporter_enabled()) {
     ::opencensus::exporters::trace::StackdriverOptions opts;
     opts.project_id = oc_config.stackdriver_project_id();
-    auto google_default_cred = grpc::GoogleDefaultCredentials();
     if (!oc_config.stackdriver_address().empty()) {
       auto channel =
           grpc::CreateChannel(oc_config.stackdriver_address(), grpc::InsecureChannelCredentials());
