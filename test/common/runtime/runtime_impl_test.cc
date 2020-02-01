@@ -162,6 +162,9 @@ public:
 };
 
 TEST_F(DiskLoaderImplTest, EmptyKeyTest) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
   EXPECT_EQ("", loader_->snapshot().get(""));
   EXPECT_EQ(11, loader_->snapshot().getInteger("", 11));
   EXPECT_EQ(1.1, loader_->snapshot().getDouble("", 1.1));
