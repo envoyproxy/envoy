@@ -6,6 +6,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"
+#include "common/grpc/google_grpc_utils.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -235,27 +236,10 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& /*config*/, const std::
 
 void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampled", sampled}}); }
 
-std::shared_ptr<grpc::CallCredentials>
-getStackdriverCallCredential(const envoy::config::trace::v3::OpenCensusConfig& oc_config) {
-  const auto& credential = oc_config.stackdriver_call_credentials();
-  grpc::experimental::StsCredentialsOptions options = {
-      credential.sts_service().token_exchange_service_uri(),
-      credential.sts_service().resource(),
-      credential.sts_service().audience(),
-      credential.sts_service().scope(),
-      credential.sts_service().requested_token_type(),
-      credential.sts_service().subject_token_path(),
-      credential.sts_service().subject_token_type(),
-      credential.sts_service().actor_token_path(),
-      credential.sts_service().actor_token_type(),
-  };
-  return grpc::experimental::StsCredentials(options);
-}
-
 } // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-               const LocalInfo::LocalInfo& localinfo)
+               const LocalInfo::LocalInfo& localinfo, Api::Api& api)
     : oc_config_(oc_config), local_info_(localinfo) {
   if (oc_config.has_trace_config()) {
     applyTraceConfig(oc_config.trace_config());
@@ -271,13 +255,18 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       auto channel =
           grpc::CreateChannel(oc_config.stackdriver_address(), grpc::InsecureChannelCredentials());
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
-    } else if (oc_config.has_stackdriver_call_credentials() &&
-               oc_config.stackdriver_call_credentials().has_sts_service() &&
-               google_default_cred != nullptr) {
-      // If call credential is provided and is STS service, create a stub with that credential.
-      auto call_creds = getStackdriverCallCredential(oc_config);
-      auto channel_creds = grpc::CompositeChannelCredentials(google_default_cred, call_creds);
-      auto channel = grpc::CreateChannel(GoogleStackdriverTraceAddress, channel_creds);
+    } else if (oc_config.has_stackdriver_grpc_service()) {
+      if (!oc_config.stackdriver_grpc_service().has_google_grpc()) {
+        throw EnvoyException("Opencensus stackdriver tracer only support GoogleGrpc.");
+      }
+      envoy::config::core::v3::GrpcService stackdriver_service =
+          oc_config.stackdriver_grpc_service();
+      if (stackdriver_service.google_grpc().target_uri().empty()) {
+        // If stackdriver server address is not provided, the default production stackdriver
+        // address will be used.
+        stackdriver_service.mutable_google_grpc()->set_target_uri(GoogleStackdriverTraceAddress);
+      }
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     }
     ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));
