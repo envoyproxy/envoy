@@ -14,7 +14,6 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "requires_trusted_downstream_and_upstream",
-    status = "alpha",
     deps = [
         ":router_lib",
         "//include/envoy/registry",
