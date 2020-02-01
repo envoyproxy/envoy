@@ -309,13 +309,13 @@ public:
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
     return generic_secret.get();
   }
-  Common::CallbackHandle* addValidationCallback(
-      std::function<void(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>)
-      override {
-    return nullptr;
-  }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
     return update_callback_manager_.add(callback);
+  }
+  Common::CallbackHandle* addValidationCallback(
+      std::function<void(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>
+          callback) override {
+    return validation_callback_manager_.add(callback);
   }
 
 protected:
@@ -323,10 +323,15 @@ protected:
     generic_secret = std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
         secret.generic_secret());
   }
-  void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
+  void
+  validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
+    validation_callback_manager_.runCallbacks(secret.generic_secret());
+  }
 
 private:
   GenericSecretPtr generic_secret;
+  Common::CallbackManager<const envoy::extensions::transport_sockets::tls::v3::GenericSecret&>
+      validation_callback_manager_;
 };
 
 } // namespace Secret
