@@ -15,7 +15,6 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
-        "//source/common/config:data_source_lib",
         "//source/common/secret:sds_api_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
