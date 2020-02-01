@@ -54,7 +54,7 @@ public:
 class FilterTest : public testing::Test {
 public:
   void SetUp() override {
-    mock_config_ = ::std::make_shared<NiceMockz<MockFilterConfig>>();
+    mock_config_ = ::std::make_shared<NiceMock<MockFilterConfig>>();
 
     mock_verifier_ = std::make_unique<MockVerifier>();
     filter_ = std::make_unique<Filter>(mock_config_);
