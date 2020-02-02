@@ -152,10 +152,10 @@ public:
     }
   }
 
-  MockResponseStreamDecoder decoder_;
+  MockResponseDecoder decoder_;
   ConnPoolCallbacks callbacks_;
-  Http::StreamDecoder* inner_decoder_{};
-  NiceMock<MockRequestStreamEncoder> inner_encoder_;
+  ResponseDecoder* inner_decoder_{};
+  NiceMock<MockRequestEncoder> inner_encoder_;
 };
 
 void Http2ConnPoolImplLegacyTest::expectClientConnect(size_t index, ActiveTestRequest& r) {
@@ -362,7 +362,7 @@ TEST_F(Http2ConnPoolImplLegacyTest, PendingRequestsMaxPendingCircuitBreaker) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
 
-  MockResponseStreamDecoder decoder;
+  MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(nullptr, pool_.newStream(decoder, callbacks));
@@ -661,7 +661,7 @@ TEST_F(Http2ConnPoolImplLegacyTest, MaxGlobalRequests) {
   r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
 
   ConnPoolCallbacks callbacks;
-  MockResponseStreamDecoder decoder;
+  MockResponseDecoder decoder;
   EXPECT_CALL(callbacks.pool_failure_, ready());
   EXPECT_EQ(nullptr, pool_.newStream(decoder, callbacks));
 

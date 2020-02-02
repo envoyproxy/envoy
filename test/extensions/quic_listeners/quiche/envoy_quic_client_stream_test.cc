@@ -96,7 +96,7 @@ protected:
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_;
   EnvoyQuicClientStream* quic_stream_;
-  Http::MockResponseStreamDecoder stream_decoder_;
+  Http::MockResponseDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
   std::string host_{"www.abc.com"};
   Http::TestHeaderMapImpl request_headers_;

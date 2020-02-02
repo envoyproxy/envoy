@@ -6,11 +6,11 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Wrapper for ResponseStreamDecoder that just forwards to an "inner" decoder.
+ * Wrapper for ResponseDecoder that just forwards to an "inner" decoder.
  */
-class ResponseStreamDecoderWrapper : public ResponseStreamDecoder {
+class ResponseDecoderWrapper : public ResponseDecoder {
 public:
-  // StreamDecoder
+  // ResponseDecoder
   void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
     inner_.decode100ContinueHeaders(std::move(headers));
   }
@@ -50,7 +50,7 @@ public:
   }
 
 protected:
-  ResponseStreamDecoderWrapper(ResponseStreamDecoder& inner) : inner_(inner) {}
+  ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when a decode is complete. This is called
@@ -59,19 +59,15 @@ protected:
   virtual void onPreDecodeComplete() PURE;
   virtual void onDecodeComplete() PURE;
 
-  ResponseStreamDecoder& inner_;
+  ResponseDecoder& inner_;
 };
 
 /**
- * Wrapper for RequestStreamEncoder that just forwards to an "inner" encoder.
+ * Wrapper for RequestEncoder that just forwards to an "inner" encoder.
  */
-class RequestStreamEncoderWrapper : public RequestStreamEncoder {
+class RequestEncoderWrapper : public RequestEncoder {
 public:
-  // StreamEncoder
-  void encode100ContinueHeaders(const HeaderMap& headers) override {
-    inner_.encode100ContinueHeaders(headers);
-  }
-
+  // RequestEncoder
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
     inner_.encodeHeaders(headers, end_stream);
     if (end_stream) {
@@ -98,7 +94,7 @@ public:
   Stream& getStream() override { return inner_.getStream(); }
 
 protected:
-  RequestStreamEncoderWrapper(RequestStreamEncoder& inner) : inner_(inner) {}
+  RequestEncoderWrapper(RequestEncoder& inner) : inner_(inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when an encode is complete. This is called at
@@ -106,7 +102,7 @@ protected:
    */
   virtual void onEncodeComplete() PURE;
 
-  RequestStreamEncoder& inner_;
+  RequestEncoder& inner_;
 };
 
 } // namespace Http

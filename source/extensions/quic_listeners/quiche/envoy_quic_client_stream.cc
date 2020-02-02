@@ -44,11 +44,6 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
-void EnvoyQuicClientStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
-  encodeHeaders(headers, false);
-}
-
 void EnvoyQuicClientStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);

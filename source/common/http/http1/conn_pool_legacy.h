@@ -44,7 +44,7 @@ public:
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
   bool hasActiveConnections() const override;
-  ConnectionPool::Cancellable* newStream(ResponseStreamDecoder& response_decoder,
+  ConnectionPool::Cancellable* newStream(ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
 
@@ -54,10 +54,10 @@ public:
 protected:
   struct ActiveClient;
 
-  struct StreamWrapper : public RequestStreamEncoderWrapper,
-                         public ResponseStreamDecoderWrapper,
+  struct StreamWrapper : public RequestEncoderWrapper,
+                         public ResponseDecoderWrapper,
                          public StreamCallbacks {
-    StreamWrapper(ResponseStreamDecoder& response_decoder, ActiveClient& parent);
+    StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent);
     ~StreamWrapper() override;
 
     // StreamEncoderWrapper
@@ -108,7 +108,7 @@ protected:
 
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
-  void attachRequestToClient(ActiveClient& client, ResponseStreamDecoder& response_decoder,
+  void attachRequestToClient(ActiveClient& client, ResponseDecoder& response_decoder,
                              ConnectionPool::Callbacks& callbacks);
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   void createNewConnection();

@@ -78,7 +78,7 @@ ClientCodecFrameInjector::ClientCodecFrameInjector() : CodecFrameInjector("serve
 
 ServerCodecFrameInjector::ServerCodecFrameInjector() : CodecFrameInjector("client") {
   EXPECT_CALL(server_callbacks_, newStream(_, _))
-      .WillRepeatedly(Invoke([&](ResponseStreamEncoder& encoder, bool) -> RequestStreamDecoder& {
+      .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         encoder.getStream().addCallbacks(server_stream_callbacks_);
         return request_decoder_;
       }));

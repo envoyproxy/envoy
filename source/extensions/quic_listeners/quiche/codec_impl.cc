@@ -61,8 +61,8 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSessio
   session.setHttpConnectionCallbacks(callbacks);
 }
 
-Http::RequestStreamEncoder&
-QuicHttpClientConnectionImpl::newStream(Http::ResponseStreamDecoder& response_decoder) {
+Http::RequestEncoder&
+QuicHttpClientConnectionImpl::newStream(Http::ResponseDecoder& response_decoder) {
   EnvoyQuicClientStream* stream =
       quicStreamToEnvoyClientStream(quic_client_session_.CreateOutgoingBidirectionalStream());
   // TODO(danzh) handle stream creation failure gracefully. This can happen when

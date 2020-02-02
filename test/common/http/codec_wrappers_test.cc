@@ -8,29 +8,29 @@ using testing::_;
 namespace Envoy {
 namespace Http {
 
-class MockRequestStreamEncoderWrapper : public RequestStreamEncoderWrapper {
+class MockRequestEncoderWrapper : public RequestEncoderWrapper {
 public:
-  MockRequestStreamEncoderWrapper() : RequestStreamEncoderWrapper(inner_encoder_) {}
+  MockRequestEncoderWrapper() : RequestEncoderWrapper(inner_encoder_) {}
   void onEncodeComplete() override { encode_complete_ = true; }
 
-  MockStreamEncoder& innerEncoder() { return inner_encoder_; }
+  MockRequestEncoder& innerEncoder() { return inner_encoder_; }
   bool encodeComplete() const { return encode_complete_; }
 
 private:
-  MockRequestStreamEncoder inner_encoder_;
+  MockRequestEncoder inner_encoder_;
   bool encode_complete_{};
 };
 
-TEST(RequestStreamEncoderWrapper, HeaderOnlyEncode) {
-  MockRequestStreamEncoderWrapper wrapper;
+TEST(RequestEncoderWrapper, HeaderOnlyEncode) {
+  MockRequestEncoderWrapper wrapper;
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, true));
   wrapper.encodeHeaders(TestHeaderMapImpl{{":status", "200"}}, true);
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
-TEST(RequestStreamEncoderWrapper, HeaderAndBodyEncode) {
-  MockRequestStreamEncoderWrapper wrapper;
+TEST(RequestEncoderWrapper, HeaderAndBodyEncode) {
+  MockRequestEncoderWrapper wrapper;
 
   TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, false));
@@ -43,8 +43,8 @@ TEST(RequestStreamEncoderWrapper, HeaderAndBodyEncode) {
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
-TEST(RequestStreamEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
-  MockRequestStreamEncoderWrapper wrapper;
+TEST(RequestEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
+  MockRequestEncoderWrapper wrapper;
 
   TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, false));
@@ -58,18 +58,6 @@ TEST(RequestStreamEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeTrailers(_));
   wrapper.encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
-  EXPECT_TRUE(wrapper.encodeComplete());
-}
-
-TEST(RequestStreamEncoderWrapper, 100ContinueHeaderEncode) {
-  MockRequestStreamEncoderWrapper wrapper;
-
-  EXPECT_CALL(wrapper.innerEncoder(), encode100ContinueHeaders(_));
-  wrapper.encode100ContinueHeaders(TestHeaderMapImpl{{":status", "100"}});
-  EXPECT_FALSE(wrapper.encodeComplete());
-
-  EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, true));
-  wrapper.encodeHeaders(TestHeaderMapImpl{{":status", "200"}}, true);
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 

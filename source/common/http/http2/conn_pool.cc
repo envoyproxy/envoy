@@ -82,8 +82,7 @@ bool ConnPoolImpl::ActiveClient::closingWithIncompleteRequest() const {
   return closed_with_active_rq_;
 }
 
-RequestStreamEncoder&
-ConnPoolImpl::ActiveClient::newStreamEncoder(ResponseStreamDecoder& response_decoder) {
+RequestEncoder& ConnPoolImpl::ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
   return codec_client_->newStream(response_decoder);
 }
 

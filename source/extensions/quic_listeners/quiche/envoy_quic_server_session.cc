@@ -72,7 +72,7 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream
 
 void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) {
   ASSERT(http_connection_callbacks_ != nullptr);
-  Http::RequestStreamDecoder& decoder = http_connection_callbacks_->newStream(stream);
+  Http::RequestDecoder& decoder = http_connection_callbacks_->newStream(stream);
   stream.setRequestDecoder(decoder);
 }
 
