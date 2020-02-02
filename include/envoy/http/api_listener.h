@@ -20,7 +20,7 @@ public:
    *                         response are backed by the same Stream object.
    * @param is_internally_created indicates if this stream was originated by a
    *   client, or was created by Envoy, by example as part of an internal redirect.
-   * @return ResponseStreamDecoder& supplies the decoder callbacks to fire into for stream
+   * @return RequestStreamDecoder& supplies the decoder callbacks to fire into for stream
    *   decoding events.
    */
   virtual RequestStreamDecoder& newStream(ResponseStreamEncoder& response_encoder,

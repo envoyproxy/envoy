@@ -15,12 +15,16 @@ namespace Envoy {
 namespace Quic {
 
 // This class is a quic stream and also a request encoder.
-class EnvoyQuicClientStream : public quic::QuicSpdyClientStream, public EnvoyQuicStream {
+class EnvoyQuicClientStream : public quic::QuicSpdyClientStream,
+                              public EnvoyQuicStream,
+                              public Http::RequestStreamEncoder {
 public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type);
   EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type);
+
+  void setResponseDecoder(Http::ResponseStreamDecoder& decoder) { response_decoder_ = &decoder; }
 
   // Http::StreamEncoder
   void encode100ContinueHeaders(const Http::HeaderMap& headers) override;
@@ -54,6 +58,8 @@ protected:
 
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
+
+  Http::ResponseStreamDecoder* response_decoder_{nullptr};
 };
 
 } // namespace Quic
