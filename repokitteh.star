@@ -16,3 +16,8 @@ use(
 )
 
 alias('retest', 'retry-circle')
+
+def _backport():
+  github.issue_label('backport/review')
+
+command(name='backport', func=_backport)
