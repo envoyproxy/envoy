@@ -30,13 +30,10 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::EndsWith;
-using testing::Field;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
-using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
 
