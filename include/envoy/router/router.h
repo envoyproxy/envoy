@@ -530,11 +530,23 @@ public:
   filterMatchCriteria(const std::set<std::string>& names) const PURE;
 };
 
+/**
+ * Criterion that a route entry uses for matching TLS connection context.
+ */
 class TlsContextMatchCriteria {
 public:
   virtual ~TlsContextMatchCriteria() = default;
 
+  /**
+   * @return bool indicating whether the client presented credentials.
+   */
   virtual const absl::optional<bool>& presented() const PURE;
+
+  /**
+   * @return bool indicating whether the client credentials successfully validated against the TLS
+   * context validation context.
+   */
+  virtual const absl::optional<bool>& validated() const PURE;
 };
 
 using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
