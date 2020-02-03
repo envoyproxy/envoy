@@ -373,6 +373,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+      request_client_certificate_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, request_client_certificate, false)),
       session_ticket_keys_provider_(
           getTlsSessionTicketKeysConfigProvider(factory_context, config)) {
   if (session_ticket_keys_provider_ != nullptr) {
