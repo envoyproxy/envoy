@@ -8,8 +8,8 @@ public final class EnvoyClientBuilder: NSObject {
   private var logLevel: LogLevel = .info
 
   private enum BaseConfiguration {
-    case yaml(String)
-    case domain(String)
+    case standard
+    case custom(String)
   }
 
   private var statsDomain: String = "0.0.0.0"
@@ -19,20 +19,17 @@ public final class EnvoyClientBuilder: NSObject {
 
   // MARK: - Public
 
-  /// Initialize a new builder with the provided domain.
-  ///
-  /// - parameter domain: The domain to use with Envoy (i.e., `api.foo.com`).
-  ///                     TODO: https://github.com/lyft/envoy-mobile/issues/433
-  public init(domain: String) {
-    self.base = .domain(domain)
+  /// Initialize a new builder with standard HTTP library configuration.
+  public override init() {
+    self.base = .standard
   }
 
-  /// Initialize a new builder with a full YAML configuration.
+  /// Initialize a new builder with a custom full YAML configuration.
   /// Setting other attributes in this builder will have no effect.
   ///
   /// - parameter yaml: Contents of a YAML file to use for configuration.
   public init(yaml: String) {
-    self.base = .yaml(yaml)
+    self.base = .custom(yaml)
   }
 
   /// Add a stats domain for Envoy to flush stats to.
@@ -97,11 +94,10 @@ public final class EnvoyClientBuilder: NSObject {
   public func build() throws -> EnvoyClient {
     let engine = self.engineType.init()
     switch self.base {
-    case .yaml(let yaml):
+    case .custom(let yaml):
       return EnvoyClient(configYAML: yaml, logLevel: self.logLevel, engine: engine)
-    case .domain(let domain):
-      let config = EnvoyConfiguration(domain: domain,
-                                      statsDomain: self.statsDomain,
+    case .standard:
+      let config = EnvoyConfiguration(statsDomain: self.statsDomain,
                                       connectTimeoutSeconds: self.connectTimeoutSeconds,
                                       dnsRefreshSeconds: self.dnsRefreshSeconds,
                                       statsFlushSeconds: self.statsFlushSeconds)

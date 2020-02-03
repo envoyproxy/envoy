@@ -16,8 +16,7 @@ final class ViewController: UITableViewController {
     super.viewDidLoad()
     do {
       NSLog("Starting Envoy...")
-      self.envoy = try EnvoyClientBuilder(domain: kRequestAuthority)
-        .build()
+      self.envoy = try EnvoyClientBuilder().build()
     } catch let error {
       NSLog("Starting Envoy failed: \(error)")
     }

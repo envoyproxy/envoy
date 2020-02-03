@@ -4,17 +4,15 @@
 
 @implementation EnvoyConfiguration
 
-- (instancetype)initWithDomain:(NSString *)domain
-                   statsDomain:(NSString *)statsDomain
-         connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
-             dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
-             statsFlushSeconds:(UInt32)statsFlushSeconds {
+- (instancetype)initWithStatsDomain:(NSString *)statsDomain
+              connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
+                  dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
+                  statsFlushSeconds:(UInt32)statsFlushSeconds {
   self = [super init];
   if (!self) {
     return nil;
   }
 
-  self.domain = domain;
   self.statsDomain = statsDomain;
   self.connectTimeoutSeconds = connectTimeoutSeconds;
   self.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -24,7 +22,6 @@
 
 - (nullable NSString *)resolveTemplate:(NSString *)templateYAML {
   NSDictionary<NSString *, NSString *> *templateKeysToValues = @{
-    @"domain" : self.domain,
     @"stats_domain" : self.statsDomain,
     @"connect_timeout_seconds" :
         [NSString stringWithFormat:@"%lu", (unsigned long)self.connectTimeoutSeconds],

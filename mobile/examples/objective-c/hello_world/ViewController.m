@@ -36,7 +36,7 @@ NSString *_REQUEST_SCHEME = @"https";
 - (void)startEnvoy {
   NSLog(@"Starting Envoy...");
   NSError *error;
-  EnvoyClientBuilder *builder = [[EnvoyClientBuilder alloc] initWithDomain:_REQUEST_AUTHORITY];
+  EnvoyClientBuilder *builder = [[EnvoyClientBuilder alloc] init];
   self.envoy = [builder buildAndReturnError:&error];
   if (error) {
     NSLog(@"Starting Envoy failed: %@", error);
