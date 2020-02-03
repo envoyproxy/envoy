@@ -11,6 +11,7 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           generate_request_id: true
+          tracing: {}
           codec_type: auto
           stat_prefix: ingress_http
           route_config:

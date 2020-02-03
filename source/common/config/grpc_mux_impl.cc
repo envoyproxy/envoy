@@ -75,12 +75,11 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 }
 
-GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
-                                       const std::set<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
-  auto watch =
-      std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
-  ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
+GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
+                                      const std::set<std::string>& resources,
+                                      SubscriptionCallbacks& callbacks, std::chrono::milliseconds) {
+  auto watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, type_url, *this);
+  ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
 
   // Lazily kick off the requests based on first subscription. This has the
   // convenient side-effect that we order messages on the channel based on
@@ -166,7 +165,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // We have to walk all watches (and need an efficient map as a result) to
     // ensure we deliver empty config updates when a resource is dropped.
     std::unordered_map<std::string, ProtobufWkt::Any> resources;
-    GrpcMuxCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
+    SubscriptionCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
     for (const auto& resource : message->resources()) {
       if (type_url != resource.type_url()) {
         throw EnvoyException(

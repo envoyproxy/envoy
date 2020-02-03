@@ -134,7 +134,8 @@ message Node {
   // Defines the local service cluster name where Envoy is running. Though
   // optional, it should be set if any of the following features are used:
   // :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
-  // verification <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>`,
+  // verification
+  // <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher>`,
   // :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v2.Runtime>`,
   // :ref:`user agent addition
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>`,

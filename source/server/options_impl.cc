@@ -157,9 +157,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
-
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
-
   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
   cpuset_threads_ = cpuset_threads.getValue();
 

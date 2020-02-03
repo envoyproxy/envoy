@@ -93,8 +93,8 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(
       continue;
     }
     envoy::config::route::v3::VirtualHost vhost =
-        MessageUtil::anyConvert<envoy::config::route::v3::VirtualHost>(resource.resource());
-    MessageUtil::validate(vhost, validation_visitor_);
+        MessageUtil::anyConvertAndValidate<envoy::config::route::v3::VirtualHost>(
+            resource.resource(), validation_visitor_);
     auto found = vhosts.find(vhost.name());
     if (found != vhosts.end()) {
       vhosts.erase(found);

@@ -386,10 +386,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Extract debug configuration from filter state. This is used further along to determine whether
   // we should append cluster and host headers to the response, and whether to forward the request
   // upstream.
-  const StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
   const DebugConfig* debug_config =
-      filter_state.hasData<DebugConfig>(DebugConfig::key())
-          ? &(filter_state.getDataReadOnly<DebugConfig>(DebugConfig::key()))
+      filter_state->hasData<DebugConfig>(DebugConfig::key())
+          ? &(filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key()))
           : nullptr;
 
   // TODO: Maybe add a filter API for this.
@@ -493,11 +493,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
-    // TODO(#7003): converting this header value into a StatName requires
-    // taking a global symbol-table lock. This is not a frequently used feature,
-    // but may not be the only occurrence of this pattern, where it's difficult
-    // or impossible to pre-compute a StatName for a component of a stat name.
-    alt_stat_prefix_ = std::make_unique<Stats::StatNameManagedStorage>(
+    alt_stat_prefix_ = std::make_unique<Stats::StatNameDynamicStorage>(
         request_alt_name->value().getStringView(), config_.scope_.symbolTable());
     headers.removeEnvoyUpstreamAltStatName();
   }
@@ -525,15 +521,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   if (upstream_http_protocol_options.has_value() &&
       upstream_http_protocol_options.value().auto_sni()) {
-    const auto host_str = headers.Host()->value().getStringView();
-    const auto parsed_authority = Http::Utility::parseAuthority(host_str);
+    const auto parsed_authority =
+        Http::Utility::parseAuthority(headers.Host()->value().getStringView());
     if (!parsed_authority.is_ip_address_) {
       // TODO: Add SAN verification here and use it from dynamic_forward_proxy
       // Update filter state with the host/authority to use for setting SNI in the transport
       // socket options. This is referenced during the getConnPool() call below.
-      callbacks_->streamInfo().filterState().setData(
+      callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(host_str),
+          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
           StreamInfo::FilterState::StateType::Mutable);
     }
   }
@@ -631,7 +627,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      callbacks_->streamInfo().filterState());
+      *callbacks_->streamInfo().filterState());
 
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
@@ -1127,9 +1123,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     }
   }
 
-  if (grpc_status.has_value() &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.outlier_detection_support_for_grpc_status")) {
+  if (grpc_status.has_value()) {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(grpc_to_http_status);
   } else {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
@@ -1376,13 +1370,13 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
-  StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
 
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, filter_state,
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, *filter_state,
                                                route_entry_->maxInternalRedirects(), *location,
                                                *callbacks_->connection()) &&
       callbacks_->recreateStream()) {

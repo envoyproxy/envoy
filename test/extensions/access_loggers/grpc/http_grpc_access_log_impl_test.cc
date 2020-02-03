@@ -36,18 +36,16 @@ using envoy::data::accesslog::v3::HTTPAccessLogEntry;
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD1(log, void(HTTPAccessLogEntry&& entry));
-  MOCK_METHOD1(log, void(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry));
+  MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry));
+  MOCK_METHOD(void, log, (envoy::data::accesslog::v3::TCPAccessLogEntry && entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD2(
-      getOrCreateLogger,
-      GrpcCommon::GrpcAccessLoggerSharedPtr(
-          const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-          GrpcCommon::GrpcAccessLoggerType logger_type));
+  MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
+              (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+               GrpcCommon::GrpcAccessLoggerType logger_type));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -147,13 +145,13 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
     stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
-    stream_info.filter_state_.setData("string_accessor",
-                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
-    stream_info.filter_state_.setData("serialized", std::make_unique<TestSerializedFilterState>(),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("string_accessor",
+                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:

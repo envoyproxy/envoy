@@ -33,7 +33,7 @@ using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
 class OriginalDstCluster : public ClusterImplBase {
 public:
   OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-                     Server::Configuration::TransportSocketFactoryContext& factory_context,
+                     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                      Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
@@ -123,11 +123,10 @@ public:
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().OriginalDst) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

@@ -25,6 +25,7 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "udpa/type/v1/typed_struct.pb.h"
 
 using testing::Return;
 
@@ -257,9 +258,12 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
       "http": {
         "name": "invalid",
         "typed_config": {
-          "@type": "type.googleapis.com/envoy.config.trace.v2.LightstepConfig",
-          "collector_cluster": "cluster_0",
-          "access_token_file": "/etc/envoy/envoy.cfg"
+          "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+          "type_url": "type.googleapis.com/envoy.config.trace.v2.BlackHoleConfig",
+          "value": {
+            "collector_cluster": "cluster_0",
+            "access_token_file": "/etc/envoy/envoy.cfg"
+          }
         }
       }
     },
@@ -336,7 +340,6 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
 
   envoy::config::metrics::v3::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
-  addStatsdFakeClusterConfig(sink);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
@@ -365,8 +368,40 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
 
   auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
+  bootstrap.mutable_stats_sinks()->Add();
+
+  MainImpl config;
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException,
+                            "Provided name for static registration lookup was empty.");
+}
+
+TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
+  std::string json = R"EOF(
+  {
+    "static_resources": {
+      "listeners": [],
+      "clusters": []
+    },
+    "admin": {
+      "access_log_path": "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
+
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  addStatsdFakeClusterConfig(sink);
+  udpa::type::v1::TypedStruct typed_struct;
+  auto untyped_struct = typed_struct.mutable_value();
+  (*untyped_struct->mutable_fields())["foo"].set_string_value("bar");
+  sink.mutable_typed_config()->PackFrom(typed_struct);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),

@@ -778,9 +778,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
-    if (!proto_config.typed_config().value().empty()) {
-      MessageUtil::unpackTo(proto_config.typed_config(), *message);
-    }
+    Config::Utility::translateOpaqueConfig(proto_config.typed_config(), ProtobufWkt::Struct(),
+                                           factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(callback);
@@ -840,7 +839,7 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 
 ClusterImplBase::ClusterImplBase(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),

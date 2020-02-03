@@ -12,7 +12,6 @@ import argparse
 import logging
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 
@@ -123,6 +122,10 @@ def checkToolNotFoundError():
   oldPath = os.environ["PATH"]
   os.environ["PATH"] = "/sbin:/usr/sbin"
   clang_format = os.getenv("CLANG_FORMAT", "clang-format-9")
+  # If CLANG_FORMAT points directly to the binary, skip this test.
+  if os.path.isfile(clang_format) and os.access(clang_format, os.X_OK):
+    os.environ["PATH"] = oldPath
+    return 0
   errors = checkFileExpectingError("no_namespace_envoy.cc", "Command %s not found." % clang_format)
   os.environ["PATH"] = oldPath
   return errors
@@ -206,6 +209,9 @@ def runChecks():
       "grpc_shutdown.cc",
       "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
       "See #8282")
+  errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
+  errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
+  errors += checkUnfixableError("clang_format_double_on.cc", "clang-format nested on")
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",
       "Unable to find package name for proto file: ./api/missing_package.proto")
@@ -222,6 +228,8 @@ def runChecks():
   errors += checkAndFixError("proto_style.cc", "incorrect protobuf type reference")
   errors += checkAndFixError("long_line.cc", "clang-format check failed")
   errors += checkAndFixError("header_order.cc", "header_order.py check failed")
+  errors += checkAndFixError("clang_format_on.cc",
+                             "./clang_format_on.cc:7: over-enthusiastic spaces")
   # Validate that a missing license is added.
   errors += checkAndFixError("license.BUILD", "envoy_build_fixer check failed")
   # Validate that an incorrect license is replaced and reordered.
@@ -249,6 +257,7 @@ def runChecks():
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
+  errors += checkFileExpectingOK("clang_format_off.cc")
   return errors
 
 

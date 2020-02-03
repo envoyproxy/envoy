@@ -9,7 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/tracing/v2/custom_tag.pb.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/access_log/access_log_formatter.h"
@@ -112,7 +112,7 @@ public:
   }
 
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header) {
-    envoy::type::tracing::v2::CustomTag::Header headerTag;
+    envoy::type::tracing::v3::CustomTag::Header headerTag;
     headerTag.set_name(header);
     return std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
   }
@@ -845,24 +845,24 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   std::vector<TracingTagMetaSuite> tracing_tag_meta_cases = {
       {"l-tag",
        [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v2::CustomTag::Literal literal;
+         envoy::type::tracing::v3::CustomTag::Literal literal;
          literal.set_value(v);
          return std::make_shared<Tracing::LiteralCustomTag>(t, literal);
        }},
       {"e-tag",
        [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v2::CustomTag::Environment e;
+         envoy::type::tracing::v3::CustomTag::Environment e;
          e.set_default_value(v);
          return std::make_shared<Tracing::EnvironmentCustomTag>(t, e);
        }},
       {"x-tag",
        [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v2::CustomTag::Header h;
+         envoy::type::tracing::v3::CustomTag::Header h;
          h.set_default_value(v);
          return std::make_shared<Tracing::RequestHeaderCustomTag>(t, h);
        }},
       {"m-tag", [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v2::CustomTag::Metadata m;
+         envoy::type::tracing::v3::CustomTag::Metadata m;
          m.mutable_kind()->mutable_host();
          m.set_default_value(v);
          return std::make_shared<Tracing::MetadataCustomTag>(t, m);
@@ -5117,15 +5117,15 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
     InSequence s;
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
-          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+          decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_filter_chain", std::make_unique<SimpleType>(1),
               StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::FilterChain);
-          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+          decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_request", std::make_unique<SimpleType>(2),
               StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::DownstreamRequest);
-          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+          decoder_filters_[0]->callbacks_->streamInfo().filterState()->setData(
               "per_downstream_connection", std::make_unique<SimpleType>(3),
               StreamInfo::FilterState::StateType::ReadOnly,
               StreamInfo::FilterState::LifeSpan::DownstreamConnection);
@@ -5134,26 +5134,26 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
           EXPECT_FALSE(
-              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_filter_chain"));
           EXPECT_TRUE(
-              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_request"));
           EXPECT_TRUE(
-              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
           return FilterHeadersStatus::StopIteration;
         }));
     EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
         .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
           EXPECT_FALSE(
-              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_filter_chain"));
           EXPECT_FALSE(
-              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_request"));
           EXPECT_TRUE(
-              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState()->hasData<SimpleType>(
                   "per_downstream_connection"));
           return FilterHeadersStatus::StopIteration;
         }));

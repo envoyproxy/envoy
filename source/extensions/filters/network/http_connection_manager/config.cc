@@ -11,7 +11,7 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/tracing/v2/custom_tag.pb.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -309,7 +309,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::CustomTagMap custom_tags;
     for (const std::string& header :
          tracing_config.hidden_envoy_deprecated_request_headers_for_tags()) {
-      envoy::type::tracing::v2::CustomTag::Header headerTag;
+      envoy::type::tracing::v3::CustomTag::Header headerTag;
       headerTag.set_name(header);
       custom_tags.emplace(
           header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));

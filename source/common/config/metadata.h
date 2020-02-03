@@ -7,7 +7,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/registry/registry.h"
-#include "envoy/type/metadata/v2/metadata.pb.h"
+#include "envoy/type/metadata/v3/metadata.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -21,7 +21,7 @@ struct MetadataKey {
   std::string key_;
   std::vector<std::string> path_;
 
-  MetadataKey(const envoy::type::metadata::v2::MetadataKey& metadata_key);
+  MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key);
 };
 
 /**
