@@ -108,6 +108,7 @@ public:
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<void()> callback));
 
   MOCK_METHOD(bool, requireClientCertificate, (), (const));
+  MOCK_METHOD(bool, requestClientCertificate, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
 };
 
