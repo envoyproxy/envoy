@@ -3,9 +3,9 @@ package io.envoyproxy.envoymobile
 import android.content.Context
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl
 
-class AndroidEnvoyClientBuilder(
+class AndroidEnvoyClientBuilder @JvmOverloads constructor (
     context: Context,
-    baseConfiguration: BaseConfiguration
+    baseConfiguration: BaseConfiguration = Standard()
 ) : EnvoyClientBuilder(baseConfiguration) {
 
   init {

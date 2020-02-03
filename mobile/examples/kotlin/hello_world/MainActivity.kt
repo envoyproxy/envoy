@@ -9,7 +9,6 @@ import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.util.Log
 import io.envoyproxy.envoymobile.AndroidEnvoyClientBuilder
-import io.envoyproxy.envoymobile.Domain
 import io.envoyproxy.envoymobile.Envoy
 import io.envoyproxy.envoymobile.RequestBuilder
 import io.envoyproxy.envoymobile.RequestMethod
@@ -41,7 +40,7 @@ class MainActivity : Activity() {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
 
-    envoy = AndroidEnvoyClientBuilder(baseContext, Domain(REQUEST_AUTHORITY)).build()
+    envoy = AndroidEnvoyClientBuilder(baseContext).build()
 
     recyclerView = findViewById(R.id.recycler_view) as RecyclerView
     recyclerView.layoutManager = LinearLayoutManager(this)

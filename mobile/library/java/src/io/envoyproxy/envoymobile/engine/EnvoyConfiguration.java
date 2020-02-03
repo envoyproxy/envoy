@@ -2,7 +2,6 @@ package io.envoyproxy.envoymobile.engine;
 
 public class EnvoyConfiguration {
 
-  public final String domain;
   public final String statsDomain;
   public final Integer connectTimeoutSeconds;
   public final Integer dnsRefreshSeconds;
@@ -11,18 +10,14 @@ public class EnvoyConfiguration {
   /**
    * Create an EnvoyConfiguration with a user provided configuration values.
    *
-   * @param domain                The domain to use with Envoy (i.e.,
-   *                              `api.foo.com`). TODO:
-   *                              https://github.com/lyft/envoy-mobile/issues/433
    * @param statsDomain           The domain to flush stats to.
    * @param connectTimeoutSeconds timeout for new network connections to hosts in
    *                              the cluster.
    * @param dnsRefreshSeconds     rate in seconds to refresh DNS.
    * @param statsFlushSeconds     interval at which to flush Envoy stats.
    */
-  public EnvoyConfiguration(String domain, String statsDomain, int connectTimeoutSeconds,
-                            int dnsRefreshSeconds, int statsFlushSeconds) {
-    this.domain = domain;
+  public EnvoyConfiguration(String statsDomain, int connectTimeoutSeconds, int dnsRefreshSeconds,
+                            int statsFlushSeconds) {
     this.statsDomain = statsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -40,8 +35,7 @@ public class EnvoyConfiguration {
    */
   String resolveTemplate(String templateYAML) {
     String resolvedConfiguration =
-        templateYAML.replace("{{ domain }}", domain)
-            .replace("{{ stats_domain }}", String.format("%s", statsDomain))
+        templateYAML.replace("{{ stats_domain }}", String.format("%s", statsDomain))
             .replace("{{ connect_timeout_seconds }}", String.format("%s", connectTimeoutSeconds))
             .replace("{{ dns_refresh_rate_seconds }}", String.format("%s", dnsRefreshSeconds))
             .replace("{{ stats_flush_interval_seconds }}", String.format("%s", statsFlushSeconds))
