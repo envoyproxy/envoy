@@ -191,10 +191,10 @@ TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
       {".", FileType::Directory},
       {"..", FileType::Directory},
 #ifndef WIN32
-// On Linux, a broken directory link is simply a symlink to be rm'ed
+      // On Linux, a broken directory link is simply a symlink to be rm'ed
       {"link_dir", FileType::Regular},
 #else
-// On Windows, a broken directory link remains a directory link to be rmdir'ed
+      // On Windows, a broken directory link remains a directory link to be rmdir'ed
       {"link_dir", FileType::Directory},
 #endif
   };
