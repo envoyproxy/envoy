@@ -24,9 +24,7 @@ ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigPr
 
 Network::ActiveUdpListenerFactoryPtr
 ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
-    const Protobuf::Message& message) {
-  auto& config =
-      dynamic_cast<const envoy::config::listener::v3alpha::ActiveRawUdpListenerConfig&>(message);
+    const Protobuf::Message& /*message*/) {  
   return std::make_unique<Server::ActiveRawUdpListenerFactory>();
 }
 

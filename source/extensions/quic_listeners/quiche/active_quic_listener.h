@@ -5,6 +5,7 @@
 #include "envoy/network/listener.h"
 
 #include "common/protobuf/utility.h"
+#include "envoy/runtime/runtime.h"
 
 #include "server/connection_handler_impl.h"
 
@@ -23,11 +24,11 @@ public:
   static const size_t kNumSessionsToCreatePerLoop = 16;
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config, Runtime::Loader& runtime);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config, Runtime::Loader& runtime);
 
   ~ActiveQuicListener() override;
 
@@ -46,9 +47,10 @@ public:
   Network::Listener* listener() override { return udp_listener_.get(); }
   void destroy() override { udp_listener_.reset(); }
 
+  bool enabled() { return enabled_.enabled(); }
+
 private:
   friend class ActiveQuicListenerPeer;
-  // todo (nezdolik) Propagate shutdown signal from udp listener to quick listener
   Network::UdpListenerPtr udp_listener_;
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;
@@ -56,6 +58,7 @@ private:
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   Network::Socket& listen_socket_;
+  Runtime::FeatureFlag enabled_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
@@ -83,9 +86,9 @@ public:
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
+  createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                           Network::ListenerConfig& config) const override {
-    return std::make_unique<ActiveQuicListener>(disptacher, parent, config, quic_config_);
+    return std::make_unique<ActiveQuicListener>(dispatcher, parent, config, quic_config_);
   }
   bool isTransportConnectionless() const override { return false; }
 

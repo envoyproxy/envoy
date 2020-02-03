@@ -32,21 +32,3 @@ message QuicProtocolOptions {
   // 20000ms if not specified.
   google.protobuf.Duration crypto_handshake_timeout = 3;
 }
-
-message ActiveQuicListenerConfig {
-  enum QuicShutDownMode {
-    // Stop accepting connections and reading packets, send resets to active sessions.
-    GRACEFUL_SHUTDOWN = 0;
-
-    // Stop accepting connections and reading packets, terminate sessions and close connections
-    // immediately.
-    HARD_SHUTDOWN = 1;
-  }
-
-  QuicShutDownMode shutdown_mode = 1 [(validate.rules).enum = {defined_only: true}];
-
-  // If set to false, listener will stop reading new packets and shutdown active sessions.
-  // Shutdown type is configured with
-  // :ref:`shutdown_mode<envoy_api_field_ActiveQuicListenerConfig.shutdown_mode>`.
-  bool enabled = 2;
-}

@@ -13,19 +13,21 @@ namespace Quic {
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::ListenerConfig& listener_config,
-                                       const quic::QuicConfig& quic_config)
+                                       const quic::QuicConfig& quic_config,
+                                       Runtime::Loader& runtime)
     : ActiveQuicListener(dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
-                         quic_config) {}
+                         quic_config, runtime) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::SocketSharedPtr listen_socket,
                                        Network::ListenerConfig& listener_config,
-                                       const quic::QuicConfig& quic_config)
+                                       const quic::QuicConfig& quic_config, Runtime::Loader& runtime)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
-      listen_socket_(*listen_socket) {
+      listen_socket_(*listen_socket),
+      enabled_(true, runtime) {
   udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
@@ -39,6 +41,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
+
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_,
       dispatcher, listen_socket_);
@@ -53,6 +56,10 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
+    if (!enabled()) {
+    ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
+    return;
+  }
   quic::QuicSocketAddress peer_address(
       envoyAddressInstanceToQuicSocketAddress(data.addresses_.peer_));
   quic::QuicSocketAddress self_address(
@@ -75,10 +82,18 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
 }
 
 void ActiveQuicListener::onReadReady() {
+  if (!enabled()) {
+    ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
+    return;
+  }
   quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
 }
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
+  if (!enabled()) {
+    ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
+    return;
+  }  
   quic_dispatcher_->OnCanWrite();
 }
 
