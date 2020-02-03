@@ -32,3 +32,5 @@ clang.bazelrc
 user.bazelrc
 CMakeLists.txt
 cmake-build-debug
+.DS_Store
+.idea
