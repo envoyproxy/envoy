@@ -21,6 +21,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/environment.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/network_utility.h"
 #include "absl/time/time.h"
@@ -64,7 +65,7 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
 
     quic_listener_ = std::make_unique<ActiveQuicListener>(
-        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_);
+        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, runtime_);
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -84,7 +85,8 @@ protected:
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .Times(connection_count);
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-        .Times(connection_count);
+        .Times(connection_count);    
+    //EXPECT_CALL(runtime_, snapshot()getBoolean(_,_)).Times(AnyNumber());   
 
     testing::Sequence seq;
     for (int i = 0; i < connection_count; ++i) {
@@ -199,6 +201,7 @@ protected:
   quic::QuicConfig quic_config_;
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
+  NiceMock<Runtime::MockLoader> runtime_;
 
   std::list<std::unique_ptr<Socket>> client_sockets_;
   std::list<std::shared_ptr<Network::MockReadFilter>> read_filters_;
