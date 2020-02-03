@@ -116,7 +116,9 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       random_generator_(context.random()) {
 
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr(new UpstreamDrainManager());
+    ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
+        std::make_shared<UpstreamDrainManager>();
+    return drain_manager;
   });
 
   if (config.has_hidden_envoy_deprecated_deprecated_v1()) {
@@ -168,10 +170,10 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
 
 RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
-  if (connection.streamInfo().filterState().hasData<PerConnectionCluster>(
+  if (connection.streamInfo().filterState()->hasData<PerConnectionCluster>(
           PerConnectionCluster::key())) {
     const PerConnectionCluster& per_connection_cluster =
-        connection.streamInfo().filterState().getDataReadOnly<PerConnectionCluster>(
+        connection.streamInfo().filterState()->getDataReadOnly<PerConnectionCluster>(
             PerConnectionCluster::key());
 
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute

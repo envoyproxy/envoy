@@ -21,6 +21,7 @@
 #include "common/stats/symbol_table_creator.h"
 #include "common/stats/timespan_impl.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/global.h"
 
 #include "gmock/gmock.h"
@@ -312,7 +313,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : public SymbolTableProvider, public IsolatedStoreImpl {
+class MockIsolatedStatsStore : public SymbolTableProvider, public TestUtil::TestStore {
 public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;

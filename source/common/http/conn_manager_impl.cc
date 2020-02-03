@@ -1549,6 +1549,19 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     ENVOY_STREAM_LOG(debug, "drain closing connection", *this);
   }
 
+  if (connection_manager_.codec_->protocol() == Protocol::Http10) {
+    // As HTTP/1.0 and below can not do chunked encoding, if there is no content
+    // length the response will be framed by connection close.
+    if (!headers.ContentLength()) {
+      state_.saw_connection_close_ = true;
+    }
+    // If the request came with a keep-alive and no other factor resulted in a
+    // connection close header, send an explicit keep-alive header.
+    if (!state_.saw_connection_close_) {
+      headers.setConnection(Headers::get().ConnectionValues.KeepAlive);
+    }
+  }
+
   if (connection_manager_.drain_state_ == DrainState::NotDraining && state_.saw_connection_close_) {
     ENVOY_STREAM_LOG(debug, "closing connection due to connection close header", *this);
     connection_manager_.drain_state_ = DrainState::Closing;

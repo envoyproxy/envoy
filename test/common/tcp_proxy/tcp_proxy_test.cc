@@ -750,7 +750,7 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   HashedValue hv1(v1), hv2(v2);
 
   NiceMock<Network::MockConnection> connection;
-  connection.stream_info_.filterState().setData(
+  connection.stream_info_.filterState()->setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
       StreamInfo::FilterState::StateType::Mutable,
       StreamInfo::FilterState::LifeSpan::DownstreamConnection);
@@ -1775,10 +1775,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
   initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState().setData("envoy.tcp_proxy.cluster",
-                                    std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-                                    StreamInfo::FilterState::StateType::Mutable,
-                                    StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+  stream_info.filterState()->setData("envoy.tcp_proxy.cluster",
+                                     std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+                                     StreamInfo::FilterState::StateType::Mutable,
+                                     StreamInfo::FilterState::LifeSpan::DownstreamConnection);
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
@@ -1796,10 +1796,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState().setData("envoy.network.upstream_server_name",
-                                    std::make_unique<UpstreamServerName>("www.example.com"),
-                                    StreamInfo::FilterState::StateType::ReadOnly,
-                                    StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+  stream_info.filterState()->setData("envoy.network.upstream_server_name",
+                                     std::make_unique<UpstreamServerName>("www.example.com"),
+                                     StreamInfo::FilterState::StateType::ReadOnly,
+                                     StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
@@ -1831,7 +1831,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   initializeFilter();
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState().setData(
+  stream_info.filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
       StreamInfo::FilterState::StateType::ReadOnly,

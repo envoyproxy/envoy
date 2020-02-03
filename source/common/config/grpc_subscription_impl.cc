@@ -29,7 +29,7 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ = grpc_mux_->subscribe(type_url_, resources, *this);
+  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, init_fetch_timeout_);
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
   // "attempt" for a given xDS API combined by ADS is not really that meaningful.
@@ -46,7 +46,7 @@ void GrpcSubscriptionImpl::updateResourceInterest(
   // previously watched resources and the new ones (we may have lost interest in some of the
   // previously watched ones).
   watch_.reset();
-  watch_ = grpc_mux_->subscribe(type_url_, update_to_these_names, *this);
+  watch_ = grpc_mux_->addWatch(type_url_, update_to_these_names, *this, init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
 
