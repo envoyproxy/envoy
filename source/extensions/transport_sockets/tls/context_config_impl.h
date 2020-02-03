@@ -134,6 +134,7 @@ public:
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }
+  bool requestClientCertificate() const override { return request_client_certificate_; }
   const std::vector<SessionTicketKey>& sessionTicketKeys() const override {
     return session_ticket_keys_;
   }
@@ -155,6 +156,7 @@ private:
   static const std::string DEFAULT_CURVES;
 
   const bool require_client_certificate_;
+  const bool request_client_certificate_;
   std::vector<SessionTicketKey> session_ticket_keys_;
   const Secret::TlsSessionTicketKeysConfigProviderSharedPtr session_ticket_keys_provider_;
   Common::CallbackHandle* stk_update_callback_handle_{};

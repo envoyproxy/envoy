@@ -929,6 +929,10 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
       });
 
   for (auto& ctx : tls_contexts_) {
+    if (config.requestClientCertificate()) {
+      SSL_CTX_set_verify(ctx.ssl_ctx_.get(), SSL_VERIFY_PEER, nullptr);
+    }
+
     if (config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
       ctx.addClientValidationContext(*config.certificateValidationContext(),

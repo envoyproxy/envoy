@@ -118,6 +118,11 @@ public:
   virtual bool requireClientCertificate() const PURE;
 
   /**
+   * @return True if client certificate should be requested requested, false otherwise.
+   */
+  virtual bool requestClientCertificate() const PURE;
+
+  /**
    * @return The keys to use for encrypting and decrypting session tickets.
    * The first element is used for encrypting new tickets, and all elements
    * are candidates for decrypting received tickets.
