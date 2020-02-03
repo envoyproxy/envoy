@@ -404,7 +404,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
@@ -415,6 +415,9 @@ message DownstreamTlsContext {
   // If specified, Envoy will reject connections without a valid client
   // certificate.
   google.protobuf.BoolValue require_client_certificate = 2;
+
+  // If specified, Envoy will request a client certificate.
+  google.protobuf.BoolValue request_client_certificate = 7;
 
   // If specified, Envoy will reject connections without a valid and matching SNI.
   // [#not-implemented-hide:]
