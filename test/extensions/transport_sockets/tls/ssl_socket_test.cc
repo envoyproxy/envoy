@@ -1141,7 +1141,6 @@ TEST_P(SslSocketTest, GetPeerCert) {
                .setExpectedPeerCert(expected_peer_cert));
 }
 
-
 TEST_P(SslSocketTest, RequestPeerCertNoCert) {
   const std::string client_ctx_yaml = R"EOF(
     common_tls_context:
