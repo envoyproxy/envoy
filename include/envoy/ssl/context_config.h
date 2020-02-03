@@ -118,7 +118,7 @@ public:
   virtual bool requireClientCertificate() const PURE;
 
   /**
-   * @return True if client certificate should be requested requested, false otherwise.
+   * @return True if client certificate should be requested, false otherwise.
    */
   virtual bool requestClientCertificate() const PURE;
 
