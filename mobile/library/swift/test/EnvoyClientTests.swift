@@ -53,7 +53,7 @@ final class EnvoyClientTests: XCTestCase {
       closeExpectation.fulfill()
     }
 
-    let envoy = try EnvoyClientBuilder(domain: "api.foo.com")
+    let envoy = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .build()
     envoy.send(expectedRequest, body: expectedData, trailers: expectedTrailers,
@@ -67,7 +67,7 @@ final class EnvoyClientTests: XCTestCase {
       method: .get, scheme: "https", authority: "www.envoyproxy.io", path: "/docs")
       .addRetryPolicy(RetryPolicy(maxRetryCount: 3, retryOn: RetryRule.allCases))
       .build()
-    let envoy = try EnvoyClientBuilder(domain: "api.foo.com")
+    let envoy = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .build()
     envoy.send(request, body: Data(), trailers: [:], handler: ResponseHandler())
@@ -79,7 +79,7 @@ final class EnvoyClientTests: XCTestCase {
     let request = RequestBuilder(
       method: .get, scheme: "https", authority: "www.envoyproxy.io", path: "/docs")
       .build()
-    let envoy = try EnvoyClientBuilder(domain: "api.foo.com")
+    let envoy = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .build()
     envoy.send(request, body: Data(), trailers: [:], handler: ResponseHandler())

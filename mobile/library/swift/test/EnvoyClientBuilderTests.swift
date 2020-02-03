@@ -5,7 +5,6 @@ import XCTest
 private let kMockTemplate = """
 mock_template:
 - name: mock
-  domain: {{ domain }}
   stats_domain: {{ stats_domain }}
   device_os: {{ device_os }}
   connect_timeout: {{ connect_timeout_seconds }}s
@@ -62,7 +61,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+    _ = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addLogLevel(.trace)
       .build()
@@ -76,7 +75,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+    _ = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsDomain("stats.foo.com")
       .build()
@@ -90,7 +89,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+    _ = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addConnectTimeoutSeconds(12345)
       .build()
@@ -104,7 +103,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+    _ = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addDNSRefreshSeconds(23)
       .build()
@@ -118,7 +117,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
       expectation.fulfill()
     }
 
-    _ = try EnvoyClientBuilder(domain: "api.foo.com")
+    _ = try EnvoyClientBuilder()
       .addEngineType(MockEnvoyEngine.self)
       .addStatsFlushSeconds(42)
       .build()
@@ -126,8 +125,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
   }
 
   func testResolvesYAMLWithIndividuallySetValues() throws {
-    let config = EnvoyConfiguration(domain: "api.foo.com",
-                                    statsDomain: "stats.foo.com",
+    let config = EnvoyConfiguration(statsDomain: "stats.foo.com",
                                     connectTimeoutSeconds: 200,
                                     dnsRefreshSeconds: 300,
                                     statsFlushSeconds: 400)
@@ -136,7 +134,6 @@ final class EnvoyClientBuilderTests: XCTestCase {
       return
     }
 
-    XCTAssertTrue(resolvedYAML.contains("domain: api.foo.com"))
     XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.foo.com"))
     XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
     XCTAssertTrue(resolvedYAML.contains("dns_refresh_rate: 300s"))
@@ -145,8 +142,7 @@ final class EnvoyClientBuilderTests: XCTestCase {
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
-    let config = EnvoyConfiguration(domain: "api.foo.com",
-                                    statsDomain: "stats.foo.com",
+    let config = EnvoyConfiguration(statsDomain: "stats.foo.com",
                                     connectTimeoutSeconds: 200,
                                     dnsRefreshSeconds: 300,
                                     statsFlushSeconds: 400)

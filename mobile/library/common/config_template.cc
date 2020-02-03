@@ -59,7 +59,6 @@ static_resources:
 )"
 #include "certificates.inc"
                               R"(
-        sni: {{ domain }}
     upstream_connection_options: &upstream_opts
       tcp_keepalive:
         keepalive_interval: 10
