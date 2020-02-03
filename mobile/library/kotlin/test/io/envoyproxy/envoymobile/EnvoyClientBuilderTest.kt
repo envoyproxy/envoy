@@ -23,7 +23,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `adding log level builder uses log level for running Envoy`() {
-    clientBuilder = EnvoyClientBuilder(Yaml(TEST_CONFIG))
+    clientBuilder = EnvoyClientBuilder(Custom(TEST_CONFIG))
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addLogLevel(LogLevel.DEBUG)
@@ -33,7 +33,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `specifying stats domain overrides default`() {
-    clientBuilder = EnvoyClientBuilder(Domain("api.foo.com"))
+    clientBuilder = EnvoyClientBuilder(Standard())
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addStatsDomain("stats.foo.com")
@@ -43,7 +43,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `specifying connection timeout overrides default`() {
-    clientBuilder = EnvoyClientBuilder(Domain("api.foo.com"))
+    clientBuilder = EnvoyClientBuilder(Standard())
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addConnectTimeoutSeconds(1234)
@@ -53,7 +53,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `specifying DNS refresh overrides default`() {
-    clientBuilder = EnvoyClientBuilder(Domain("api.foo.com"))
+    clientBuilder = EnvoyClientBuilder(Standard())
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addDNSRefreshSeconds(1234)
@@ -63,7 +63,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `specifying stats flush overrides default`() {
-    clientBuilder = EnvoyClientBuilder(Domain("api.foo.com"))
+    clientBuilder = EnvoyClientBuilder(Standard())
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addStatsFlushSeconds(1234)
