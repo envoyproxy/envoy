@@ -272,7 +272,7 @@ public:
   /**
    * Truncates the message to a length less than default GRPC trailers size limit (by default 8KiB).
    */
-  static std::string truncateDebugString(absl::string_view error_message);
+  static std::string truncateGrpcStatusMessage(absl::string_view error_message);
 
   /**
    * Create TagProducer instance. Check all tag names for conflicts to avoid

@@ -118,7 +118,7 @@ void DeltaSubscriptionState::handleGoodResponse(
 void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
   // Note that error_detail being set is what indicates that a DeltaDiscoveryRequest is a NACK.
   ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
-  ack.error_detail_.set_message(Config::Utility::truncateDebugString(e.what()));
+  ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   disableInitFetchTimeoutTimer();
   ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
   callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
