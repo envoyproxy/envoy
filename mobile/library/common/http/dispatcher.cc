@@ -195,7 +195,14 @@ Dispatcher::DirectStream::~DirectStream() {
 
 // TODO(junr03): map from StreamResetReason to Envoy Mobile's error types. Right now all resets
 // will be ENVOY_STREAM_RESET.
-void Dispatcher::DirectStream::resetStream(StreamResetReason) { callbacks_->onReset(); }
+void Dispatcher::DirectStream::resetStream(StreamResetReason reason) {
+  // The Http::ConnectionManager does not destroy the stream in doEndStream() when it calls
+  // resetStream on the response_encoder_'s Stream. It is up to the response_encoder_ to
+  // runResetCallbacks in order to have the Http::ConnectionManager call doDeferredStreamDestroy in
+  // ConnectionManagerImpl::ActiveStream::onResetStream.
+  runResetCallbacks(reason);
+  callbacks_->onReset();
+}
 
 void Dispatcher::DirectStream::closeLocal(bool end_stream) {
   // TODO: potentially guard against double local closure.
