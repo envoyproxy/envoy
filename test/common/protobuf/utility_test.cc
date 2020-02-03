@@ -37,8 +37,6 @@ class ProtobufUtilityTest : public testing::Test {
 protected:
   ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
 
-  const uint kLargeMessageSize = 1 << 20;
-  const std::string kVeryLargeString{std::string(1 << 20, 'A')};
   Api::ApiPtr api_;
 };
 
@@ -1133,23 +1131,6 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
-// MessageUtility::unpackTo() error message is truncated.
-TEST_F(ProtobufUtilityTest, UnpackToErrorMessageTruncated) {
-  envoy::config::cluster::v3::Cluster source;
-  envoy::config::cluster::v3::Cluster dest;
-  source.mutable_connect_timeout()->set_seconds(-1);
-  source.set_name(kVeryLargeString);
-  ProtobufWkt::Any source_any;
-  source_any.PackFrom(source);
-  try {
-    MessageUtil::unpackTo(source_any, dest);
-  } catch (EnvoyException& e) {
-    const std::string& err_msg = e.what();
-    EXPECT_TRUE(absl::EndsWith(err_msg, "AAAAAAAAA..."));
-    EXPECT_LT(err_msg.length(), kLargeMessageSize);
-  }
-}
-
 // MessageUtility::unpackTo() with API message works at same version.
 TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   {
@@ -1189,15 +1170,6 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonGarbage) {
   EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromJson("{drain_connections_on_host_removal: true", dst,
                                                     ProtobufMessage::getNullValidationVisitor()),
                           EnvoyException, "Unable to parse JSON as proto.*after key:value pair.");
-}
-
-TEST_F(ProtobufUtilityTest, LoadFromJsonErrorMessageTruncated) {
-  envoy::config::cluster::v3::Cluster dst;
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::loadFromJson(
-          fmt::format("{{drain_connections_on_host_removal:{} }}", kVeryLargeString), dst,
-          ProtobufMessage::getNullValidationVisitor()),
-      EnvoyException, "AAAAAAAAA\\.\\.\\.");
 }
 
 // MessageUtility::loadFromJson() with API message works at same version.
@@ -1264,46 +1236,6 @@ TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
   TestUtility::jsonConvert(source, tmp);
   TestUtility::jsonConvert(tmp, dest);
   EXPECT_EQ("foo", dest.flags_path());
-}
-
-TEST_F(ProtobufUtilityTest, JsonConvertErrorMessageTruncated) {
-  {
-    envoy::config::bootstrap::v3::Bootstrap source;
-    source.set_flags_path(kVeryLargeString);
-    source.mutable_stats_flush_interval()->set_seconds(360000);
-    ProtobufWkt::Struct tmp;
-    try {
-      MessageUtil::jsonConvert(source, tmp);
-    } catch (ProtoValidationException e) {
-      const std::string& err_msg = e.what();
-      EXPECT_LT(err_msg.length(), 8 * 1024);
-      // The error string should be truncated somewhere in the name.
-      EXPECT_TRUE(absl::EndsWith(err_msg, "AAAAAAAAAAA..."));
-    }
-  }
-  {
-    try {
-      const ProtobufWkt::Struct obj =
-          MessageUtil::keyValueStruct({{"node", kVeryLargeString}, {"duration", "bluh bluh"}});
-      envoy::config::bootstrap::v3::Bootstrap dest;
-      MessageUtil::jsonConvert(obj, ProtobufMessage::getNullValidationVisitor(), dest);
-    } catch (EnvoyException& e) {
-      const std::string& err_msg = e.what();
-      EXPECT_LT(err_msg.length(), kLargeMessageSize);
-      EXPECT_TRUE(absl::EndsWith(err_msg, "AAAAAAAAAAA..."));
-    }
-  }
-}
-
-TEST_F(ProtobufUtilityTest, LoadYamlErrorMessageTruncated) {
-  ProtobufWkt::DoubleValue v;
-  try {
-    MessageUtil::loadFromYaml(absl::StrCat("value: 1.0", kVeryLargeString), v,
-                              ProtobufMessage::getNullValidationVisitor());
-  } catch (EnvoyException& e) {
-    const std::string& err_msg = e.what();
-    EXPECT_TRUE(absl::EndsWith(err_msg, "AAAAAAAAAAA..."));
-  }
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertUnknownFieldSuccess) {

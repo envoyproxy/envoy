@@ -615,30 +615,6 @@ key:
             "foo_routes");
 }
 
-TEST_F(ScopedRdsTest, ErrorMessageIsTruncated) {
-  setup();
-  context_init_manager_.initialize(init_watcher_);
-  init_watcher_.expectReady().Times(0);
-  constexpr uint32_t kLargeMessageLen = 1 << 20;
-  const std::string config_yaml = fmt::format(R"EOF(
-route_configuration_name: {}
-key:
-  fragments:
-    - string_key: x-foo-key
-)EOF",
-                                              std::string(kLargeMessageLen, 'A'));
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
-  try {
-    srds_subscription_->onConfigUpdate(resources, "1");
-  } catch (EnvoyException e) {
-    const std::string& err_msg = e.what();
-    EXPECT_LT(err_msg.length(), kLargeMessageLen);
-    // The error message should be truncated somewhere in the resource name.
-    EXPECT_TRUE(absl::EndsWith(err_msg, "AAAAAAAAAAA..."));
-  }
-}
-
 // Tests that only one resource is provided during a config update.
 TEST_F(ScopedRdsTest, InvalidDuplicateResourceSotw) {
   setup();

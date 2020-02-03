@@ -22,15 +22,6 @@
 namespace Envoy {
 namespace {
 
-const std::string truncateDebugString(absl::string_view message) {
-  // GRPC sends error message via trailers, which by default has a 8KB size limit(see
-  // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests). Truncates the
-  // DebugString of a protobuf if it's too long.
-  constexpr uint32_t kProtobufErrMsgLen = 512;
-  return fmt::format("{}{}", message.substr(0, kProtobufErrMsgLen),
-                     message.length() > kProtobufErrMsgLen ? "..." : "");
-}
-
 absl::string_view filenameFromPath(absl::string_view full_path) {
   size_t index = full_path.rfind("/");
   if (index == std::string::npos || index == full_path.size()) {
@@ -118,7 +109,7 @@ void jsonConvertInternal(const Protobuf::Message& source,
   const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
   if (!status.ok()) {
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
-                                     status.ToString(), truncateDebugString(source.DebugString())));
+                                     status.ToString(), source.DebugString()));
   }
   MessageUtil::loadFromJson(json, dest, validation_visitor);
 }
@@ -253,17 +244,14 @@ uint64_t fractionalPercentDenominatorToInt(
 
 MissingFieldException::MissingFieldException(const std::string& field_name,
                                              const Protobuf::Message& message)
-    : EnvoyException(fmt::format("Field '{}' is missing in: {}", field_name,
-                                 truncateDebugString(message.DebugString()))) {
-  ENVOY_LOG_MISC(debug, "Field '{}' is missing in: {}", field_name, message.DebugString());
-}
+    : EnvoyException(
+          fmt::format("Field '{}' is missing in: {}", field_name, message.DebugString())) {}
 
 ProtoValidationException::ProtoValidationException(const std::string& validation_error,
                                                    const Protobuf::Message& message)
     : EnvoyException(fmt::format("Proto constraint validation failed ({}): {}", validation_error,
-                                 truncateDebugString(message.DebugString()))) {
-  ENVOY_LOG_MISC(debug, "Proto validation error, throwing {}: {}", validation_error,
-                 message.DebugString());
+                                 message.DebugString())) {
+  ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
@@ -304,8 +292,8 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
         // If we still fail with relaxed unknown field checking, the error has nothing
         // to do with unknown fields.
         if (!relaxed_status.ok()) {
-          throw EnvoyException(truncateDebugString("Unable to parse JSON as proto (" +
-                                                   relaxed_status.ToString() + "): " + json));
+          throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
+                               "): " + json);
         }
         // We know it's an unknown field at this point. If we're at the latest
         // version, then it's definitely an unknown field, otherwise we try to
@@ -334,7 +322,7 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
     jsonConvertInternal(value, validation_visitor, message);
     return;
   }
-  throw EnvoyException(truncateDebugString("Unable to convert YAML as JSON: " + yaml));
+  throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message) {
@@ -556,7 +544,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
       if (!any_message.UnpackTo(earlier_message.get())) {
         throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
                                          earlier_message->GetDescriptor()->full_name(),
-                                         truncateDebugString(any_message.DebugString())));
+                                         any_message.DebugString()));
       }
       Config::VersionConverter::upgrade(*earlier_message, message);
       return;
@@ -567,7 +555,7 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
   if (!any_message.UnpackTo(&message)) {
     throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
                                      message.GetDescriptor()->full_name(),
-                                     truncateDebugString(any_message.DebugString())));
+                                     any_message.DebugString()));
   }
 }
 

@@ -87,6 +87,7 @@ envoy_cc_library(
     deps = [
         ":api_version_lib",
         ":pausable_ack_queue_lib",
+        ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
