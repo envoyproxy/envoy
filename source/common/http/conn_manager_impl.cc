@@ -931,13 +931,15 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
   // If a decorator has been defined, apply it to the active span.
   if (hasCachedRoute() && cached_route_.value()->decorator()) {
-    cached_route_.value()->decorator()->apply(*active_span_);
+    const Router::Decorator* decorator = cached_route_.value()->decorator();
 
-    decorated_propagate_ = cached_route_.value()->decorator()->getPropagate();
+    decorator->apply(*active_span_);
+
+    decorated_propagate_ = decorator->getPropagate();
 
     // Cache decorated operation.
-    if (!cached_route_.value()->decorator()->getOperation().empty()) {
-      decorated_operation_ = &cached_route_.value()->decorator()->getOperation();
+    if (!decorator->getOperation().empty()) {
+      decorated_operation_ = &decorator->getOperation();
     }
   }
 

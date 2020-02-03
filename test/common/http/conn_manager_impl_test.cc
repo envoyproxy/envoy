@@ -978,7 +978,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(5);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -1045,7 +1045,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
   ON_CALL(route_config_provider_.route_config_->route_->decorator_, getPropagate())
       .WillByDefault(Return(false));
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(5);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -1109,7 +1109,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "initOp";
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(5);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -1189,7 +1189,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(5);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -1272,7 +1272,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
   ON_CALL(route_config_provider_.route_config_->route_->decorator_, getPropagate())
       .WillByDefault(Return(false));
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(5);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -1351,7 +1351,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "initOp";
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(5);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
