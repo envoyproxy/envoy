@@ -483,10 +483,10 @@ void RouterCheckTool::printResults() {
 
 // The Mock for runtime value checks.
 // This is a simple implementation to mimic the actual runtime checks in Snapshot.featureEnabled
-bool RouterCheckTool::runtimeMock(const std::string& key,
+bool RouterCheckTool::runtimeMock(absl::string_view key,
                                   const envoy::type::v3::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  return !active_runtime_.empty() && active_runtime_.compare(key) == 0 &&
+  return !active_runtime_.empty() && key.compare(active_runtime_) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 

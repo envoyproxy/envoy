@@ -145,13 +145,13 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
     stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
-    stream_info.filter_state_.setData("string_accessor",
-                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
-    stream_info.filter_state_.setData("serialized", std::make_unique<TestSerializedFilterState>(),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("string_accessor",
+                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
