@@ -14,7 +14,8 @@ Version history
   "envoy.reloadable_features.new_http2_connection_pool_behavior" and then re-configure your clusters or
   restart Envoy. The behavior will not switch until the connection pools are recreated. The new
   circuit breaker behavior is described :ref:`here <arch_overview_circuit_break>`.
-* upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`. 
+* upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`.
+* tls: added :ref:`request_client_certificate <envoy_api_field_auth.DownstreamTlsContext.request_client_certificate>` to request client certificates without requiring them.
 
 1.13.0 (January 20, 2020)
 =========================
