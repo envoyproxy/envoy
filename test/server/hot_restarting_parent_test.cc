@@ -126,6 +126,7 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     parent_store.counter("c1").inc();
     parent_store.counterFromStatName(dynamic.add("c2")).inc();
     parent_store.gauge("g1", Stats::Gauge::ImportMode::Accumulate).set(123);
+    parent_store.gaugeFromStatName(dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate).set(42);
     hot_restarting_parent_.exportStatsToChild(&stats_proto);
   }
 
@@ -136,12 +137,15 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     Stats::Counter& c1 = child_store.counter("c1");
     Stats::Counter& c2 = child_store.counterFromStatName(dynamic.add("c2"));
     Stats::Gauge& g1 = child_store.gauge("g1", Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge& g2 = child_store.gaugeFromStatName(
+        dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate);
 
     HotRestartingChild hot_restarting_child(0, 0);
     hot_restarting_child.mergeParentStats(child_store, stats_proto);
     EXPECT_EQ(1, c1.value());
     EXPECT_EQ(1, c2.value());
     EXPECT_EQ(123, g1.value());
+    EXPECT_EQ(42, g2.value());
   }
 }
 

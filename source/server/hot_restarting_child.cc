@@ -91,10 +91,18 @@ void HotRestartingChild::sendParentTerminateRequest() {
 
 void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
+  using StatMerger = Stats::StatMerger;
   if (!stat_merger_) {
-    stat_merger_ = std::make_unique<Stats::StatMerger>(stats_store);
+    stat_merger_ = std::make_unique<StatMerger>(stats_store);
   }
-  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges());
+  StatMerger::DynamicsMap dynamics;
+  for (auto iter : stats_proto.dynamics()) {
+    StatMerger::DynamicSpans& spans = dynamics[iter.first];
+    for (int i = 0; i < iter.second.begin_size(); ++i) {
+      spans.push_back(StatMerger::DynamicSpan(iter.second.begin(i), iter.second.end(i)));
+    }
+  }
+  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics);
 }
 
 } // namespace Server

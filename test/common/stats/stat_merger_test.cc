@@ -201,9 +201,8 @@ TEST_F(StatMergerThreadLocalTest, filterOutUninitializedGauges) {
   EXPECT_EQ(&g1, &(find->get()));
 }
 
-// When the parent sends us counters we haven't ourselves instantiated, they will be
-// stored only as map values in the StatMerger instance. The values will be propagated
-// to actual stats only when the StatMerger instance is destructed.
+// When the parent sends us counters we haven't ourselves instantiated, they should be stored
+// temporarily, but then uninstantiated if hot restart ends without the child accessing them.
 TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
   {
     StatMerger stat_merger(store_);
@@ -216,27 +215,18 @@ TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
     gauges["newgauge1"] = 1;
     gauges["newgauge2"] = 2;
     stat_merger.mergeStats(counter_deltas, gauges);
-    EXPECT_FALSE(TestUtility::findCounter(store_, "newcounter0"));
-    EXPECT_FALSE(TestUtility::findCounter(store_, "newcounter1"));
-    EXPECT_FALSE(TestUtility::findCounter(store_, "newcounter2"));
-    EXPECT_FALSE(TestUtility::findCounter(store_, "newgauge1"));
-    EXPECT_FALSE(TestUtility::findCounter(store_, "newgauge2"));
-
-    // All the values will be zero when the stats are created.
     EXPECT_EQ(0, store_.counter("newcounter0").value());
     EXPECT_EQ(0, store_.counter("newcounter0").latch());
-    EXPECT_EQ(0, store_.counter("newcounter1").value());
-    EXPECT_EQ(0, store_.counter("newcounter1").latch());
-    EXPECT_EQ(0, store_.gauge("newgauge1", Gauge::ImportMode::Accumulate).value());
+    EXPECT_EQ(1, store_.counter("newcounter1").value());
+    EXPECT_EQ(1, store_.counter("newcounter1").latch());
+    EXPECT_EQ(1, store_.gauge("newgauge1", Gauge::ImportMode::Accumulate).value());
   }
-  // We accessed 0 and 1 above, but not 2. Now that StatMerger has been
-  // destroyed, 2 should be gone, and 0 and 1 should have their values
-  // populated.
-  EXPECT_EQ(0, TestUtility::findCounter(store_, "newcounter0")->value());
-  EXPECT_EQ(1, TestUtility::findCounter(store_, "newcounter1")->value());
-  EXPECT_EQ(1, TestUtility::findGauge(store_, "newgauge1")->value());
-
+  // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
+  // 2 should be gone.
+  EXPECT_TRUE(TestUtility::findCounter(store_, "newcounter0"));
+  EXPECT_TRUE(TestUtility::findCounter(store_, "newcounter1"));
   EXPECT_FALSE(TestUtility::findCounter(store_, "newcounter2"));
+  EXPECT_TRUE(TestUtility::findGauge(store_, "newgauge1"));
   EXPECT_FALSE(TestUtility::findGauge(store_, "newgauge2"));
 }
 

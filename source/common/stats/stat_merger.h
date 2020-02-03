@@ -15,20 +15,37 @@ namespace Stats {
 class StatMerger {
 public:
   StatMerger(Stats::Store& target_store);
-  ~StatMerger();
+
+  using DynamicSpan = std::pair<uint32_t, uint32_t>;
+  using DynamicSpans = std::vector<DynamicSpan>;
+  using DynamicsMap = absl::flat_hash_map<std::string, DynamicSpans>;
 
   // Merge the values of stats_proto into stats_store. Counters are always straightforward
   // addition, while gauges default to addition but have exceptions.
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
-                  const Protobuf::Map<std::string, uint64_t>& gauges);
+                  const Protobuf::Map<std::string, uint64_t>& gauges,
+                  const DynamicsMap& dynamics);
+
+  /**
+   * Identifies the dynamic compnents of a stat_name into an array of integer
+   * paris, indicating the begin/end of spans of tokens in the stat-name that
+   * are created from StatNameDynamicStore or StatNameDynamicPool.
+   *
+   * This is can be used to reconstruct the same exact StatNames in mergeStats(),
+   * to enable stat continuity across hot-restart.
+   *
+   * @param stat_name the input statname
+   * @return the array pair indicating the bounds.
+   */
+  static DynamicSpans encodeDynamicComponents(StatName stat_name);
 
 private:
-  void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas);
-  void applyCounters();
-  void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges);
-  void applyGauges();
+  void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
+                     const DynamicsMap&);
+  void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges, const DynamicsMap&);
+  StatNameManagedStorage makeStatName(const std::string& name, const DynamicsMap& dynamic_map);
 
-  absl::flat_hash_map<std::string, uint64_t> parent_gauge_values_;
+  StatNameHashMap<uint64_t> parent_gauge_values_;
   // A stats Scope for our in-the-merging-process counters to live in. Scopes conceptually hold
   // shared_ptrs to the stats that live in them, with the question of which stats are living in a
   // given scope determined by which stat names have been accessed via that scope. E.g., if you
@@ -47,10 +64,7 @@ private:
   // preserve all stats throughout the hot restart. Then, when the restart completes, dropping
   // the scope will drop exactly those stats whose names have not already been accessed through
   // another store/scope.
-
-  Store& store_;
-  absl::flat_hash_map<std::string, uint64_t> counter_deltas_;
-  absl::flat_hash_map<std::string, uint64_t> gauge_values_;
+  ScopePtr temp_scope_;
 };
 
 } // namespace Stats

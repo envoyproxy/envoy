@@ -334,6 +334,8 @@ public:
   // absl::flat_hash_map value.
   StatNameStorage(StatNameStorage&& src) noexcept : StatNameStorageBase(std::move(src)) {}
 
+  StatNameStorage(SymbolTable::StoragePtr&& bytes) : StatNameStorageBase(std::move(bytes)) {}
+
   // Obtains new backing storage for an already existing StatName. Used to
   // record a computed StatName held in a temp into a more persistent data
   // structure.
@@ -491,6 +493,10 @@ public:
   // generate symbols for it.
   StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
+  StatNameManagedStorage(SymbolTable::StoragePtr&& bytes, SymbolTable& symbol_table)
+      : StatNameStorage(std::move(bytes)), symbol_table_(symbol_table) {}
+  StatNameManagedStorage(StatNameManagedStorage&& storage)
+      : StatNameStorage(std::move(storage)), symbol_table_(storage.symbol_table_) {}
 
   ~StatNameManagedStorage() { free(symbol_table_); }
 

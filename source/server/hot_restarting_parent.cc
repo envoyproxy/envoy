@@ -2,6 +2,8 @@
 
 #include "envoy/server/instance.h"
 
+#include "common/stats/symbol_table_impl.h"
+#include "common/stats/stat_merger.h"
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 
@@ -117,7 +119,9 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
   for (const auto& gauge : server_->stats().gauges()) {
     if (gauge->used()) {
-      (*stats->mutable_gauges())[gauge->name()] = gauge->value();
+      const std::string name = gauge->name();
+      (*stats->mutable_gauges())[name] = gauge->value();
+      recordDynamics(stats, name, gauge->statName());
     }
   }
 
@@ -127,12 +131,28 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
       // latching) by the time it begins exporting to the hot restart child.
       uint64_t latched_value = counter->latch();
       if (latched_value > 0) {
-        (*stats->mutable_counter_deltas())[counter->name()] = latched_value;
+        const std::string name = counter->name();
+        (*stats->mutable_counter_deltas())[name] = latched_value;
+        recordDynamics(stats, name, counter->statName());
       }
     }
   }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
   stats->set_num_connections(server_->listenerManager().numConnections());
+}
+
+void HotRestartingParent::Internal::recordDynamics(HotRestartMessage::Reply::Stats* stats,
+                                                   const std::string& name,
+                                                   Stats::StatName stat_name) {
+  Stats::StatMerger::DynamicSpans spans = Stats::StatMerger::encodeDynamicComponents(stat_name);
+  if (!spans.empty()) {
+    HotRestartMessage::Reply::RepeatedUInt32Pairs dynamic_pair_proto;
+    for (const Stats::StatMerger::DynamicSpan& span : spans) {
+      dynamic_pair_proto.add_begin(span.first);
+      dynamic_pair_proto.add_end(span.second);
+    }
+    (*stats->mutable_dynamics())[name] = dynamic_pair_proto;
+  }
 }
 
 void HotRestartingParent::Internal::drainListeners() { server_->drainListeners(); }
