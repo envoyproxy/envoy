@@ -10,7 +10,8 @@ at the end of each quarter.
 Stable releases of Envoy include:
 
 * Extended maintenance window (any version released in the last 12 months).
-* Security fixes backported from the `master` branch (including those deemed not worthy CVE).
+* Security fixes backported from the `master` branch (including those deemed not worthy
+  of creating a CVE).
 * Stability fixes backported from the `master` branch (anything that can result in a crash,
   including crashes triggered by a trusted control plane).
 * Bugfixes, deemed worthwhile by the maintainers of stable releases.
@@ -35,7 +36,7 @@ by Envoy maintainers, Envoy security team, the change author, or members of the 
 by adding the `backport/review` or `backport/approved` label (this can be done using [repokitteh]'s
 `/backport` command). Changes nominated by the change author and/or members of the Envoy community
 are evaluated for backporting on a case-by-case basis, and require approval from either the release
- manager of stable release, Envoy maintainers, or Envoy security team. Once approved, those fixes
+manager of stable release, Envoy maintainers, or Envoy security team. Once approved, those fixes
 are backported from the `master` branch to all supported stable branches by the maintainers of
 stable releases. New stable versions from non-critical security fixes are released on a regular
 schedule, initially aiming for the bi-weekly releases.
