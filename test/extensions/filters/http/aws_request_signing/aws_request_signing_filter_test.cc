@@ -48,7 +48,7 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
 
   Http::TestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(1UL, filter_config_->stats_.auth_header_added_.value());
+  EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
 }
 
 // Verify filter functionality when signing fails.

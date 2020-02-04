@@ -18,7 +18,7 @@ namespace AwsRequestSigningFilter {
  */
 // clang-format off
 #define ALL_AWS_REQUEST_SIGNING_FILTER_STATS(COUNTER)                                                           \
-  COUNTER(auth_header_added)                                                                        \
+  COUNTER(signing_added)                                                                        \
   COUNTER(signing_failed)
 // clang-format on
 

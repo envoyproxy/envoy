@@ -38,5 +38,5 @@ comes from the owning HTTP connection manager.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  auth_header_added, Counter, Total authentication headers added to requests
+  signing_added, Counter, Total authentication headers added to requests
   signing_failed, Counter, Total requests for which a signature was not added
