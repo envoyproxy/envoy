@@ -9,7 +9,10 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 http_archive(
     name = "com_google_protobuf",
     patch_args = ["-p1"],
-    patches = ["@envoy//bazel:protobuf.patch", "//bazel:protobuf.patch"],
+    patches = [
+        "@envoy//bazel:protobuf.patch",
+        "//bazel:protobuf.patch",
+    ],
     sha256 = "d7cfd31620a352b2ee8c1ed883222a0d77e44346643458e062e86b1d069ace3e",
     strip_prefix = "protobuf-3.10.1",
     urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.10.1/protobuf-all-3.10.1.tar.gz"],
@@ -22,9 +25,10 @@ http_archive(
 http_archive(
     name = "com_google_absl",
     patches = ["//bazel:abseil.patch"],
-    sha256 = "7ddf863ddced6fa5bf7304103f9c7aa619c20a2fcf84475512c8d3834b9d14fa",
-    strip_prefix = "abseil-cpp-61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529",
-    urls = ["https://github.com/abseil/abseil-cpp/archive/61c9bf3e3e1c28a4aa6d7f1be4b37fd473bb5529.tar.gz"],
+    sha256 = "190b0c9e65ef0866b44c54b517b5a3e15b67a1001b34547f03f8f4d8553c2851",
+    strip_prefix = "abseil-cpp-63ee2f8877915a3565c29707dba8fe4d7822596a",
+    # 2020-01-08
+    urls = ["https://github.com/abseil/abseil-cpp/archive/63ee2f8877915a3565c29707dba8fe4d7822596a.tar.gz"],
 )
 
 # This should be kept in sync with Envoy itself, we just need to apply this patch
