@@ -1091,6 +1091,7 @@ unejection
 unescape
 unescaped
 unescaping
+unfreed
 unhandled
 unicast
 unicode

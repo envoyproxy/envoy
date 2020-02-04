@@ -28,6 +28,7 @@ Version history
 * api: remove all support for v1
 * api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
 * api: support for the v3 xDS API added. See :ref:`api_supported_versions`.
+* aws_request_signing: added new alpha :ref:`HTTP AWS request signing filter <config_http_filters_aws_request_signing>`.
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * cluster: added :ref:`aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
