@@ -61,7 +61,7 @@ public:
    * Encode headers, optionally indicating end of stream. Response headers must
    * have a valid :status set.
    * @param headers supplies the header map to encode.
-   * @param end_stream supplies whether this is a header only request/response.
+   * @param end_stream supplies whether this is a header only request.
    */
   virtual void encodeHeaders(const HeaderMap& headers, bool end_stream) PURE;
 
@@ -87,7 +87,7 @@ public:
    * Encode headers, optionally indicating end of stream. Response headers must
    * have a valid :status set.
    * @param headers supplies the header map to encode.
-   * @param end_stream supplies whether this is a header only request/response.
+   * @param end_stream supplies whether this is a header only response.
    */
   virtual void encodeHeaders(const HeaderMap& headers, bool end_stream) PURE;
 
@@ -126,8 +126,8 @@ class RequestDecoder : public virtual StreamDecoder {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
-   * @param headers supplies the decoded headers map that is moved into the callee.
-   * @param end_stream supplies whether this is a header only request/response.
+   * @param headers supplies the decoded headers map.
+   * @param end_stream supplies whether this is a header only request.
    */
   virtual void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
 
@@ -145,14 +145,14 @@ class ResponseDecoder : public virtual StreamDecoder {
 public:
   /**
    * Called with decoded 100-Continue headers.
-   * @param headers supplies the decoded 100-Continue headers map that is moved into the callee.
+   * @param headers supplies the decoded 100-Continue headers map.
    */
   virtual void decode100ContinueHeaders(HeaderMapPtr&& headers) PURE;
 
   /**
    * Called with decoded headers, optionally indicating end of stream.
-   * @param headers supplies the decoded headers map that is moved into the callee.
-   * @param end_stream supplies whether this is a header only request/response.
+   * @param headers supplies the decoded headers map.
+   * @param end_stream supplies whether this is a header only response.
    */
   virtual void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
 

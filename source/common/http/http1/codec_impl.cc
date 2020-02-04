@@ -276,6 +276,9 @@ static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   started_response_ = true;
+
+  // The contract is that client codecs must ensure that :status is present.
+  ASSERT(headers.Status() != nullptr);
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
   if (connection_.protocol() == Protocol::Http10 && connection_.supports_http_10()) {
