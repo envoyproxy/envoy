@@ -13,7 +13,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 namespace {
@@ -167,6 +166,5 @@ TEST_F(SignerImplTest, SignHostHeader) {
 } // namespace
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

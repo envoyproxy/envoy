@@ -9,7 +9,6 @@ using testing::Pair;
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 namespace {
@@ -150,6 +149,5 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
 } // namespace
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

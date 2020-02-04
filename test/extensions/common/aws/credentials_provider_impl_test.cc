@@ -14,7 +14,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -444,6 +443,5 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
