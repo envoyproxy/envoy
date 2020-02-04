@@ -65,10 +65,16 @@ StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3::StringMatch
     : matcher_(matcher) {
   if (matcher.match_pattern_case() ==
       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
+    if (matcher.ignore_case()) {
+      throw EnvoyException("ignore_case has no effect for regex.");
+    }
     regex_ =
         Regex::Utility::parseStdRegexAsCompiledMatcher(matcher_.hidden_envoy_deprecated_regex());
   } else if (matcher.match_pattern_case() ==
              envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
+    if (matcher.ignore_case()) {
+      throw EnvoyException("ignore_case has no effect for safe_regex.");
+    }
     regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
   }
 }
@@ -84,11 +90,14 @@ bool StringMatcherImpl::match(const ProtobufWkt::Value& value) const {
 bool StringMatcherImpl::match(const absl::string_view value) const {
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
-    return matcher_.exact() == value;
+    return matcher_.ignore_case() ? absl::EqualsIgnoreCase(value, matcher_.exact())
+                                  : value == matcher_.exact();
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
-    return absl::StartsWith(value, matcher_.prefix());
+    return matcher_.ignore_case() ? absl::StartsWithIgnoreCase(value, matcher_.prefix())
+                                  : absl::StartsWith(value, matcher_.prefix());
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
-    return absl::EndsWith(value, matcher_.suffix());
+    return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
+                                  : absl::EndsWith(value, matcher_.suffix());
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return regex_->match(value);
