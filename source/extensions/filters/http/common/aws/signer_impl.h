@@ -52,6 +52,7 @@ public:
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {}
 
   void sign(Http::Message& message, bool sign_body = false) override;
+  void sign(Http::HeaderMap& headers) override;
 
 private:
   std::string createContentHash(Http::Message& message, bool sign_body) const;
@@ -68,6 +69,8 @@ private:
                                         absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         absl::string_view signature) const;
+
+  void sign(Http::HeaderMap& headers, const std::string& content_hash);
 
   const std::string service_name_;
   const std::string region_;

@@ -116,7 +116,9 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       random_generator_(context.random()) {
 
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
-    return ThreadLocal::ThreadLocalObjectSharedPtr(new UpstreamDrainManager());
+    ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
+        std::make_shared<UpstreamDrainManager>();
+    return drain_manager;
   });
 
   if (config.has_hidden_envoy_deprecated_deprecated_v1()) {
@@ -467,6 +469,8 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
   getStreamInfo().onUpstreamHostSelected(host);
   getStreamInfo().setUpstreamLocalAddress(connection.localAddress());
   getStreamInfo().setUpstreamSslConnection(connection.streamInfo().downstreamSslConnection());
+  read_callbacks_->connection().streamInfo().setUpstreamFilterState(
+      connection.streamInfo().filterState());
 
   // Simulate the event that onPoolReady represents.
   upstream_callbacks_->onEvent(Network::ConnectionEvent::Connected);

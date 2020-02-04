@@ -922,6 +922,7 @@ resync
 ret
 retriable
 retriggers
+rmdir
 rollout
 roundtrip
 rpcs

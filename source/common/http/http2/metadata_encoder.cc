@@ -80,6 +80,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
 bool MetadataEncoder::hasNextFrame() { return payload_.length() > 0; }
 
 uint64_t MetadataEncoder::packNextFramePayload(uint8_t* buf, const size_t len) {
+  ASSERT(!payload_size_queue_.empty());
   const uint64_t current_payload_size =
       std::min(METADATA_MAX_PAYLOAD_SIZE, payload_size_queue_.front());
 

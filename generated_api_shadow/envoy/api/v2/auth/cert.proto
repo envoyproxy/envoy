@@ -180,8 +180,19 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message CertificateValidationContext {
+  // Peer certificate verification mode.
+  enum TrustChainVerification {
+    // Perform default certificate verification (e.g., against CA / verification lists)
+    VERIFY_TRUST_CHAIN = 0;
+
+    // Connections where the certificate fails verification will be permitted.
+    // For HTTP connections, the result of certificate verification can be used in route matching. (
+    // see :ref:`validated <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>` ).
+    ACCEPT_UNTRUSTED = 1;
+  }
+
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
   // for listeners). If not specified and a peer certificate is presented it will not be
@@ -300,6 +311,10 @@ message CertificateValidationContext {
 
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
+
+  // Certificate trust chain verification mode.
+  TrustChainVerification trust_chain_verification = 10
+      [(validate.rules).enum = {defined_only: true}];
 }
 
 // TLS context shared by both client and server TLS contexts.
