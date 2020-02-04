@@ -71,14 +71,15 @@ rules:
 )";
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  // make sure that the thread callbacks are not invoked inline.
+  // Make sure that the thread callbacks are not invoked inline.
   server_context.thread_local_.defer_data = true;
   {
-    // scope in all the things that the filter depends on, so they are destroyed as we leave the
+    // Scope in all the things that the filter depends on, so they are destroyed as we leave the
     // scope.
     NiceMock<Server::Configuration::MockFactoryContext> context;
-    // the threadLocal, dispatcher and api that are used by the filter config, actually belong to
-    // the server factory context that who's lifetime is longer. so we return them here.
+    // The threadLocal, dispatcher and api that are used by the filter config, actually belong to
+    // the server factory context that who's lifetime is longer. We simulate that by returning
+    // their instances from outside the scope.
     ON_CALL(context, dispatcher()).WillByDefault(ReturnRef(server_context.dispatcher()));
     ON_CALL(context, api()).WillByDefault(ReturnRef(server_context.api()));
     ON_CALL(context, threadLocal()).WillByDefault(ReturnRef(server_context.threadLocal()));
@@ -88,11 +89,11 @@ rules:
     auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
   }
 
-  // even though filter_conf is now de-allocated, using a reference to it might still work, as its
+  // Even though filter_conf is now de-allocated, using a reference to it might still work, as its
   // memory was not cleared. This leads to a false positive in this test when run normally. The
   // test should fail under asan if the code uses invalid reference.
 
-  // make sure the filter scheduled a callback
+  // Make sure the filter scheduled a callback
   EXPECT_EQ(1, server_context.thread_local_.deferred_data_.size());
 
   // Simulate a situation where the callback is called after the filter config is destroyed.
