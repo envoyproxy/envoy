@@ -68,7 +68,7 @@ private:
 /**
  * HTTP AWS request signing auth filter.
  */
-class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Http::PassThroughDecoderFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const std::shared_ptr<FilterConfig>& config);
 
