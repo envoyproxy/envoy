@@ -39,7 +39,7 @@ public:
   /**
    * @return the config's signer.
    */
-  virtual Common::Aws::Signer& signer() PURE;
+  virtual Extensions::Common::Aws::Signer& signer() PURE;
 
   /**
    * @return the filter stats.
@@ -54,14 +54,14 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfigImpl(Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
+  FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
                    Stats::Scope& scope);
 
-  Common::Aws::Signer& signer() override;
+  Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
 
 private:
-  Common::Aws::SignerPtr signer_;
+  Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
 };
 

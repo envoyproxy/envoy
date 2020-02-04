@@ -18,11 +18,12 @@ Http::FilterFactoryCb AwsRequestSigningFilterFactory::createFilterFactoryFromPro
     const envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigning& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
-  auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-      context.api(), Common::Aws::Utility::metadataFetcher);
-  auto signer = std::make_unique<Common::Aws::SignerImpl>(config.service_name(), config.region(),
-                                                          credentials_provider,
-                                                          context.dispatcher().timeSource());
+  auto credentials_provider =
+      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+          context.api(), Extensions::Common::Aws::Utility::metadataFetcher);
+  auto signer = std::make_unique<Extensions::Common::Aws::SignerImpl>(
+      config.service_name(), config.region(), credentials_provider,
+      context.dispatcher().timeSource());
 
   auto filter_config =
       std::make_shared<FilterConfigImpl>(std::move(signer), stats_prefix, context.scope());
