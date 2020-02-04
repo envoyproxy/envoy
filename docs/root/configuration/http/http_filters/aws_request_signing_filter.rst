@@ -9,9 +9,9 @@ AWS Request Signing
 
 .. attention::
 
-  The Aws request signing filter is experimental and is currently under active development.
+  The AWS request signing filter is experimental and is currently under active development.
 
-The HTTP Aws request signing filter is used to access authenticated AWS services. It uses the
+The HTTP AWS request signing filter is used to access authenticated AWS services. It uses the
 existing AWS Credential Provider to get the secrets used for generating the required
 headers.
 
@@ -30,7 +30,7 @@ Example filter configuration:
 Statistics
 ----------
 
-The Aws request signing filter outputs statistics in the *http.<stat_prefix>.aws_request_signing.* namespace. The
+The AWS request signing filter outputs statistics in the *http.<stat_prefix>.aws_request_signing.* namespace. The
 :ref:`stat prefix <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.
 
