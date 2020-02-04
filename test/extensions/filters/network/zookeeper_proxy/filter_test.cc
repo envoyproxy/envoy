@@ -495,7 +495,7 @@ public:
     EXPECT_NE(absl::nullopt, findHistogram(histogram_name));
   }
 
-  Stats::OptionalHistogram findHistogram(const std::string& name) {
+  Stats::HistogramOptConstRef findHistogram(const std::string& name) {
     Stats::StatNameManagedStorage storage(name, scope_.symbolTable());
     return scope_.findHistogram(storage.statName());
   }

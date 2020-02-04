@@ -94,7 +94,7 @@ public:
   Stats::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Upstream::MockClusterManager> cm_;

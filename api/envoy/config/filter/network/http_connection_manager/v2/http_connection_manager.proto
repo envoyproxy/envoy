@@ -576,7 +576,9 @@ message ScopedRoutes {
       }
     }
 
-    // The final scope key consists of the ordered union of these fragments.
+    // The final(built) scope key consists of the ordered union of these fragments, which are compared in order with the
+    // fragments of a :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`.
+    // A missing fragment during comparison will make the key invalid, i.e., the computed key doesn't match any key.
     repeated FragmentBuilder fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 

@@ -161,6 +161,19 @@ public:
   ProtobufWkt::Struct base_;
 };
 
+TEST_F(DiskLoaderImplTest, EmptyKeyTest) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  EXPECT_EQ("", loader_->snapshot().get(""));
+  EXPECT_EQ(11, loader_->snapshot().getInteger("", 11));
+  EXPECT_EQ(1.1, loader_->snapshot().getDouble("", 1.1));
+  EXPECT_EQ(false, loader_->snapshot().featureEnabled("", 0));
+  EXPECT_EQ(true, loader_->snapshot().featureEnabled("", 100));
+  EXPECT_EQ(true, loader_->snapshot().getBoolean("", true));
+  EXPECT_EQ(false, loader_->snapshot().getBoolean("", false));
+}
+
 TEST_F(DiskLoaderImplTest, DoubleUintInteraction) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");

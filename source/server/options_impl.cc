@@ -157,18 +157,8 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
-
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
-
-  // TODO(#9768); When This bug is fixed, we can remove this hack. Until then
-  // is not safe to use real symbol tables.
-  //   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
-  fake_symbol_table_enabled_ = true;
-  if (!use_fake_symbol_table.getValue()) {
-    ENVOY_LOG(warn, "Real symbol tables are temporarily disabled due to #9768. "
-                    "Using fake symbol tables");
-  }
-
+  fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
   cpuset_threads_ = cpuset_threads.getValue();
 
   log_level_ = default_log_level;

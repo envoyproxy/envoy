@@ -98,7 +98,7 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  OptProcessContextRef processContext() override { return absl::nullopt; }
+  ProcessContextOptRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }

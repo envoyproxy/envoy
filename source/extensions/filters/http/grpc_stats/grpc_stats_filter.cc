@@ -81,7 +81,7 @@ public:
     if (filter_object_ == nullptr) {
       auto state = std::make_unique<GrpcStatsObject>();
       filter_object_ = state.get();
-      decoder_callbacks_->streamInfo().filterState().setData(
+      decoder_callbacks_->streamInfo().filterState()->setData(
           HttpFilterNames::get().GrpcStats, std::move(state),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);

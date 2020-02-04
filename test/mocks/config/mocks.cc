@@ -32,12 +32,6 @@ MockGrpcMux::~MockGrpcMux() = default;
 MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() = default;
 MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() = default;
 
-GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
-                                       const std::set<std::string>& resources,
-                                       SubscriptionCallbacks& callbacks) {
-  return GrpcMuxWatchPtr(subscribe_(type_url, resources, callbacks));
-}
-
 MockSubscriptionCallbacks::MockSubscriptionCallbacks() {
   ON_CALL(*this, resourceName(testing::_))
       .WillByDefault(testing::Invoke(TestUtility::xdsResourceName));

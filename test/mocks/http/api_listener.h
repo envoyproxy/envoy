@@ -12,8 +12,8 @@ public:
   ~MockApiListener() override;
 
   // Http::ApiListener
-  MOCK_METHOD2(newStream,
-               StreamDecoder&(StreamEncoder& response_encoder, bool is_internally_created));
+  MOCK_METHOD(StreamDecoder&, newStream,
+              (StreamEncoder & response_encoder, bool is_internally_created));
 };
 
 } // namespace Http
