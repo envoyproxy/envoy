@@ -26,7 +26,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
         "//source/extensions/common/aws:signer_impl_lib",
-        "//test/extensions/filters/http/common/aws:aws_mocks",
+        "//test/extensions/common/aws:aws_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
@@ -55,7 +55,7 @@ envoy_cc_test(
     srcs = ["credentials_provider_impl_test.cc"],
     deps = [
         "//source/extensions/common/aws:credentials_provider_impl_lib",
-        "//test/extensions/filters/http/common/aws:aws_mocks",
+        "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/test_common:environment_lib",
