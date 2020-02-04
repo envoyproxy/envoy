@@ -6,6 +6,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "extensions/filters/http/common/aws/signer.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -67,28 +68,13 @@ private:
 /**
  * HTTP AWS request signing auth filter.
  */
-class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const std::shared_ptr<FilterConfig>& config);
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  // Http::StreamFilterBase
-  void onDestroy() override {}
-
-  // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
-
-  // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override;
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
-  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override;
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override;
 
 private:
   std::shared_ptr<FilterConfig> config_;
