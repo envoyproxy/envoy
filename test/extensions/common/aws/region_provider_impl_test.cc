@@ -1,4 +1,4 @@
-#include "extensions/filters/http/common/aws/region_provider_impl.h"
+#include "extensions/common/aws/region_provider_impl.h"
 
 #include "test/test_common/environment.h"
 
@@ -6,7 +6,6 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -37,6 +36,5 @@ TEST_F(StaticRegionProviderTest, SomeRegion) {
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

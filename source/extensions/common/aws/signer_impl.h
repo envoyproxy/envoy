@@ -4,12 +4,11 @@
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
 
-#include "extensions/filters/http/common/aws/credentials_provider.h"
-#include "extensions/filters/http/common/aws/signer.h"
+#include "extensions/common/aws/credentials_provider.h"
+#include "extensions/common/aws/signer.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -82,6 +81,5 @@ private:
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

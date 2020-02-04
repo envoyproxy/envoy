@@ -1,4 +1,4 @@
-#include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/aws/utility.h"
 
 #include "test/test_common/utility.h"
 
@@ -9,7 +9,6 @@ using testing::Pair;
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 namespace {
@@ -150,6 +149,5 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
 } // namespace
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

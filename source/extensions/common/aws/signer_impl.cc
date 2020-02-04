@@ -1,4 +1,4 @@
-#include "extensions/filters/http/common/aws/signer_impl.h"
+#include "extensions/common/aws/signer_impl.h"
 
 #include "envoy/common/exception.h"
 
@@ -8,13 +8,12 @@
 #include "common/crypto/utility.h"
 #include "common/http/headers.h"
 
-#include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -122,6 +121,5 @@ SignerImpl::createAuthorizationHeader(absl::string_view access_key_id,
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

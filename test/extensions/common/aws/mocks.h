@@ -1,13 +1,12 @@
 #pragma once
 
-#include "extensions/filters/http/common/aws/credentials_provider.h"
-#include "extensions/filters/http/common/aws/signer.h"
+#include "extensions/common/aws/credentials_provider.h"
+#include "extensions/common/aws/signer.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -46,6 +45,5 @@ public:
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

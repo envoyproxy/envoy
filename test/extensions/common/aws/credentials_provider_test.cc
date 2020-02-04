@@ -1,10 +1,9 @@
-#include "extensions/filters/http/common/aws/credentials_provider.h"
+#include "extensions/common/aws/credentials_provider.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -52,6 +51,5 @@ TEST(Credentials, AllNonEmpty) {
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

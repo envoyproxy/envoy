@@ -8,13 +8,12 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 
-#include "extensions/filters/http/common/aws/credentials_provider.h"
+#include "extensions/common/aws/credentials_provider.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -165,6 +164,5 @@ private:
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -5,7 +5,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/filters/http/common/aws/signer.h"
+#include "extensions/common/aws/signer.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -39,7 +39,7 @@ public:
   /**
    * @return the config's signer.
    */
-  virtual HttpFilters::Common::Aws::Signer& signer() PURE;
+  virtual Extensions::Common::Aws::Signer& signer() PURE;
 
   /**
    * @return the filter stats.
@@ -54,14 +54,14 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfigImpl(HttpFilters::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
+  FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
                    Stats::Scope& scope);
 
-  HttpFilters::Common::Aws::Signer& signer() override;
+  Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
 
 private:
-  HttpFilters::Common::Aws::SignerPtr signer_;
+  Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
 };
 
