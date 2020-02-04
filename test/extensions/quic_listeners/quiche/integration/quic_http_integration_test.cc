@@ -268,10 +268,8 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
 #endif
 }
 
+#ifndef __APPLE__
 TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
-#ifdef __APPLE__
-  return;
-#endif
   concurrency_ = 8;
   set_reuse_port_ = true;
   initialize();
@@ -324,13 +322,15 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
 #define SO_ATTACH_REUSEPORT_CBPF SO_ATTACH_REUSEPORT_CBPF_TMP
 #endif
 }
+#endif
 
-TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
+TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
   concurrency_ = 2;
   set_reuse_port_ = true;
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  uint32_t old_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
                                                           {":path", "/test/long/url"},
@@ -346,6 +346,7 @@ TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
       Network::Test::getCanonicalLoopbackAddress(version_);
   quic_connection_->switchConnectionSocket(
       createConnectionSocket(server_addr_, local_addr, nullptr));
+  EXPECT_NE(old_port, local_addr->ip()->port());
   // Send the rest data.
   codec_client_->sendData(*request_encoder_, 1024u, true);
   waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
@@ -360,7 +361,8 @@ TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
   cleanupUpstreamAndDownstream();
-#endif
 }
+#endif
+
 } // namespace Quic
 } // namespace Envoy

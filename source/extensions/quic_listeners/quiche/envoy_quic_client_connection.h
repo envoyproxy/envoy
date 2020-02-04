@@ -40,6 +40,7 @@ public:
   // Register file event and apply socket options.
   void setUpConnectionSocket();
 
+  // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
 
 private:
