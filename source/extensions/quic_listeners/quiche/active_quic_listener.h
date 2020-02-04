@@ -3,9 +3,9 @@
 #include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/protobuf/utility.h"
-#include "envoy/runtime/runtime.h"
 #include "common/runtime/runtime_protos.h"
 
 #include "server/connection_handler_impl.h"
@@ -25,11 +25,13 @@ public:
   static const size_t kNumSessionsToCreatePerLoop = 16;
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config, Runtime::Loader& runtime);
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
+                     Runtime::Loader& runtime);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config, Runtime::Loader& runtime);
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
+                     Runtime::Loader& runtime);
 
   ~ActiveQuicListener() override;
 
@@ -67,7 +69,8 @@ using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 // A factory to create ActiveQuicListener based on given config.
 class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
-  ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config, const Runtime::Loader& runtime) {
+  ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
+                            const Runtime::Loader& runtime) {
     uint64_t idle_network_timeout_ms =
         config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                   : 300000;

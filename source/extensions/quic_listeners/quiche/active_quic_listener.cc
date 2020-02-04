@@ -23,11 +23,12 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::SocketSharedPtr listen_socket,
                                        Network::ListenerConfig& listener_config,
-                                       const quic::QuicConfig& quic_config, Runtime::Loader& runtime)
+                                       const quic::QuicConfig& quic_config,
+                                       Runtime::Loader& runtime)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
-      listen_socket_(*listen_socket),
-      enabled_(true, runtime) {
+      // todo(nezdolik) extract feature flag value from conf
+      listen_socket_(*listen_socket), enabled_(true, runtime) {
   udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
@@ -56,7 +57,7 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
-    if (!enabled()) {
+  if (!enabled()) {
     ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
     return;
   }
@@ -93,7 +94,7 @@ void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
   if (!enabled()) {
     ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
     return;
-  }  
+  }
   quic_dispatcher_->OnCanWrite();
 }
 

@@ -64,8 +64,9 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
 
-    quic_listener_ = std::make_unique<ActiveQuicListener>(
-        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, runtime_);
+    quic_listener_ =
+        std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_, listen_socket_,
+                                             listener_config_, quic_config_, runtime_);
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -85,8 +86,8 @@ protected:
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .Times(connection_count);
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-        .Times(connection_count);    
-    //EXPECT_CALL(runtime_, snapshot()getBoolean(_,_)).Times(AnyNumber());   
+        .Times(connection_count);
+    // EXPECT_CALL(runtime_, snapshot()getBoolean(_,_)).Times(AnyNumber());
 
     testing::Sequence seq;
     for (int i = 0; i < connection_count; ++i) {

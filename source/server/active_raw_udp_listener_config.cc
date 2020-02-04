@@ -24,7 +24,7 @@ ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigPr
 
 Network::ActiveUdpListenerFactoryPtr
 ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
-    const Protobuf::Message& /*message*/) {  
+    const Protobuf::Message& /*message*/) {
   return std::make_unique<Server::ActiveRawUdpListenerFactory>();
 }
 
