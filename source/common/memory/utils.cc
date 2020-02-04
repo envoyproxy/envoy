@@ -26,12 +26,12 @@ void Utils::tryShrinkHeap() {
 #ifdef TCMALLOC
   // TODO(zyfjeff): Make max unfreed memory byte configurable
   static const uint64_t MAX_UNFREED_MEMORY_BYTE = 100 * 1024 * 1024;
-  auto heap_size = Stats::totalCurrentlyReserved() - Stats::totalPageHeapUnmapped();
-  auto allocate_size = Stats::totalCurrentlyAllocated();
+  auto total_physical_bytes = Stats::totalPhysicalBytes();
+  auto allocated_size_by_app = Stats::totalCurrentlyAllocated();
 
-  ASSERT(heap_size >= allocate_size);
+  ASSERT(total_physical_bytes >= allocated_size_by_app);
 
-  if ((heap_size - allocate_size) >= MAX_UNFREED_MEMORY_BYTE) {
+  if ((total_physical_bytes - allocated_size_by_app) >= MAX_UNFREED_MEMORY_BYTE) {
     Utils::releaseFreeMemory();
   }
 #endif
