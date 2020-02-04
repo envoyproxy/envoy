@@ -25,14 +25,21 @@ struct TaggedField {
   uint32_t tag_;
   std::vector<unsigned char> data_;
 
-  uint32_t computeSize(const EncodingContext&) const {
-    // FIXME(adam.kotwasinski)
-    throw std::runtime_error("not implemented");
+  uint32_t computeCompactSize(const EncodingContext& encoder) const {
+    uint32_t result{0};
+    result += encoder.computeCompactSize(tag_);
+    result += encoder.computeCompactSize(static_cast<uint32_t>(data_.size()));
+    result += data_.size();
+    return result;
   }
 
-  uint32_t encode(Buffer::Instance&, EncodingContext&) const {
-    // FIXME(adam.kotwasinski)
-    throw std::runtime_error("not implemented");
+  uint32_t encodeCompact(Buffer::Instance& dst, EncodingContext& encoder) const {
+    uint32_t written{0};
+    written += encoder.encodeCompact(tag_, dst);
+    written += encoder.encodeCompact(static_cast<uint32_t>(data_.size()), dst);
+    dst.add(data_.data(), data_.size());
+    written += data_.size();
+    return written;
   }
 
   bool operator==(const TaggedField& rhs) const { return tag_ == rhs.tag_ && data_ == rhs.data_; }
@@ -95,14 +102,22 @@ struct TaggedFields {
 
   const std::vector<TaggedField> fields_;
 
-  uint32_t computeSize(const EncodingContext&) const {
-    // FIXME(adam.kotwasinski)
-    throw std::runtime_error("not implemented");
+  uint32_t computeCompactSize(const EncodingContext& encoder) const {
+    uint32_t result{0};
+    result += encoder.computeCompactSize(static_cast<uint32_t>(fields_.size()));
+    for (const TaggedField& tagged_field : fields_) {
+      result += tagged_field.computeCompactSize(encoder);
+    }
+    return result;
   }
 
-  uint32_t encode(Buffer::Instance&, EncodingContext&) const {
-    // FIXME(adam.kotwasinski)
-    throw std::runtime_error("not implemented");
+  uint32_t encodeCompact(Buffer::Instance& dst, EncodingContext& encoder) const {
+    uint32_t written{0};
+    written += encoder.encodeCompact(static_cast<uint32_t>(fields_.size()), dst);
+    for (const TaggedField& tagged_field : fields_) {
+      written += tagged_field.encodeCompact(dst, encoder);
+    }
+    return written;
   }
 
   bool operator==(const TaggedFields& rhs) const { return fields_ == rhs.fields_; }
