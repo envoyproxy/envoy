@@ -5,9 +5,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -56,7 +56,7 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
   }
 
   if (check_config.input().additional_headers().data()) {
-    for (const envoy::api::v2::core::HeaderValue& header_config :
+    for (const envoy::config::core::v3::HeaderValue& header_config :
          check_config.input().additional_headers()) {
       headers->addCopy(header_config.key(), header_config.value());
     }
@@ -72,7 +72,7 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
                                         const bool disable_deprecation_check) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
-  envoy::api::v2::RouteConfiguration route_config;
+  envoy::config::route::v3::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
   TestUtility::loadFromFile(router_config_file, route_config, *api);
@@ -92,7 +92,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
                          std::move(api), Coverage(route_config));
 }
 
-void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration& route_config) {
+void RouterCheckTool::assignUniqueRouteNames(
+    envoy::config::route::v3::RouteConfiguration& route_config) {
   Runtime::RandomGeneratorImpl random;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
@@ -101,7 +102,8 @@ void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration&
   }
 }
 
-void RouterCheckTool::assignRuntimeFraction(envoy::api::v2::RouteConfiguration& route_config) {
+void RouterCheckTool::assignRuntimeFraction(
+    envoy::config::route::v3::RouteConfiguration& route_config) {
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
       if (route.match().has_runtime_fraction() &&
@@ -120,7 +122,7 @@ RouterCheckTool::RouterCheckTool(
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
   ON_CALL(factory_context_->runtime_loader_.snapshot_,
-          featureEnabled(_, testing::An<const envoy::type::FractionalPercent&>(),
+          featureEnabled(_, testing::An<const envoy::type::v3::FractionalPercent&>(),
                          testing::An<uint64_t>()))
       .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
 }
@@ -386,6 +388,7 @@ bool RouterCheckTool::compareRewriteHost(
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
   if (tool_config.route_->directResponseEntry() != nullptr) {
+    tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.headers_, true);
     actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
 
@@ -411,7 +414,7 @@ bool RouterCheckTool::compareHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.header_fields().data()) {
-    for (const envoy::api::v2::core::HeaderValue& header : expected.header_fields()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.header_fields()) {
       if (!compareHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
@@ -444,7 +447,7 @@ bool RouterCheckTool::compareCustomHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.custom_header_fields().data()) {
-    for (const envoy::api::v2::core::HeaderValue& header : expected.custom_header_fields()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.custom_header_fields()) {
       if (!compareCustomHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
@@ -480,10 +483,10 @@ void RouterCheckTool::printResults() {
 
 // The Mock for runtime value checks.
 // This is a simple implementation to mimic the actual runtime checks in Snapshot.featureEnabled
-bool RouterCheckTool::runtimeMock(const std::string& key,
-                                  const envoy::type::FractionalPercent& default_value,
+bool RouterCheckTool::runtimeMock(absl::string_view key,
+                                  const envoy::type::v3::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  return !active_runtime_.empty() && active_runtime_.compare(key) == 0 &&
+  return !active_runtime_.empty() && key.compare(active_runtime_) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 

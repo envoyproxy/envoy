@@ -11,12 +11,19 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "ProtocolProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 
 // [#protodoc-title: Protocol options]
 
 // [#not-implemented-hide:]
 message TcpProtocolOptions {
+}
+
+message UpstreamHttpProtocolOptions {
+  // Set transport socket `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ for new
+  // upstream connections based on the downstream HTTP host/authority header, as seen by the
+  // :ref:`router filter <config_http_filters_router>`.
+  bool auto_sni = 1;
 }
 
 message HttpProtocolOptions {
@@ -110,6 +117,10 @@ message Http2ProtocolOptions {
   // `Maximum concurrent streams <https://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
   // allowed for peer on one HTTP/2 connection. Valid values range from 1 to 2147483647 (2^31 - 1)
   // and defaults to 2147483647.
+  //
+  // For upstream connections, this also limits how many streams Envoy will initiate concurrently
+  // on a single connection. If the limit is reached, Envoy may queue requests or establish
+  // additional connections (as allowed per circuit breaker limits).
   google.protobuf.UInt32Value max_concurrent_streams = 2
       [(validate.rules).uint32 = {lte: 2147483647 gte: 1}];
 

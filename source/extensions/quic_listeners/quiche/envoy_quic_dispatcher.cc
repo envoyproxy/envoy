@@ -21,12 +21,6 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       connection_handler_(connection_handler), listener_config_(listener_config),
       listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
       listen_socket_(listen_socket) {
-  // Turn off chlo buffering in QuicDispatcher because per event loop clean
-  // up is not implemented.
-  // TODO(danzh): Add a per event loop callback to
-  // Network::UdpListenerCallbacks which should be called at the beginning
-  // of HandleReadEvent(). And this callback should call quic::Dispatcher::ProcessBufferedChlos().
-  SetQuicFlag(FLAGS_quic_allow_chlo_buffering, false);
   // Set send buffer twice of max flow control window to ensure that stream send
   // buffer always takes all the data.
   // The max amount of data buffered is the per-stream high watermark + the max

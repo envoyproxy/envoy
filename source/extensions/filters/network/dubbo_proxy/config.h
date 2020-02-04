@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/dubbo_proxy/conn_manager.h"
@@ -21,14 +21,13 @@ namespace DubboProxy {
  * Config registration for the dubbo proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 class DubboProxyFilterConfigFactory
-    : public Common::FactoryBase<
-          envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy> {
+    : public Common::FactoryBase<envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy> {
 public:
   DubboProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().DubboProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy& proto_config,
+      const envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 
@@ -37,8 +36,8 @@ class ConfigImpl : public Config,
                    public DubboFilters::FilterChainFactory,
                    Logger::Loggable<Logger::Id::config> {
 public:
-  using DubboProxyConfig = envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy;
-  using DubboFilterConfig = envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboFilter;
+  using DubboProxyConfig = envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy;
+  using DubboFilterConfig = envoy::extensions::filters::network::dubbo_proxy::v3::DubboFilter;
 
   ConfigImpl(const DubboProxyConfig& config, Server::Configuration::FactoryContext& context);
   ~ConfigImpl() override = default;

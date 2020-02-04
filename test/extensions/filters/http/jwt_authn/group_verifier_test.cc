@@ -1,4 +1,4 @@
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "extensions/filters/http/jwt_authn/verifier.h"
 
@@ -8,7 +8,7 @@
 
 #include "gmock/gmock.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using ::google::jwt_verify::Status;
 using ::testing::NiceMock;
 

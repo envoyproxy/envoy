@@ -51,12 +51,12 @@ uint32_t feedBytesIntoBuffers(absl::string_view& data, DeserializerType& length_
         ready = true;
       } else {
         // Invalid payload: null length for non-null object.
-        throw EnvoyException(fmt::format("invalid length: {}", required));
+        throw EnvoyException(absl::StrCat("invalid length: ", required));
       }
     }
 
     if (required < null_value_length) {
-      throw EnvoyException(fmt::format("invalid length: {}", required));
+      throw EnvoyException(absl::StrCat("invalid length: ", required));
     }
 
     length_consumed_marker = true;

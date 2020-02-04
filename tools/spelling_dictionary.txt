@@ -26,6 +26,7 @@ CHACHA
 CHLO
 CHMOD
 CHLOS
+CHLOs
 CIDR
 CLA
 CLI
@@ -41,6 +42,7 @@ CRC
 CRL
 CRLFs
 CRT
+CSDS
 CSRF
 CSS
 CSV
@@ -49,6 +51,7 @@ CTXs
 CVC
 CVE
 CX
+Cxx
 CYGWIN
 DER
 DESC
@@ -56,6 +59,7 @@ DFATAL
 DGRAM
 DLOG
 DNS
+DQUOTE
 DRYs
 DS
 DST
@@ -92,6 +96,7 @@ FAQ
 FASTOPEN
 FB
 FCDS
+FCM
 FFFF
 FIN
 FIPS
@@ -118,6 +123,7 @@ HCM
 HDS
 HMAC
 HPACK
+HTAB
 HTML
 HTTP
 HTTPS
@@ -137,6 +143,7 @@ IPs
 IPv
 ITOA
 Isode
+Iters
 JSON
 JSONs
 JWKS
@@ -156,6 +163,7 @@ LEV
 LF
 LHS
 LLVM
+LPT
 LRS
 MB
 MD
@@ -292,6 +300,7 @@ UA
 UBSAN
 UDP
 UDS
+UNC
 URI
 URL
 USEVC
@@ -300,6 +309,7 @@ UTF
 UUID
 UUIDs
 VC
+VCHAR
 VH
 VHDS
 VLOG
@@ -348,6 +358,7 @@ args
 argv
 artisanal
 ary
+asctime
 async
 atoi
 atomicity
@@ -394,6 +405,7 @@ builtin
 builtins
 bulkstrings
 bursty
+bytecode
 callee
 callsite
 callsites
@@ -419,6 +431,7 @@ ciphersuites
 circllhist
 CITT
 cloneable
+cloneability
 cmd
 cmsghdr
 codebase
@@ -492,6 +505,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializing
 dest
 destructor
 destructors
@@ -504,6 +518,7 @@ dir
 dirname
 djb
 downcasted
+downcasting
 downstreams
 dtor
 dubbo
@@ -542,6 +557,7 @@ faceplant
 facto
 failover
 fallbacks
+fastbuild
 favicon
 fd
 fds
@@ -550,6 +566,7 @@ filenames
 fileno
 filesystem
 firefox
+fixdate
 fixup
 fld
 fmt
@@ -568,6 +585,7 @@ gcov
 genrule
 getaddrinfo
 getaffinity
+gethostname
 getifaddrs
 getpeername
 getsockname
@@ -647,6 +665,7 @@ jitter
 jittered
 jlt
 jne
+kafka
 keepalive
 keepalives
 ketama
@@ -686,6 +705,7 @@ lookups
 loopback
 lossy
 lowp
+lstat
 ltrim
 lua
 lyft
@@ -694,6 +714,7 @@ malloc
 matchable
 matcher
 matchers
+maxage
 maxbuffer
 megamiss
 mem
@@ -841,10 +862,12 @@ pts
 pubkey
 pwd
 py
+qdtext
 qps
 quantile
 quantiles
 queueing
+quiesce
 quitquitquit
 qvalue
 rapidjson
@@ -879,6 +902,8 @@ referer
 refetch
 regex
 regexes
+reified
+reify
 reimplements
 rele
 releasor
@@ -890,6 +915,7 @@ repicked
 repo
 requirepass
 reselecting
+reserialize
 reservable
 resize
 resized
@@ -903,6 +929,7 @@ resync
 ret
 retriable
 retriggers
+rmdir
 rollout
 roundtrip
 rpcs
@@ -913,6 +940,7 @@ ruleset
 runfiles
 runtime
 runtimes
+rver
 rxhash
 sandboxed
 sanitization
@@ -1006,6 +1034,8 @@ syscalls
 sysctl
 sz
 tbl
+tchar
+tchars
 tcmalloc
 tcpdump
 teardown
@@ -1133,6 +1163,7 @@ vhost
 viewable
 vip
 virtualhost
+virtualize
 vptr
 wakeup
 wakeups
@@ -1161,3 +1192,5 @@ zig
 zipkin
 zlib
 OBQ
+SemVer
+SCM

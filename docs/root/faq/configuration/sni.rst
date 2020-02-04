@@ -4,7 +4,7 @@ How do I configure SNI?
 =======================
 
 `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ is only supported in the :ref:`v2
-configuration/API <config_overview_v2>`.
+configuration/API <config_overview>`.
 
 .. attention::
 

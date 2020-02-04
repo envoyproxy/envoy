@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
@@ -195,6 +195,13 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
   updateWriteBufferStats(0, 0);
+
+  // As the socket closes, drain any remaining data.
+  // The data won't be written out at this point, and where there are reference
+  // counted buffer fragments, it helps avoid lifetime issues with the
+  // connection outlasting the subscriber.
+  write_buffer_->drain(write_buffer_->length());
+
   connection_stats_.reset();
 
   file_event_.reset();
@@ -279,13 +286,12 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 }
 
 void ConnectionImpl::readDisable(bool disable) {
+  // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
-  if (state() != State::Open || file_event_ == nullptr) {
-    // If readDisable is called on a closed connection in error, do not crash.
-    return;
-  }
+  ASSERT(file_event_ != nullptr);
 
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled_, disable);
+  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={} state={}", *this, read_enabled_,
+                 disable, static_cast<int>(state()));
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -302,6 +308,11 @@ void ConnectionImpl::readDisable(bool disable) {
     ASSERT(read_enabled_);
     read_enabled_ = false;
 
+    if (state() != State::Open || file_event_ == nullptr) {
+      // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+
     // If half-close semantics are enabled, we never want early close notifications; we
     // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
@@ -316,6 +327,12 @@ void ConnectionImpl::readDisable(bool disable) {
     }
     ASSERT(!read_enabled_);
     read_enabled_ = true;
+
+    if (state() != State::Open || file_event_ == nullptr) {
+      // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -342,7 +359,12 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   }
 }
 
-bool ConnectionImpl::readEnabled() const { return read_enabled_; }
+bool ConnectionImpl::readEnabled() const {
+  // Calls to readEnabled on a closed socket are considered to be an error.
+  ASSERT(state() == State::Open);
+  ASSERT(file_event_ != nullptr);
+  return read_enabled_;
+}
 
 void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
@@ -641,7 +663,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
     if (!Network::Socket::applyOptions(options, *socket_,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;

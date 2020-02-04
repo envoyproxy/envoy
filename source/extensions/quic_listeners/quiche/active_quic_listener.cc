@@ -36,8 +36,8 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket) {
   if (options != nullptr) {
-    const bool ok = Network::Socket::applyOptions(options, listen_socket_,
-                                                  envoy::api::v2::core::SocketOption::STATE_BOUND);
+    const bool ok = Network::Socket::applyOptions(
+        options, listen_socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
     if (!ok) {
       ENVOY_LOG(warn, "Fail to apply socket options to socket {} on listener {} after binding",
                 listen_socket_.ioHandle().fd(), listener_config.name());
@@ -94,12 +94,16 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
 }
 
+void ActiveQuicListener::onReadReady() {
+  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
+}
+
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
   quic_dispatcher_->OnCanWrite();
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
-    const envoy::api::v2::listener::QuicProtocolOptions& config, uint32_t concurrency)
+    const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
     : concurrency_(concurrency) {
   uint64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
@@ -160,7 +164,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
       prog.len = filter.size();
       prog.filter = filter.data();
       options->push_back(std::make_shared<Network::SocketOptionImpl>(
-          envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
+          envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
           absl::string_view(reinterpret_cast<char*>(&prog), sizeof(prog))));
     }
   });

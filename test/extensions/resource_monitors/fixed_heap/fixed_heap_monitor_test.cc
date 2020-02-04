@@ -16,8 +16,8 @@ class MockMemoryStatsReader : public MemoryStatsReader {
 public:
   MockMemoryStatsReader() = default;
 
-  MOCK_METHOD0(reservedHeapBytes, uint64_t());
-  MOCK_METHOD0(unmappedHeapBytes, uint64_t());
+  MOCK_METHOD(uint64_t, reservedHeapBytes, ());
+  MOCK_METHOD(uint64_t, unmappedHeapBytes, ());
 };
 
 class ResourcePressure : public Server::ResourceMonitor::Callbacks {

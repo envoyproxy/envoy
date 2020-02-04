@@ -1,8 +1,8 @@
 #include "server/listener_impl.h"
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -79,8 +79,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
   ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
             local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
-    const bool ok = Network::Socket::applyOptions(options_, *socket,
-                                                  envoy::api::v2::core::SocketOption::STATE_BOUND);
+    const bool ok = Network::Socket::applyOptions(
+        options_, *socket, envoy::config::core::v3::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -123,18 +123,19 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
   return createListenSocketAndApplyOptions();
 }
 
-ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
-                           ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-                           bool workers_started, uint64_t hash,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
+ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
+                           const std::string& version_info, ListenerManagerImpl& parent,
+                           const std::string& name, bool added_via_api, bool workers_started,
+                           uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
                            uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
+      filter_chain_manager_(address_, *this),
+      global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       hand_off_restored_destination_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
@@ -174,8 +175,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     if (udp_config.udp_listener_name().empty()) {
       udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
     }
-    auto& config_factory = Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
-        udp_config.udp_listener_name());
+    auto& config_factory =
+        Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(
+            udp_config.udp_listener_name());
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
@@ -220,14 +222,17 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
-  factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
-  filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
+  transport_factory_context.setInitManager(initManager());
+  // The init manager is a little messy. Will refactor when filter chain manager could accept
+  // network filter chain update.
+  // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
+  ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+  filter_chain_manager_.addFilterChain(config.filter_chains(), builder, filter_chain_manager_);
 
   if (socket_type == Network::Address::SocketType::Datagram) {
     return;
@@ -248,9 +253,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   // Add original dst listener filter if 'use_original_dst' flag is set.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)) {
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
@@ -261,7 +266,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   //                   selected.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
@@ -291,7 +296,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     ENVOY_LOG(warn, "{}", message);
 
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
@@ -328,10 +333,10 @@ Singleton::Manager& ListenerImpl::singletonManager() { return parent_.server_.si
 OverloadManager& ListenerImpl::overloadManager() { return parent_.server_.overloadManager(); }
 ThreadLocal::Instance& ListenerImpl::threadLocal() { return parent_.server_.threadLocal(); }
 Admin& ListenerImpl::admin() { return parent_.server_.admin(); }
-const envoy::api::v2::core::Metadata& ListenerImpl::listenerMetadata() const {
+const envoy::config::core::v3::Metadata& ListenerImpl::listenerMetadata() const {
   return config_.metadata();
 };
-envoy::api::v2::core::TrafficDirection ListenerImpl::direction() const {
+envoy::config::core::v3::TrafficDirection ListenerImpl::direction() const {
   return config_.traffic_direction();
 };
 TimeSource& ListenerImpl::timeSource() { return api().timeSource(); }
@@ -344,9 +349,13 @@ Api::Api& ListenerImpl::api() { return parent_.server_.api(); }
 ServerLifecycleNotifier& ListenerImpl::lifecycleNotifier() {
   return parent_.server_.lifecycleNotifier();
 }
-OptProcessContextRef ListenerImpl::processContext() { return parent_.server_.processContext(); }
+ProcessContextOptRef ListenerImpl::processContext() { return parent_.server_.processContext(); }
 Configuration::ServerFactoryContext& ListenerImpl::getServerFactoryContext() const {
   return parent_.server_.serverFactoryContext();
+}
+Configuration::TransportSocketFactoryContext&
+ListenerImpl::getTransportSocketFactoryContext() const {
+  return parent_.server_.transportSocketFactoryContext();
 }
 
 bool ListenerImpl::createNetworkFilterChain(

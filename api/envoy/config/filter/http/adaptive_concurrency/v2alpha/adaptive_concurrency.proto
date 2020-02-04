@@ -16,7 +16,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.adaptive_concurren
 option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.adaptive_concurrency.v3alpha";
+    "envoy.extensions.filters.http.adaptive_concurrency.v3";
 
 // [#protodoc-title: Adaptive Concurrency]
 // Adaptive Concurrency Control :ref:`configuration overview

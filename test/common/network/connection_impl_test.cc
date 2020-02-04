@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -141,6 +141,11 @@ protected:
   }
 
   void disconnect(bool wait_for_remote_close) {
+    if (client_write_buffer_) {
+      EXPECT_CALL(*client_write_buffer_, drain(_))
+          .Times(AnyNumber())
+          .WillOnce(Invoke([&](uint64_t size) -> void { client_write_buffer_->baseDrain(size); }));
+    }
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
     client_connection_->close(ConnectionCloseType::NoFlush);
     if (wait_for_remote_close) {
@@ -313,7 +318,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
       .WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -362,7 +367,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
       .WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -577,15 +582,38 @@ TEST_P(ConnectionImplTest, KickUndone) {
   disconnect(true);
 }
 
-// Regression test for (at least one failure mode of)
-// https://github.com/envoyproxy/envoy/issues/3639 where readDisable on a close
-// connection caused a crash.
-TEST_P(ConnectionImplTest, ReadDisableAfterClose) {
+// Ensure that calls to readDisable on a closed connection are handled gracefully. Known past issues
+// include a crash on https://github.com/envoyproxy/envoy/issues/3639, and ASSERT failure followed
+// by infinite loop in https://github.com/envoyproxy/envoy/issues/9508
+TEST_P(ConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
   setUpBasicConnection();
-  disconnect(false);
 
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(false);
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  disconnect(false);
+#ifndef NDEBUG
+  // When running in debug mode, verify that calls to readDisable and readEnabled on a closed socket
+  // trigger ASSERT failures.
+  EXPECT_DEBUG_DEATH(client_connection_->readEnabled(), "");
   EXPECT_DEBUG_DEATH(client_connection_->readDisable(true), "");
   EXPECT_DEBUG_DEATH(client_connection_->readDisable(false), "");
+#else
+  // When running in release mode, verify that calls to readDisable change the readEnabled state.
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  EXPECT_FALSE(client_connection_->readEnabled());
+  client_connection_->readDisable(false);
+  EXPECT_TRUE(client_connection_->readEnabled());
+#endif
 }
 
 TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
@@ -822,8 +850,6 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
-  EXPECT_CALL(*client_write_buffer_, drain(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
 
   disconnect(true);
@@ -901,6 +927,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
   disconnect(true);
 }
 
@@ -933,8 +960,8 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
-  EXPECT_CALL(*option, setOption(_, Eq(envoy::api::v2::core::SocketOption::STATE_PREBIND)))
-      .WillOnce(Invoke([&](Socket& socket, envoy::api::v2::core::SocketOption::SocketState) {
+  EXPECT_CALL(*option, setOption(_, Eq(envoy::config::core::v3::SocketOption::STATE_PREBIND)))
+      .WillOnce(Invoke([&](Socket& socket, envoy::config::core::v3::SocketOption::SocketState) {
         socket.setLocalAddress(new_source_address);
         return true;
       }));

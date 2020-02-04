@@ -1,8 +1,8 @@
 #include "common/http/http2/metadata_encoder.h"
 
 #include "common/common/assert.h"
-#include "common/common/stack_array.h"
 
+#include "absl/container/fixed_array.h"
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
@@ -48,7 +48,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
   // Constructs input for nghttp2 deflater (encoder). Encoding method used is
   // "HPACK Literal Header Field Never Indexed".
   const size_t nvlen = metadata_map.size();
-  STACK_ARRAY(nva, nghttp2_nv, nvlen);
+  absl::FixedArray<nghttp2_nv> nva(nvlen);
   size_t i = 0;
   for (const auto& header : metadata_map) {
     nva[i++] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(header.first.data())),
@@ -80,6 +80,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
 bool MetadataEncoder::hasNextFrame() { return payload_.length() > 0; }
 
 uint64_t MetadataEncoder::packNextFramePayload(uint8_t* buf, const size_t len) {
+  ASSERT(!payload_size_queue_.empty());
   const uint64_t current_payload_size =
       std::min(METADATA_MAX_PAYLOAD_SIZE, payload_size_queue_.front());
 

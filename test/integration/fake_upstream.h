@@ -6,7 +6,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -629,9 +629,7 @@ private:
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }
-    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-      return *socket_;
-    }
+    Network::SocketOptRef sharedSocket() const override { return *socket_; }
 
   private:
     Network::SocketSharedPtr socket_;
@@ -677,8 +675,8 @@ private:
       return udp_listener_factory_.get();
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
-    envoy::api::v2::core::TrafficDirection direction() const override {
-      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    envoy::config::core::v3::TrafficDirection direction() const override {
+      return envoy::config::core::v3::UNSPECIFIED;
     }
 
     FakeUpstream& parent_;

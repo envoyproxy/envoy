@@ -1,8 +1,8 @@
 #include <cstddef>
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
@@ -100,8 +100,8 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
       ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
@@ -111,10 +111,10 @@ public:
       bootstrap.mutable_static_resources()->mutable_listeners(0)->set_reuse_port(set_reuse_port_);
     });
     config_helper_.addConfigModifier(
-        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
-          EXPECT_EQ(hcm.codec_type(), envoy::config::filter::network::http_connection_manager::v2::
-                                          HttpConnectionManager::HTTP3);
+          EXPECT_EQ(hcm.codec_type(), envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager::HTTP3);
         });
 
     HttpIntegrationTest::initialize();
@@ -197,7 +197,8 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
         // 200ms.
         hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
         hcm.mutable_drain_timeout()->set_seconds(1);

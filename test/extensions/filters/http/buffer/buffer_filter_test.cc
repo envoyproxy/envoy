@@ -1,8 +1,8 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -30,7 +30,7 @@ namespace BufferFilter {
 class BufferFilterTest : public testing::Test {
 public:
   BufferFilterConfigSharedPtr setupConfig() {
-    envoy::config::filter::http::buffer::v2::Buffer proto_config;
+    envoy::extensions::filters::http::buffer::v3::Buffer proto_config;
     proto_config.mutable_max_request_bytes()->set_value(1024 * 1024);
     return std::make_shared<BufferFilterConfig>(proto_config);
   }
@@ -138,24 +138,11 @@ TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
   EXPECT_EQ(headers.ContentLength()->value().getStringView(), "3");
 }
 
-TEST_F(BufferFilterTest, ContentLengthPopulationRuntimeGuard) {
-  InSequence s;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.buffer_filter_populate_content_length", "false"}});
-
-  Http::TestHeaderMapImpl headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
-
-  Buffer::OwnedImpl data("foo");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
-  EXPECT_EQ(headers.ContentLength(), nullptr);
-}
-
 TEST_F(BufferFilterTest, RouteConfigOverride) {
-  envoy::config::filter::http::buffer::v2::BufferPerRoute route_cfg;
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute route_cfg;
   auto* buf = route_cfg.mutable_buffer();
   buf->mutable_max_request_bytes()->set_value(123);
-  envoy::config::filter::http::buffer::v2::BufferPerRoute vhost_cfg;
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute vhost_cfg;
   vhost_cfg.set_disabled(true);
   BufferFilterSettings route_settings(route_cfg);
   BufferFilterSettings vhost_settings(vhost_cfg);
@@ -170,7 +157,7 @@ TEST_F(BufferFilterTest, RouteConfigOverride) {
 }
 
 TEST_F(BufferFilterTest, VHostConfigOverride) {
-  envoy::config::filter::http::buffer::v2::BufferPerRoute vhost_cfg;
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute vhost_cfg;
   auto* buf = vhost_cfg.mutable_buffer();
   buf->mutable_max_request_bytes()->set_value(789);
   BufferFilterSettings vhost_settings(vhost_cfg);
@@ -184,7 +171,7 @@ TEST_F(BufferFilterTest, VHostConfigOverride) {
 }
 
 TEST_F(BufferFilterTest, RouteDisabledConfigOverride) {
-  envoy::config::filter::http::buffer::v2::BufferPerRoute vhost_cfg;
+  envoy::extensions::filters::http::buffer::v3::BufferPerRoute vhost_cfg;
   vhost_cfg.set_disabled(true);
   BufferFilterSettings vhost_settings(vhost_cfg);
   routeLocalConfig(nullptr, &vhost_settings);

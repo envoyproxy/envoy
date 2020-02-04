@@ -75,7 +75,7 @@ host when forwarding. See the example below within the configured routes.
             http_filters:
             - name: envoy.filters.http.dynamic_forward_proxy
               typed_config:
-                "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
+                "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
                 dns_cache_config:
                   name: dynamic_forward_proxy_cache_config
                   dns_lookup_family: V4_ONLY

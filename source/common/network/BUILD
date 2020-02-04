@@ -25,7 +25,6 @@ envoy_cc_library(
         "//include/envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:stack_array",
         "//source/common/common:utility_lib",
     ],
 )
@@ -51,8 +50,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -98,7 +96,7 @@ envoy_cc_library(
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/stream_info:stream_info_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -145,7 +143,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/network:hash_policy_interface",
         "//source/common/common:hash_lib",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -180,7 +178,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -210,7 +208,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:libevent_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -240,7 +238,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -257,7 +255,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -273,7 +271,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -288,7 +286,7 @@ envoy_cc_library(
         ":socket_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -307,7 +305,7 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

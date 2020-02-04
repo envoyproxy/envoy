@@ -24,8 +24,8 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
         "//test/extensions/quic_listeners/quiche:quic_test_utils_for_envoy_lib",
         "//test/integration:http_integration_lib",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

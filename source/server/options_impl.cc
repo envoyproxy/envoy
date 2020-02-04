@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-#include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/admin/v3/server_info.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
@@ -157,9 +157,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
-
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
-
   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
   cpuset_threads_ = cpuset_threads.getValue();
 
@@ -279,7 +277,7 @@ void OptionsImpl::logError(const std::string& error) const { throw MalformedArgv
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =
-      std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+      std::make_unique<envoy::admin::v3::CommandLineOptions>();
   command_line_options->set_base_id(baseId());
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
@@ -297,18 +295,16 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_service_node(serviceNodeName());
   command_line_options->set_service_zone(serviceZone());
   if (mode() == Server::Mode::Serve) {
-    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::Serve);
+    command_line_options->set_mode(envoy::admin::v3::CommandLineOptions::Serve);
   } else if (mode() == Server::Mode::Validate) {
-    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::Validate);
+    command_line_options->set_mode(envoy::admin::v3::CommandLineOptions::Validate);
   } else {
-    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::InitOnly);
+    command_line_options->set_mode(envoy::admin::v3::CommandLineOptions::InitOnly);
   }
   if (localAddressIpVersion() == Network::Address::IpVersion::v4) {
-    command_line_options->set_local_address_ip_version(
-        envoy::admin::v2alpha::CommandLineOptions::v4);
+    command_line_options->set_local_address_ip_version(envoy::admin::v3::CommandLineOptions::v4);
   } else {
-    command_line_options->set_local_address_ip_version(
-        envoy::admin::v2alpha::CommandLineOptions::v6);
+    command_line_options->set_local_address_ip_version(envoy::admin::v3::CommandLineOptions::v6);
   }
   command_line_options->mutable_file_flush_interval()->MergeFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(fileFlushIntervalMsec().count()));

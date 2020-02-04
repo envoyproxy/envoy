@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,7 +9,7 @@ namespace OriginalSrc {
 class Config {
 public:
   Config() = default;
-  Config(const envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc& config);
+  Config(const envoy::extensions::filters::listener::original_src::v3::OriginalSrc& config);
 
   bool usePort() const { return use_port_; }
   uint32_t mark() const { return mark_; }
