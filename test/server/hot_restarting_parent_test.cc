@@ -137,8 +137,8 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
     Stats::Counter& c1 = child_store.counter("c1");
     Stats::Counter& c2 = child_store.counterFromStatName(dynamic.add("c2"));
     Stats::Gauge& g1 = child_store.gauge("g1", Stats::Gauge::ImportMode::Accumulate);
-    Stats::Gauge& g2 = child_store.gaugeFromStatName(
-        dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge& g2 =
+        child_store.gaugeFromStatName(dynamic.add("g2"), Stats::Gauge::ImportMode::Accumulate);
 
     HotRestartingChild hot_restarting_child(0, 0);
     hot_restarting_child.mergeParentStats(child_store, stats_proto);

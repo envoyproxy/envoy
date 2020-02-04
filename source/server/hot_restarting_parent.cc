@@ -2,10 +2,10 @@
 
 #include "envoy/server/instance.h"
 
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/stat_merger.h"
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
+#include "common/stats/stat_merger.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "server/listener_impl.h"
 

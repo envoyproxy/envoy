@@ -23,27 +23,12 @@ public:
   // Merge the values of stats_proto into stats_store. Counters are always straightforward
   // addition, while gauges default to addition but have exceptions.
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
-                  const Protobuf::Map<std::string, uint64_t>& gauges,
-                  const DynamicsMap& dynamics);
-
-  /**
-   * Identifies the dynamic compnents of a stat_name into an array of integer
-   * paris, indicating the begin/end of spans of tokens in the stat-name that
-   * are created from StatNameDynamicStore or StatNameDynamicPool.
-   *
-   * This is can be used to reconstruct the same exact StatNames in mergeStats(),
-   * to enable stat continuity across hot-restart.
-   *
-   * @param stat_name the input statname
-   * @return the array pair indicating the bounds.
-   */
-  static DynamicSpans encodeDynamicComponents(StatName stat_name);
+                  const Protobuf::Map<std::string, uint64_t>& gauges, const DynamicsMap& dynamics);
 
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                      const DynamicsMap&);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges, const DynamicsMap&);
-  StatNameManagedStorage makeStatName(const std::string& name, const DynamicsMap& dynamic_map);
 
   StatNameHashMap<uint64_t> parent_gauge_values_;
   // A stats Scope for our in-the-merging-process counters to live in. Scopes conceptually hold
@@ -65,6 +50,35 @@ private:
   // the scope will drop exactly those stats whose names have not already been accessed through
   // another store/scope.
   ScopePtr temp_scope_;
+};
+
+class StatMergerDynamicContext {
+ public:
+  StatMergerDynamicContext(SymbolTable& symbol_table)
+      : symbol_table_(symbol_table),
+        symbolic_pool_(symbol_table),
+        dynamic_pool_(symbol_table) {}
+
+  /**
+   * Identifies the dynamic components of a stat_name into an array of integer
+   * pairs, indicating the begin/end of spans of tokens in the stat-name that
+   * are created from StatNameDynamicStore or StatNameDynamicPool.
+   *
+   * This is can be used to reconstruct the same exact StatNames in mergeStats(),
+   * to enable stat continuity across hot-restart.
+   *
+   * @param stat_name the input stat name.
+   * @return the array pair indicating the bounds.
+   */
+  static StatMerger::DynamicSpans encodeComponents(StatName stat_name);
+
+  StatName makeDynamicStatName(const std::string& name, const StatMerger::DynamicsMap& dynamic_map);
+
+ private:
+  SymbolTable& symbol_table_;
+  StatNamePool symbolic_pool_;
+  StatNameDynamicPool dynamic_pool_;
+  SymbolTable::StoragePtr storage_ptr_;
 };
 
 } // namespace Stats

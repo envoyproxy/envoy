@@ -5,49 +5,37 @@ namespace Stats {
 
 StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
-void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
-                               const DynamicsMap& dynamic_map) {
-  for (const auto& counter : counter_deltas) {
-    const std::string& name = counter.first;
-    StatNameManagedStorage stat_name_storage = makeStatName(name, dynamic_map);
-    temp_scope_->counterFromStatName(stat_name_storage.statName()).add(counter.second);
-  }
-}
-
-StatMerger::DynamicSpans StatMerger::encodeDynamicComponents(StatName stat_name) {
+StatMerger::DynamicSpans StatMergerDynamicContext::encodeComponents(StatName stat_name) {
   StatMerger::DynamicSpans dynamic_spans;
   uint32_t index = 0;
   auto record_dynamic = [&dynamic_spans, &index](absl::string_view str) {
-                          DynamicSpan span;
-                          span.first = index;
-                          for (auto segment : absl::StrSplit(str, '.')) {
-                            UNREFERENCED_PARAMETER(segment);
-                            ++index;
-                          }
-                          span.second = index;
-                          dynamic_spans.push_back(span);
-                        };
+    StatMerger::DynamicSpan span;
+    span.first = index;
+    for (auto segment : absl::StrSplit(str, '.')) {
+      UNREFERENCED_PARAMETER(segment);
+      ++index;
+    }
+    span.second = index - 1;
+    dynamic_spans.push_back(span);
+  };
   Stats::SymbolTableImpl::Encoding::decodeTokens(
       stat_name.data(), stat_name.dataSize(), [&index](Stats::Symbol) { ++index; }, record_dynamic);
   return dynamic_spans;
 }
 
-StatNameManagedStorage StatMerger::makeStatName(
-    const std::string& name, const DynamicsMap& dynamic_map) {
-  SymbolTable& symbol_table = temp_scope_->symbolTable();
+StatName StatMergerDynamicContext::makeDynamicStatName(
+    const std::string& name, const StatMerger::DynamicsMap& dynamic_map) {
   auto iter = dynamic_map.find(name);
   if (iter == dynamic_map.end()) {
-    return StatNameManagedStorage(name, symbol_table);
+    return symbolic_pool_.add(name);
   }
 
-  const std::vector<DynamicSpan>& dynamic_spans = iter->second;
+  const std::vector<StatMerger::DynamicSpan>& dynamic_spans = iter->second;
   auto dynamic = dynamic_spans.begin();
   auto dynamic_end = dynamic_spans.end();
 
   // Name has embedded dynamic components; we'll need to join together the
   // static/dynamic StatName components.
-  StatNameDynamicPool dynamic_pool(symbol_table);
-  StatNamePool symbolic_pool(symbol_table);
   std::vector<StatName> components;
   uint32_t component_index = 0;
   std::vector<absl::string_view> dynamic_tokens;
@@ -55,23 +43,38 @@ StatNameManagedStorage StatMerger::makeStatName(
   for (auto segment : absl::StrSplit(name, '.')) {
     if (dynamic != dynamic_end && dynamic->first == component_index) {
       ASSERT(dynamic_tokens.empty());
-      dynamic_tokens.push_back(segment);
-    } else if (dynamic->second == component_index) {
+      if (dynamic->second == component_index) {
+        components.push_back(dynamic_pool_.add(segment));
+        ++dynamic;
+      } else {
+        dynamic_tokens.push_back(segment);
+      }
+    } else if (dynamic != dynamic_end && dynamic->second == component_index) {
       ASSERT(!dynamic_tokens.empty());
-      components.push_back(dynamic_pool.add(absl::StrJoin(dynamic_tokens, ".")));
+      dynamic_tokens.push_back(segment);
+      components.push_back(dynamic_pool_.add(absl::StrJoin(dynamic_tokens, ".")));
       dynamic_tokens.clear();
+      ++dynamic;
     } else {
-      components.push_back(symbolic_pool.add(segment));
+      components.push_back(symbolic_pool_.add(segment));
     }
     ++component_index;
   }
-  if (!dynamic_tokens.empty()) {
-    ASSERT(dynamic != dynamic_end);
-    ASSERT(component_index == dynamic->second);
-    components.push_back(dynamic_pool.add(absl::StrJoin(dynamic_tokens, ".")));
-  }
+  ASSERT(dynamic_tokens.empty());
+  ASSERT(dynamic == dynamic_end);
 
-  return StatNameManagedStorage(symbol_table.join(components), symbol_table);
+  storage_ptr_ = symbol_table_.join(components);
+  return StatName(storage_ptr_.get());
+}
+
+void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
+                               const DynamicsMap& dynamic_map) {
+  for (const auto& counter : counter_deltas) {
+    const std::string& name = counter.first;
+    StatMergerDynamicContext dynamic_context(temp_scope_->symbolTable());
+    StatName stat_name = dynamic_context.makeDynamicStatName(name, dynamic_map);
+    temp_scope_->counterFromStatName(stat_name).add(counter.second);
+  }
 }
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
@@ -97,8 +100,8 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
     // 3b. Child later initializes gauges as Accumulate: the parent value is
     //     retained.
 
-    StatNameManagedStorage stat_name_storage = makeStatName(gauge.first, dynamic_map);
-    StatName stat_name = stat_name_storage.statName();
+    StatMergerDynamicContext dynamic_context(temp_scope_->symbolTable());
+    StatName stat_name = dynamic_context.makeDynamicStatName(gauge.first, dynamic_map);
     GaugeOptConstRef gauge_opt = temp_scope_->findGauge(stat_name);
 
     Gauge::ImportMode import_mode = Gauge::ImportMode::Uninitialized;
