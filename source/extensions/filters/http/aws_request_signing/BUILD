@@ -18,9 +18,9 @@ envoy_cc_library(
     hdrs = ["aws_request_signing_filter.h"],
     deps = [
         "//include/envoy/http:filter_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/common/aws:credentials_provider_impl_lib",
         "//source/extensions/filters/http/common/aws:signer_impl_lib",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/aws_request_signing/v3:pkg_cc_proto",
     ],
 )
