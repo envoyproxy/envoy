@@ -26,7 +26,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   try {
     config_->signer().sign(headers);
     config_->stats().auth_header_added_.inc();
-  } catch (EnvoyException&) {
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(debug, "signing failed: {}", e.what());
     config_->stats().signing_failed_.inc();
   }
 

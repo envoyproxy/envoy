@@ -67,7 +67,7 @@ private:
 /**
  * HTTP AWS request signing auth filter.
  */
-class Filter : public Http::StreamFilter {
+class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const std::shared_ptr<FilterConfig>& config);
 
