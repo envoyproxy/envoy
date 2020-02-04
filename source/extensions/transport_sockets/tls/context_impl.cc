@@ -1025,7 +1025,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     }
 
     int rc =
-        SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_id.begin(), session_id.size());
+        SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_id.data(), session_id.size());
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 }
@@ -1156,7 +1156,7 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
   static_assert(session_id.size() == SHA256_DIGEST_LENGTH, "hash size mismatch");
   static_assert(session_id.size() == SSL_MAX_SSL_SESSION_ID_LENGTH, "TLS session ID size mismatch");
 
-  rc = EVP_DigestFinal(md.get(), session_id.begin(), &hash_length);
+  rc = EVP_DigestFinal(md.get(), session_id.data(), &hash_length);
   RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   RELEASE_ASSERT(hash_length == session_id.size(),
                  "SHA256 hash length must match TLS Session ID size");
