@@ -1,6 +1,16 @@
 Version history
 ---------------
 
+0.2.2 (Feb 3, 2020)
+===================
+
+Envoy Mobile v0.2.2 changes how network requests are performed to no longer use Envoy's `AsyncClient` and to instead consume the `ApiListener` directly (#616).
+
+Additional changes:
+
+- Domain specification when starting the library is no longer supported (#641, #642). Envoy Mobile now uses the authority specified when starting a new stream
+- Less aggressive retry back-off policies (#652)
+
 0.2.1 (Jan 6, 2020)
 ===================
 

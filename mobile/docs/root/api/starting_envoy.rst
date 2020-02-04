@@ -17,7 +17,7 @@ functions, some of which are demonstrated below:
 
 **Kotlin example**::
 
-  val envoy = AndroidEnvoyClientBuilder(baseContext, Domain("api.envoyproxy.io"))
+  val envoy = AndroidEnvoyClientBuilder(baseContext)
     .addLogLevel(LogLevel.WARN)
     .addStatsFlushSeconds(60)
     ...
@@ -25,7 +25,7 @@ functions, some of which are demonstrated below:
 
 **Swift example**::
 
-  let envoy = try EnvoyClientBuilder(domain: "api.envoyproxy.io")
+  let envoy = try EnvoyClientBuilder()
     .addLogLevel(.warn)
     .addStatsFlushSeconds(60)
     ...
