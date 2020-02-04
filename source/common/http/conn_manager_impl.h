@@ -480,6 +480,9 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
+    // As with most of the encode functions, this runs encodeHeaders on various
+    // filters before doing some final header munging and passing the headers to
+    // the encoder.
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
     // filter to start the iteration with.
@@ -487,6 +490,11 @@ private:
                     FilterIterationStartState filter_iteration_start_state);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
+
+    // This does the non-filter bits of encodeHeaders, doing the munging and actual encoding.
+    void encodeHeadersInternal(HeaderMap& headers, bool end_stream);
+    void encodeDataInternal(Buffer::Instance& data, bool end_stream);
+
     void maybeEndEncode(bool end_stream);
     // Returns true if new metadata is decoded. Otherwise, returns false.
     bool processNewlyAddedMetadata();
