@@ -136,8 +136,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       break;
     }
     case test::common::http::Action::kCopy: {
-      header_map = std::make_unique<Http::HeaderMapImpl>(
-          *reinterpret_cast<Http::HeaderMap*>(header_map.get()));
+      header_map =
+          std::make_unique<Http::HeaderMapImpl>(*static_cast<Http::HeaderMap*>(header_map.get()));
       break;
     }
     case test::common::http::Action::kLookup: {

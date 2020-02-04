@@ -44,7 +44,7 @@ FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encode
   encoder.getStream().addCallbacks(*this);
 }
 
-void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void FakeStream::decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) {
   Thread::LockGuard lock(lock_);
   headers_ = std::move(headers);
   setEndStream(end_stream);
@@ -59,7 +59,7 @@ void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
   decoder_event_.notifyOne();
 }
 
-void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+void FakeStream::decodeTrailers(Http::RequestTrailerMapPtr&& trailers) {
   Thread::LockGuard lock(lock_);
   setEndStream(true);
   trailers_ = std::move(trailers);
