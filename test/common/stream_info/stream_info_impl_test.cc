@@ -167,6 +167,10 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
                                        FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
+    stream_info.setUpstreamFilterState(stream_info.filterState());
+    EXPECT_EQ(1,
+              stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
+
     EXPECT_EQ("", stream_info.requestedServerName());
     absl::string_view sni_name = "stubserver.org";
     stream_info.setRequestedServerName(sni_name);
