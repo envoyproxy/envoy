@@ -27,7 +27,10 @@ const char MaxResponseHeadersCountOverrideKey[] =
 class Stream;
 
 /**
- * Encodes an HTTP stream.
+ * Encodes an HTTP stream. This interface contains methods common to both the request and response
+ * path.
+ * TODO(mattklein123): Consider removing the StreamEncoder interface entirely and just duplicating
+ * the methods in both the request/response path for simplicity.
  */
 class StreamEncoder {
 public:
@@ -53,7 +56,10 @@ public:
 };
 
 /**
- * Stream encoder used for sending a request (client to server).
+ * Stream encoder used for sending a request (client to server). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ * TODO(mattklein123): In a future change the header types will be changed to differentiate from
+ * the response path.
  */
 class RequestEncoder : public virtual StreamEncoder {
 public:
@@ -73,7 +79,10 @@ public:
 };
 
 /**
- * Stream encoder used for sending a response (server to client).
+ * Stream encoder used for sending a response (server to client). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ * TODO(mattklein123): In a future change the header types will be changed to differentiate from
+ * the request path.
  */
 class ResponseEncoder : public virtual StreamEncoder {
 public:
@@ -99,7 +108,10 @@ public:
 };
 
 /**
- * Decodes an HTTP stream. These are callbacks fired into a sink.
+ * Decodes an HTTP stream. These are callbacks fired into a sink. This interface contains methods
+ * common to both the request and response path.
+ * TODO(mattklein123): Consider removing the StreamDecoder interface entirely and just duplicating
+ * the methods in both the request/response path for simplicity.
  */
 class StreamDecoder {
 public:
@@ -120,7 +132,10 @@ public:
 };
 
 /**
- * Stream decoder used for receiving a request (client to server).
+ * Stream decoder used for receiving a request (client to server). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ * TODO(mattklein123): In a future change the header types will be changed to differentiate from
+ * the response path.
  */
 class RequestDecoder : public virtual StreamDecoder {
 public:
@@ -139,7 +154,10 @@ public:
 };
 
 /**
- * Stream decoder used for receiving a response (server to client).
+ * Stream decoder used for receiving a response (server to client). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ * TODO(mattklein123): In a future change the header types will be changed to differentiate from
+ * the request path.
  */
 class ResponseDecoder : public virtual StreamDecoder {
 public:

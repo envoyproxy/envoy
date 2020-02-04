@@ -12,13 +12,28 @@ MockStreamEncoder::MockStreamEncoder() {
 
 MockStreamEncoder::~MockStreamEncoder() = default;
 
-MockRequestEncoder::MockRequestEncoder() = default;
+MockRequestEncoder::MockRequestEncoder() {
+  ON_CALL(*this, encodeHeaders(_, _)).WillByDefault(Invoke([](const HeaderMap& headers, bool) {
+    // Check for passing response headers as request headers in a test.
+    // TODO(mattklein123): In future changes this will become impossible once the header/trailer
+    // implementation classes are split.
+    ASSERT(headers.Status() == nullptr);
+    // Check to see that method is not-null. Path can be null for CONNECT and authority can be null
+    // at the codec level.
+    ASSERT(headers.Method() != nullptr);
+  }));
+}
 MockRequestEncoder::~MockRequestEncoder() = default;
 
 MockResponseEncoder::MockResponseEncoder() {
   ON_CALL(*this, encodeHeaders(_, _)).WillByDefault(Invoke([](const HeaderMap& headers, bool) {
-    // The contract is that client codecs must ensure that :status is present.
+    // Check for passing request headers as response headers in a test.
+    // TODO(mattklein123): In future changes this will become impossible once the header/trailer
+    // implementation classes are split.
     ASSERT(headers.Status() != nullptr);
+    ASSERT(headers.Path() == nullptr);
+    ASSERT(headers.Method() == nullptr);
+    ASSERT(headers.Host() == nullptr);
   }));
 }
 MockResponseEncoder::~MockResponseEncoder() = default;

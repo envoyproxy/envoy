@@ -203,7 +203,10 @@ struct ActiveTestRequest {
     EXPECT_CALL(callbacks_.pool_ready_, ready());
   }
 
-  void startRequest() { callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true); }
+  void startRequest() {
+    callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                             true);
+  }
 
   Http1ConnPoolImplLegacyTest& parent_;
   size_t client_index_;
@@ -576,12 +579,14 @@ TEST_F(Http1ConnPoolImplLegacyTest, MaxConnections) {
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks2.pool_ready_, ready());
 
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                          true);
   Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   conn_pool_.expectAndRunUpstreamReady();
-  callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                           true);
   // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
   response_headers = std::make_unique<TestHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
@@ -628,7 +633,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, ConnectionCloseWithoutHeader) {
   // Finishing request 1 will schedule binding the connection to request 2.
   conn_pool_.expectEnableUpstreamReady();
 
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                          true);
   Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
@@ -645,7 +651,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, ConnectionCloseWithoutHeader) {
   EXPECT_CALL(callbacks2.pool_ready_, ready());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                           true);
   // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
   response_headers = std::make_unique<TestHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
@@ -677,7 +684,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, ConnectionCloseHeader) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                          true);
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
@@ -710,7 +718,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, ProxyConnectionCloseHeader) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                          true);
 
   // Response with 'proxy-connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
@@ -743,7 +752,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, Http10NoConnectionKeepAlive) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                          true);
 
   // Response without 'connection: keep-alive' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
@@ -778,7 +788,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, MaxRequestsPerConnection) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                          true);
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
@@ -883,9 +894,10 @@ TEST_F(Http1ConnPoolImplLegacyTest, RemoteCloseToCompleteResponse) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
+                                          true);
 
-  inner_decoder->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, false);
+  inner_decoder->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
   Buffer::OwnedImpl dummy_data("12345");
   inner_decoder->decodeData(dummy_data, false);
 

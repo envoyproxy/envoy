@@ -25,16 +25,17 @@ TEST(RequestEncoderWrapper, HeaderOnlyEncode) {
   MockRequestEncoderWrapper wrapper;
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, true));
-  wrapper.encodeHeaders(TestHeaderMapImpl{{":status", "200"}}, true);
+  wrapper.encodeHeaders(
+      TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, true);
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
 TEST(RequestEncoderWrapper, HeaderAndBodyEncode) {
   MockRequestEncoderWrapper wrapper;
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, false));
-  wrapper.encodeHeaders(response_headers, false);
+  wrapper.encodeHeaders(
+      TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, false);
   EXPECT_FALSE(wrapper.encodeComplete());
 
   Buffer::OwnedImpl data;
@@ -46,9 +47,9 @@ TEST(RequestEncoderWrapper, HeaderAndBodyEncode) {
 TEST(RequestEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
   MockRequestEncoderWrapper wrapper;
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, false));
-  wrapper.encodeHeaders(response_headers, false);
+  wrapper.encodeHeaders(
+      TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, false);
   EXPECT_FALSE(wrapper.encodeComplete());
 
   Buffer::OwnedImpl data;
