@@ -144,14 +144,25 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
 void HotRestartingParent::Internal::recordDynamics(HotRestartMessage::Reply::Stats* stats,
                                                    const std::string& name,
                                                    Stats::StatName stat_name) {
-  Stats::StatMerger::DynamicSpans spans = Stats::StatMerger::encodeDynamicComponents(stat_name);
+  // Compute an array of spans describing which components of the stat name are
+  // dynamic. This is needed so that when the child recovers the StatName, it
+  // correlates with how the system generates those stats, with the same exact
+  // components using a dynamic representation.
+  //
+  // See https://github.com/envoyproxy/envoy/issues/9874 for more details.
+  Stats::StatMerger::DynamicSpans spans =
+      Stats::StatMergerDynamicContext::encodeComponents(stat_name);
+
+  // Convert that C++ structure (controlled by stat_merger.cc) into a protobuf
+  // for serialization.
   if (!spans.empty()) {
-    HotRestartMessage::Reply::RepeatedUInt32Pairs dynamic_pair_proto;
+    HotRestartMessage::Reply::RepeatedSpan spans_proto;
     for (const Stats::StatMerger::DynamicSpan& span : spans) {
-      dynamic_pair_proto.add_begin(span.first);
-      dynamic_pair_proto.add_end(span.second);
+      HotRestartMessage::Reply::Span* span_proto = spans_proto.add_spans();
+      span_proto->set_first(span.first);
+      span_proto->set_last(span.second);
     }
-    (*stats->mutable_dynamics())[name] = dynamic_pair_proto;
+    (*stats->mutable_dynamics())[name] = spans_proto;
   }
 }
 

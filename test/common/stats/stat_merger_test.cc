@@ -8,7 +8,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -211,7 +210,7 @@ TEST_F(StatMergerTest, gaugeMergeImportMode) {
 }
 
 class StatMergerDynamicTest : public testing::Test {
- public:
+public:
   StatMergerDynamicTest() : store_(symbol_table_), stat_merger_(store_) {}
 
   void dynamicEncodeDecodeTest(absl::string_view input_name) {

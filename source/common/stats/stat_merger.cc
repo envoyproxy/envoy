@@ -23,8 +23,8 @@ StatMerger::DynamicSpans StatMergerDynamicContext::encodeComponents(StatName sta
   return dynamic_spans;
 }
 
-StatName StatMergerDynamicContext::makeDynamicStatName(
-    const std::string& name, const StatMerger::DynamicsMap& dynamic_map) {
+StatName StatMergerDynamicContext::makeDynamicStatName(const std::string& name,
+                                                       const StatMerger::DynamicsMap& dynamic_map) {
   auto iter = dynamic_map.find(name);
   if (iter == dynamic_map.end()) {
     return symbolic_pool_.add(name);

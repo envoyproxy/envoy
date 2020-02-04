@@ -53,11 +53,9 @@ private:
 };
 
 class StatMergerDynamicContext {
- public:
+public:
   StatMergerDynamicContext(SymbolTable& symbol_table)
-      : symbol_table_(symbol_table),
-        symbolic_pool_(symbol_table),
-        dynamic_pool_(symbol_table) {}
+      : symbol_table_(symbol_table), symbolic_pool_(symbol_table), dynamic_pool_(symbol_table) {}
 
   /**
    * Identifies the dynamic components of a stat_name into an array of integer
@@ -74,7 +72,7 @@ class StatMergerDynamicContext {
 
   StatName makeDynamicStatName(const std::string& name, const StatMerger::DynamicsMap& dynamic_map);
 
- private:
+private:
   SymbolTable& symbol_table_;
   StatNamePool symbolic_pool_;
   StatNameDynamicPool dynamic_pool_;
