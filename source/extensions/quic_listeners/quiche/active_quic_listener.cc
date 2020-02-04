@@ -28,7 +28,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       // todo(nezdolik) extract feature flag value from conf
-      listen_socket_(*listen_socket), enabled_(true, runtime) {
+      listen_socket_(*listen_socket), enabled_(envoy::config::core::v3::RuntimeFeatureFlag(), runtime) {
   udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
