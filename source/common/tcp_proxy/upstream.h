@@ -52,7 +52,7 @@ public:
   TcpUpstream(Tcp::ConnectionPool::ConnectionDataPtr&& data,
               Tcp::ConnectionPool::UpstreamCallbacks& callbacks);
 
-  // GenricUpstream
+  // GenericUpstream
   bool readDisable(bool disable) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
