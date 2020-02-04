@@ -25,6 +25,10 @@ static_resources:
                     prefix: "/"
                   route:
                     cluster_header: x-envoy-mobile-cluster
+                    retry_policy:
+                      retry_back_off:
+                        base_interval: 0.25s
+                        max_interval: 60s
         http_filters:
           - name: envoy.filters.http.dynamic_forward_proxy
             typed_config:
