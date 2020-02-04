@@ -1,6 +1,6 @@
 #include "common/common/fmt.h"
 
-#include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/aws/utility.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -9,7 +9,7 @@
 
 namespace Envoy {
 
-using Envoy::Extensions::HttpFilters::Common::Aws::Utility;
+using Envoy::Extensions::Common::Aws::Utility;
 
 class AwsMetadataIntegrationTestBase : public ::testing::Test, public BaseIntegrationTest {
 public:

@@ -7,13 +7,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
-FilterConfigImpl::FilterConfigImpl(HttpFilters::Common::Aws::SignerPtr&& signer,
-                                   const std::string& stats_prefix, Stats::Scope& scope)
+FilterConfigImpl::FilterConfigImpl(Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
+                                   Stats::Scope& scope)
     : signer_(std::move(signer)), stats_(Filter::generateStats(stats_prefix, scope)) {}
 
 Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
 
-HttpFilters::Common::Aws::Signer& FilterConfigImpl::signer() { return *signer_; }
+Common::Aws::Signer& FilterConfigImpl::signer() { return *signer_; }
 
 FilterStats& FilterConfigImpl::stats() { return stats_; }
 

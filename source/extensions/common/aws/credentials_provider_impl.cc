@@ -1,4 +1,4 @@
-#include "extensions/filters/http/common/aws/credentials_provider_impl.h"
+#include "extensions/common/aws/credentials_provider_impl.h"
 
 #include "envoy/common/exception.h"
 
@@ -8,7 +8,6 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -221,6 +220,5 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

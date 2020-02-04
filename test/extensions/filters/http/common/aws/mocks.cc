@@ -1,4 +1,4 @@
-#include "test/extensions/filters/http/common/aws/mocks.h"
+#include "test/extensions/common/aws/mocks.h"
 
 namespace Envoy {
 namespace Extensions {

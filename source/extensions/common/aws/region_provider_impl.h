@@ -2,11 +2,10 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/http/common/aws/region_provider.h"
+#include "extensions/common/aws/region_provider.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -33,6 +32,5 @@ private:
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

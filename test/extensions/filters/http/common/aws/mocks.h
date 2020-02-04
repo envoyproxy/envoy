@@ -1,7 +1,7 @@
 #pragma once
 
-#include "extensions/filters/http/common/aws/credentials_provider.h"
-#include "extensions/filters/http/common/aws/signer.h"
+#include "extensions/common/aws/credentials_provider.h"
+#include "extensions/common/aws/signer.h"
 
 #include "gmock/gmock.h"
 

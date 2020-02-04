@@ -1,4 +1,4 @@
-#include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/aws/utility.h"
 
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -8,7 +8,6 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -141,6 +140,5 @@ absl::optional<std::string> Utility::metadataFetcher(const std::string& host,
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

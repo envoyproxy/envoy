@@ -6,7 +6,6 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
@@ -28,6 +27,5 @@ using RegionProviderSharedPtr = std::shared_ptr<RegionProvider>;
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

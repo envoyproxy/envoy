@@ -1,4 +1,4 @@
-#include "extensions/filters/http/common/aws/credentials_provider.h"
+#include "extensions/common/aws/credentials_provider.h"
 
 #include "gtest/gtest.h"
 

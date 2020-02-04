@@ -1,10 +1,10 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/message_impl.h"
 
-#include "extensions/filters/http/common/aws/signer_impl.h"
-#include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/aws/signer_impl.h"
+#include "extensions/common/aws/utility.h"
 
-#include "test/extensions/filters/http/common/aws/mocks.h"
+#include "test/extensions/common/aws/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 

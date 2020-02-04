@@ -5,11 +5,9 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
-// TODO(rgs): Move this to source/extensions/common.
 class Signer {
 public:
   virtual ~Signer() = default;
@@ -34,6 +32,5 @@ using SignerPtr = std::unique_ptr<Signer>;
 
 } // namespace Aws
 } // namespace Common
-} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

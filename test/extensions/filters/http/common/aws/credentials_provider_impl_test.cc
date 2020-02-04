@@ -1,6 +1,6 @@
-#include "extensions/filters/http/common/aws/credentials_provider_impl.h"
+#include "extensions/common/aws/credentials_provider_impl.h"
 
-#include "test/extensions/filters/http/common/aws/mocks.h"
+#include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"

@@ -1,4 +1,4 @@
-#include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/aws/utility.h"
 
 #include "test/test_common/utility.h"
 

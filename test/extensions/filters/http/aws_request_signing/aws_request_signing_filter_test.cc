@@ -1,5 +1,5 @@
+#include "extensions/common/aws/signer.h"
 #include "extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
-#include "extensions/filters/http/common/aws/signer.h"
 
 #include "test/mocks/http/mocks.h"
 
@@ -22,7 +22,7 @@ class MockFilterConfig : public FilterConfig {
 public:
   MockFilterConfig() { signer_ = std::make_shared<MockSigner>(); }
 
-  HttpFilters::Common::Aws::Signer& signer() override { return *signer_; }
+  Common::Aws::Signer& signer() override { return *signer_; }
   FilterStats& stats() override { return stats_; }
 
   std::shared_ptr<MockSigner> signer_;

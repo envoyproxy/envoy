@@ -1,4 +1,4 @@
-#include "extensions/filters/http/common/aws/region_provider_impl.h"
+#include "extensions/common/aws/region_provider_impl.h"
 
 #include "test/test_common/environment.h"
 
