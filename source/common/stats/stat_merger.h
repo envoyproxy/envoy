@@ -70,6 +70,10 @@ public:
    */
   static StatMerger::DynamicSpans encodeComponents(StatName stat_name);
 
+  /**
+   * Generates a StatName with mixed dynamic/symbolic components based on
+   * the string and the dynamic_map obtained from encodeComponents.
+   */
   StatName makeDynamicStatName(const std::string& name, const StatMerger::DynamicsMap& dynamic_map);
 
 private:
