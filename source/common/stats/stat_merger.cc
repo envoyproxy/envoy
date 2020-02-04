@@ -5,11 +5,11 @@ namespace Stats {
 
 StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
-StatMerger::DynamicSpans StatMergerDynamicContext::encodeComponents(StatName stat_name) {
-  StatMerger::DynamicSpans dynamic_spans;
+StatMerger::DynamicSpans StatMerger::DynamicContext::encodeComponents(StatName stat_name) {
+  DynamicSpans dynamic_spans;
   uint32_t index = 0;
   auto record_dynamic = [&dynamic_spans, &index](absl::string_view str) {
-    StatMerger::DynamicSpan span;
+    DynamicSpan span;
     span.first = index;
     for (auto segment : absl::StrSplit(str, '.')) {
       UNREFERENCED_PARAMETER(segment);
@@ -23,14 +23,14 @@ StatMerger::DynamicSpans StatMergerDynamicContext::encodeComponents(StatName sta
   return dynamic_spans;
 }
 
-StatName StatMergerDynamicContext::makeDynamicStatName(const std::string& name,
-                                                       const StatMerger::DynamicsMap& dynamic_map) {
-  auto iter = dynamic_map.find(name);
-  if (iter == dynamic_map.end()) {
+StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name,
+                                                         const DynamicsMap& map) {
+  auto iter = map.find(name);
+  if (iter == map.end()) {
     return symbolic_pool_.add(name);
   }
 
-  const std::vector<StatMerger::DynamicSpan>& dynamic_spans = iter->second;
+  const DynamicSpans& dynamic_spans = iter->second;
   auto dynamic = dynamic_spans.begin();
   auto dynamic_end = dynamic_spans.end();
 
@@ -71,7 +71,7 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
                                const DynamicsMap& dynamic_map) {
   for (const auto& counter : counter_deltas) {
     const std::string& name = counter.first;
-    StatMergerDynamicContext dynamic_context(temp_scope_->symbolTable());
+    StatMerger::DynamicContext dynamic_context(temp_scope_->symbolTable());
     StatName stat_name = dynamic_context.makeDynamicStatName(name, dynamic_map);
     temp_scope_->counterFromStatName(stat_name).add(counter.second);
   }
@@ -100,7 +100,7 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
     // 3b. Child later initializes gauges as Accumulate: the parent value is
     //     retained.
 
-    StatMergerDynamicContext dynamic_context(temp_scope_->symbolTable());
+    StatMerger::DynamicContext dynamic_context(temp_scope_->symbolTable());
     StatName stat_name = dynamic_context.makeDynamicStatName(gauge.first, dynamic_map);
     GaugeOptConstRef gauge_opt = temp_scope_->findGauge(stat_name);
 

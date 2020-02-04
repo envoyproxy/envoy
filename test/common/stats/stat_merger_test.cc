@@ -51,8 +51,8 @@ public:
 
     std::string name = symbol_table.toString(stat_name);
     StatMerger::DynamicsMap dynamic_map;
-    dynamic_map[name] = StatMergerDynamicContext::encodeComponents(stat_name);
-    StatMergerDynamicContext dynamic_context(symbol_table);
+    dynamic_map[name] = StatMerger::DynamicContext::encodeComponents(stat_name);
+    StatMerger::DynamicContext dynamic_context(symbol_table);
     StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
     EXPECT_EQ(stat_name, decoded) << name;
   }
@@ -233,9 +233,9 @@ public:
 
     std::string name = symbol_table_.toString(stat_name);
     StatMerger::DynamicsMap dynamic_map;
-    dynamic_map[name] = StatMergerDynamicContext::encodeComponents(stat_name);
+    dynamic_map[name] = StatMerger::DynamicContext::encodeComponents(stat_name);
 
-    StatMergerDynamicContext dynamic_context(symbol_table_);
+    StatMerger::DynamicContext dynamic_context(symbol_table_);
     StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
     EXPECT_EQ(name, symbol_table_.toString(decoded)) << "input=" << input_name;
     EXPECT_TRUE(stat_name == decoded) << "input=" << input_name << ", name=" << name;

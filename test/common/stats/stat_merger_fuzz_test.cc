@@ -37,10 +37,10 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
   SymbolTable::StoragePtr joined = symbol_table.join(stat_names);
   StatName stat_name(joined.get());
 
-  StatMergerDynamicContext dynamic_context(symbol_table);
+  StatMerger::DynamicContext dynamic_context(symbol_table);
   std::string name = symbol_table.toString(stat_name);
   StatMerger::DynamicsMap dynamic_map;
-  dynamic_map[name] = StatMergerDynamicContext::encodeComponents(stat_name);
+  dynamic_map[name] = StatMerger::DynamicContext::encodeComponents(stat_name);
 
   StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
   FUZZ_ASSERT(name == symbol_table.toString(decoded));

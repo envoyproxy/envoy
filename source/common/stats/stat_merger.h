@@ -14,11 +14,48 @@ namespace Stats {
 // (typically hot restart parent+child) Envoy processes.
 class StatMerger {
 public:
-  StatMerger(Stats::Store& target_store);
-
   using DynamicSpan = std::pair<uint32_t, uint32_t>;
   using DynamicSpans = std::vector<DynamicSpan>;
   using DynamicsMap = absl::flat_hash_map<std::string, DynamicSpans>;
+
+  // Holds state needed construct StatName with mixed dynamic/symbolic
+  // components, based on a map.
+  class DynamicContext {
+  public:
+    DynamicContext(SymbolTable& symbol_table)
+        : symbol_table_(symbol_table), symbolic_pool_(symbol_table), dynamic_pool_(symbol_table) {}
+
+    /**
+     * Identifies the dynamic components of a stat_name into an array of integer
+     * pairs, indicating the begin/end of spans of tokens in the stat-name that
+     * are created from StatNameDynamicStore or StatNameDynamicPool.
+     *
+     * This is can be used to reconstruct the same exact StatNames in mergeStats(),
+     * to enable stat continuity across hot-restart.
+     *
+     * @param stat_name the input stat name.
+     * @return the array pair indicating the bounds.
+     */
+    static DynamicSpans encodeComponents(StatName stat_name);
+
+    /**
+     * Generates a StatName with mixed dynamic/symbolic components based on
+     * the string and the dynamic_map obtained from encodeComponents.
+     *
+     * @param name The string corresponding to the desired StatName.
+     * @param map a map indicating which spans of tokens in the stat-name are dynamic.
+     * @return the generated StatName, valid as long as the DynamicContext.
+     */
+    StatName makeDynamicStatName(const std::string& name, const DynamicsMap& map);
+
+  private:
+    SymbolTable& symbol_table_;
+    StatNamePool symbolic_pool_;
+    StatNameDynamicPool dynamic_pool_;
+    SymbolTable::StoragePtr storage_ptr_;
+  };
+
+  StatMerger(Stats::Store& target_store);
 
   // Merge the values of stats_proto into stats_store. Counters are always straightforward
   // addition, while gauges default to addition but have exceptions.
@@ -50,37 +87,6 @@ private:
   // the scope will drop exactly those stats whose names have not already been accessed through
   // another store/scope.
   ScopePtr temp_scope_;
-};
-
-class StatMergerDynamicContext {
-public:
-  StatMergerDynamicContext(SymbolTable& symbol_table)
-      : symbol_table_(symbol_table), symbolic_pool_(symbol_table), dynamic_pool_(symbol_table) {}
-
-  /**
-   * Identifies the dynamic components of a stat_name into an array of integer
-   * pairs, indicating the begin/end of spans of tokens in the stat-name that
-   * are created from StatNameDynamicStore or StatNameDynamicPool.
-   *
-   * This is can be used to reconstruct the same exact StatNames in mergeStats(),
-   * to enable stat continuity across hot-restart.
-   *
-   * @param stat_name the input stat name.
-   * @return the array pair indicating the bounds.
-   */
-  static StatMerger::DynamicSpans encodeComponents(StatName stat_name);
-
-  /**
-   * Generates a StatName with mixed dynamic/symbolic components based on
-   * the string and the dynamic_map obtained from encodeComponents.
-   */
-  StatName makeDynamicStatName(const std::string& name, const StatMerger::DynamicsMap& dynamic_map);
-
-private:
-  SymbolTable& symbol_table_;
-  StatNamePool symbolic_pool_;
-  StatNameDynamicPool dynamic_pool_;
-  SymbolTable::StoragePtr storage_ptr_;
 };
 
 } // namespace Stats

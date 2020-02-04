@@ -151,7 +151,7 @@ void HotRestartingParent::Internal::recordDynamics(HotRestartMessage::Reply::Sta
   //
   // See https://github.com/envoyproxy/envoy/issues/9874 for more details.
   Stats::StatMerger::DynamicSpans spans =
-      Stats::StatMergerDynamicContext::encodeComponents(stat_name);
+      Stats::StatMerger::DynamicContext::encodeComponents(stat_name);
 
   // Convert that C++ structure (controlled by stat_merger.cc) into a protobuf
   // for serialization.
