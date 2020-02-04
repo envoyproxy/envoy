@@ -9,7 +9,7 @@ namespace HttpFilters {
 namespace Common {
 namespace Aws {
 
-// TODO(lavignes): Move this interface to include/envoy if this is needed elsewhere
+// TODO(rgs): Move this to source/extensions/common.
 class Signer {
 public:
   virtual ~Signer() = default;
