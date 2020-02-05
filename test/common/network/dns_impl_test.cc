@@ -475,62 +475,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(DnsImplTest, DestroyChannelOnRefused) {
-  ASSERT_FALSE(peer_->isChannelDirty());
-  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
-  server_->setRefused(true);
-
-  std::list<Address::InstanceConstSharedPtr> address_list;
-  EXPECT_NE(nullptr, resolver_->resolve("", DnsLookupFamily::V4Only,
-                                        [&](std::list<DnsResponse>&& results) -> void {
-                                          address_list = getAddressList(results);
-                                          dispatcher_->exit();
-                                        }));
-
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  // The c-ares channel should be dirty because the TestDnsServer replied with return code REFUSED;
-  // This test, and the way the TestDnsServerQuery is setup, relies on the fact that Envoy's
-  // c-ares channel is configured **without** the ARES_FLAG_NOCHECKRESP flag. This causes c-ares to
-  // discard packets with REFUSED, and thus Envoy receives ARES_ECONNREFUSED due to the code here:
-  // https://github.com/c-ares/c-ares/blob/d7e070e7283f822b1d2787903cce3615536c5610/ares_process.c#L654
-  // If that flag needs to be set, or c-ares changes its handling this test will need to be updated
-  // to create another condition where c-ares invokes onAresGetAddrInfoCallback with status ==
-  // ARES_ECONNREFUSED.
-  EXPECT_TRUE(peer_->isChannelDirty());
-  EXPECT_TRUE(address_list.empty());
-
-  server_->setRefused(false);
-
-  // Resolve will destroy the original channel and create a new one.
-  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::V4Only,
-                                        [&](std::list<DnsResponse>&& results) -> void {
-                                          address_list = getAddressList(results);
-                                          dispatcher_->exit();
-                                        }));
-
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  // However, the fresh channel initialized by production code does not point to the TestDnsServer.
-  // This means that resolution will return ARES_ENOTFOUND. This should not dirty the channel.
-  EXPECT_FALSE(peer_->isChannelDirty());
-  EXPECT_TRUE(address_list.empty());
-
-  // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
-  if (tcp_only()) {
-    peer_->resetChannelTcpOnly(zero_timeout());
-  }
-  ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
-
-  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::Auto,
-                                        [&](std::list<DnsResponse>&& results) -> void {
-                                          address_list = getAddressList(results);
-                                          dispatcher_->exit();
-                                        }));
-
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_FALSE(peer_->isChannelDirty());
-  EXPECT_TRUE(hasAddress(address_list, "201.134.56.7"));
-}
-
 // Validate that when DnsResolverImpl is destructed with outstanding requests,
 // that we don't invoke any callbacks. This is a regression test from
 // development, where segfaults were encountered due to callback invocations on
@@ -644,6 +588,64 @@ TEST_P(DnsImplTest, CallbackException) {
                                             /*results*/) -> void { throw std::string(); }));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "unknown");
+}
+
+// Validate that the c-ares channel is destroyed and re-initialized when c-ares returns
+// ARES_ECONNREFUSED as its callback status.
+TEST_P(DnsImplTest, DestroyChannelOnRefused) {
+  ASSERT_FALSE(peer_->isChannelDirty());
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->setRefused(true);
+
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  EXPECT_NE(nullptr, resolver_->resolve("", DnsLookupFamily::V4Only,
+                                        [&](std::list<DnsResponse>&& results) -> void {
+                                          address_list = getAddressList(results);
+                                          dispatcher_->exit();
+                                        }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // The c-ares channel should be dirty because the TestDnsServer replied with return code REFUSED;
+  // This test, and the way the TestDnsServerQuery is setup, relies on the fact that Envoy's
+  // c-ares channel is configured **without** the ARES_FLAG_NOCHECKRESP flag. This causes c-ares to
+  // discard packets with REFUSED, and thus Envoy receives ARES_ECONNREFUSED due to the code here:
+  // https://github.com/c-ares/c-ares/blob/d7e070e7283f822b1d2787903cce3615536c5610/ares_process.c#L654
+  // If that flag needs to be set, or c-ares changes its handling this test will need to be updated
+  // to create another condition where c-ares invokes onAresGetAddrInfoCallback with status ==
+  // ARES_ECONNREFUSED.
+  EXPECT_TRUE(peer_->isChannelDirty());
+  EXPECT_TRUE(address_list.empty());
+
+  server_->setRefused(false);
+
+  // Resolve will destroy the original channel and create a new one.
+  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::V4Only,
+                                        [&](std::list<DnsResponse>&& results) -> void {
+                                          address_list = getAddressList(results);
+                                          dispatcher_->exit();
+                                        }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // However, the fresh channel initialized by production code does not point to the TestDnsServer.
+  // This means that resolution will return ARES_ENOTFOUND. This should not dirty the channel.
+  EXPECT_FALSE(peer_->isChannelDirty());
+  EXPECT_TRUE(address_list.empty());
+
+  // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
+  if (tcp_only()) {
+    peer_->resetChannelTcpOnly(zero_timeout());
+  }
+  ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+
+  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::Auto,
+                                        [&](std::list<DnsResponse>&& results) -> void {
+                                          address_list = getAddressList(results);
+                                          dispatcher_->exit();
+                                        }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(peer_->isChannelDirty());
+  EXPECT_TRUE(hasAddress(address_list, "201.134.56.7"));
 }
 
 TEST_P(DnsImplTest, DnsIpAddressVersion) {
