@@ -27,6 +27,15 @@
 namespace Envoy {
 namespace Config {
 
+std::string Utility::truncateGrpcStatusMessage(absl::string_view error_message) {
+  // GRPC sends error message via trailers, which by default has a 8KB size limit(see
+  // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests). Truncates the
+  // error message if it's too long.
+  constexpr uint32_t kProtobufErrMsgLen = 4096;
+  return fmt::format("{}{}", error_message.substr(0, kProtobufErrMsgLen),
+                     error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
+}
+
 void Utility::translateApiConfigSource(
     const std::string& cluster, uint32_t refresh_delay_ms, const std::string& api_type,
     envoy::config::core::v3::ApiConfigSource& api_config_source) {

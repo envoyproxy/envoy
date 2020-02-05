@@ -16,6 +16,7 @@ using ::google::jwt_verify::Status;
 using testing::_;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -28,22 +29,32 @@ public:
   MOCK_METHOD(bool, matches, (const Http::HeaderMap& headers), (const));
 };
 
+JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
+  return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, ""))};
+}
+
 class MockFilterConfig : public FilterConfig {
 public:
-  MockFilterConfig(
-      const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
-      : FilterConfig(proto_config, stats_prefix, context) {}
+  MockFilterConfig() : stats_(generateMockStats(stats_store_)) {
+    ON_CALL(*this, bypassCorsPreflightRequest()).WillByDefault(Return(true));
+    ON_CALL(*this, findVerifier(_, _)).WillByDefault(Return(nullptr));
+    ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+  }
+
   MOCK_METHOD(const Verifier*, findVerifier,
               (const Http::HeaderMap& headers, const StreamInfo::FilterState& filter_state),
               (const));
+  MOCK_METHOD(bool, bypassCorsPreflightRequest, (), (const));
+  MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
+
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  JwtAuthnFilterStats stats_;
 };
 
 class FilterTest : public testing::Test {
 public:
   void SetUp() override {
-    proto_config_.set_bypass_cors_preflight(true);
-    mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);
+    mock_config_ = ::std::make_shared<NiceMock<MockFilterConfig>>();
 
     mock_verifier_ = std::make_unique<MockVerifier>();
     filter_ = std::make_unique<Filter>(mock_config_);
@@ -54,9 +65,7 @@ public:
     EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(mock_verifier_.get()));
   }
 
-  JwtAuthentication proto_config_;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_context_;
-  std::shared_ptr<MockFilterConfig> mock_config_;
+  std::shared_ptr<NiceMock<MockFilterConfig>> mock_config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Filter> filter_;
   std::unique_ptr<MockVerifier> mock_verifier_;

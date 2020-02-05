@@ -235,7 +235,7 @@ bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value,
 
 const std::string& SnapshotImpl::get(absl::string_view key) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
-  auto entry = values_.find(key);
+  auto entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end()) {
     return EMPTY_STRING;
   } else {
@@ -251,7 +251,7 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
 bool SnapshotImpl::featureEnabled(absl::string_view key,
                                   const envoy::type::v3::FractionalPercent& default_value,
                                   uint64_t random_value) const {
-  const auto& entry = values_.find(key);
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
   envoy::type::v3::FractionalPercent percent;
   if (entry != values_.end() && entry->second.fractional_percent_value_.has_value()) {
     percent = entry->second.fractional_percent_value_.value();
@@ -277,7 +277,7 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
 
 uint64_t SnapshotImpl::getInteger(absl::string_view key, uint64_t default_value) const {
   ASSERT(!isRuntimeFeature(key));
-  auto entry = values_.find(key);
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end() || !entry->second.uint_value_) {
     return default_value;
   } else {
@@ -287,7 +287,7 @@ uint64_t SnapshotImpl::getInteger(absl::string_view key, uint64_t default_value)
 
 double SnapshotImpl::getDouble(absl::string_view key, double default_value) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
-  auto entry = values_.find(key);
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end() || !entry->second.double_value_) {
     return default_value;
   } else {
@@ -296,7 +296,7 @@ double SnapshotImpl::getDouble(absl::string_view key, double default_value) cons
 }
 
 bool SnapshotImpl::getBoolean(absl::string_view key, bool default_value) const {
-  auto entry = values_.find(key);
+  const auto& entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end() || !entry->second.bool_value_.has_value()) {
     return default_value;
   } else {

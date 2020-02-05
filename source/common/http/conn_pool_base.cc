@@ -54,7 +54,8 @@ void ConnPoolImplBase::tryCreateNewConnection() {
   }
 }
 
-void ConnPoolImplBase::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
+void ConnPoolImplBase::attachRequestToClient(ActiveClient& client,
+                                             ResponseDecoder& response_decoder,
                                              ConnectionPool::Callbacks& callbacks) {
   ASSERT(client.state_ == ActiveClient::State::READY);
 
@@ -65,7 +66,7 @@ void ConnPoolImplBase::attachRequestToClient(ActiveClient& client, StreamDecoder
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
   } else {
     ENVOY_CONN_LOG(debug, "creating stream", *client.codec_client_);
-    StreamEncoder& new_encoder = client.newStreamEncoder(response_decoder);
+    RequestEncoder& new_encoder = client.newStreamEncoder(response_decoder);
 
     client.remaining_requests_--;
     if (client.remaining_requests_ == 0) {
@@ -110,7 +111,7 @@ void ConnPoolImplBase::onRequestClosed(ActiveClient& client, bool delay_attachin
   }
 }
 
-ConnectionPool::Cancellable* ConnPoolImplBase::newStream(Http::StreamDecoder& response_decoder,
+ConnectionPool::Cancellable* ConnPoolImplBase::newStream(ResponseDecoder& response_decoder,
                                                          ConnectionPool::Callbacks& callbacks) {
   if (!ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
@@ -317,7 +318,7 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
   }
 }
 
-ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
+ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, ResponseDecoder& decoder,
                                                  ConnectionPool::Callbacks& callbacks)
     : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
   parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
@@ -331,7 +332,8 @@ ConnPoolImplBase::PendingRequest::~PendingRequest() {
 }
 
 ConnectionPool::Cancellable*
-ConnPoolImplBase::newPendingRequest(StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks) {
+ConnPoolImplBase::newPendingRequest(ResponseDecoder& decoder,
+                                    ConnectionPool::Callbacks& callbacks) {
   ENVOY_LOG(debug, "queueing request due to no available connections");
   PendingRequestPtr pending_request(new PendingRequest(*this, decoder, callbacks));
   pending_request->moveIntoList(std::move(pending_request), pending_requests_);

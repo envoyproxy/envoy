@@ -352,7 +352,12 @@ message RouteMatch {
 
   message TlsContextMatchOptions {
     // If specified, the route will match against whether or not a certificate is presented.
+    // If not specified, certificate presentation status (true or false) will not be considered when route matching.
     google.protobuf.BoolValue presented = 1;
+
+    // If specified, the route will match against whether or not a certificate is validated.
+    // If not specified, certificate validation status (true or false) will not be considered when route matching.
+    google.protobuf.BoolValue validated = 2;
   }
 
   reserved 5;

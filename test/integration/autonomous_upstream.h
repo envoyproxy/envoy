@@ -20,7 +20,7 @@ public:
   // sending a response.
   static const char RESET_AFTER_REQUEST[];
 
-  AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+  AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                    AutonomousUpstream& upstream, bool allow_incomplete_streams);
   ~AutonomousStream() override;
 
@@ -38,7 +38,7 @@ public:
   AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
                            Type type, AutonomousUpstream& upstream);
 
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
+  Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
 
 private:
   AutonomousUpstream& upstream_;

@@ -1697,7 +1697,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
+void Filter::UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host,
                                           const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
@@ -1787,7 +1787,7 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
                                 priority);
 }
 
-void Filter::UpstreamRequest::setRequestEncoder(Http::StreamEncoder& request_encoder) {
+void Filter::UpstreamRequest::setRequestEncoder(Http::RequestEncoder& request_encoder) {
   request_encoder_ = &request_encoder;
   // Now that there is an encoder, have the connection manager inform the manager when the
   // downstream buffers are overrun. This may result in immediate watermark callbacks referencing

@@ -18,7 +18,7 @@ class ConnPoolImplBase : public ConnectionPool::Instance,
                          protected Logger::Loggable<Logger::Id::pool> {
 public:
   // ConnectionPool::Instance
-  ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
+  ConnectionPool::Cancellable* newStream(ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
   void addDrainedCallback(DrainedCb cb) override;
   bool hasActiveConnections() const override;
@@ -68,7 +68,7 @@ protected:
 
     virtual bool hasActiveRequests() const PURE;
     virtual bool closingWithIncompleteRequest() const PURE;
-    virtual StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) PURE;
+    virtual RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) PURE;
 
     enum class State {
       CONNECTING, // Connection is not yet established.
@@ -94,7 +94,7 @@ protected:
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
-    PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
+    PendingRequest(ConnPoolImplBase& parent, ResponseDecoder& decoder,
                    ConnectionPool::Callbacks& callbacks);
     ~PendingRequest() override;
 
@@ -102,7 +102,7 @@ protected:
     void cancel() override { parent_.onPendingRequestCancel(*this); }
 
     ConnPoolImplBase& parent_;
-    StreamDecoder& decoder_;
+    ResponseDecoder& decoder_;
     ConnectionPool::Callbacks& callbacks_;
   };
 
@@ -118,7 +118,7 @@ protected:
   std::list<ActiveClientPtr>& owningList(ActiveClient::State state);
 
   // Creates a new PendingRequest and enqueues it into the request queue.
-  ConnectionPool::Cancellable* newPendingRequest(StreamDecoder& decoder,
+  ConnectionPool::Cancellable* newPendingRequest(ResponseDecoder& decoder,
                                                  ConnectionPool::Callbacks& callbacks);
   // Removes the PendingRequest from the list of requests. Called when the PendingRequest is
   // cancelled, e.g. when the stream is reset before a connection has been established.
@@ -140,7 +140,7 @@ protected:
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void checkForDrained();
   void onUpstreamReady();
-  void attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
+  void attachRequestToClient(ActiveClient& client, ResponseDecoder& response_decoder,
                              ConnectionPool::Callbacks& callbacks);
 
   // Creates a new connection if allowed by resourceManager, or if created to avoid

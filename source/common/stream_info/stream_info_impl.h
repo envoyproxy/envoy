@@ -219,6 +219,13 @@ struct StreamInfoImpl : public StreamInfo {
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
 
+  const FilterStateSharedPtr& upstreamFilterState() const override {
+    return upstream_filter_state_;
+  }
+  void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) override {
+    upstream_filter_state_ = filter_state;
+  }
+
   void setRequestedServerName(absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
   }
@@ -262,6 +269,7 @@ struct StreamInfoImpl : public StreamInfo {
   const Router::RouteEntry* route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
+  FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
 
 private:

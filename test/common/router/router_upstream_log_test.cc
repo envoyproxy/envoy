@@ -125,12 +125,12 @@ public:
       const std::initializer_list<std::pair<std::string, std::string>>& request_headers_init,
       const std::initializer_list<std::pair<std::string, std::string>>& response_headers_init,
       const std::initializer_list<std::pair<std::string, std::string>>& response_trailers_init) {
-    NiceMock<Http::MockStreamEncoder> encoder;
-    Http::StreamDecoder* response_decoder = nullptr;
+    NiceMock<Http::MockRequestEncoder> encoder;
+    Http::ResponseDecoder* response_decoder = nullptr;
 
     EXPECT_CALL(context_.cluster_manager_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
-            [&](Http::StreamDecoder& decoder,
+            [&](Http::ResponseDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
               EXPECT_CALL(encoder.stream_, connectionLocalAddress())
@@ -161,12 +161,12 @@ public:
   void run() { run(200, {}, {}, {}); }
 
   void runWithRetry() {
-    NiceMock<Http::MockStreamEncoder> encoder1;
-    Http::StreamDecoder* response_decoder = nullptr;
+    NiceMock<Http::MockRequestEncoder> encoder1;
+    Http::ResponseDecoder* response_decoder = nullptr;
 
     EXPECT_CALL(context_.cluster_manager_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
-            [&](Http::StreamDecoder& decoder,
+            [&](Http::ResponseDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
               EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
@@ -190,10 +190,10 @@ public:
     per_try_timeout_->invokeCallback();
 
     // We expect this reset to kick off a new request.
-    NiceMock<Http::MockStreamEncoder> encoder2;
+    NiceMock<Http::MockRequestEncoder> encoder2;
     EXPECT_CALL(context_.cluster_manager_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
-            [&](Http::StreamDecoder& decoder,
+            [&](Http::ResponseDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
               EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
