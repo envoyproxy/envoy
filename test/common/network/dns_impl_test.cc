@@ -514,7 +514,7 @@ TEST_P(DnsImplTest, DestroyChannelOnRefused) {
   EXPECT_FALSE(peer_->isChannelDirty());
   EXPECT_TRUE(address_list.empty());
 
-  // Reset the channel to point to the TestDndServer, and make sure resolution is healthy.
+  // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
   if (tcp_only()) {
     peer_->resetChannelTcpOnly(zero_timeout());
   }
