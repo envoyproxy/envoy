@@ -5,6 +5,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/api_version.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -14,11 +15,11 @@ namespace MetricsService {
 
 void validateProtoDescriptors() {
   // https://github.com/envoyproxy/envoy/issues/9639
-  const envoy::service::metrics::v2::StreamMetricsMessage _dummy_service_v2;
+  const API_NO_BOOST(envoy::service::metrics::v2::StreamMetricsMessage) _dummy_service_v2;
   // https://github.com/envoyproxy/envoy/pull/9618 made it necessary to register the previous
   // version's config descriptor by calling ApiTypeOracle::getEarlierVersionDescriptor which has an
   // assertion for nullptr types.
-  const envoy::config::metrics::v2::MetricsServiceConfig _dummy_config_v2;
+  const API_NO_BOOST(envoy::config::metrics::v2::MetricsServiceConfig) _dummy_config_v2;
 
   const auto method = "envoy.service.metrics.v2.MetricsService.StreamMetrics";
 
