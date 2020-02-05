@@ -176,6 +176,16 @@ protected:
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.localAddress();
     }
+    absl::string_view responseDetails() override { return details_; }
+
+    void setDetails(absl::string_view details) {
+      // FIXME [matteof 2020-02-05] Figure out whether we can
+      // guarantee that details_ is set at most once. It is probably
+      // a mistake to call setDetails() twice. For now assert that
+      // details_ is empty.
+      ASSERT(details_.empty());
+      details_ = details;
+    }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
       pending_recv_data_.setWatermarks(low_watermark, high_watermark);
@@ -230,6 +240,7 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
+    absl::string_view details_;
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
