@@ -935,7 +935,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
     decorator->apply(*active_span_);
 
-    decorated_propagate_ = decorator->getPropagate();
+    decorated_propagate_ = decorator->propagate();
 
     // Cache decorated operation.
     if (!decorator->getOperation().empty()) {

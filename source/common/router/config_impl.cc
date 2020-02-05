@@ -199,7 +199,7 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
-bool DecoratorImpl::getPropagate() const { return propagate_; }
+bool DecoratorImpl::propagate() const { return propagate_; }
 
 RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing) {
   if (!tracing.has_client_sampling()) {

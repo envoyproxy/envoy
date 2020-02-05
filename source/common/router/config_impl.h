@@ -337,7 +337,7 @@ public:
   const std::string& getOperation() const override;
 
   // Decorator::getOperation
-  bool getPropagate() const override;
+  bool propagate() const override;
 
 private:
   const std::string operation_;

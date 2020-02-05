@@ -822,7 +822,7 @@ public:
    * should be propagated to other services.
    * @return whether to propagate
    */
-  virtual bool getPropagate() const PURE;
+  virtual bool propagate() const PURE;
 };
 
 using DecoratorConstPtr = std::unique_ptr<const Decorator>;

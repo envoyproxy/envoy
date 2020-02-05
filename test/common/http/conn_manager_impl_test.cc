@@ -982,7 +982,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
-  EXPECT_EQ(true, route_config_provider_.route_config_->route_->decorator_.getPropagate());
+  EXPECT_EQ(true, route_config_provider_.route_config_->route_->decorator_.propagate());
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(
@@ -1043,7 +1043,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
-  ON_CALL(route_config_provider_.route_config_->route_->decorator_, getPropagate())
+  ON_CALL(route_config_provider_.route_config_->route_->decorator_, propagate())
       .WillByDefault(Return(false));
   EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
@@ -1193,7 +1193,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
-  EXPECT_EQ(true, route_config_provider_.route_config_->route_->decorator_.getPropagate());
+  EXPECT_EQ(true, route_config_provider_.route_config_->route_->decorator_.propagate());
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(
@@ -1270,7 +1270,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
-  ON_CALL(route_config_provider_.route_config_->route_->decorator_, getPropagate())
+  ON_CALL(route_config_provider_.route_config_->route_->decorator_, propagate())
       .WillByDefault(Return(false));
   EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))

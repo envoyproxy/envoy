@@ -5005,7 +5005,7 @@ virtual_hosts:
     Tracing::MockSpan span;
     EXPECT_CALL(span, setOperation(Eq("myFoo")));
     route->decorator()->apply(span);
-    EXPECT_EQ(false, route->decorator()->getPropagate());
+    EXPECT_EQ(false, route->decorator()->propagate());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
