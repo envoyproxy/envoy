@@ -346,6 +346,11 @@ TEST_F(OptionsImplTest, WarnIsValidLogLevel) {
   EXPECT_EQ(spdlog::level::level_enum::warn, options->logLevel());
 }
 
+TEST_F(OptionsImplTest, AllowedLogLevels) {
+  EXPECT_EQ("[trace][debug][info][warning][error][critical][off][warn]",
+            OptionsImpl::allowedLogLevels());
+}
+
 // Test that the test constructor comes up with the same default values as the main constructor.
 TEST_F(OptionsImplTest, SaneTestConstructor) {
   std::unique_ptr<OptionsImpl> regular_options_impl(createOptionsImpl("envoy"));

@@ -146,6 +146,7 @@ public:
    * factories.
    */
   static void disableExtensions(const std::vector<std::string>&);
+  static std::string allowedLogLevels();
 
 private:
   void logError(const std::string& error) const;

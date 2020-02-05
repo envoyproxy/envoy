@@ -39,10 +39,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level)
     : signal_handling_enabled_(true) {
-  std::string log_levels_string = "Log levels: ";
-  for (auto level_string_view : spdlog::level::level_string_views) {
-    log_levels_string += fmt::format("[{}]", level_string_view);
-  }
+  std::string log_levels_string = fmt::format("Log levels: {}", allowedLogLevels());
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
 
@@ -255,6 +252,15 @@ spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(const std::strin
     logError(fmt::format("error: invalid log level specified '{}'", log_level));
   }
   return static_cast<spdlog::level::level_enum>(level_to_use);
+}
+
+std::string OptionsImpl::allowedLogLevels() {
+  std::string allowed_log_levels;
+  for (auto level_string_view : spdlog::level::level_string_views) {
+    allowed_log_levels += fmt::format("[{}]", level_string_view);
+  }
+  allowed_log_levels += "[warn]";
+  return allowed_log_levels;
 }
 
 void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
