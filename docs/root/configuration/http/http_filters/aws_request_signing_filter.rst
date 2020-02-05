@@ -25,6 +25,8 @@ Example filter configuration:
   name: envoy.filters.http.aws_request_signing
   typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigning
+    service_name: s3
+    region: us-west-2
 
 
 Statistics
