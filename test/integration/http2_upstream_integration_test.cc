@@ -148,7 +148,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                           {":path", "/test/long/url"},
                                                           {":scheme", "http"},
                                                           {":authority", "host"}});
-  Http::StreamEncoder* encoder1 = &encoder_decoder1.first;
+  Http::RequestEncoder* encoder1 = &encoder_decoder1.first;
   auto response1 = std::move(encoder_decoder1.second);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request1));
@@ -159,7 +159,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                           {":path", "/test/long/url"},
                                                           {":scheme", "http"},
                                                           {":authority", "host"}});
-  Http::StreamEncoder* encoder2 = &encoder_decoder2.first;
+  Http::RequestEncoder* encoder2 = &encoder_decoder2.first;
   auto response2 = std::move(encoder_decoder2.second);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
 
@@ -204,7 +204,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
 void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes, uint32_t) {
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;
-  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<int> response_bytes;
   autonomous_upstream_ = true;
@@ -264,7 +264,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
-  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
   initialize();

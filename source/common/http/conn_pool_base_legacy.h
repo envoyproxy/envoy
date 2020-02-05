@@ -40,7 +40,7 @@ protected:
   };
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
-    PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
+    PendingRequest(ConnPoolImplBase& parent, ResponseDecoder& decoder,
                    ConnectionPool::Callbacks& callbacks);
     ~PendingRequest() override;
 
@@ -48,14 +48,14 @@ protected:
     void cancel() override { parent_.onPendingRequestCancel(*this); }
 
     ConnPoolImplBase& parent_;
-    StreamDecoder& decoder_;
+    ResponseDecoder& decoder_;
     ConnectionPool::Callbacks& callbacks_;
   };
 
   using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
   // Creates a new PendingRequest and enqueues it into the request queue.
-  ConnectionPool::Cancellable* newPendingRequest(StreamDecoder& decoder,
+  ConnectionPool::Cancellable* newPendingRequest(ResponseDecoder& decoder,
                                                  ConnectionPool::Callbacks& callbacks);
   // Removes the PendingRequest from the list of requests. Called when the PendingRequest is
   // cancelled, e.g. when the stream is reset before a connection has been established.

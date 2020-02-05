@@ -68,7 +68,7 @@ bool ConnPoolImpl::hasActiveConnections() const {
   return !pending_requests_.empty() || !busy_clients_.empty();
 }
 
-void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
+void ConnPoolImpl::attachRequestToClient(ActiveClient& client, ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) {
   ASSERT(!client.stream_wrapper_);
   host_->cluster().stats().upstream_rq_total_.inc();
@@ -96,7 +96,7 @@ void ConnPoolImpl::createNewConnection() {
   client->moveIntoList(std::move(client), busy_clients_);
 }
 
-ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
+ConnectionPool::Cancellable* ConnPoolImpl::newStream(ResponseDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
   if (!ready_clients_.empty()) {
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
@@ -254,11 +254,11 @@ void ConnPoolImpl::processIdleClient(ActiveClient& client, bool delay) {
   checkForDrained();
 }
 
-ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, ActiveClient& parent)
-    : StreamEncoderWrapper(parent.codec_client_->newStream(*this)),
-      StreamDecoderWrapper(response_decoder), parent_(parent) {
+ConnPoolImpl::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
+    : RequestEncoderWrapper(parent.codec_client_->newStream(*this)),
+      ResponseDecoderWrapper(response_decoder), parent_(parent) {
 
-  StreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
+  RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.inc();
   parent_.parent_.host_->stats().rq_active_.inc();
 
@@ -297,7 +297,7 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end
     close_connection_ = true;
   }
 
-  StreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
+  ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
 
 void ConnPoolImpl::StreamWrapper::onDecodeComplete() {

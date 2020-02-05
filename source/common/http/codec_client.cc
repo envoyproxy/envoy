@@ -58,7 +58,7 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
   }
 }
 
-StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
+RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);

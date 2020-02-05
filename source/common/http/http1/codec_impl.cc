@@ -63,9 +63,9 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      HeaderKeyFormatter* header_key_formatter)
-    : connection_(connection), header_key_formatter_(header_key_formatter), chunk_encoding_(true),
-      processing_100_continue_(false), is_response_to_head_request_(false),
-      is_content_length_allowed_(true) {
+    : connection_(connection), chunk_encoding_(true), processing_100_continue_(false),
+      is_response_to_head_request_(false), is_content_length_allowed_(true),
+      header_key_formatter_(header_key_formatter) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -94,14 +94,14 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
   }
 }
 
-void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
+void ResponseEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   processing_100_continue_ = true;
   encodeHeaders(headers, false);
   processing_100_continue_ = false;
 }
 
-void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void StreamEncoderImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
@@ -204,7 +204,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
+void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (!connection_.enableTrailers()) {
     return endEncode();
   }
@@ -274,8 +274,11 @@ const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLoc
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
-void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void ResponseEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   started_response_ = true;
+
+  // The contract is that client codecs must ensure that :status is present.
+  ASSERT(headers.Status() != nullptr);
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
   if (connection_.protocol() == Protocol::Http10 && connection_.supports_http_10()) {
@@ -302,12 +305,12 @@ void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end
     setIsContentLengthAllowed(true);
   }
 
-  StreamEncoderImpl::encodeHeaders(headers, end_stream);
+  encodeHeadersBase(headers, end_stream);
 }
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
-void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void RequestEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   if (!method || !path) {
@@ -322,7 +325,7 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
-  StreamEncoderImpl::encodeHeaders(headers, end_stream);
+  encodeHeadersBase(headers, end_stream);
 }
 
 http_parser_settings ConnectionImpl::settings_{
@@ -843,7 +846,7 @@ bool ClientConnectionImpl::cannotHaveBody() {
   }
 }
 
-StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) {
+RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decoder) {
   if (resetStreamCalled()) {
     throw CodecClientException("cannot create new streams after calling reset");
   }
@@ -852,7 +855,7 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   // reusing this connection. This is done when the final pipeline response is received.
   ASSERT(connection_.readEnabled());
 
-  request_encoder_ = std::make_unique<RequestStreamEncoderImpl>(*this, header_key_formatter_.get());
+  request_encoder_ = std::make_unique<RequestEncoderImpl>(*this, header_key_formatter_.get());
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
 }

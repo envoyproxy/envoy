@@ -42,7 +42,7 @@ public:
         stream_id_(quic_version_.transport_version == quic::QUIC_VERSION_99 ? 4u : 5u),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}} {
-    quic_stream_->setDecoder(stream_decoder_);
+    quic_stream_->setResponseDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicClientStream>(quic_stream_));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _))
@@ -96,7 +96,7 @@ protected:
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_;
   EnvoyQuicClientStream* quic_stream_;
-  Http::MockStreamDecoder stream_decoder_;
+  Http::MockResponseDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
   std::string host_{"www.abc.com"};
   Http::TestHeaderMapImpl request_headers_;

@@ -228,7 +228,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     expect_reset_ = false;
   }
 
-  Http::StreamEncoder* request_encoder = &client_->newStream(*this);
+  Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
 
   Http::HeaderMapImpl request_headers{

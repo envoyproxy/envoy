@@ -81,7 +81,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     client.close();
     dispatcher->exit();
   }));
-  Http::StreamEncoder& encoder = client.newStream(*response);
+  Http::RequestEncoder& encoder = client.newStream(*response);
   encoder.getStream().addCallbacks(*response);
 
   Http::HeaderMapImpl headers;

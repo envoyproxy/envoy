@@ -75,7 +75,7 @@ public:
     setupDefaultConnectionMocks();
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillRepeatedly(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
@@ -146,10 +146,10 @@ public:
   MockServerConnectionCallbacks server_callbacks_;
   std::unique_ptr<TestServerConnectionImpl> server_;
   ConnectionWrapper server_wrapper_;
-  MockStreamDecoder response_decoder_;
-  StreamEncoder* request_encoder_;
-  MockStreamDecoder request_decoder_;
-  StreamEncoder* response_encoder_{};
+  MockResponseDecoder response_decoder_;
+  RequestEncoder* request_encoder_;
+  MockRequestDecoder request_decoder_;
+  ResponseEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
   // Corrupt a metadata frame payload.
   bool corrupt_metadata_frame_ = false;
@@ -741,16 +741,16 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
 
   // Now create a second stream on the connection.
   MockStreamDecoder response_decoder2;
-  StreamEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
   StreamEncoder* response_encoder2;
   MockStreamCallbacks server_stream_callbacks2;
-  MockStreamDecoder request_decoder2;
+  MockRequestDecoder request_decoder2;
   // When the server stream is created it should check the status of the
   // underlying connection. Pretend it is overrun.
   EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(server_stream_callbacks2, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(server_callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder2 = &encoder;
         encoder.getStream().addCallbacks(server_stream_callbacks2);
         return request_decoder2;
@@ -937,7 +937,7 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;

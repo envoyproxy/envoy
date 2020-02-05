@@ -254,8 +254,8 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 }
 
-StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
-                                                bool is_internally_created) {
+RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
+                                                 bool is_internally_created) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
@@ -2297,14 +2297,14 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // decoder because the decoder callbacks are complete. It would be good to
   // null out that pointer but should not be necessary.
   HeaderMapPtr request_headers(std::move(parent_.request_headers_));
-  StreamEncoder* response_encoder = parent_.response_encoder_;
+  ResponseEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
   response_encoder->getStream().removeCallbacks(parent_);
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
   parent_.connection_manager_.doEndStream(this->parent_);
 
-  StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
+  RequestDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
   // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
   // heap allocation.
