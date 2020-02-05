@@ -82,15 +82,22 @@ private:
     const std::string dns_name_;
   };
 
+  struct AresOptions {
+    ares_options options_;
+    int optmask_;
+  };
+
   // Callback for events on sockets tracked in events_.
   void onEventCallback(int fd, uint32_t events);
   // c-ares callback when a socket state changes, indicating that libevent
   // should listen for read/write events.
   void onAresSocketStateChange(int fd, int read, int write);
   // Initialize the channel.
-  void initializeChannel();
+  void initializeChannel(ares_options* options, int optmask);
   // Update timer for c-ares timeouts.
   void updateAresTimer();
+  // Return default AresOptions.
+  AresOptions defaultAresOptions();
 
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;

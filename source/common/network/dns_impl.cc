@@ -27,7 +27,8 @@ DnsResolverImpl::DnsResolverImpl(
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups) {
 
-  initializeChannel();
+  AresOptions options = defaultAresOptions();
+  initializeChannel(&options.options_, options.optmask_);
 
   if (!resolvers.empty()) {
     std::vector<std::string> resolver_addrs;
@@ -59,38 +60,27 @@ DnsResolverImpl::~DnsResolverImpl() {
   ares_destroy(channel_);
 }
 
-void DnsResolverImpl::initializeChannel() {
-  ares_options options{};
-  int optmask = 0;
+DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
+  AresOptions options{};
 
   if (use_tcp_for_dns_lookups_) {
-    optmask |= ARES_OPT_FLAGS;
-    options.flags |= ARES_FLAG_USEVC;
+    options.optmask_ |= ARES_OPT_FLAGS;
+    options.options_.flags |= ARES_FLAG_USEVC;
   }
 
+  return options;
+}
+
+void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   options->sock_state_cb = [](void* arg, int fd, int read, int write) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
-  int status = ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
-  ENVOY_LOG(error, "ARES CHANNEL INIT {}", status);
+  ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 }
 
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
                                                                    ares_addrinfo* addrinfo) {
-  // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
-  // broken. Mark the channel dirty so that it is destroyed and reinitialized on a subsequent call
-  // to DnsResolver::resolve(). The optimal solution would be for c-ares to reinitialize the
-  // channel, and not have Envoy track side effects.
-  // context: https://github.com/envoyproxy/envoy/issues/4543 and
-  // https://github.com/c-ares/c-ares/issues/301.
-  //
-  // n.b: the channel cannot be destroyed and reinitialized here because that leads to a c-ares
-  // segfault.
-  if (status == ARES_ECONNREFUSED && !fallback_if_failed_) {
-    parent_.dirty_channel_ = true;
-    return;
-  }
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
@@ -99,6 +89,19 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   }
   if (!fallback_if_failed_) {
     completed_ = true;
+
+    // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
+    // broken. Mark the channel dirty so that it is destroyed and reinitialized on a subsequent call
+    // to DnsResolver::resolve(). The optimal solution would be for c-ares to reinitialize the
+    // channel, and not have Envoy track side effects.
+    // context: https://github.com/envoyproxy/envoy/issues/4543 and
+    // https://github.com/c-ares/c-ares/issues/301.
+    //
+    // The channel cannot be destroyed and reinitialized here because that leads to a c-ares
+    // segfault.
+    if (status == ARES_ECONNREFUSED) {
+      parent_.dirty_channel_ = true;
+    }
   }
 
   std::list<DnsResponse> address_list;
@@ -224,7 +227,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   if (dirty_channel_) {
     dirty_channel_ = false;
     ares_destroy(channel_);
-    initializeChannel();
+
+    AresOptions options = defaultAresOptions();
+    initializeChannel(&options.options_, options.optmask_);
   }
   std::unique_ptr<PendingResolution> pending_resolution(
       new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
