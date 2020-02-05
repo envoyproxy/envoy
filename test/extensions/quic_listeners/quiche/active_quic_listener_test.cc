@@ -6,6 +6,9 @@
 
 #include <memory>
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/base.pb.validate.h"
+
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
@@ -56,7 +59,11 @@ protected:
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher()), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, "test_thread") {}
+        connection_handler_(*dispatcher_, "test_thread") {
+    Runtime::LoaderSingleton::initialize(&runtime_);
+  }
+
+  ~ActiveQuicListenerTest() { Runtime::LoaderSingleton::clear(); }
 
   void SetUp() override {
     listen_socket_ =
@@ -66,7 +73,7 @@ protected:
 
     quic_listener_ =
         std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_, listen_socket_,
-                                             listener_config_, quic_config_, runtime_);
+                                             listener_config_, quic_config_, enabled_flag());
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -87,7 +94,8 @@ protected:
         .Times(connection_count);
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
-    // EXPECT_CALL(runtime_, snapshot()getBoolean(_,_)).Times(AnyNumber());
+
+    ON_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true)).WillByDefault(Return(true));
 
     testing::Sequence seq;
     for (int i = 0; i < connection_count; ++i) {
@@ -188,6 +196,16 @@ protected:
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  virtual envoy::config::core::v3::RuntimeFeatureFlag enabled_flag() const {
+    envoy::config::core::v3::RuntimeFeatureFlag enabled_proto;
+    std::string yaml(R"EOF(
+runtime_key: "quic.enabled"
+default_value: true
+)EOF");
+    TestUtility::loadFromYamlAndValidate(yaml, enabled_proto);
+    return enabled_proto;
+  }
+
   Network::Address::IpVersion version_;
   Event::SimulatedTimeSystemHelper simulated_time_system_;
   Api::ApiPtr api_;
@@ -259,6 +277,21 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
 
   ReadFromClientSockets();
 }
+
+TEST_P(ActiveQuicListenerTest, QuicProcessingEnabled) {}
+
+class ActiveQuicListenerDisabledTest : public ActiveQuicListenerTest {
+protected:
+  envoy::config::core::v3::RuntimeFeatureFlag enabled_flag() const override {
+    envoy::config::core::v3::RuntimeFeatureFlag enabled_proto;
+    std::string yaml(R"EOF(
+runtime_key: "quic.enabled"
+default_value: false
+)EOF");
+    TestUtility::loadFromYamlAndValidate(yaml, enabled_proto);
+    return enabled_proto;
+  }
+};
 
 } // namespace Quic
 } // namespace Envoy

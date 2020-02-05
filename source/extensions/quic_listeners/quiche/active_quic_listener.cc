@@ -14,21 +14,20 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config,
-                                       Runtime::Loader& runtime)
+                                       const envoy::config::core::v3::RuntimeFeatureFlag enabled)
     : ActiveQuicListener(dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
-                         quic_config, runtime) {}
+                         quic_config, enabled) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::SocketSharedPtr listen_socket,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config,
-                                       Runtime::Loader& runtime)
+                                       const envoy::config::core::v3::RuntimeFeatureFlag enabled)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
-      // todo(nezdolik) extract feature flag value from conf
-      listen_socket_(*listen_socket), enabled_(envoy::config::core::v3::RuntimeFeatureFlag(), runtime) {
+      listen_socket_(*listen_socket), enabled_(enabled, Runtime::LoaderSingleton::get()) {
   udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));

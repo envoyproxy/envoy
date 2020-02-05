@@ -26,12 +26,12 @@ public:
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     Runtime::Loader& runtime);
+                     const envoy::config::core::v3::RuntimeFeatureFlag enabled);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     Runtime::Loader& runtime);
+                     const envoy::config::core::v3::RuntimeFeatureFlag enabled);
 
   ~ActiveQuicListener() override;
 
@@ -69,8 +69,8 @@ using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 // A factory to create ActiveQuicListener based on given config.
 class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
-  ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
-                            const Runtime::Loader& runtime) {
+  ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config)
+      : enabled_(config.enabled()) {
     uint64_t idle_network_timeout_ms =
         config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                   : 300000;
@@ -86,14 +86,13 @@ public:
     int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
     quic_config_.SetMaxIncomingBidirectionalStreamsToSend(max_streams);
     quic_config_.SetMaxIncomingUnidirectionalStreamsToSend(max_streams);
-    runtime_(runtime);
   }
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                           Network::ListenerConfig& config) const override {
-    return std::make_unique<ActiveQuicListener>(dispatcher, parent, config, quic_config_, runtime_);
+    return std::make_unique<ActiveQuicListener>(dispatcher, parent, config, quic_config_, enabled_);
   }
   bool isTransportConnectionless() const override { return false; }
 
@@ -101,7 +100,7 @@ private:
   friend class ActiveQuicListenerFactoryPeer;
 
   quic::QuicConfig quic_config_;
-  Runtime::Loader& runtime_;
+  envoy::config::core::v3::RuntimeFeatureFlag enabled_;
 };
 
 } // namespace Quic
