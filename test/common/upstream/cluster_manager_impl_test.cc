@@ -1838,6 +1838,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
           "example.com", std::vector<std::string>{"example.com"})));
 
+  NiceMock<MockLoadBalancerContext> example_com_context_with_san2;
+  ON_CALL(example_com_context_with_san, upstreamTransportSocketOptions())
+      .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
+          "example.com", std::vector<std::string>{"example.net"})));
+
   NiceMock<MockLoadBalancerContext> ibm_com_context;
   ON_CALL(ibm_com_context, upstreamTransportSocketOptions())
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>("ibm.com")));
@@ -1901,7 +1906,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .Times(9)
+      .Times(10)
       .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
 
   // This should provide us a CP for each of the above hosts, and for different SNIs
@@ -2008,6 +2013,9 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, &example_com_context_with_san));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san2 =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, &example_com_context_with_san2));
   Tcp::ConnectionPool::MockInstance* tcp3_ibm_com =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, &ibm_com_context));
@@ -2019,6 +2027,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_EQ(tcp2_ibm_com, tcp3_ibm_com);
 
   EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san);
+  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san_2);
+  EXPECT_NE(tcp3_example_com_with_san, tcp3_example_com_with_san_2);
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
