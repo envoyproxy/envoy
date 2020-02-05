@@ -60,7 +60,7 @@ public:
 
   void SetUp() override {
     fake_handshaker_server_thread_ = api_->threadFactory().createThread([this]() {
-      std::unique_ptr<grpc::Service> service = grpc::gcp::CreateFakeHandshakerService();
+      std::unique_ptr<grpc::Service> service = grpc::gcp::CreateFakeHandshakerService(/* expected_max_concurrent_rpcs */ 0);
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
       grpc::ServerBuilder builder;
