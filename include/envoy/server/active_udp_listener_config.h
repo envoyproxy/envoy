@@ -20,7 +20,7 @@ public:
 
   /**
    * Create an ActiveUdpListenerFactory object according to given message.
-   * @param message specifies QUIC's protocol options in a protobuf.
+   * @param message specifies QUIC protocol options in a protobuf.
    * @param concurrency is the number of listeners instances to be created.
    */
   virtual Network::ActiveUdpListenerFactoryPtr
