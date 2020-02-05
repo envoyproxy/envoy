@@ -46,13 +46,14 @@ versioning guidelines:
 * Unless the community and Envoy maintainer team agrees on an exception, during the
   first release cycle after a feature has been deprecated, use of that feature
   will cause a logged warning, and incrementing the
-  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime#statistics)
   `runtime.deprecated_feature_use` stat.
   During the second release cycle, use of the deprecated configuration will
   cause a configuration load failure, unless the feature in question is
   explicitly overridden in
-  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
-  config. Finally, following the deprecation of the API major version where the field was first
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/runtime#using-runtime-overrides-for-deprecated-features)
+  config ([example](configs/using_deprecated_config.v2.yaml)). Finally, following the deprecation 
+  of the API major version where the field was first
   marked deprecated, the entire implementation code will be removed from the Envoy implementation.
 * This policy means that organizations deploying master should have some time to get ready for
   breaking changes at the next major API version. This is typically a window of at least 12 months

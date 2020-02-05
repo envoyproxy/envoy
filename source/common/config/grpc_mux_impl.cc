@@ -75,11 +75,11 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 }
 
-GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
-                                       const std::set<std::string>& resources,
-                                       SubscriptionCallbacks& callbacks) {
+GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
+                                      const std::set<std::string>& resources,
+                                      SubscriptionCallbacks& callbacks, std::chrono::milliseconds) {
   auto watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, type_url, *this);
-  ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
+  ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
 
   // Lazily kick off the requests based on first subscription. This has the
   // convenient side-effect that we order messages on the channel based on
