@@ -19,9 +19,9 @@ Stable releases of Envoy include:
 ### Hand-off
 
 Hand-off to the maintainers of stable releases happens after Envoy maintainers release a new
-version from the `master` branch by creating a `vX.Y.0` tag and a corresponding `vX.Y` branch,
-with merge permissions given to the release manager of stable releases, and CI configured to
-execute tests on it.
+version from the `master` branch by creating a `vX.Y.0` tag and a corresponding `release/vX.Y`
+branch, with merge permissions given to the release manager of stable releases, and CI configured
+to execute tests on it.
 
 ### Security releases
 

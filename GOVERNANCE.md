@@ -89,7 +89,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
-* Create a branch from the tagged release, e.g. "v1.6". It will be used for the
+* Create a branch from the tagged release, e.g. "release/v1.6". It will be used for the
   [stable releases](RELEASES.md#stable-releases).
 * Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
