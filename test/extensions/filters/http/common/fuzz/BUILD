@@ -26,9 +26,6 @@ envoy_cc_fuzz_test(
     name = "filter_fuzz_test",
     srcs = ["filter_fuzz_test.cc"],
     corpus = "filter_corpus",
-    # TODO(asraa): Remove this tag when automatic filter config dictionary and/or corpus
-    # generation is implemented. Tracked in https://github.com/envoyproxy/envoy/issues/9798.
-    tags = ["no_fuzz"],
     deps = [
         ":filter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",

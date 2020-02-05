@@ -95,10 +95,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "3cc8b2208d52d2ac3c6ee02b8de24d5a1d966b293a7f301b15568fee73710fc4",
-        strip_prefix = "libprotobuf-mutator-9eaf063427ffb3a48ef4f69ffc99496a766e99e6",
-        # 2019-10-08
-        urls = ["https://github.com/google/libprotobuf-mutator/archive/9eaf063427ffb3a48ef4f69ffc99496a766e99e6.tar.gz"],
+        sha256 = "",
+        strip_prefix = "libprotobuf-mutator-3521f47a2828da9ace403e4ecc4aece1a84feb36",
+        # 2020-02-04
+        urls = ["https://github.com/google/libprotobuf-mutator/archive/3521f47a2828da9ace403e4ecc4aece1a84feb36.tar.gz"],
     ),
     com_github_gperftools_gperftools = dict(
         # TODO(cmluciano): Bump to release 2.8
