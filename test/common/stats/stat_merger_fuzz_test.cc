@@ -53,11 +53,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FakeSymbolTableImpl fake_symbol_table;
   SymbolTableImpl symbol_table;
 
-  while (provider.remaining_bytes() != 0) {
-    std::string data = provider.ConsumeRandomLengthString(provider.remaining_bytes());
-    testDynamicEncoding(data, fake_symbol_table);
-    testDynamicEncoding(data, symbol_table);
-  }
+  absl::string_view data(reinterpret_cast<const char*>(buf), len);
+  testDynamicEncoding(data, fake_symbol_table);
+  testDynamicEncoding(data, symbol_table);
 }
 
 } // namespace Fuzz
