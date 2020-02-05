@@ -8,6 +8,7 @@ Mobile client networking libraries based on the [Envoy](https://www.envoyproxy.i
 - [Project website](https://envoy-mobile.github.io)
 - [Getting started demos](https://envoy-mobile.github.io/docs/envoy-mobile/latest/start/start.html)
 - [API and usage](https://envoy-mobile.github.io/docs/envoy-mobile/latest/api/api.html)
+- [Additional resources](https://envoy-mobile.github.io/docs/envoy-mobile/latest/intro/additional_resources.html)
 
 ## Contact
 

@@ -10,3 +10,4 @@ Introduction
   comparison
   getting_help
   version_history
+  additional_resources
