@@ -33,7 +33,7 @@ public:
 };
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/8911
-TEST(UdpOverUdsStatsdSinkTest, InitWithIpAddress) {
+TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   auto uds_address = std::make_shared<Network::Address::PipeInstance>(
       TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
   NiceMock<ThreadLocal::MockInstance> tls_;
