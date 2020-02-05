@@ -32,6 +32,39 @@ public:
   MOCK_METHOD(void, write, (const std::string& message));
 };
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/8911
+TEST(UdpOverUdsStatsdSinkTest, InitWithIpAddress) {
+  auto uds_address = std::make_shared<Network::Address::PipeInstance>(
+      TestEnvironment::unixDomainSocketPath("udstest.1.sock"));
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  UdpStatsdSink sink(tls_, uds_address, false);
+
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.used_ = true;
+  counter.latch_ = 1;
+  snapshot.counters_.push_back({1, counter});
+
+  // Flush before the server is running. This will fail.
+  sink.flush(snapshot);
+
+  // Start the server.
+  // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
+  // modification back to the abstraction layer so it will work for multiple platforms. Additionally
+  // this uses low level networking calls because our abstractions in this area only work for IP
+  // sockets. Revisit this also.
+  auto io_handle = uds_address->socket(Network::Address::SocketType::Datagram);
+  RELEASE_ASSERT(fcntl(io_handle->fd(), F_SETFL, 0) != -1, "");
+  uds_address->bind(io_handle->fd());
+
+  // Do the flush which should have somewhere to write now.
+  sink.flush(snapshot);
+  Buffer::OwnedImpl receive_buffer;
+  receive_buffer.read(*io_handle, 32);
+  EXPECT_EQ("envoy.test_counter:1|c", receive_buffer.toString());
+}
+
 class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

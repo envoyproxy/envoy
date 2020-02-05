@@ -219,7 +219,7 @@ UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
     : socket_(
           std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
   // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
-  // modification black to the abstraction layer so it will work for multiple platforms.
+  // modification back to the abstraction layer so it will work for multiple platforms.
   RELEASE_ASSERT(fcntl(socket_->ioHandle().fd(), F_SETFL, 0) != -1, "");
 }
 
