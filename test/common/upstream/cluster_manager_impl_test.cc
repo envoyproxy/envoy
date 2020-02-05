@@ -1906,7 +1906,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .Times(10)
+      .Times(9)
       .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
 
   // This should provide us a CP for each of the above hosts, and for different SNIs
@@ -2027,8 +2027,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_EQ(tcp2_ibm_com, tcp3_ibm_com);
 
   EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san);
-  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san_2);
-  EXPECT_NE(tcp3_example_com_with_san, tcp3_example_com_with_san_2);
+  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san2);
+  EXPECT_NE(tcp3_example_com_with_san, tcp3_example_com_with_san2);
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
