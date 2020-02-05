@@ -26,6 +26,8 @@ public:
               findStaticCertificateValidationContextProvider, (const std::string& name), (const));
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr,
               findStaticTlsSessionTicketKeysContextProvider, (const std::string& name), (const));
+  MOCK_METHOD(GenericSecretConfigProviderSharedPtr, findStaticGenericSecretProvider,
+              (const std::string& name), (const));
   MOCK_METHOD(
       TlsCertificateConfigProviderSharedPtr, createInlineTlsCertificateProvider,
       (const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate));
@@ -36,6 +38,8 @@ public:
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr, createInlineTlsSessionTicketKeysProvider,
               (const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&
                    tls_session_ticket_keys));
+  MOCK_METHOD(GenericSecretConfigProviderSharedPtr, createInlineGenericSecretProvider,
+              (const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret));
   MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findOrCreateTlsCertificateProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::TransportSocketFactoryContext&));
@@ -46,6 +50,9 @@ public:
                Server::Configuration::TransportSocketFactoryContext& secret_provider_context));
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr,
               findOrCreateTlsSessionTicketKeysContextProvider,
+              (const envoy::config::core::v3::ConfigSource&, const std::string&,
+               Server::Configuration::TransportSocketFactoryContext&));
+  MOCK_METHOD(GenericSecretConfigProviderSharedPtr, findOrCreateGenericSecretProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::TransportSocketFactoryContext&));
 };

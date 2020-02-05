@@ -435,6 +435,11 @@ message DownstreamTlsContext {
   }];
 }
 
+message GenericSecret {
+  // Secret of generic type and is available to filters.
+  core.DataSource secret = 1 [(udpa.annotations.sensitive) = true];
+}
+
 message SdsSecretConfig {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   // When both name and config are specified, then secret can be fetched and/or reloaded via
@@ -444,6 +449,7 @@ message SdsSecretConfig {
   core.ConfigSource sds_config = 2;
 }
 
+// [#next-free-field: 6]
 message Secret {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;
@@ -454,5 +460,7 @@ message Secret {
     TlsSessionTicketKeys session_ticket_keys = 3;
 
     CertificateValidationContext validation_context = 4;
+
+    GenericSecret generic_secret = 5;
   }
 }
