@@ -49,7 +49,6 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
 
 // Fuzzer for symbol tables.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  FuzzedDataProvider provider(buf, len);
   FakeSymbolTableImpl fake_symbol_table;
   SymbolTableImpl symbol_table;
 
