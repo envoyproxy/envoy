@@ -438,3 +438,24 @@ private:
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifdef BUILDING_SO
+    #ifndef __APPLE__
+        #define LSH_EXPORT __attribute__ ((visibility ("protected")))
+    #else
+        /* OSX does not support protect-visibility */
+        #define LSH_EXPORT __attribute__ ((visibility ("default")))
+    #endif
+#else
+    #define LSH_EXPORT
+#endif
+
+long envoy_time();
+
+#ifdef __cplusplus
+}
+#endif
