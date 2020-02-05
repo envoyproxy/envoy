@@ -1,9 +1,11 @@
 #include "common/stats/stat_merger.h"
 
+#include <algorithm>
+
 namespace Envoy {
 namespace Stats {
 
-StatMerger::StatMerger(Stats::Store& target_store) : temp_scope_(target_store.createScope("")) {}
+StatMerger::StatMerger(Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
 StatMerger::DynamicSpans StatMerger::DynamicContext::encodeComponents(StatName stat_name) {
   DynamicSpans dynamic_spans;
@@ -11,15 +13,13 @@ StatMerger::DynamicSpans StatMerger::DynamicContext::encodeComponents(StatName s
   auto record_dynamic = [&dynamic_spans, &index](absl::string_view str) {
     DynamicSpan span;
     span.first = index;
-    for (auto segment : absl::StrSplit(str, '.')) {
-      UNREFERENCED_PARAMETER(segment);
-      ++index;
-    }
-    span.second = index - 1;
+    index += std::count(str.begin(), str.end(), '.');
+    span.second = index;
+    ++index;
     dynamic_spans.push_back(span);
   };
-  Stats::SymbolTableImpl::Encoding::decodeTokens(
-      stat_name.data(), stat_name.dataSize(), [&index](Stats::Symbol) { ++index; }, record_dynamic);
+  SymbolTableImpl::Encoding::decodeTokens(
+      stat_name.data(), stat_name.dataSize(), [&index](Symbol) { ++index; }, record_dynamic);
   return dynamic_spans;
 }
 
