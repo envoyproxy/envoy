@@ -27,12 +27,13 @@ def envoy_copts(repository, test = False):
         "-Zc:__cplusplus",
         "-std:c++14",
         "-DWIN32",
-        "-D_WIN32_WINNT=0x0602",
-        "-DNTDDI_VERSION=0x06020000",
+        "-D_WIN32_WINNT=0x0A00",
+        "-DNTDDI_VERSION=0x0A000000",
         "-DWIN32_LEAN_AND_MEAN",
         "-DNOUSER",
         "-DNOMCX",
         "-DNOIME",
+        "-DNOCRYPT",
     ]
 
     return select({
