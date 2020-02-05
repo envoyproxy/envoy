@@ -625,3 +625,8 @@ void Filter::EncoderCallbacks::respond(Http::HeaderMapPtr&&, Buffer::Instance*, 
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
+
+long envoy_time() {
+  auto now = std::chrono::system_clock::now();
+  return std::chrono::system_clock::to_time_t(now);
+}
