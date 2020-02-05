@@ -404,6 +404,7 @@ public:
   MOCK_METHOD(bool, shouldDrainReadBuffer, ());
   MOCK_METHOD(void, setReadBufferReady, ());
   MOCK_METHOD(void, raiseEvent, (ConnectionEvent));
+  MOCK_METHOD(void, flushWriteBuffer, ());
 
   testing::NiceMock<MockConnection> connection_;
 };
