@@ -34,7 +34,19 @@
 
 using ssize_t = ptrdiff_t;
 
+using os_fd_t = SOCKET;
+
 typedef unsigned int sa_family_t;
+
+#define SOCKET_VALID(sock) ((sock) != INVALID_SOCKET)
+#define SOCKET_INVALID(sock) ((sock) == INVALID_SOCKET)
+#define SOCKET_FAILURE(rc) ((rc) == SOCKET_ERROR)
+#define SET_SOCKET_INVALID(sock) (sock) = INVALID_SOCKET
+
+// arguments to shutdown
+#define ENVOY_SHUT_RD SD_RECEIVE
+#define ENVOY_SHUT_WR SD_SEND
+#define ENVOY_SHUT_RDWR SD_BOTH
 
 #else // POSIX
 
@@ -46,9 +58,10 @@ typedef unsigned int sa_family_t;
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/uio.h> // for iovec
 #include <sys/un.h>
-#include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -62,5 +75,18 @@ typedef unsigned int sa_family_t;
 // From linux/netfilter_ipv6/ip6_tables.h
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
+
+using os_fd_t = int;
+
+#define INVALID_SOCKET -1
+#define SOCKET_VALID(sock) ((sock) >= 0)
+#define SOCKET_INVALID(sock) ((sock) == -1)
+#define SOCKET_FAILURE(rc) ((rc) == -1)
+#define SET_SOCKET_INVALID(sock) (sock) = -1
+
+// arguments to shutdown
+#define ENVOY_SHUT_RD SHUT_RD
+#define ENVOY_SHUT_WR SHUT_WR
+#define ENVOY_SHUT_RDWR SHUT_RDWR
 
 #endif
