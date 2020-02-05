@@ -830,6 +830,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "sds_generic_secret_integration_test",
+    srcs = [
+        "sds_generic_secret_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//include/envoy/registry",
+        "//source/common/grpc:common_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "tcp_proxy_integration_test",
     srcs = [
         "tcp_proxy_integration_test.cc",
