@@ -279,7 +279,7 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
 
   // In the protocol error case, we need to reset all streams now. The connection might stick around
   // long enough for a pending stream to come back and try to encode.
-  resetAllStreams(StreamInfo::ResponseFlag::DownstreamProtocolError);
+  resetAllStreams(StreamResetReason::LocalReset);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
@@ -378,8 +378,7 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   return Network::FilterStatus::StopIteration;
 }
 
-void ConnectionManagerImpl::resetAllStreams(
-    absl::optional<StreamInfo::ResponseFlag> response_flag) {
+void ConnectionManagerImpl::resetAllStreams(StreamResetReason reason) {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case. We must also remove callbacks here. Though we are
     // about to close the connection and will disable further reads, it is possible that flushing
@@ -391,14 +390,7 @@ void ConnectionManagerImpl::resetAllStreams(
     // codec but there are no easy answers and this seems simpler.
     auto& stream = *streams_.front();
     stream.response_encoder_->getStream().removeCallbacks(stream);
-    stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
-    if (response_flag.has_value()) {
-      stream.stream_info_.setResponseFlag(response_flag.value());
-      if (*response_flag == StreamInfo::ResponseFlag::DownstreamProtocolError) {
-        stream.stream_info_.setResponseCodeDetails(
-            stream.response_encoder_->getStream().responseDetails());
-      }
-    }
+    stream.onResetStream(reason, stream.response_encoder_->getStream().responseDetails());
   }
 }
 
@@ -439,7 +431,7 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(event, true);
-    resetAllStreams(absl::nullopt);
+    resetAllStreams(StreamResetReason::ConnectionTermination);
   }
 }
 
@@ -1870,7 +1862,8 @@ bool ConnectionManagerImpl::ActiveStream::handleDataIfStopAll(ActiveStreamFilter
   return false;
 }
 
-void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl::string_view) {
+void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reason,
+                                                        absl::string_view) {
   // NOTE: This function gets called in all of the following cases:
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset
@@ -1879,6 +1872,17 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
   connection_manager_.doDeferredStreamDestroy(*this);
+
+  // THINKME [matteof 2020-02-10] We interpret a LocalReset as a
+  // downstream protocol error. As far as I can tell this
+  // interpretation is correct in today's code. However, mapping
+  // between StreamResetReason and ResponseFlag is fragile, because
+  // somebody may use LocalReset for something that is not a
+  // DownstreamProtocolError.
+  if (reason == StreamResetReason::LocalReset) {
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    stream_info_.setResponseCodeDetails(response_encoder_->getStream().responseDetails());
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {

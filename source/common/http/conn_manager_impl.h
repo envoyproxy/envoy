@@ -736,7 +736,7 @@ private:
    */
   void doEndStream(ActiveStream& stream);
 
-  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag);
+  void resetAllStreams(StreamResetReason reason);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
   void onDrainTimeout();
