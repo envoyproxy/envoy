@@ -150,14 +150,14 @@ void HotRestartingParent::Internal::recordDynamics(HotRestartMessage::Reply::Sta
   // components using a dynamic representation.
   //
   // See https://github.com/envoyproxy/envoy/issues/9874 for more details.
-  Stats::StatMerger::DynamicSpans spans =
-      Stats::StatMerger::DynamicContext::encodeComponents(stat_name);
+  using Stats::StatMerger;
+  StatMerger::DynamicSpans spans = StatMerger::DynamicContext::encodeComponents(stat_name);
 
   // Convert that C++ structure (controlled by stat_merger.cc) into a protobuf
   // for serialization.
   if (!spans.empty()) {
     HotRestartMessage::Reply::RepeatedSpan spans_proto;
-    for (const Stats::StatMerger::DynamicSpan& span : spans) {
+    for (const StatMerger::DynamicSpan& span : spans) {
       HotRestartMessage::Reply::Span* span_proto = spans_proto.add_spans();
       span_proto->set_first(span.first);
       span_proto->set_last(span.second);

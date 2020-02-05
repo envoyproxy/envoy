@@ -213,14 +213,25 @@ class StatMergerDynamicTest : public testing::Test {
 public:
   StatMergerDynamicTest() : store_(symbol_table_), stat_merger_(store_) {}
 
-  void dynamicEncodeDecodeTest(absl::string_view input_name) {
+  // Test helper functions takes an input_descriptor. And input_descriptor is
+  // mostly like the stringified StatName, but each segment that is prefixed by
+  // "D:" is dynamic, and within a segment, we map "," to ".". The "D:" hack
+  // restricts the stat names we can test by making a prefix special. The ","
+  // hack does that too, allowing us to represent a single multi-segment dynamic
+  // token in the tests. These hacks were easy to implement (~ 3 lines of code)
+  // and provide a reasonably concise way to make a few test-cases.
+  //
+  // The test-helper ensures that a StatName created from a descriptor can
+  // be encoded into a DynamicsMap, and also decoded back into a StatName
+  // that compares as expected.
+  void dynamicEncodeDecodeTest(absl::string_view input_descriptor) {
     // Encode the input name into a joined StatName, using "D:" to indicate
     // a dynamic component.
     std::vector<StatName> components;
     StatNamePool symbolic_pool(symbol_table_);
     StatNameDynamicPool dynamic_pool(symbol_table_);
 
-    for (absl::string_view segment : absl::StrSplit(input_name, ".")) {
+    for (absl::string_view segment : absl::StrSplit(input_descriptor, ".")) {
       if (absl::StartsWith(segment, "D:")) {
         std::string hacked = absl::StrReplaceAll(segment.substr(2), {{",", "."}});
         components.push_back(dynamic_pool.add(hacked));
@@ -237,8 +248,8 @@ public:
 
     StatMerger::DynamicContext dynamic_context(symbol_table_);
     StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
-    EXPECT_EQ(name, symbol_table_.toString(decoded)) << "input=" << input_name;
-    EXPECT_TRUE(stat_name == decoded) << "input=" << input_name << ", name=" << name;
+    EXPECT_EQ(name, symbol_table_.toString(decoded)) << "input=" << input_descriptor;
+    EXPECT_TRUE(stat_name == decoded) << "input=" << input_descriptor << ", name=" << name;
   }
 
   SymbolTableImpl symbol_table_;

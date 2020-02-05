@@ -53,11 +53,12 @@ message HotRestartMessage {
       map<string, uint64> counter_deltas = 3;
       // The parent's current values for various gauges in its stats store.
       map<string, uint64> gauges = 4;
-      // Maps the string representation of a StatName into an int-pair array,
-      // which indicates which of the StatName tokens are dynamic. For example,
+      // Maps the string representation of a StatName into an array of Spans,
+      // which indicate which of the StatName tokens are dynamic. For example,
       // if we are recording a counter or gauge named "a.b.c.d.e.f", where "a",
       // and "d.e" were created from a StatNameDynamicPool, then we'd map
-      // "a.b.c.d.e.f" to the integer array [0, 3, 4].
+      // "a.b.c.d.e.f" to the span array [[0,0], [3,4]], where the [0,0] span
+      // covers the "a", and the [3,4] span covers "d.e".
       map<string, RepeatedSpan> dynamics = 5;
     }
     oneof reply {
