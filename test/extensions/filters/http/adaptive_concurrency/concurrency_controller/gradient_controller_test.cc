@@ -232,16 +232,19 @@ min_rtt_calc_params:
       stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
           .value());
   EXPECT_EQ(controller->concurrencyLimit(), 7);
-  tryForward(controller, true);
+  for (int i = 0; i < 7; ++i) {
+    tryForward(controller, true);
+  }
   tryForward(controller, false);
   tryForward(controller, false);
-  controller->recordLatencySample(min_rtt);
+  for (int i = 0; i < 7; ++i) {
+    controller->recordLatencySample(min_rtt);
+  }
 
-  // 49 more requests should cause the minRTT to be done calculating.
-  for (int i = 0; i < 49; ++i) {
+  // 43 more requests should cause the minRTT to be done calculating.
+  for (int i = 0; i < 43; ++i) {
     EXPECT_EQ(controller->concurrencyLimit(), 7);
     tryForward(controller, true);
-    tryForward(controller, false);
     controller->recordLatencySample(min_rtt);
   }
 
@@ -371,8 +374,8 @@ min_rtt_calc_params:
   // the max gradient.
   time_system_.sleep(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_GE(controller->concurrencyLimit(), 3);
-  EXPECT_LE(controller->concurrencyLimit() / 3.0, 2.0);
+  EXPECT_GE(controller->concurrencyLimit(), 7);
+  EXPECT_LE(controller->concurrencyLimit() / 7.0, 2.0);
 
   // Make it seem as if the recorded latencies are consistently lower than the measured minRTT.
   // Ensure that it grows.
