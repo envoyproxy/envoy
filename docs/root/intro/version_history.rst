@@ -11,6 +11,7 @@ Version history
 * router: added the ability to match a route based on whether a downstream TLS connection certificate has been
   :ref:`validated <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>`.
 * sds: added :ref:`GenericSecret <envoy_api_msg_auth.GenericSecret>` to support secret of generic type.
+* tracing: added gRPC service configuration to the OpenCensus Stackdriver tracer.
 * upstream: combined HTTP/1 and HTTP/2 connection pool code. This means that circuit breaker
   limits for both requests and connections apply to both pool types. Also, HTTP/2 now has
   the option to limit concurrent requests on a connection, and allow multiple draining
@@ -20,7 +21,6 @@ Version history
   restart Envoy. The behavior will not switch until the connection pools are recreated. The new
   circuit breaker behavior is described :ref:`here <arch_overview_circuit_break>`.
 * upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`. 
-* tracing: added gRPC service configuration to the OpenCensus Stackdriver tracer.
 
 1.13.0 (January 20, 2020)
 =========================
