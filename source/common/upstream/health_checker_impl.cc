@@ -259,6 +259,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HealthCheckResult
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
+  if (response_headers_->EnvoyImmediateHealthCheckFail()) {
+    return HealthCheckResult::Failed;
+  }
+
   uint64_t response_code = Http::Utility::getResponseStatus(*response_headers_);
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
@@ -297,7 +301,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     break;
   case HealthCheckResult::Failed:
     host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
-    handleFailure(envoy::data::core::v3::ACTIVE);
+    handleFailure(response_headers_->EnvoyImmediateHealthCheckFail() != nullptr
+                      ? envoy::data::core::v3::PASSIVE
+                      : envoy::data::core::v3::ACTIVE);
     break;
   }
 

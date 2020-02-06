@@ -269,6 +269,11 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
   num_unhealthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
+  if (host_->healthFlagGet(Host::HealthFlag::EXCLUDE_FROM_LB)) {
+    host_->healthFlagClear(Host::HealthFlag::EXCLUDE_FROM_LB);
+    changed_state = HealthTransition::ChangePending;
+  }
+
   if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     // If this is the first time we ever got a check result on this host, we immediately move
     // it to healthy. This makes startup faster with a small reduction in overall reliability
@@ -323,7 +328,10 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   num_healthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
-  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+  if (type == envoy::data::core::v3::PASSIVE) {
+    host_->healthFlagSet(Host::HealthFlag::EXCLUDE_FROM_LB);
+    changed_state = HealthTransition::ChangePending;
+  } else if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     if (type != envoy::data::core::v3::NETWORK ||
         ++num_unhealthy_ == parent_.unhealthy_threshold_) {
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);

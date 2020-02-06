@@ -129,7 +129,7 @@ message HostStatus {
 }
 
 // Health status for a host.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HostHealthStatus {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.HostHealthStatus";
@@ -154,4 +154,7 @@ message HostHealthStatus {
   // here.
   // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
   config.core.v3.HealthStatus eds_health_status = 3;
+
+  // The host has indicated to remove immediately from lb
+  bool immediate_removal_from_lb = 7;
 }

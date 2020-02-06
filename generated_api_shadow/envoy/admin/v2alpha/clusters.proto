@@ -121,7 +121,7 @@ message HostStatus {
 }
 
 // Health status for a host.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HostHealthStatus {
   // The host is currently failing active health checks.
   bool failed_active_health_check = 1;
@@ -143,4 +143,7 @@ message HostHealthStatus {
   // here.
   // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
   api.v2.core.HealthStatus eds_health_status = 3;
+
+  // The host has indicated to remove immediately from lb
+  bool immediate_removal_from_lb = 7;
 }

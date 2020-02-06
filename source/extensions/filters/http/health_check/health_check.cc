@@ -96,6 +96,11 @@ Http::FilterTrailersStatus HealthCheckFilter::decodeTrailers(Http::HeaderMap&) {
 }
 
 Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+  if (context_.healthCheckFailed()) {
+    headers.setReferenceEnvoyImmediateHealthCheckFail(
+        Http::Headers::get().EnvoyImmediateHealthCheckFailValues.True);
+  }
+
   if (health_check_request_) {
     if (cache_manager_) {
       cache_manager_->setCachedResponse(
@@ -104,9 +109,6 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& head
     }
 
     headers.setEnvoyUpstreamHealthCheckedCluster(context_.localInfo().clusterName());
-  } else if (context_.healthCheckFailed()) {
-    headers.setReferenceEnvoyImmediateHealthCheckFail(
-        Http::Headers::get().EnvoyImmediateHealthCheckFailValues.True);
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -174,14 +176,13 @@ void HealthCheckFilter::onComplete() {
     }
   }
 
-  callbacks_->sendLocalReply(
-      final_status, "",
-      [degraded](auto& headers) {
-        if (degraded) {
-          headers.setEnvoyDegraded("");
-        }
-      },
-      absl::nullopt, *details);
+  callbacks_->sendLocalReply(final_status, "",
+                             [degraded](auto& headers) {
+                               if (degraded) {
+                                 headers.setEnvoyDegraded("");
+                               }
+                             },
+                             absl::nullopt, *details);
 }
 
 } // namespace HealthCheck

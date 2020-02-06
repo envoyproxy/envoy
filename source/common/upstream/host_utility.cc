@@ -56,6 +56,13 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Host& host, std::strin
     }
     break;
   }
+
+  case Host::HealthFlag::EXCLUDE_FROM_LB: {
+    if (host.healthFlagGet(Host::HealthFlag::EXCLUDE_FROM_LB)) {
+      health_status += "/exclude_from_lb";
+    }
+    break;
+  }
   }
 }
 
