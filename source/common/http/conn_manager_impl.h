@@ -481,18 +481,24 @@ private:
                         absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     // As with most of the encode functions, this runs encodeHeaders on various
-    // filters before doing some final header munging and passing the headers to
-    // the encoder.
+    // filters before calling encodeHeadersInternal which does final header munging and passes the
+    // headers to the encoder.
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
-    // filter to start the iteration with.
+    // filter to start the iteration with, and finally calls encodeDataInternal
+    // to update stats, do end stream bookkeeping, and send the data to encoder.
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                     FilterIterationStartState filter_iteration_start_state);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
 
-    // This does the non-filter bits of encodeHeaders, doing the munging and actual encoding.
+    // This is a helper function for encodeHeaders and responseDataTooLarge which allows for shared
+    // code for the two headers encoding paths. It does header munging, updates timing stats, and
+    // sends the headers to the encoder.
     void encodeHeadersInternal(HeaderMap& headers, bool end_stream);
+    // This is a helper function for encodeData and responseDataTooLarge which allows for shared
+    // code for the two data encoding paths. It does stats updates and tracks potential end of
+    // stream.
     void encodeDataInternal(Buffer::Instance& data, bool end_stream);
 
     void maybeEndEncode(bool end_stream);

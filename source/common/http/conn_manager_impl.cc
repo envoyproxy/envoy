@@ -1524,7 +1524,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     }
   }
 
-  bool modified_end_stream =
+  const bool modified_end_stream =
       encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
   encodeHeadersInternal(headers, modified_end_stream);
 
@@ -1772,7 +1772,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(
     }
   }
 
-  bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
+  const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
   encodeDataInternal(data, modified_end_stream);
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
@@ -2403,6 +2403,10 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
 
       parent_.stream_info_.setResponseCodeDetails(
           StreamInfo::ResponseCodeDetails::get().RequestHeadersTooLarge);
+      // This does not call the standard sendLocalReply because if there is already response data
+      // we do not want to pass a second set of response headers through the filter chain.
+      // Instead, call the encodeHeadersInternal / encodeDataInternal helpers
+      // directly, which maximizes shared code with the normal response path.
       Http::Utility::sendLocalReply(
           Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
           [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
