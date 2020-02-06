@@ -374,6 +374,7 @@ authz
 autoscale
 backend
 backends
+backgrounded
 backoff
 backpressure
 backticks
