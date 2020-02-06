@@ -48,8 +48,8 @@ GradientController::GradientController(GradientControllerConfig config,
                                        const std::string& stats_prefix, Stats::Scope& scope,
                                        Runtime::RandomGenerator& random)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
-      stats_(generateStats(scope_, stats_prefix)), random_(random),
-      num_rq_outstanding_(0), concurrency_limit_(config_.minConcurrency()),
+      stats_(generateStats(scope_, stats_prefix)), random_(random), num_rq_outstanding_(0),
+      concurrency_limit_(config_.minConcurrency()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
 
@@ -165,7 +165,8 @@ uint32_t GradientController::calculateNewLimit() {
   // in the range [configured_min, configured_max].
   const uint32_t new_limit = limit + burst_headroom;
   return std::max<uint32_t>(config_.minConcurrency(),
-      std::min<uint32_t>(config_.maxConcurrencyLimit(), new_limit));
+                            std::min<uint32_t>(config_.maxConcurrencyLimit(), new_limit));
+
 }
 
 RequestForwardingAction GradientController::forwardingDecision() {
