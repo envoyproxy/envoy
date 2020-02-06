@@ -2132,6 +2132,34 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
             cluster->info()->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.unit());
 }
 
+// Validates HTTP2 SETTINGS config.
+TEST_F(ClusterInfoImplTest, Http2ProtocolOptions) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options:
+      hpack_table_size: 2048
+      initial_stream_window_size: 65536
+      custom_settings_parameters:
+        - identifier: 0x10
+          value: 10
+        - identifier: 0x12
+          value: 12
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(cluster->info()->http2Options().hpack_table_size().value(), 2048);
+  EXPECT_EQ(cluster->info()->http2Options().initial_stream_window_size().value(), 65536);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].identifier().value(),
+            0x10);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].value().value(), 10);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].identifier().value(),
+            0x12);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].value().value(), 12);
+}
+
 class TestFilterConfigFactoryBase {
 public:
   TestFilterConfigFactoryBase(

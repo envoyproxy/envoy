@@ -846,6 +846,7 @@ void ConnectionImpl::sendPendingFrames() {
 void ConnectionImpl::sendSettings(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options, bool disable_push) {
   std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals> settings;
+  // Custom parameters override named parameters, so they must be inserted first into the set.
   for (const auto it : http2_options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     auto result =
@@ -855,25 +856,30 @@ void ConnectionImpl::sendSettings(
                      connection_, it.identifier().value(), it.value().value());
       continue;
     }
-    ENVOY_CONN_LOG(debug, "setting user defined settings parameter with id {:#x} to {}",
-                   connection_, it.identifier().value(), it.value().value());
+    ENVOY_CONN_LOG(debug, "adding user defined settings parameter with id {:#x} to {}", connection_,
+                   it.identifier().value(), it.value().value());
   }
 
   struct SettingsDescriptor {
     nghttp2_settings_entry entry;
     uint32_t default_value;
   };
-  for (const auto& descriptor : std::vector<SettingsDescriptor>{
-           {{NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()}, 0},
-           {{NGHTTP2_SETTINGS_ENABLE_PUSH, disable_push ? 0U : 1U}, 1},
-           {{NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_options.hpack_table_size().value()},
-            NGHTTP2_DEFAULT_HEADER_TABLE_SIZE},
-           {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,
-             http2_options.max_concurrent_streams().value()},
-            NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS},
-           {{NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE,
-             http2_options.initial_stream_window_size().value()},
-            NGHTTP2_INITIAL_WINDOW_SIZE}}) {
+  auto descriptors = std::vector<SettingsDescriptor>{
+      {{/*nghttp2_settings_entry.settings_id=*/NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL,
+        /*nghttp2_settings_entry.value=*/http2_options.allow_connect()},
+       /*default_value=*/0},
+      {// Universally disable receiving push promise frames as we don't currently support
+       // them.  nghttp2 will fail the connection if the other side still sends them.
+       // TODO(mattklein123): Remove this when we correctly proxy push promise.
+       {NGHTTP2_SETTINGS_ENABLE_PUSH, disable_push ? 0U : 1U},
+       1},
+      {{NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_options.hpack_table_size().value()},
+       NGHTTP2_DEFAULT_HEADER_TABLE_SIZE},
+      {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
+       NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS},
+      {{NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()},
+       NGHTTP2_INITIAL_WINDOW_SIZE}};
+  for (const auto& descriptor : descriptors) {
     if (descriptor.entry.value != descriptor.default_value) {
       auto result = settings.insert(descriptor.entry);
       if (!result.second) {
@@ -881,7 +887,7 @@ void ConnectionImpl::sendSettings(
                        connection_, descriptor.entry.settings_id, descriptor.entry.value);
         continue;
       }
-      ENVOY_CONN_LOG(debug, "setting named settings parameter with id {:#x} to {}", connection_,
+      ENVOY_CONN_LOG(debug, "adding named settings parameter with id {:#x} to {}", connection_,
                      descriptor.entry.settings_id, descriptor.entry.value);
     }
   }
