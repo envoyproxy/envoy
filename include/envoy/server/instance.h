@@ -196,7 +196,7 @@ public:
   /**
    * @return the server-wide process context.
    */
-  virtual OptProcessContextRef processContext() PURE;
+  virtual ProcessContextOptRef processContext() PURE;
 
   /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
@@ -229,6 +229,11 @@ public:
    * @return Configuration::ServerFactoryContext& factory context for filters.
    */
   virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * @return Configuration::TransportSocketFactoryContext& factory context for transport sockets.
+   */
+  virtual Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() PURE;
 };
 
 } // namespace Server

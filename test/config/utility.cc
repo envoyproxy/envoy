@@ -397,6 +397,20 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
+void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
+  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
+    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    static_layer->set_name("static_layer");
+    static_layer->mutable_static_layer();
+    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    admin_layer->set_name("admin");
+    admin_layer->mutable_admin_layer();
+  }
+  auto* static_layer =
+      bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
+  (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
+}
+
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   RELEASE_ASSERT(!finalized_, "");
 
@@ -810,7 +824,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
       "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
-  TestUtility::renameFile(file, lds_filename);
+  TestEnvironment::renameFile(file, lds_filename);
 }
 
 void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames) {
@@ -843,7 +857,7 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   // FilesystemSubscriptionImpl is subscribed to.
   std::string path =
       TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
-  TestUtility::renameFile(path, cds_path_);
+  TestEnvironment::renameFile(path, cds_path_);
 }
 
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
@@ -865,7 +879,7 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   // FilesystemSubscriptionImpl is subscribed to.
   std::string path =
       TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
-  TestUtility::renameFile(path, eds_path_);
+  TestEnvironment::renameFile(path, eds_path_);
 }
 
 void EdsHelper::setEdsAndWait(

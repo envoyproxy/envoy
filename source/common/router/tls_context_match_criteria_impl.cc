@@ -10,6 +10,10 @@ TlsContextMatchCriteriaImpl::TlsContextMatchCriteriaImpl(
   if (options.has_presented()) {
     presented_ = options.presented().value();
   }
+
+  if (options.has_validated()) {
+    validated_ = options.validated().value();
+  }
 }
 
 } // namespace Router

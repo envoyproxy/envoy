@@ -884,8 +884,8 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
 TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;
-  Http::StreamEncoder* encoder1;
-  Http::StreamEncoder* encoder2;
+  Http::RequestEncoder* encoder1;
+  Http::RequestEncoder* encoder2;
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   int32_t request1_bytes = 1024;
@@ -1018,8 +1018,8 @@ TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
 void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes) {
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;
-  Http::StreamEncoder* encoder1;
-  Http::StreamEncoder* encoder2;
+  Http::RequestEncoder* encoder1;
+  Http::RequestEncoder* encoder2;
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   initialize();
@@ -1249,7 +1249,7 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
     std::function<void(IntegrationStreamDecoder&)> cb) {
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;
-  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
 

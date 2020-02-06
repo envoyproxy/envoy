@@ -203,8 +203,7 @@ message GrpcService {
 
     // The target URI when using the `Google C++ gRPC client
     // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in
-    // :ref:`channel_credentials
-    // <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials>`.
+    // :ref:`channel_credentials <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials>`.
     string target_uri = 1 [(validate.rules).string = {min_bytes: 1}];
 
     ChannelCredentials channel_credentials = 2;

@@ -32,7 +32,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
     const Http::HeaderEntry* entry = headers.get(header_);
     if (entry) {
-      decoder_callbacks_->streamInfo().filterState().setData(
+      decoder_callbacks_->streamInfo().filterState()->setData(
           state_, std::make_unique<Router::StringAccessorImpl>(entry->value().getStringView()),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::FilterChain);

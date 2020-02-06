@@ -14,20 +14,21 @@ MetricHelper::~MetricHelper() {
   ASSERT(!stat_names_.populated());
 }
 
-MetricHelper::MetricHelper(absl::string_view name, absl::string_view tag_extracted_name,
+MetricHelper::MetricHelper(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags, SymbolTable& symbol_table) {
   // Encode all the names and tags into transient storage so we can count the
   // required bytes. 2 is added to account for the name and tag_extracted_name,
   // and we multiply the number of tags by 2 to account for the name and value
   // of each tag.
   const uint32_t num_names = 2 + 2 * tags.size();
-  STACK_ARRAY(names, absl::string_view, num_names);
+  absl::FixedArray<StatName> names(num_names);
   names[0] = name;
-  names[1] = tag_extracted_name;
+  StatNamePool pool(symbol_table);
+  names[1] = pool.add(tag_extracted_name);
   int index = 1;
   for (auto& tag : tags) {
-    names[++index] = tag.name_;
-    names[++index] = tag.value_;
+    names[++index] = pool.add(tag.name_);
+    names[++index] = pool.add(tag.value_);
   }
   symbol_table.populateList(names.begin(), num_names, stat_names_);
 }

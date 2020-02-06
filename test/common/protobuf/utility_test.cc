@@ -1,10 +1,13 @@
 #include <unordered_set>
 
 #include "envoy/api/v2/cluster.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/filter.pb.h"
+#include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
@@ -252,6 +255,20 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
   envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+}
+
+TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadV2TextProtoFromFile)) {
+  API_NO_BOOST(envoy::config::bootstrap::v2::Bootstrap) bootstrap;
+  bootstrap.mutable_node()->set_build_version("foo");
+
+  std::string bootstrap_text;
+  ASSERT_TRUE(Protobuf::TextFormat::PrintToString(bootstrap, &bootstrap_text));
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
+
+  API_NO_BOOST(envoy::config::bootstrap::v3::Bootstrap) proto_from_file;
+  TestUtility::loadFromFile(filename, proto_from_file, *api_);
+  EXPECT_EQ("foo", proto_from_file.node().hidden_envoy_deprecated_build_version());
 }
 
 TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
@@ -1092,6 +1109,16 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
+// Validated exception thrown when anyConvertAndValidate observes a PGV failures.
+TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
+  envoy::config::cluster::v3::Filter filter;
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(filter);
+  EXPECT_THROW(MessageUtil::anyConvertAndValidate<envoy::config::cluster::v3::Filter>(
+                   source_any, ProtobufMessage::getStrictValidationVisitor()),
+               ProtoValidationException);
+}
+
 // MessageUtility::unpackTo() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
@@ -1433,7 +1460,9 @@ TEST_P(DeprecatedFieldsTest,
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
-      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
+      "warning",
+      "Using runtime overrides to continue using now fatal-by-default deprecated option "
+      "'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
       checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
@@ -1575,7 +1604,13 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_FATAL", "true"}});
 
-  checkForDeprecation(base);
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using runtime overrides to continue using now fatal-by-default deprecated value "
+      "DEPRECATED_FATAL for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' "
+      "from file deprecated.proto. This enum value will be removed from Envoy soon.",
+      checkForDeprecation(base));
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
@@ -1618,8 +1653,9 @@ TEST(StatusCode, Strings) {
   for (int i = 0; i < last_code; ++i) {
     EXPECT_NE(MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(i)), "");
   }
-  ASSERT_EQ("",
+  ASSERT_EQ("UNKNOWN",
             MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+  ASSERT_EQ("OK", MessageUtil::CodeEnumToString(ProtobufUtil::error::OK));
 }
 
 TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {

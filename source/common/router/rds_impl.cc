@@ -102,8 +102,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     return;
   }
   auto route_config =
-      MessageUtil::anyConvert<envoy::config::route::v3::RouteConfiguration>(resources[0]);
-  MessageUtil::validate(route_config, validator_);
+      MessageUtil::anyConvertAndValidate<envoy::config::route::v3::RouteConfiguration>(resources[0],
+                                                                                       validator_);
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));

@@ -104,7 +104,7 @@ public:
   };
 
   // HttpHealthCheckerImpl
-  MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
@@ -117,8 +117,8 @@ public:
     Http::MockClientConnection* codec_{};
     Stats::IsolatedStoreImpl stats_store_;
     Network::MockClientConnection* client_connection_{};
-    NiceMock<Http::MockStreamEncoder> request_encoder_;
-    Http::StreamDecoder* stream_response_callbacks_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
   };
 
   using TestSessionPtr = std::unique_ptr<TestSession>;
@@ -695,7 +695,7 @@ public:
               cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
   }
 
-  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
+  MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -3362,7 +3362,7 @@ public:
   };
 
   // GrpcHealthCheckerImpl
-  MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 };
 
 class GrpcHealthCheckerImplTestBase {
@@ -3375,8 +3375,8 @@ public:
     Http::MockClientConnection* codec_{};
     Stats::IsolatedStoreImpl stats_store_;
     Network::MockClientConnection* client_connection_{};
-    NiceMock<Http::MockStreamEncoder> request_encoder_;
-    Http::StreamDecoder* stream_response_callbacks_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
     CodecClientForTest* codec_client_{};
   };
 
@@ -3709,7 +3709,7 @@ public:
     expectHostHealthy(true);
   }
 
-  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
+  MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;

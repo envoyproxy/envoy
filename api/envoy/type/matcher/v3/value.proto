@@ -13,7 +13,7 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "ValueProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: ValueMatcher]
+// [#protodoc-title: Value matcher]
 
 // Specifies the way to match a ProtobufWkt::Value. Primitive values and ListValue are supported.
 // StructValue is not supported and is always not matched.

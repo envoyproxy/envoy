@@ -262,12 +262,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (dyn_resources.has_ads_config()) {
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-      auto& api_config_source = dyn_resources.has_ads_config()
-                                    ? dyn_resources.ads_config()
-                                    : dyn_resources.cds_config().api_config_source();
       ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, api_config_source,
-                                                         stats)
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                         dyn_resources.ads_config(), stats)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -1260,7 +1257,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
-  ConnPoolsContainer::ConnPools::OptPoolRef pool =
+  ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
         return parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, protocol,
@@ -1333,15 +1330,14 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
   if (protocol == Http::Protocol::Http2 &&
       runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                           transport_socket_options);
+    return Http::Http2::allocateConnPool(dispatcher, host, priority, options,
+                                         transport_socket_options);
   } else if (protocol == Http::Protocol::Http3) {
     // Quic connection pool is not implemented.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   } else {
-    return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
-                                                           host->cluster().http1Settings(),
-                                                           transport_socket_options);
+    return Http::Http1::allocateConnPool(dispatcher, host, priority, options,
+                                         transport_socket_options);
   }
 }
 

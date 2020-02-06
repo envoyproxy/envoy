@@ -45,7 +45,7 @@ public:
   // Lua filter
   const std::string Lua = "envoy.lua";
   // On-demand RDS updates filter
-  const std::string OnDemand = "envoy.on_demand";
+  const std::string OnDemand = "envoy.filters.http.on_demand";
   // Squash filter
   const std::string Squash = "envoy.squash";
   // External Authorization filter
@@ -64,6 +64,8 @@ public:
   const std::string OriginalSrc = "envoy.filters.http.original_src";
   // Dynamic forward proxy filter
   const std::string DynamicForwardProxy = "envoy.filters.http.dynamic_forward_proxy";
+  // AWS request signing filter
+  const std::string AwsRequestSigning = "envoy.filters.http.aws_request_signing";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

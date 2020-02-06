@@ -25,7 +25,7 @@ public:
   TestNullVmPlugin() = default;
   ~TestNullVmPlugin() override = default;
 
-  MOCK_METHOD0(start, void());
+  MOCK_METHOD(void, start, ());
 };
 
 class PluginFactory : public Null::NullVmPluginFactory {
@@ -106,8 +106,8 @@ TEST_F(BaseVmTest, NullVmMemory) {
 
 class MockHostFunctions {
 public:
-  MOCK_CONST_METHOD1(pong, void(uint32_t));
-  MOCK_CONST_METHOD0(random, uint32_t());
+  MOCK_METHOD(void, pong, (uint32_t), (const));
+  MOCK_METHOD(uint32_t, random, (), (const));
 };
 
 MockHostFunctions* g_host_functions;

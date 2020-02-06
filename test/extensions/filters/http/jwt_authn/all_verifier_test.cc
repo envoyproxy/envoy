@@ -73,7 +73,7 @@ public:
   }
 
   void createVerifier() {
-    filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
+    filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
                                  *filter_config_);
   }
@@ -83,7 +83,7 @@ public:
   }
 
   JwtAuthentication proto_config_;
-  FilterConfigSharedPtr filter_config_;
+  std::shared_ptr<FilterConfigImpl> filter_config_;
   VerifierConstPtr verifier_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;

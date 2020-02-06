@@ -54,11 +54,10 @@ message DiscoveryRequest {
   // delta, where it is populated only for new explicit ACKs).
   string response_nonce = 5;
 
-  // This is populated when the previous :ref:`DiscoveryResponse
-  // <envoy_api_msg_service.discovery.v3.DiscoveryResponse>` failed to update configuration. The
-  // *message* field in *error_details* provides the Envoy internal exception related to the
-  // failure. It is only intended for consumption during manual debugging, the string provided is
-  // not guaranteed to be stable across Envoy versions.
+  // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_service.discovery.v3.DiscoveryResponse>`
+  // failed to update configuration. The *message* field in *error_details* provides the Envoy
+  // internal exception related to the failure. It is only intended for consumption during manual
+  // debugging, the string provided is not guaranteed to be stable across Envoy versions.
   google.rpc.Status error_detail = 6;
 }
 
@@ -192,10 +191,9 @@ message DeltaDiscoveryRequest {
   // Otherwise (unlike in DiscoveryRequest) response_nonce must be omitted.
   string response_nonce = 6;
 
-  // This is populated when the previous :ref:`DiscoveryResponse
-  // <envoy_api_msg_service.discovery.v3.DiscoveryResponse>` failed to update configuration. The
-  // *message* field in *error_details* provides the Envoy internal exception related to the
-  // failure.
+  // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_service.discovery.v3.DiscoveryResponse>`
+  // failed to update configuration. The *message* field in *error_details*
+  // provides the Envoy internal exception related to the failure.
   google.rpc.Status error_detail = 7;
 }
 
