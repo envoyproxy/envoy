@@ -86,7 +86,7 @@ TEST_F(TsiHandshakerTest, DoHandshake) {
 
   tsi_peer client_peer;
   EXPECT_EQ(TSI_OK, tsi_handshaker_result_extract_peer(client_result.get(), &client_peer));
-  EXPECT_EQ(1, client_peer.property_count);
+  EXPECT_EQ(2, client_peer.property_count);
   EXPECT_STREQ("certificate_type", client_peer.properties[0].name);
   absl::string_view client_certificate_type{client_peer.properties[0].value.data,
                                             client_peer.properties[0].value.length};
@@ -94,7 +94,7 @@ TEST_F(TsiHandshakerTest, DoHandshake) {
 
   tsi_peer server_peer;
   EXPECT_EQ(TSI_OK, tsi_handshaker_result_extract_peer(server_result.get(), &server_peer));
-  EXPECT_EQ(1, server_peer.property_count);
+  EXPECT_EQ(2, server_peer.property_count);
   EXPECT_STREQ("certificate_type", server_peer.properties[0].name);
   absl::string_view server_certificate_type{server_peer.properties[0].value.data,
                                             server_peer.properties[0].value.length};

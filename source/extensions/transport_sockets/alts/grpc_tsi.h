@@ -26,10 +26,12 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
+void wrapped_tsi_handshaker_destroy(tsi_handshaker* self);
+
 using CFrameProtectorPtr = CSmartPtr<tsi_frame_protector, tsi_frame_protector_destroy>;
 
 using CHandshakerResultPtr = CSmartPtr<tsi_handshaker_result, tsi_handshaker_result_destroy>;
-using CHandshakerPtr = CSmartPtr<tsi_handshaker, tsi_handshaker_destroy>;
+using CHandshakerPtr = CSmartPtr<tsi_handshaker, wrapped_tsi_handshaker_destroy>;
 
 } // namespace Alts
 } // namespace TransportSockets

@@ -208,6 +208,7 @@ TEST_P(AltsIntegrationTestClientInvalidPeer, clientValidationFail) {
   initialize();
   codec_client_ = makeRawHttpConnection(makeAltsConnection());
   EXPECT_FALSE(codec_client_->connected());
+  codec_client_.release();
 }
 
 class AltsIntegrationTestServerInvalidPeer : public AltsIntegrationTestBase {

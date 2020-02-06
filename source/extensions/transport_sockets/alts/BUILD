@@ -14,6 +14,9 @@ envoy_package()
 
 envoy_cc_library(
     name = "grpc_tsi_wrapper",
+    srcs = [
+        "grpc_tsi.cc",
+    ],
     hdrs = [
         "grpc_tsi.h",
     ],
