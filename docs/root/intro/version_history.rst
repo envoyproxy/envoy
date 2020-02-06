@@ -3,6 +3,8 @@ Version history
 
 1.14.0 (Pending)
 ================
+* access loggers: access logger extensions use the "envoy.access_loggers" name space. A mapping
+  of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
@@ -17,7 +19,7 @@ Version history
   "envoy.reloadable_features.new_http2_connection_pool_behavior" and then re-configure your clusters or
   restart Envoy. The behavior will not switch until the connection pools are recreated. The new
   circuit breaker behavior is described :ref:`here <arch_overview_circuit_break>`.
-* upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`. 
+* upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`.
 
 1.13.0 (January 20, 2020)
 =========================

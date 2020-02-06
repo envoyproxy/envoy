@@ -330,7 +330,7 @@ name: envoy.router
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
-    name: envoy.file_access_log
+    name: envoy.access_loggers.file
     filter:
       not_health_check_filter: {}
     typed_config:
@@ -455,7 +455,7 @@ name: envoy.router
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
-    name: envoy.http_grpc_access_log
+    name: envoy.access_loggers.http_grpc
     filter:
       not_health_check_filter: {}
     typed_config:

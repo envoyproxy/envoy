@@ -50,7 +50,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
           access_log:
-          - name: envoy.file_access_log
+          - name: envoy.access_loggers.file
             typed_config:
               "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
               path: /dev/null
