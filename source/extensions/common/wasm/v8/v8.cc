@@ -373,18 +373,18 @@ absl::string_view V8::getCustomSection(absl::string_view name) {
 }
 
 #if defined(__linux__) && defined(__x86_64__)
-#define WEE8_PLATFORM "linux_x86_64"
-#else
-#define WEE8_PLATFORM ""
+#define WEE8_WASM_PRECOMPILE_PLATFORM "linux_x86_64"
 #endif
 
 absl::string_view V8::getPrecompiledSectionName() {
+#ifndef WEE8_WASM_PRECOMPILE_PLATFORM
+  return ""
+#else
   static const auto name =
-      sizeof(WEE8_PLATFORM) - 1 > 0
-          ? absl::StrCat("precompiled_wee8_v", V8_MAJOR_VERSION, ".", V8_MINOR_VERSION, ".",
-                         V8_BUILD_NUMBER, ".", V8_PATCH_LEVEL, "_", WEE8_PLATFORM)
-          : "";
+      absl::StrCat("precompiled_v8_v", V8_MAJOR_VERSION, ".", V8_MINOR_VERSION, ".",
+                   V8_BUILD_NUMBER, ".", V8_PATCH_LEVEL, "_", WEE8_WASM_PRECOMPILE_PLATFORM);
   return name;
+#endif
 }
 
 void V8::link(absl::string_view debug_name) {

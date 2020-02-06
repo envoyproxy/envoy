@@ -3,7 +3,7 @@
  *
  * This is accomplished by loading and instantiating the Wasm module, serializing
  * the V8 Isolate containing compiled code, and saving it in Wasm module's Custom
- * Section under the "precompiled_wee8_v<version>_<platform>" name.
+ * Section under the "precompiled_v8_v<version>_<platform>" name.
  *
  * Such precompiled Wasm module can be deserialized and loaded by V8, without the
  * need to compile Wasm bytecode each time it's loaded.
@@ -21,16 +21,19 @@
 #include "v8-version.h"
 #include "wasm-api/wasm.hh"
 
-uint32_t parseVarint(const byte_t*& pos, const byte_t* end) {
+uint32_t InvalidVarint = ~uint32_t{0};
+
+uint32_t parseVarint(const byte_t** pos, const byte_t* end) {
   uint32_t n = 0;
   uint32_t shift = 0;
   byte_t b;
 
   do {
-    if (pos + 1 > end) {
-      return static_cast<uint32_t>(-1);
+    if (*pos >= end) {
+      return InvalidVarint;
     }
-    b = *pos++;
+    b = **pos;
+    (*pos)++;
     n += (b & 0x7f) << shift;
     shift += 7;
   } while ((b & 0x80) != 0);
@@ -42,15 +45,11 @@ wasm::vec<byte_t> getVarint(uint32_t value) {
   byte_t bytes[5];
   int pos = 0;
 
-  while (pos < 5) {
-    if ((value & ~0x7F) == 0) {
-      bytes[pos++] = static_cast<uint8_t>(value);
-      break;
-    }
-
-    bytes[pos++] = static_cast<uint8_t>(value & 0x7F) | 0x80;
+  while (value >= 0x80) {
+    bytes[pos++] = static_cast<uint8_t>(0x80 | (value & 0x7f));
     value >>= 7;
   }
+  bytes[pos++] = static_cast<uint8_t>(value & 0x7f);
 
   auto vec = wasm::vec<byte_t>::make_uninitialized(pos);
   ::memcpy(vec.get(), bytes, pos);
@@ -80,24 +79,20 @@ wasm::vec<byte_t> readWasmModule(const char* path, const std::string& name) {
     return wasm::vec<byte_t>::invalid();
   }
 
-  // Parse custom sections to see if precompiled module already exists.
+  // Parse Custom Sections to see if precompiled module already exists.
   const byte_t* pos = content.get() + 8 /* Wasm header */;
   const byte_t* end = content.get() + content.size();
   while (pos < end) {
-    if (pos + 1 > end) {
+    const byte_t section_type = *pos++;
+    const uint32_t section_len = parseVarint(&pos, end);
+    if (section_len == InvalidVarint || section_len > static_cast<size_t>(end - pos)) {
       std::cerr << "ERROR: Failed to parse corrupted Wasm module from: " << path << std::endl;
       return wasm::vec<byte_t>::invalid();
     }
-    const auto section_type = *pos++;
-    const auto section_len = parseVarint(pos, end);
-    if (section_len == static_cast<uint32_t>(-1) || pos + section_len > end) {
-      std::cerr << "ERROR: Failed to parse corrupted Wasm module from: " << path << std::endl;
-      return wasm::vec<byte_t>::invalid();
-    }
-    if (section_type == 0 /* custom section */) {
-      const auto section_data_start = pos;
-      const auto section_name_len = parseVarint(pos, end);
-      if (section_name_len == static_cast<uint32_t>(-1) || pos + section_name_len > end) {
+    if (section_type == 0 /* Custom Section */) {
+      const byte_t* section_data_start = pos;
+      const uint32_t section_name_len = parseVarint(&pos, end);
+      if (section_name_len == InvalidVarint || section_name_len > static_cast<size_t>(end - pos)) {
         std::cerr << "ERROR: Failed to parse corrupted Wasm module from: " << path << std::endl;
         return wasm::vec<byte_t>::invalid();
       }
@@ -126,18 +121,14 @@ wasm::vec<byte_t> stripWasmModule(const wasm::vec<byte_t>& module) {
   pos += 8;
 
   while (pos < end) {
-    const auto section_start = pos;
-    if (pos + 1 > end) {
+    const byte_t* section_start = pos;
+    const byte_t section_type = *pos++;
+    const uint32_t section_len = parseVarint(&pos, end);
+    if (section_len == InvalidVarint || section_len > static_cast<size_t>(end - pos)) {
       std::cerr << "ERROR: Failed to parse corrupted Wasm module." << std::endl;
       return wasm::vec<byte_t>::invalid();
     }
-    const auto section_type = *pos++;
-    const auto section_len = parseVarint(pos, end);
-    if (section_len == static_cast<uint32_t>(-1) || pos + section_len > end) {
-      std::cerr << "ERROR: Failed to parse corrupted Wasm module." << std::endl;
-      return wasm::vec<byte_t>::invalid();
-    }
-    if (section_type != 0 /* custom section */) {
+    if (section_type != 0 /* Custom Section */) {
       stripped.insert(stripped.end(), section_start, pos + section_len);
     }
     pos += section_len;
@@ -165,7 +156,8 @@ wasm::vec<byte_t> serializeWasmModule(const char* path, const wasm::vec<byte_t>&
     return wasm::vec<byte_t>::invalid();
   }
 
-  // TODO(PiotrSikora): figure out how to hook the completion callback.
+  // TODO(PiotrSikora): figure out how to wait until the backgrounded (optimized) compilation is
+  // finished, or ideally, how to run the optimized synchronous compilation right away.
   sleep(3);
 
   return module->serialize();
@@ -175,11 +167,11 @@ bool writeWasmModule(const char* path, const wasm::vec<byte_t>& module, size_t s
                      const std::string& section_name, const wasm::vec<byte_t>& serialized) {
   auto file = std::fstream(path, std::ios::out | std::ios::binary);
   file.write(module.get(), module.size());
-  const char section_type = '\0'; // custom section
+  const char section_type = '\0'; // Custom Section
   file.write(&section_type, 1);
-  const auto section_name_len = getVarint(section_name.size());
-  const auto section_size =
-      getVarint(section_name_len.size() + section_name.size() + serialized.size());
+  const wasm::vec<byte_t> section_name_len = getVarint(static_cast<uint32_t>(section_name.size()));
+  const wasm::vec<byte_t> section_size = getVarint(
+      static_cast<uint32_t>(section_name_len.size() + section_name.size() + serialized.size()));
   file.write(section_size.get(), section_size.size());
   file.write(section_name_len.get(), section_name_len.size());
   file.write(section_name.data(), section_name.size());
@@ -191,46 +183,43 @@ bool writeWasmModule(const char* path, const wasm::vec<byte_t>& module, size_t s
     return false;
   }
 
-  const auto total_size = module.size() + 1 + section_size.size() + section_name_len.size() +
-                          section_name.size() + serialized.size();
+  const size_t total_size = module.size() + 1 + section_size.size() + section_name_len.size() +
+                            section_name.size() + serialized.size();
   std::cout << "Written " << total_size << " bytes (bytecode: " << stripped_module_size << " bytes,"
             << " precompiled: " << serialized.size() << " bytes)." << std::endl;
   return true;
 }
 
 #if defined(__linux__) && defined(__x86_64__)
-#define WEE8_PLATFORM "linux_x86_64"
-#else
-#define WEE8_PLATFORM ""
+#define WEE8_WASM_PRECOMPILE_PLATFORM "linux_x86_64"
 #endif
 
 int main(int argc, char* argv[]) {
-  if (sizeof(WEE8_PLATFORM) - 1 == 0) {
-    std::cerr << "Unsupported platform." << std::endl;
-    return EXIT_FAILURE;
-  }
-
+#ifndef WEE8_WASM_PRECOMPILE_PLATFORM
+  std::cerr << "Unsupported platform." << std::endl;
+  return EXIT_FAILURE;
+#else
   if (argc != 3) {
     std::cerr << "Usage: " << argv[0] << " <input> <output>" << std::endl;
     return EXIT_FAILURE;
   }
 
-  const std::string section_name = "precompiled_wee8_v" + std::to_string(V8_MAJOR_VERSION) + "." +
-                                   std::to_string(V8_MINOR_VERSION) + "." +
-                                   std::to_string(V8_BUILD_NUMBER) + "." +
-                                   std::to_string(V8_PATCH_LEVEL) + "_" + WEE8_PLATFORM;
+  const std::string section_name =
+      "precompiled_v8_v" + std::to_string(V8_MAJOR_VERSION) + "." +
+      std::to_string(V8_MINOR_VERSION) + "." + std::to_string(V8_BUILD_NUMBER) + "." +
+      std::to_string(V8_PATCH_LEVEL) + "_" + WEE8_WASM_PRECOMPILE_PLATFORM;
 
-  const auto module = readWasmModule(argv[1], section_name);
+  const wasm::vec<byte_t> module = readWasmModule(argv[1], section_name);
   if (!module) {
     return EXIT_FAILURE;
   }
 
-  const auto stripped_module = stripWasmModule(module);
+  const wasm::vec<byte_t> stripped_module = stripWasmModule(module);
   if (!stripped_module) {
     return EXIT_FAILURE;
   }
 
-  const auto serialized = serializeWasmModule(argv[1], stripped_module);
+  const wasm::vec<byte_t> serialized = serializeWasmModule(argv[1], stripped_module);
   if (!serialized) {
     return EXIT_FAILURE;
   }
@@ -240,4 +229,5 @@ int main(int argc, char* argv[]) {
   }
 
   return EXIT_SUCCESS;
+#endif
 }
