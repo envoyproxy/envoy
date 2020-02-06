@@ -150,7 +150,7 @@ public:
 
 private:
   void logError(const std::string& error) const;
-  spdlog::level::level_enum parseAndValidateLogLevel(const std::string& log_level);
+  spdlog::level::level_enum parseAndValidateLogLevel(absl::string_view log_level);
 
   uint64_t base_id_;
   uint32_t concurrency_;

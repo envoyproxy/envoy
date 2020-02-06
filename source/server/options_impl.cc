@@ -16,6 +16,7 @@
 #include "server/options_impl_platform.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
@@ -235,14 +236,14 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 }
 
-spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(const std::string& log_level) {
+spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(absl::string_view log_level) {
   if (log_level == "warn") {
     return spdlog::level::level_enum::warn;
   }
 
   size_t level_to_use = std::numeric_limits<size_t>::max();
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    if (log_level == spdlog::level::level_string_views[i]) {
+    if (std::string(log_level) == spdlog::level::level_string_views[i]) {
       level_to_use = i;
       break;
     }
@@ -257,9 +258,12 @@ spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(const std::strin
 std::string OptionsImpl::allowedLogLevels() {
   std::string allowed_log_levels;
   for (auto level_string_view : spdlog::level::level_string_views) {
-    allowed_log_levels += fmt::format("[{}]", level_string_view);
+    if (level_string_view == spdlog::level::to_string_view(spdlog::level::warn)) {
+      allowed_log_levels += fmt::format("[{}|warn]", level_string_view);
+    } else {
+      allowed_log_levels += fmt::format("[{}]", level_string_view);
+    }
   }
-  allowed_log_levels += "[warn]";
   return allowed_log_levels;
 }
 

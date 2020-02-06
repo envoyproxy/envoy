@@ -347,7 +347,7 @@ TEST_F(OptionsImplTest, WarnIsValidLogLevel) {
 }
 
 TEST_F(OptionsImplTest, AllowedLogLevels) {
-  EXPECT_EQ("[trace][debug][info][warning][error][critical][off][warn]",
+  EXPECT_EQ("[trace][debug][info][warning|warn][error][critical][off]",
             OptionsImpl::allowedLogLevels());
 }
 
