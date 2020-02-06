@@ -80,8 +80,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config, api);
-  std::shared_ptr<grpc::Channel> channel = CreateChannel(config.google_grpc().target_uri(), creds);
+  std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
