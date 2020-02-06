@@ -41,16 +41,13 @@ class ConnectionImpl;
 /**
  * Base class for HTTP/1.1 request and response encoders.
  */
-class StreamEncoderImpl : public StreamEncoder,
+class StreamEncoderImpl : public virtual StreamEncoder,
                           public Stream,
                           Logger::Loggable<Logger::Id::http>,
                           public StreamCallbackHelper {
 public:
   // Http::StreamEncoder
-  void encode100ContinueHeaders(const HeaderMap& headers) override;
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void encodeTrailers(const HeaderMap& trailers) override;
   void encodeMetadata(const MetadataMapVector&) override;
   Stream& getStream() override { return *this; }
 
@@ -68,12 +65,18 @@ public:
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
+  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
+  void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
+  void encodeTrailersBase(const HeaderMap& headers);
 
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
-  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
+  bool chunk_encoding_ : 1;
+  bool processing_100_continue_ : 1;
+  bool is_response_to_head_request_ : 1;
+  bool is_content_length_allowed_ : 1;
 
 private:
   /**
@@ -100,25 +103,23 @@ private:
   void encodeFormattedHeader(absl::string_view key, absl::string_view value);
 
   const HeaderKeyFormatter* const header_key_formatter_;
-  bool chunk_encoding_ : 1;
-  bool processing_100_continue_ : 1;
-  bool is_response_to_head_request_ : 1;
-  bool is_content_length_allowed_ : 1;
   absl::string_view details_;
 };
 
 /**
  * HTTP/1.1 response encoder.
  */
-class ResponseStreamEncoderImpl : public StreamEncoderImpl {
+class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
 
   bool startedResponse() { return started_response_; }
 
-  // Http::StreamEncoder
+  // Http::ResponseEncoder
+  void encode100ContinueHeaders(const HeaderMap& headers) override;
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool started_response_{};
@@ -127,14 +128,15 @@ private:
 /**
  * HTTP/1.1 request encoder.
  */
-class RequestStreamEncoderImpl : public StreamEncoderImpl {
+class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
 public:
-  RequestStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
+  RequestEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
       : StreamEncoderImpl(connection, header_key_formatter) {}
   bool headRequest() { return head_request_; }
 
-  // Http::StreamEncoder
+  // Http::RequestEncoder
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool head_request_{};
@@ -341,8 +343,8 @@ private:
         : response_encoder_(connection, header_key_formatter) {}
 
     HeaderString request_url_;
-    StreamDecoder* request_decoder_{};
-    ResponseStreamEncoderImpl response_encoder_;
+    RequestDecoder* request_decoder_{};
+    ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
 
@@ -384,13 +386,13 @@ public:
                        const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
-  StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 
 private:
   struct PendingResponse {
-    PendingResponse(StreamDecoder* decoder) : decoder_(decoder) {}
+    PendingResponse(ResponseDecoder* decoder) : decoder_(decoder) {}
 
-    StreamDecoder* decoder_;
+    ResponseDecoder* decoder_;
     bool head_request_{};
   };
 
@@ -409,7 +411,7 @@ private:
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 
-  std::unique_ptr<RequestStreamEncoderImpl> request_encoder_;
+  std::unique_ptr<RequestEncoderImpl> request_encoder_;
   std::list<PendingResponse> pending_responses_;
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};

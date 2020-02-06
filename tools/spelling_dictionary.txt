@@ -76,6 +76,7 @@ EDESTRUCTION
 EDF
 EINVAL
 ELB
+ENOTFOUND
 ENOTSUP
 ENV
 EOF
@@ -181,6 +182,7 @@ NDEBUG
 NEXTHDR
 NGHTTP
 NOAUTH
+NOCHECKRESP
 NODELAY
 NOLINT
 NOLINTNEXTLINE
@@ -923,6 +925,7 @@ resync
 ret
 retriable
 retriggers
+rmdir
 rollout
 roundtrip
 rpcs
@@ -1091,6 +1094,7 @@ unejection
 unescape
 unescaped
 unescaping
+unfreed
 unhandled
 unicast
 unicode

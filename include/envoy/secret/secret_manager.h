@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 class TransportSocketFactoryContext;
+class FactoryContext;
 } // namespace Configuration
 } // namespace Server
 
@@ -55,6 +56,14 @@ public:
   findStaticTlsSessionTicketKeysContextProvider(const std::string& name) const PURE;
 
   /**
+   * @param name a name of the static GenericSecretConfigProvider.
+   * @return the GenericSecretConfigProviderSharedPtr. Returns nullptr if the static secret is not
+   * found.
+   */
+  virtual GenericSecretConfigProviderSharedPtr
+  findStaticGenericSecretProvider(const std::string& name) const PURE;
+
+  /**
    * @param tls_certificate the protobuf config of the TLS certificate.
    * @return a TlsCertificateConfigProviderSharedPtr created from tls_certificate.
    */
@@ -79,6 +88,13 @@ public:
   virtual TlsSessionTicketKeysConfigProviderSharedPtr createInlineTlsSessionTicketKeysProvider(
       const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& tls_certificate)
       PURE;
+
+  /**
+   * @param generic_secret the protobuf config of the generic secret.
+   * @return a GenericSecretConfigProviderSharedPtr created from tls_certificate.
+   */
+  virtual GenericSecretConfigProviderSharedPtr createInlineGenericSecretProvider(
+      const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create
@@ -123,6 +139,20 @@ public:
    */
   virtual TlsSessionTicketKeysConfigProviderSharedPtr
   findOrCreateTlsSessionTicketKeysContextProvider(
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
+
+  /**
+   * Finds and returns a dynamic secret provider associated to SDS config. Create a new one if such
+   * provider does not exist.
+   *
+   * @param config_source a protobuf message object containing a SDS config source.
+   * @param config_name a name that uniquely refers to the SDS config source.
+   * @param secret_provider_context context that provides components for creating and initializing
+   * secret provider.
+   * @return GenericSecretConfigProviderSharedPtr the dynamic generic secret provider.
+   */
+  virtual GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };

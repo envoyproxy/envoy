@@ -6,6 +6,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
+#include "common/config/datasource.h"
 #include "common/secret/sds_api.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
@@ -320,6 +321,66 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   // secret contains SPKI list from dynamic CertificateValidationContext.
   EXPECT_EQ(1, cvc_config.verifyCertificateSpkiList().size());
   EXPECT_EQ(dynamic_verify_certificate_spki, cvc_config.verifyCertificateSpkiList()[0]);
+
+  handle->remove();
+  validation_handle->remove();
+}
+
+class GenericSecretValidationCallback {
+public:
+  virtual ~GenericSecretValidationCallback() = default;
+  virtual void
+  validateGenericSecret(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&) PURE;
+};
+
+class MockGenericSecretValidationCallback : public GenericSecretValidationCallback {
+public:
+  MockGenericSecretValidationCallback() = default;
+  ~MockGenericSecretValidationCallback() override = default;
+  MOCK_METHOD(void, validateGenericSecret,
+              (const envoy::extensions::transport_sockets::tls::v3::GenericSecret&));
+};
+
+// Validate that GenericSecretSdsApi updates secrets successfully if
+// a good secret is passed to onConfigUpdate().
+TEST_F(SdsApiTest, GenericSecretSdsApiTest) {
+  NiceMock<Server::MockInstance> server;
+  envoy::config::core::v3::ConfigSource config_source;
+  GenericSecretSdsApi sds_api(config_source, "encryption_key", subscription_factory_, time_system_,
+                              validation_visitor_, server.stats(), init_manager_, []() {});
+
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  auto handle =
+      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  NiceMock<MockGenericSecretValidationCallback> validation_callback;
+  auto validation_handle = sds_api.addValidationCallback(
+      [&validation_callback](
+          const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret) {
+        validation_callback.validateGenericSecret(secret);
+      });
+
+  std::string yaml =
+      R"EOF(
+name: "encryption_key"
+generic_secret:
+  secret:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/aes_128_key"
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
+  EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
+  EXPECT_CALL(validation_callback, validateGenericSecret(_));
+  initialize();
+  subscription_factory_.callbacks_->onConfigUpdate(secret_resources, "");
+
+  const envoy::extensions::transport_sockets::tls::v3::GenericSecret generic_secret(
+      *sds_api.secret());
+  const std::string secret_path =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/aes_128_key";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(secret_path)),
+            Config::DataSource::read(generic_secret.secret(), true, *api_));
 
   handle->remove();
   validation_handle->remove();

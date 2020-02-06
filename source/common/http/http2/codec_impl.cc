@@ -88,12 +88,12 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
       &final_headers);
 }
 
-void ConnectionImpl::StreamImpl::encode100ContinueHeaders(const HeaderMap& headers) {
+void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);
 }
 
-void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   std::vector<nghttp2_nv> final_headers;
 
   // This must exist outside of the scope of isUpgrade as the underlying memory is
@@ -122,7 +122,7 @@ void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool en
   parent_.sendPendingFrames();
 }
 
-void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
+void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   if (pending_send_data_.length() > 0) {
@@ -185,9 +185,32 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   readDisable(false);
 }
 
-void ConnectionImpl::StreamImpl::decodeHeaders() {
-  maybeTransformUpgradeFromH2ToH1();
-  decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
+void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
+  if (!upgrade_type_.empty() && headers_->Status()) {
+    Http::Utility::transformUpgradeResponseFromH2toH1(*headers_, upgrade_type_);
+  }
+
+  if (headers_->Status()->value() == "100") {
+    ASSERT(!remote_end_stream_);
+    response_decoder_.decode100ContinueHeaders(std::move(headers_));
+  } else {
+    response_decoder_.decodeHeaders(std::move(headers_), remote_end_stream_);
+  }
+}
+
+void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
+  response_decoder_.decodeTrailers(std::move(headers_));
+}
+
+void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
+  if (Http::Utility::isH2UpgradeRequest(*headers_)) {
+    Http::Utility::transformUpgradeRequestFromH2toH1(*headers_);
+  }
+  request_decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
+}
+
+void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
+  request_decoder_->decodeTrailers(std::move(headers_));
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -344,7 +367,7 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
-  decoder_->decodeMetadata(std::move(metadata_map_ptr));
+  decoder().decodeMetadata(std::move(metadata_map_ptr));
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
@@ -492,14 +515,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       if (CodeUtility::is1xx(Http::Utility::getResponseStatus(*stream->headers_))) {
         stream->waiting_for_non_informational_headers_ = true;
       }
-
-      if (stream->headers_->Status()->value() == "100") {
-        ASSERT(!stream->remote_end_stream_);
-        stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
-      } else {
-        stream->decodeHeaders();
-      }
-      break;
+      FALLTHRU;
     }
 
     case NGHTTP2_HCAT_REQUEST: {
@@ -522,7 +538,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
             stats_.too_many_header_frames_.inc();
             throw CodecProtocolException("Unexpected 'trailers' with no end stream.");
           } else {
-            stream->decoder_->decodeTrailers(std::move(stream->headers_));
+            stream->decodeTrailers();
           }
         } else {
           ASSERT(!nghttp2_session_check_server_session(session_));
@@ -552,7 +568,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // It's possible that we are waiting to send a deferred reset, so only raise data if local
     // is not complete.
     if (!stream->deferred_reset_) {
-      stream->decoder_->decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
+      stream->decoder().decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
     }
 
     stream->pending_recv_data_.drain(stream->pending_recv_data_.length());
@@ -1062,17 +1078,17 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
   allow_metadata_ = http2_settings.allow_metadata_;
 }
 
-Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
-  StreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_));
-  stream->decoder_ = &decoder;
+RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
+  ClientStreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_, decoder));
   // If the connection is currently above the high watermark, make sure to inform the new stream.
   // The connection can not pass this on automatically as it has no awareness that a new stream is
   // created.
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
+  ClientStreamImpl& stream_ref = *stream;
   stream->moveIntoList(std::move(stream), active_streams_);
-  return *active_streams_.front();
+  return stream_ref;
 }
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
@@ -1131,11 +1147,11 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
     return 0;
   }
 
-  StreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
+  ServerStreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
-  stream->decoder_ = &callbacks_.newStream(*stream);
+  stream->request_decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
   stream->moveIntoList(std::move(stream), active_streams_);
   nghttp2_session_set_stream_user_data(session_, frame->hd.stream_id,

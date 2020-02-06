@@ -132,11 +132,11 @@ envoy_cmake_external(
         "//bazel:windows_x86_64": [
             "event.lib",
             "event_core.lib",
-            "event_extra.lib",
         ],
         "//conditions:default": [
             "libevent.a",
             "libevent_pthreads.a",
+            "libevent_core.a",
         ],
     }),
 )

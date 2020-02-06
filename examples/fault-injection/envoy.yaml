@@ -12,7 +12,7 @@ static_resources:
           codec_type: auto
           stat_prefix: ingress_http
           access_log:
-            name: envoy.file_access_log
+            name: envoy.access_loggers.file
             typed_config:
               "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
               path: /dev/stdout
