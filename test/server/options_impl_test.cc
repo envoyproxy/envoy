@@ -223,6 +223,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
+  EXPECT_EQ(spdlog::level::warn, options->logLevel());
   EXPECT_FALSE(options->hotRestartDisabled());
   EXPECT_FALSE(options->cpusetThreadsEnabled());
 
@@ -305,10 +306,16 @@ TEST_F(OptionsImplTest, InvalidComponent) {
                           "error: invalid component specified 'blah'");
 }
 
-TEST_F(OptionsImplTest, InvalidLogLevel) {
+TEST_F(OptionsImplTest, InvalidComponentLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:blah,connection:trace"),
                           MalformedArgvException, "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, ComponentLogLevelContainsBlank) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:,connection:trace"),
+                          MalformedArgvException, "error: invalid log level specified ''");
 }
 
 TEST_F(OptionsImplTest, InvalidComponentLogLevelStructure) {
@@ -322,6 +329,26 @@ TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream"), MalformedArgvException,
                           "component log level not correctly specified 'upstream'");
+}
+
+TEST_F(OptionsImplTest, InvalidLogLevel) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -l blah"), MalformedArgvException,
+                          "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, ValidLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -l critical");
+  EXPECT_EQ(spdlog::level::level_enum::critical, options->logLevel());
+}
+
+TEST_F(OptionsImplTest, WarnIsValidLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -l warn");
+  EXPECT_EQ(spdlog::level::level_enum::warn, options->logLevel());
+}
+
+TEST_F(OptionsImplTest, AllowedLogLevels) {
+  EXPECT_EQ("[trace][debug][info][warning|warn][error][critical][off]",
+            OptionsImpl::allowedLogLevels());
 }
 
 // Test that the test constructor comes up with the same default values as the main constructor.
