@@ -27,7 +27,9 @@ namespace Http1 {
 /**
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
-#define ALL_HTTP1_CODEC_STATS(COUNTER) COUNTER(metadata_not_supported_error)
+#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(metadata_not_supported_error)                                                            \
+  COUNTER(response_flood)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -112,8 +114,11 @@ private:
  */
 class ResponseStreamEncoderImpl : public StreamEncoderImpl {
 public:
-  ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-      : StreamEncoderImpl(connection, header_key_formatter) {}
+  using FloodChecks = std::function<void()>;
+
+  ResponseStreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
+                            FloodChecks& flood_checks)
+      : StreamEncoderImpl(connection, header_key_formatter), flood_checks_(flood_checks) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -121,6 +126,7 @@ public:
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
 
 private:
+  FloodChecks& flood_checks_;
   bool started_response_{};
 };
 
@@ -172,7 +178,7 @@ public:
   /**
    * Flush all pending output from encoding.
    */
-  void flushOutput();
+  void flushOutput(bool end_encode = false);
 
   void addCharToBuffer(char c);
   void addIntToBuffer(uint64_t i);
@@ -195,6 +201,7 @@ public:
   virtual bool supports_http_10() { return false; }
 
   bool maybeDirectDispatch(Buffer::Instance& data);
+  virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
 
   CodecStats& stats() { return stats_; }
 
@@ -327,6 +334,7 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
+  using FloodChecks = std::function<void()>;
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
@@ -338,8 +346,9 @@ private:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-        : response_encoder_(connection, header_key_formatter) {}
+    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
+                  FloodChecks& flood_checks)
+        : response_encoder_(connection, header_key_formatter, flood_checks) {}
 
     HeaderString request_url_;
     StreamDecoder* request_decoder_{};
@@ -370,9 +379,21 @@ private:
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 
+  void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
+  void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
+  void doFloodProtectionChecks() const;
+
   ServerConnectionCallbacks& callbacks_;
+  std::function<void()> flood_checks_{[&]() { this->doFloodProtectionChecks(); }};
   std::unique_ptr<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
+  const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
+  uint32_t outbound_responses_{};
+  // This defaults to 2, which functionally disables pipelining. If any users
+  // of Envoy wish to enable pipelining (which is dangerous and ill supported)
+  // we could make this configurable.
+  uint32_t max_outbound_responses_{};
+  bool flood_protection_{};
 };
 
 /**
