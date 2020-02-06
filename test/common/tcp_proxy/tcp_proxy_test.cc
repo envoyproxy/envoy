@@ -953,8 +953,8 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
-  std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  std::unique_ptr<Filter> filter_;
   std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
   std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_{};
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
@@ -1746,6 +1746,23 @@ TEST_F(TcpProxyTest, ShareFilterState) {
                 .value());
 }
 
+// Tests that filter callback can access downstream and upstream address and ssl properties.
+TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
+  setup(1);
+
+  raiseEventUpstreamConnected(0);
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamLocalAddress(),
+            filter_callbacks_.connection().localAddress());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamRemoteAddress(),
+            filter_callbacks_.connection().remoteAddress());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamSslConnection(),
+            filter_callbacks_.connection().ssl());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
+            upstream_connections_.at(0)->localAddress());
+  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
+            upstream_connections_.at(0)->streamInfo().downstreamSslConnection());
+}
+
 class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() = default;
@@ -1826,13 +1843,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
   setup();
   initializeFilter();
 
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState()->setData("envoy.tcp_proxy.cluster",
-                                     std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-                                     StreamInfo::FilterState::StateType::Mutable,
-                                     StreamInfo::FilterState::LifeSpan::DownstreamConnection);
-  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  connection_.streamInfo().filterState()->setData(
+      "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
+      StreamInfo::FilterState::StateType::Mutable,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
@@ -1847,14 +1861,10 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   setup();
   initializeFilter();
 
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState()->setData("envoy.network.upstream_server_name",
-                                     std::make_unique<UpstreamServerName>("www.example.com"),
-                                     StreamInfo::FilterState::StateType::ReadOnly,
-                                     StreamInfo::FilterState::LifeSpan::DownstreamConnection);
-
-  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  connection_.streamInfo().filterState()->setData(
+      "envoy.network.upstream_server_name", std::make_unique<UpstreamServerName>("www.example.com"),
+      StreamInfo::FilterState::StateType::ReadOnly,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
@@ -1882,15 +1892,11 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   setup();
   initializeFilter();
 
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.filterState()->setData(
+  connection_.streamInfo().filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
       StreamInfo::FilterState::StateType::ReadOnly,
       StreamInfo::FilterState::LifeSpan::DownstreamConnection);
-
-  ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-application-protocol
