@@ -264,6 +264,8 @@ bool V8::load(const std::string& code, bool allow_precompiled) {
         auto vec = wasm::vec<byte_t>::make_uninitialized(precompiled.size());
         ::memcpy(vec.get(), precompiled.data(), precompiled.size());
 
+        // TODO(PiotrSikora): fuzz loading of precompiled Wasm modules.
+        // See: https://github.com/envoyproxy/envoy/issues/9731
         module_ = wasm::Module::deserialize(store_.get(), vec);
         if (!module_) {
           // Precompiled module that cannot be loaded is considered a hard error,
@@ -275,6 +277,8 @@ bool V8::load(const std::string& code, bool allow_precompiled) {
   }
 
   if (!module_) {
+    // TODO(PiotrSikora): fuzz loading of Wasm modules.
+    // See: https://github.com/envoyproxy/envoy/issues/9731
     const auto stripped_source = getStrippedSource();
     module_ = wasm::Module::make(store_.get(), stripped_source ? stripped_source : source_);
   }
