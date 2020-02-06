@@ -743,8 +743,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.created_filter_chain_ = true;
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
-                   Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, state_.is_head_request_,
-                   absl::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
+                   Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
+                   state_.is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().Overload);
     return;
   }
 
@@ -772,8 +773,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     stream_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
-      sendLocalReply(false, Code::UpgradeRequired, "", nullptr, state_.is_head_request_, absl::nullopt,
-                     StreamInfo::ResponseCodeDetails::get().LowVersion);
+      sendLocalReply(false, Code::UpgradeRequired, "", nullptr, state_.is_head_request_,
+                     absl::nullopt, StreamInfo::ResponseCodeDetails::get().LowVersion);
       return;
     } else {
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
@@ -980,8 +981,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
-    (*entry)->end_stream_ =
-        state_.decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end());
+    (*entry)->end_stream_ = state_.decoding_headers_only_ ||
+                            (end_stream && continue_data_entry == decoder_filters_.end());
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_));
@@ -1498,8 +1499,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
-    (*entry)->end_stream_ =
-        state_.encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
+    (*entry)->end_stream_ = state_.encoding_headers_only_ ||
+                            (end_stream && continue_data_entry == encoder_filters_.end());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->encodeComplete();
@@ -1653,8 +1654,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(HeaderMap& heade
   // Now actually encode via the codec.
   stream_info_.onFirstDownstreamTxByteSent();
   response_encoder_->encodeHeaders(
-      headers,
-      state_.encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
+      headers, state_.encoding_headers_only_ ||
+                   (end_stream && continue_data_entry == encoder_filters_.end()));
   if (continue_data_entry != encoder_filters_.end()) {
     // We use the continueEncoding() code since it will correctly handle not calling
     // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code

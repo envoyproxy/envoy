@@ -282,8 +282,8 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       parent_.stream_info_.setResponseCodeDetails(details);
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.state_.is_head_request_,
-                             grpc_status, details);
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
+                             parent_.state_.is_head_request_, grpc_status, details);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -549,7 +549,8 @@ private:
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_)
          << DUMP_MEMBER(state_.has_continue_headers_) << DUMP_MEMBER(state_.is_head_request_)
-         << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_) << "\n";
+         << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
+         << "\n";
 
       DUMP_DETAILS(request_headers_);
       DUMP_DETAILS(request_trailers_);
@@ -637,7 +638,8 @@ private:
       // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
       bool has_continue_headers_ : 1;
       bool is_head_request_ : 1;
-      // Whether a filter has indicated that the request should be treated as a headers only request.
+      // Whether a filter has indicated that the request should be treated as a headers only
+      // request.
       bool decoding_headers_only_;
       // Whether a filter has indicated that the response should be treated as a headers only
       // response.
