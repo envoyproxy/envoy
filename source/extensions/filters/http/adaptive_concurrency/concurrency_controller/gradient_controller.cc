@@ -166,7 +166,6 @@ uint32_t GradientController::calculateNewLimit() {
   const uint32_t new_limit = limit + burst_headroom;
   return std::max<uint32_t>(config_.minConcurrency(),
                             std::min<uint32_t>(config_.maxConcurrencyLimit(), new_limit));
-
 }
 
 RequestForwardingAction GradientController::forwardingDecision() {
