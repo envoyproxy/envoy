@@ -382,7 +382,7 @@ absl::string_view V8::getCustomSection(absl::string_view name) {
 
 absl::string_view V8::getPrecompiledSectionName() {
 #ifndef WEE8_WASM_PRECOMPILE_PLATFORM
-  return ""
+  return "";
 #else
   static const auto name =
       absl::StrCat("precompiled_v8_v", V8_MAJOR_VERSION, ".", V8_MINOR_VERSION, ".",
