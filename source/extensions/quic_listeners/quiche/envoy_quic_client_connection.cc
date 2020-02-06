@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/listen_socket_impl.h"
@@ -94,10 +96,10 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
 
 void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
-  auto writer = new EnvoyQuicPacketWriter(*connection_socket);
+  auto writer = std::make_unique<EnvoyQuicPacketWriter>(*connection_socket);
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket();
-  SetQuicPacketWriter(writer, true);
+  SetQuicPacketWriter(writer.release(), true);
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {

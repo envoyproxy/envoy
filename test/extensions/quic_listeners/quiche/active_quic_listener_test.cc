@@ -224,7 +224,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   EXPECT_THROW_WITH_REGEX(std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
                                                                listen_socket_, listener_config_,
                                                                quic_config_, options),
-                          EnvoyException, "Fail to apply socket options.");
+                          EnvoyException, "Failed to apply socket options.");
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {

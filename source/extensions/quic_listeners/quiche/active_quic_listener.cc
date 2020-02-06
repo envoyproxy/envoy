@@ -2,7 +2,6 @@
 
 #if defined(__linux__)
 #include <linux/filter.h>
-
 #endif
 
 #include <vector>
@@ -39,9 +38,9 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
     const bool ok = Network::Socket::applyOptions(
         options, listen_socket_, envoy::config::core::v3::SocketOption::STATE_BOUND);
     if (!ok) {
-      ENVOY_LOG(warn, "Fail to apply socket options to socket {} on listener {} after binding",
+      ENVOY_LOG(warn, "Failed to apply socket options to socket {} on listener {} after binding",
                 listen_socket_.ioHandle().fd(), listener_config.name());
-      throw EnvoyException("Fail to apply socket options.");
+      throw EnvoyException("Failed to apply socket options.");
     }
     listen_socket_.addOptions(options);
   }
@@ -128,15 +127,15 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
                                                    Network::ListenerConfig& config) {
   std::unique_ptr<Network::Socket::Options> options = std::make_unique<Network::Socket::Options>();
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
-  // This BPF filter reads the 1st word of QUIC connection id in the UDP payload and mod it by the
+  // This BPF filter reads the 1st word of QUIC connection id in the UDP payload and mods it by the
   // number of workers to get the socket index in the SO_REUSEPORT socket groups. QUIC packets
-  // should be at least 9 bytes, with the 1st byte indicates one of the below QUIC packet headers:
+  // should be at least 9 bytes, with the 1st byte indicating one of the below QUIC packet headers:
   // 1) IETF QUIC long header: most significant bit is 1. The connection id starts from the 7th
   // byte.
   // 2) IETF QUIC short header: most significant bit is 0. The connection id starts from 2nd
-  // bytes.
+  // byte.
   // 3) Google QUIC header: most significant bit is 0. The connection id starts from 2nd
-  // bytes.
+  // byte.
   // Any packet that doesn't belong to any of the three packet header types are dispatched
   // based on 5-tuple source/destination addresses.
   std::vector<sock_filter> filter = {
@@ -171,12 +170,13 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
 #else
   if (concurrency_ > 1) {
 #ifdef __APPLE__
-    // TODO(#8794) Figure out how SO_REUSEPORT behave in Mac OS.
+    // Not support multiple listeners in Mac OS unless someone cares. This is because SO_REUSEPORT
+    // doesn't behave as expected in Mac OS.(#8794)
     ENVOY_LOG(error, "Because SO_REUSEPORT doesn't guarantee stable hashing from network 5 tuple "
                      "to socket in Mac OS. QUIC connection is not stable with concurrency > 1");
 #else
     ENVOY_LOG(warn, "BPF filter is not supported on this platform. QUIC won't support connection "
-                    "migration and NET rebinding.");
+                    "migration and NAT port rebinding.");
 #endif
   }
 #endif
