@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/common/macros.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -89,12 +90,12 @@ using LowerCaseStrPairVector =
  * This is a string implementation for use in header processing. It is heavily optimized for
  * performance. It supports 3 different types of storage and can switch between them:
  * 1) A reference.
- * 2) Interned string.
- * 3) Heap allocated storage.
+ * 2) An InlinedVector (an optimized interned string for small strings, but
+ * allows heap allocation if needed).
  */
 class HeaderString {
 public:
-  enum class Type { Inline, Reference, Dynamic };
+  enum class Type { Reference, Inline };
 
   /**
    * Default constructor. Sets up for inline storage.
@@ -127,14 +128,14 @@ public:
   /**
    * @return the modifiable backing buffer (either inline or heap allocated).
    */
-  char* buffer() { return buffer_.dynamic_; }
+  char* buffer();
 
   /**
    * Get an absl::string_view. It will NOT be NUL terminated!
    *
    * @return an absl::string_view.
    */
-  absl::string_view getStringView() const { return {buffer_.ref_, string_length_}; }
+  absl::string_view getStringView() const;
 
   /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
@@ -179,7 +180,7 @@ public:
   /**
    * @return the type of backing storage for the string.
    */
-  Type type() const { return type_; }
+  Type type() const { return Type(buffer_.index()); }
 
   bool operator==(const char* rhs) const {
     return getStringView() == absl::NullSafeStringView(rhs);
@@ -191,25 +192,11 @@ public:
   bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
 private:
-  union Buffer {
-    // This should reference inline_buffer_ for Type::Inline.
-    char* dynamic_;
-    const char* ref_;
-  } buffer_;
+  absl::variant<absl::string_view, absl::InlinedVector<char, 128>> buffer_;
 
-  // Capacity in both Type::Inline and Type::Dynamic cases must be at least MinDynamicCapacity in
-  // header_map_impl.cc.
-  union {
-    char inline_buffer_[128];
-    // Since this is a union, this is only valid for type_ == Type::Dynamic.
-    uint32_t dynamic_capacity_;
-  };
-
-  void freeDynamic();
   bool valid() const;
 
   uint32_t string_length_;
-  Type type_;
 };
 
 /**
