@@ -239,7 +239,7 @@ min_rtt_calc_params:
 
   // 49 more requests should cause the minRTT to be done calculating.
   for (int i = 0; i < 49; ++i) {
-    EXPECT_EQ(controller->concurrencyLimit(), 1);
+    EXPECT_EQ(controller->concurrencyLimit(), 7);
     tryForward(controller, true);
     tryForward(controller, false);
     controller->recordLatencySample(min_rtt);
