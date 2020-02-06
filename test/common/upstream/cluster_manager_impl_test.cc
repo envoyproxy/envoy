@@ -1839,7 +1839,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
           "example.com", std::vector<std::string>{"example.com"})));
 
   NiceMock<MockLoadBalancerContext> example_com_context_with_san2;
-  ON_CALL(example_com_context_with_san, upstreamTransportSocketOptions())
+  ON_CALL(example_com_context_with_san2, upstreamTransportSocketOptions())
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
           "example.com", std::vector<std::string>{"example.net"})));
 
@@ -1906,7 +1906,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .Times(9)
+      .Times(10)
       .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
 
   // This should provide us a CP for each of the above hosts, and for different SNIs
