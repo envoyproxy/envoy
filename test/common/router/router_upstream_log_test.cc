@@ -38,7 +38,7 @@ namespace {
 absl::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string yaml = R"EOF(
-name: envoy.file_access_log
+name: envoy.access_loggers.file
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
@@ -280,7 +280,7 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
 // Test timestamps and durations are emitted.
 TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
   const std::string yaml = R"EOF(
-name: envoy.file_access_log
+name: envoy.access_loggers.file
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%

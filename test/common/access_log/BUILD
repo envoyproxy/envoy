@@ -53,6 +53,8 @@ envoy_cc_test(
     deps = [
         "//source/common/access_log:access_log_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/access_loggers/grpc:http_config",
+        "//source/extensions/access_loggers/grpc:tcp_config",
         "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
