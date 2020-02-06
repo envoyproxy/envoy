@@ -67,11 +67,17 @@ Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& reques
   switch (request.type()) {
   case RespType::Array:
     return getCommandFromRequest(request.asArray().front());
-  case RespType::Integer:
-    return unknown_metric_;
+  case RespType::CompositeArray:
+    return getCommandFromRequest(*request.asCompositeArray().command());
   case RespType::Null:
     return null_metric_;
-  default:
+  case RespType::Integer:
+    return unknown_metric_;
+  case RespType::BulkString:
+    return unknown_metric_;
+  case RespType::Error:
+    return unknown_metric_;
+  case RespType::SimpleString:
     std::string to_lower_command(request.asString());
     to_lower_table_.toLowerCase(to_lower_command);
     return stat_name_set_->getBuiltin(to_lower_command, unknown_metric_);

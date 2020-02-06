@@ -63,6 +63,11 @@ static_resources:
             op_timeout: 5s
 )EOF";
 
+// This is a configuration with command stats enabled.
+const std::string CONFIG_WITH_COMMAND_STATS = CONFIG + R"EOF(
+            enable_command_stats: true
+)EOF";
+
 // This is a configuration with moved/ask redirection support enabled.
 const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
             enable_redirection: true
@@ -429,6 +434,12 @@ public:
   RedisProxyWithMirrorsIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_MIRROR, 6) {}
 };
 
+class RedisProxyWithCommandStatsIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithCommandStatsIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_COMMAND_STATS, 2) {}
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -454,6 +465,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsIntegra
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithCommandStatsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -490,7 +505,6 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     expect_auth_command = (!auth_password.empty());
     EXPECT_TRUE(upstream->waitForRawConnection(fake_upstream_connection));
   }
-
   if (expect_auth_command) {
     std::string auth_command = makeBulkStringArray({"auth", auth_password});
     EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
@@ -597,6 +611,32 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
 TEST_P(RedisProxyIntegrationTest, SimpleRequestAndResponse) {
   initialize();
   simpleRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
+  initialize();
+  std::string request = makeBulkStringArray({"mget", "foo"});
+  std::string mget_response = "";
+
+  // Make MGET request from downstream
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->clearData();
+  redis_client->write(request);
+  redis_client->waitForData(mget_response); // MGET returns no response; proxy turns it into GETs
+  EXPECT_EQ(mget_response, redis_client->data());
+
+  // Make GET request to upstream
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_password = "";
+  std::string upstream_request = makeBulkStringArray({"get", "foo"});
+  std::string response = "$3\r\nbar\r\n";
+  expectUpstreamRequestResponse(upstream, upstream_request, response, fake_upstream_connection,
+                                auth_password);
+
+  // Cleanup
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
 }
 
 // This test sends an invalid Redis command from a fake
