@@ -22,6 +22,8 @@
 #include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
+namespace Envoy {
+namespace Config {
 template <typename Prev, typename Current>
 struct SubscriptionBase : public Config::SubscriptionCallbacks {
   static std::string getResourceName(envoy::config::core::v3::ApiVersion resource_api_version) {
@@ -36,12 +38,11 @@ struct SubscriptionBase : public Config::SubscriptionCallbacks {
     }
   }
 };
-
-namespace Envoy {
-namespace Config {
 using RdsRouteConfigSubscriptionBase =
     SubscriptionBase<envoy::api::v2::RouteConfiguration,
                      envoy::config::route::v3::RouteConfiguration>;
+using RtdsSubscriptionBase =
+    SubscriptionBase<envoy::service::discovery::v2::Runtime, envoy::service::runtime::v3::Runtime>;
 using ScopedRdsConfigSubscriptionBase =
     SubscriptionBase<envoy::api::v2::ScopedRouteConfiguration,
                      envoy::config::route::v3::ScopedRouteConfiguration>;
