@@ -475,6 +475,13 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return 0;
   }
 
+  if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
+    if (test_only_on_settings_frame_cb_) {
+      ENVOY_CONN_LOG(trace, "issuing settings cb", connection_);
+      test_only_on_settings_frame_cb_(frame->settings);
+    }
+  }
+
   StreamImpl* stream = getStream(frame->hd.stream_id);
   if (!stream) {
     return 0;
@@ -838,36 +845,50 @@ void ConnectionImpl::sendPendingFrames() {
 
 void ConnectionImpl::sendSettings(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options, bool disable_push) {
-  std::vector<nghttp2_settings_entry> iv;
-  if (http2_options.allow_connect()) {
-    iv.push_back({NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, 1});
-  }
-  const uint32_t hpack_table_size = http2_options.hpack_table_size().value();
-  if (hpack_table_size != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
-    iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, hpack_table_size});
-    ENVOY_CONN_LOG(debug, "setting HPACK table size to {}", connection_, hpack_table_size);
-  }
-  const uint32_t max_concurrent_streams = http2_options.max_concurrent_streams().value();
-  if (max_concurrent_streams != NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS) {
-    iv.push_back({NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, max_concurrent_streams});
-    ENVOY_CONN_LOG(debug, "setting max concurrent streams to {}", connection_,
-                   max_concurrent_streams);
-  }
-  const uint32_t initial_stream_window_size = http2_options.initial_stream_window_size().value();
-  if (initial_stream_window_size != NGHTTP2_INITIAL_WINDOW_SIZE) {
-    iv.push_back({NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, initial_stream_window_size});
-    ENVOY_CONN_LOG(debug, "setting stream-level initial window size to {}", connection_,
-                   initial_stream_window_size);
+  std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals> settings;
+  for (const auto it : http2_options.custom_settings_parameters()) {
+    ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
+    auto result =
+        settings.insert({static_cast<int32_t>(it.identifier().value()), it.value().value()});
+    if (!result.second) {
+      ENVOY_CONN_LOG(debug, "duplicate user defined settings parameter with id {:#x}, value {}",
+                     connection_, it.identifier().value(), it.value().value());
+      continue;
+    }
+    ENVOY_CONN_LOG(debug, "setting user defined settings parameter with id {:#x} to {}",
+                   connection_, it.identifier().value(), it.value().value());
   }
 
-  if (disable_push) {
-    // Universally disable receiving push promise frames as we don't currently support them. nghttp2
-    // will fail the connection if the other side still sends them.
-    // TODO(mattklein123): Remove this when we correctly proxy push promise.
-    iv.push_back({NGHTTP2_SETTINGS_ENABLE_PUSH, 0});
+  struct SettingsDescriptor {
+    nghttp2_settings_entry entry;
+    uint32_t default_value;
+  };
+  for (const auto& descriptor : std::vector<SettingsDescriptor>{
+           {{NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()}, 0},
+           {{NGHTTP2_SETTINGS_ENABLE_PUSH, disable_push ? 0U : 1U}, 1},
+           {{NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_options.hpack_table_size().value()},
+            NGHTTP2_DEFAULT_HEADER_TABLE_SIZE},
+           {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,
+             http2_options.max_concurrent_streams().value()},
+            NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS},
+           {{NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE,
+             http2_options.initial_stream_window_size().value()},
+            NGHTTP2_INITIAL_WINDOW_SIZE}}) {
+    if (descriptor.entry.value != descriptor.default_value) {
+      auto result = settings.insert(descriptor.entry);
+      if (!result.second) {
+        ENVOY_CONN_LOG(debug, "duplicate named settings parameter with id {:#x}, value {}",
+                       connection_, descriptor.entry.settings_id, descriptor.entry.value);
+        continue;
+      }
+      ENVOY_CONN_LOG(debug, "setting named settings parameter with id {:#x} to {}", connection_,
+                     descriptor.entry.settings_id, descriptor.entry.value);
+    }
   }
 
-  if (!iv.empty()) {
+  if (!settings.empty()) {
+    std::vector<nghttp2_settings_entry> iv;
+    std::copy(settings.begin(), settings.end(), std::back_inserter(iv));
     int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());
     ASSERT(rc == 0);
   } else {
@@ -887,7 +908,7 @@ void ConnectionImpl::sendSettings(
                                               NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
     ASSERT(rc == 0);
   }
-}
+} // namespace Http2
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_new(&callbacks_);

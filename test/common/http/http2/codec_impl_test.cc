@@ -40,6 +40,37 @@ using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
 namespace CommonUtility = ::Envoy::Http2::Utility;
 
+class ConnectionImplTestPeer {
+public:
+  void registerPeer(ConnectionImpl& connection) {
+    connection.test_only_on_settings_frame_cb_ =
+        std::bind(&ConnectionImplTestPeer::onSettingsFrame, this, std::placeholders::_1);
+  }
+
+  void onSettingsFrame(const nghttp2_settings& settings_frame) {
+    ENVOY_LOG_MISC(error, "callback issued");
+    for (uint32_t i = 0; i < settings_frame.niv; ++i) {
+      ENVOY_LOG_MISC(error, "adding setting id {} val {}", settings_frame.iv[i].settings_id,
+                     settings_frame.iv[i].value);
+      auto result = settings_.insert(settings_frame.iv[i]);
+      ASSERT(result.second);
+    }
+  }
+
+  absl::optional<uint32_t> getRemoteSettingsParameterValue(int32_t identifier) const {
+    const auto it = settings_.find({identifier, 0});
+    if (it == settings_.end()) {
+      return absl::nullopt;
+    }
+    return it->value;
+  }
+
+private:
+  std::unordered_set<nghttp2_settings_entry, ConnectionImpl::SettingsEntryHash,
+                     ConnectionImpl::SettingsEntryEquals>
+      settings_;
+};
+
 class Http2CodecImplTestFixture {
 public:
   struct ConnectionWrapper {
@@ -58,19 +89,33 @@ public:
     Buffer::OwnedImpl buffer_;
   };
 
+  enum SettingsTupleIndex {
+    HpackTableSize = 0,
+    MaxConcurrentStreams,
+    InitialStreamWindowSize,
+    InitialConnectionWindowSize
+  };
+
   Http2CodecImplTestFixture(Http2SettingsTuple client_settings, Http2SettingsTuple server_settings)
       : client_settings_(client_settings), server_settings_(server_settings) {}
   virtual ~Http2CodecImplTestFixture() = default;
 
-  virtual void initialize() {
+  virtual void initialize(ConnectionImplTestPeer* client_test_peer = nullptr,
+                          ConnectionImplTestPeer* server_test_peer = nullptr) {
     Http2OptionsFromTuple(client_http2_options_, client_settings_);
     Http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
         client_connection_, client_callbacks_, stats_store_, client_http2_options_,
         max_request_headers_kb_, max_response_headers_count_);
+    if (client_test_peer != nullptr) {
+      client_test_peer->registerPeer(*client_);
+    }
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, stats_store_, server_http2_options_,
         max_request_headers_kb_, max_request_headers_count_);
+    if (server_test_peer != nullptr) {
+      server_test_peer->registerPeer(*server_);
+    }
 
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
@@ -99,10 +144,14 @@ public:
 
   void Http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
                              const Http2SettingsTuple& tp) {
-    options.mutable_hpack_table_size()->set_value(::testing::get<0>(tp));
-    options.mutable_max_concurrent_streams()->set_value(::testing::get<1>(tp));
-    options.mutable_initial_stream_window_size()->set_value(::testing::get<2>(tp));
-    options.mutable_initial_connection_window_size()->set_value(::testing::get<3>(tp));
+    options.mutable_hpack_table_size()->set_value(
+        ::testing::get<SettingsTupleIndex::HpackTableSize>(tp));
+    options.mutable_max_concurrent_streams()->set_value(
+        ::testing::get<SettingsTupleIndex::MaxConcurrentStreams>(tp));
+    options.mutable_initial_stream_window_size()->set_value(
+        ::testing::get<SettingsTupleIndex::InitialStreamWindowSize>(tp));
+    options.mutable_initial_connection_window_size()->set_value(
+        ::testing::get<SettingsTupleIndex::InitialConnectionWindowSize>(tp));
     options.set_allow_metadata(allow_metadata_);
     options.set_stream_error_on_invalid_http_messaging(stream_error_on_invalid_http_messaging_);
     options.mutable_max_outbound_frames()->set_value(max_outbound_frames_);
@@ -923,6 +972,9 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   response_encoder_->encodeHeaders(response_headers, true);
 }
 
+class Http2CodecImplSettingsBasicTest : public Http2CodecImplTest {};
+TEST_P(Http2CodecImplSettingsBasicTest, ) {}
+
 class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 
 // Regression test for issue #3076.
@@ -1045,6 +1097,124 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
     value2.setCopy("c=d", 3);
     EXPECT_TRUE(Utility::reconstituteCrumbledCookies(key2, value2, cookies));
     EXPECT_EQ(cookies, "a=b; c=d");
+  }
+}
+
+MATCHER_P(HasValue, m, "") {
+  if (!arg.has_value()) {
+    *result_listener << "does not contain a value";
+    return false;
+  }
+  const auto& value = arg.value();
+  return ExplainMatchResult(m, value, result_listener);
+};
+
+class Http2CustomSettingsTest : public ::testing::TestWithParam<
+                                    ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool>>,
+                                public Http2CodecImplTestFixture {
+public:
+  struct SettingsParameter {
+    uint16_t identifier;
+    uint32_t value;
+  };
+
+  Http2CustomSettingsTest()
+      : Http2CodecImplTestFixture(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam())),
+        client_peer_(::testing::get<2>(GetParam())) {}
+
+  // Sets the custom settings parameters specified by |parameters| in the |options| proto.
+  void setHttp2CustomSettingsParameters(envoy::config::core::v3::Http2ProtocolOptions& options,
+                                        std::vector<SettingsParameter> parameters) {
+    for (const auto& parameter : parameters) {
+      envoy::config::core::v3::Http2ProtocolOptions::SettingsParameter* custom_param =
+          options.mutable_custom_settings_parameters()->Add();
+      custom_param->mutable_identifier()->set_value(parameter.identifier);
+      custom_param->mutable_value()->set_value(parameter.value);
+    }
+  }
+
+  // Returns the Http2ProtocolOptions proto which specifies the settings parameters to be sent to
+  // the peer under test.
+  envoy::config::core::v3::Http2ProtocolOptions& getCustomOptions() {
+    return client_peer_ ? server_http2_options_ : client_http2_options_;
+  }
+
+  // Returns the peer under test.
+  ConnectionImplTestPeer* getPeer() {
+    return client_peer_ ? &client_test_peer_ : &server_test_peer_;
+  }
+
+  // Returns the settings tuple which specifies a subset of the settings parameters to be sent to
+  // the peer under test.
+  const Http2SettingsTuple& getSettingsTuple() {
+    return client_peer_ ? server_settings_ : client_settings_;
+  }
+
+protected:
+  bool client_peer_{false};
+  ConnectionImplTestPeer client_test_peer_;
+  ConnectionImplTestPeer server_test_peer_;
+};
+
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CustomSettingsTest,
+                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
+
+// Validates that custom parameters (those which are not explicitly named in the
+// envoy::config::core::v3::Http2ProtocolOptions proto) are properly sent and processed by client
+// and server connections.
+TEST_P(Http2CustomSettingsTest, UserDefinedSettings) {
+  std::vector<SettingsParameter> custom_parameters{{0x10, 10}, {0x11, 20}};
+  setHttp2CustomSettingsParameters(getCustomOptions(), custom_parameters);
+  initialize(&client_test_peer_, &server_test_peer_);
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
+  request_encoder_->encodeHeaders(request_headers, false);
+  uint32_t hpack_table_size =
+      ::testing::get<SettingsTupleIndex::HpackTableSize>(getSettingsTuple());
+  if (hpack_table_size != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
+    EXPECT_THAT(getPeer()->getRemoteSettingsParameterValue(NGHTTP2_SETTINGS_HEADER_TABLE_SIZE),
+                HasValue(hpack_table_size));
+  }
+  uint32_t max_concurrent_streams =
+      ::testing::get<SettingsTupleIndex::MaxConcurrentStreams>(getSettingsTuple());
+  if (max_concurrent_streams != NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS) {
+    EXPECT_THAT(getPeer()->getRemoteSettingsParameterValue(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS),
+                HasValue(max_concurrent_streams));
+  }
+  uint32_t initial_stream_window_size =
+      ::testing::get<SettingsTupleIndex::InitialStreamWindowSize>(getSettingsTuple());
+  if (max_concurrent_streams != NGHTTP2_INITIAL_WINDOW_SIZE) {
+    EXPECT_THAT(getPeer()->getRemoteSettingsParameterValue(NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE),
+                HasValue(initial_stream_window_size));
+  }
+  // Validate that custom parameters are received by the endpoint (client or server) under test.
+  for (const auto& parameter : custom_parameters) {
+    EXPECT_THAT(getPeer()->getRemoteSettingsParameterValue(parameter.identifier),
+                HasValue(parameter.value));
+  }
+}
+
+// Validates that custom settings parameters override named parameter values (both when these are
+// defaulted or explicitly set).
+TEST_P(Http2CustomSettingsTest, UserDefinedSettingsParametersOverrideNamedParameters) {
+  // These settings override named parameters which are defaulted when not specified via
+  // configuration.
+  std::vector<SettingsParameter> named_parameter_overrides{
+      {NGHTTP2_SETTINGS_HEADER_TABLE_SIZE,
+       CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE - 1},
+      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,
+       CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS - 1}};
+  setHttp2CustomSettingsParameters(getCustomOptions(), named_parameter_overrides);
+  initialize(&client_test_peer_, &server_test_peer_);
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
+  request_encoder_->encodeHeaders(request_headers, false);
+  for (const auto& parameter : named_parameter_overrides) {
+    EXPECT_THAT(getPeer()->getRemoteSettingsParameterValue(parameter.identifier),
+                HasValue(parameter.value));
   }
 }
 

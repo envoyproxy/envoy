@@ -106,8 +106,18 @@ message Http1ProtocolOptions {
   bool enable_trailers = 5;
 }
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message Http2ProtocolOptions {
+  // Defines a parameter to be sent in the SETTINGS frame.
+  // See `RFC7540, sec. 6.5.1 <https://tools.ietf.org/html/rfc7540#section-6.5.1>`_ for details.
+  message SettingsParameter {
+    // The 16 bit parameter identifier.
+    google.protobuf.UInt32Value identifier = 1 [(validate.rules).uint32 = {lte: 65536 gte: 1}];
+
+    // The 32 bit parameter value.
+    google.protobuf.UInt32Value value = 2;
+  }
+
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
   // range from 0 to 4294967295 (2^32 - 1) and defaults to 4096. 0 effectively disables header
@@ -206,6 +216,16 @@ message Http2ProtocolOptions {
   //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12;
+
+  // Specifies SETTINGS frame parameters to be sent to the peer.
+  // Note that parameters specified through this config will override named parameters with matching
+  // identifiers.
+  //   e.g., A SettingsParameter { identifier = 1, value = 1000 } will override the value specified
+  //   in :ref:`hpack_table_size`.
+  // See `IANA HTTP/2 Settings
+  // <https://www.iana.org/assignments/http2-parameters/http2-parameters.xhtml#settings>`_ for
+  // standardized identifiers.
+  repeated SettingsParameter custom_settings_parameters = 13;
 }
 
 // [#not-implemented-hide:]

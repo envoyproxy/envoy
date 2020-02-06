@@ -1,9 +1,9 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
 
+#include "common/http/utility.h"
+
 #include "extensions/quic_listeners/quiche/envoy_quic_server_connection.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_session.h"
-
-#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Quic {
