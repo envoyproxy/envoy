@@ -28,8 +28,7 @@ std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
   case CacheEntryStatus::UnsatisfiableRange:
     return os << "UnsatisfiableRange";
   }
-  ASSERT(false, "Unreachable");
-  return os;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
@@ -80,7 +79,7 @@ bool LookupRequest::isFresh(const Http::HeaderMap& response_headers) const {
   }
   // We didn't find a cache-control header with enough info to determine
   // freshness, so fall back to the expires header.
-  return timestamp_ <= Utils::httpTime(response_headers.Expires());
+  return timestamp_ <= Utils::httpTime(response_headers.get(Http::Headers::get().Expires));
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_headers,

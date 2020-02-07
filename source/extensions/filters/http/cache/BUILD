@@ -30,7 +30,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 
