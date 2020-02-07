@@ -1789,6 +1789,7 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
 }
 
+// Test the interface used by external consumers.
 TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
   InSequence s;
 
