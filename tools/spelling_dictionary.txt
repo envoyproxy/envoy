@@ -9,6 +9,7 @@ AFAICT
 ALPN
 ALS
 AMZ
+APC
 API
 ASAN
 ASCII
@@ -17,6 +18,7 @@ AST
 AWS
 BACKTRACE
 BSON
+BPF
 CAS
 CB
 CDS
@@ -76,6 +78,7 @@ EDESTRUCTION
 EDF
 EINVAL
 ELB
+ENOTFOUND
 ENOTSUP
 ENV
 EOF
@@ -181,6 +184,7 @@ NDEBUG
 NEXTHDR
 NGHTTP
 NOAUTH
+NOCHECKRESP
 NODELAY
 NOLINT
 NOLINTNEXTLINE
@@ -276,6 +280,7 @@ SSL
 STDSTRING
 STL
 STRLEN
+STS
 SVG
 TBD
 TCLAP
@@ -319,6 +324,7 @@ WIP
 WKT
 WRR
 WS
+WSA
 Welford's
 Wi
 XDS
@@ -659,9 +665,12 @@ istio
 istream
 istringstream
 iteratively
+ja
 javascript
 jitter
 jittered
+jlt
+jne
 kafka
 keepalive
 keepalives
@@ -673,6 +682,8 @@ kv
 kvs
 lala
 latencies
+ld
+ldb
 len
 lenenc
 lexically
@@ -730,6 +741,7 @@ mixin
 mkdir
 mmap
 mmaping
+mod
 mongo
 moveable
 msec
@@ -936,6 +948,7 @@ runfiles
 runtime
 runtimes
 rver
+rxhash
 sandboxed
 sanitization
 sanitizer

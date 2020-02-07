@@ -62,7 +62,7 @@ public:
       dummy.set_udp_listener_name(listener_name);
       udp_listener_factory_ =
           Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(listener_name)
-              .createActiveUdpListenerFactory(dummy);
+              .createActiveUdpListenerFactory(dummy, /*concurrency=*/1);
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
 
@@ -84,7 +84,7 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
-    const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
     envoy::config::core::v3::TrafficDirection direction() const override {
