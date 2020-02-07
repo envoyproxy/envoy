@@ -17,6 +17,7 @@ AST
 AWS
 BACKTRACE
 BSON
+BPF
 CAS
 CB
 CDS
@@ -661,9 +662,12 @@ istio
 istream
 istringstream
 iteratively
+ja
 javascript
 jitter
 jittered
+jlt
+jne
 kafka
 keepalive
 keepalives
@@ -675,6 +679,8 @@ kv
 kvs
 lala
 latencies
+ld
+ldb
 len
 lenenc
 lexically
@@ -732,6 +738,7 @@ mixin
 mkdir
 mmap
 mmaping
+mod
 mongo
 moveable
 msec
@@ -937,6 +944,7 @@ runfiles
 runtime
 runtimes
 rver
+rxhash
 sandboxed
 sanitization
 sanitizer
