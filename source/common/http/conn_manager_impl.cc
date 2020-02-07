@@ -1531,7 +1531,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 
   const bool modified_end_stream =
-      encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
+      state_.encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
   encodeHeadersInternal(headers, modified_end_stream);
 
   if (continue_data_entry != encoder_filters_.end() && !modified_end_stream) {
@@ -1646,29 +1646,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(HeaderMap& heade
 
   chargeStats(headers);
 
-  ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this,
-                   state_.encoding_headers_only_ ||
-                       (end_stream && continue_data_entry == encoder_filters_.end()),
-                   headers);
+  ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream);
 
   // Now actually encode via the codec.
   stream_info_.onFirstDownstreamTxByteSent();
-  response_encoder_->encodeHeaders(
-      headers, state_.encoding_headers_only_ ||
-                   (end_stream && continue_data_entry == encoder_filters_.end()));
-  if (continue_data_entry != encoder_filters_.end()) {
-    // We use the continueEncoding() code since it will correctly handle not calling
-    // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code
-    // expects it.
-    ASSERT(buffered_response_data_);
-    (*continue_data_entry)->iteration_state_ =
-        ActiveStreamFilterBase::IterationState::StopSingleIteration;
-    (*continue_data_entry)->continueEncoding();
-  } else {
-    // End encoding if this is a header only response, either due to a filter converting it to one
-    // or due to the upstream returning headers only.
-    maybeEndEncode(state_.encoding_headers_only_ || end_stream);
-  }
+  response_encoder_->encodeHeaders(headers, end_stream);
+  maybeEndEncode(end_stream);
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter* filter,
@@ -1808,7 +1791,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(
 
 void ConnectionManagerImpl::ActiveStream::encodeDataInternal(Buffer::Instance& data,
                                                              bool end_stream) {
-  ASSERT(!encoding_headers_only_);
+  ASSERT(!state_.encoding_headers_only_);
   ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
 
