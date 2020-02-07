@@ -5,6 +5,8 @@ Version history
 ================
 * access loggers: access logger extensions use the "envoy.access_loggers" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
+  minimum.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
