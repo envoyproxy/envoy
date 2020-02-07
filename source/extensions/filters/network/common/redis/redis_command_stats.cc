@@ -73,10 +73,9 @@ Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& reques
     return null_metric_;
   case RespType::Integer:
     return unknown_metric_;
-  case RespType::BulkString:
-    return unknown_metric_;
   case RespType::Error:
     return unknown_metric_;
+  case RespType::BulkString:
   case RespType::SimpleString:
     std::string to_lower_command(request.asString());
     to_lower_table_.toLowerCase(to_lower_command);
