@@ -48,7 +48,7 @@ message CacheConfig {
   }
 
   // Config specific to the cache storage implementation.
-  google.protobuf.Any typed_config = 1;
+  google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
 
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement *vary* headers>
