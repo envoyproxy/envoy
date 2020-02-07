@@ -409,33 +409,6 @@ private:
 };
 
 /**
- * Deserializer of nullable compact bytes value.
- * First reads length (UNSIGNED_VARINT) and then allocates the buffer of given length.
- * If length was 0, buffer allocation is omitted and deserializer is immediately ready (returning
- * null value).
- *
- * From Kafka documentation:
- * First the length N+1 is given as an UNSIGNED_VARINT.
- * Then N bytes follow. A null object is represented with a length of 0.
- */
-class NullableCompactBytesDeserializer : public Deserializer<NullableBytes> {
-public:
-  uint32_t feed(absl::string_view& data) override;
-
-  bool ready() const override { return ready_; }
-
-  NullableBytes get() const override;
-
-private:
-  VarUInt32Deserializer length_buf_;
-  bool length_consumed_{false};
-  uint32_t required_;
-
-  std::vector<unsigned char> data_buf_;
-  bool ready_{false};
-};
-
-/**
  * Deserializer for array of objects of the same type.
  *
  * First reads the length of the array, then initializes N underlying deserializers of type
