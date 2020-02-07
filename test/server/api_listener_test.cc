@@ -125,7 +125,7 @@ api_listener:
       network_connection_callbacks);
 
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  // Shutting down the ApiListener should trigger stream resets from all active streams.
+  // Shutting down the ApiListener should raise an event on all connection callback targets.
   http_api_listener.shutdown();
 }
 

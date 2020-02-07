@@ -22,8 +22,7 @@ public:
   virtual absl::string_view name() const PURE;
 
   /**
-   * Shutdown the ApiListener during of server termination. This functions as an interrupt, not a
-   * clean drain.
+   * Shutdown the ApiListener. This is an interrupt, not a drain.
    */
   virtual void shutdown() PURE;
 
