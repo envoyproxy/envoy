@@ -30,7 +30,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   const std::string yaml_string = fmt::sprintf(
       R"EOF(
   http:
-    name: envoy.dynamic.ot
+    name: envoy.tracers.dynamic_ot
     config:
       library: %s
       config:
@@ -45,6 +45,14 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(DynamicOtTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.dynamic.ot";
+
+  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
+                         deprecated_name));
 }
 
 } // namespace
