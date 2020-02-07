@@ -1068,8 +1068,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   use_remote_address_ = false;
   EXPECT_CALL(random_, uuid()).Times(0);
 
-  StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  RequestDecoder* decoder = nullptr;
+  NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 
@@ -1295,8 +1295,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   use_remote_address_ = false;
   EXPECT_CALL(random_, uuid()).Times(0);
 
-  StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
+  RequestDecoder* decoder = nullptr;
+  NiceMock<MockResponseEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
 

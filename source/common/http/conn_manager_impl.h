@@ -629,10 +629,6 @@ private:
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
 
-      // Used to track which filter is the latest filter that has received data.
-      ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
-      ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
-
       bool decorated_propagate_ : 1;
       // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
       // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
@@ -644,6 +640,10 @@ private:
       // Whether a filter has indicated that the response should be treated as a headers only
       // response.
       bool encoding_headers_only_;
+
+      // Used to track which filter is the latest filter that has received data.
+      ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
+      ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
     };
 
     // Possibly increases buffer_limit_ to the value of limit.
