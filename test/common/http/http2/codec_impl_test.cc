@@ -42,11 +42,13 @@ namespace CommonUtility = ::Envoy::Http2::Utility;
 
 class ConnectionImplTestPeer {
 public:
+  // Registers callbacks from this peer with |connection|.
   void registerPeer(ConnectionImpl& connection) {
     connection.test_only_on_settings_frame_cb_ =
         std::bind(&ConnectionImplTestPeer::onSettingsFrame, this, std::placeholders::_1);
   }
 
+  // Callback issued when nghttp2 processes a SETTINGS frame.
   void onSettingsFrame(const nghttp2_settings& settings_frame) {
     ENVOY_LOG_MISC(error, "callback issued");
     for (uint32_t i = 0; i < settings_frame.niv; ++i) {
@@ -57,6 +59,7 @@ public:
     }
   }
 
+  // Returns the value of the SETTINGS parameter with |identifier|.
   absl::optional<uint32_t> getRemoteSettingsParameterValue(int32_t identifier) const {
     const auto it = settings_.find({identifier, 0});
     if (it == settings_.end()) {

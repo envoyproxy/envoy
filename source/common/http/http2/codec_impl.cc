@@ -475,9 +475,9 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return 0;
   }
 
+  // Only for tests, issue a callback when the SETTINGS frame is received.
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
     if (test_only_on_settings_frame_cb_) {
-      ENVOY_CONN_LOG(trace, "issuing settings cb", connection_);
       test_only_on_settings_frame_cb_(frame->settings);
     }
   }
