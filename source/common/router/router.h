@@ -366,7 +366,7 @@ protected:
   RetryStatePtr retry_state_;
 
 private:
-  struct UpstreamRequest : public Http::StreamDecoder,
+  struct UpstreamRequest : public Http::ResponseDecoder,
                            public Http::StreamCallbacks,
                            public Http::ConnectionPool::Callbacks,
                            public LinkedObject<UpstreamRequest> {
@@ -393,11 +393,13 @@ private:
     }
 
     // Http::StreamDecoder
+    void decodeData(Buffer::Instance& data, bool end_stream) override;
+    void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
+
+    // Http::ResponseDecoder
     void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
-    void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -439,11 +441,11 @@ private:
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
                        absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
-    void onPoolReady(Http::StreamEncoder& request_encoder,
+    void onPoolReady(Http::RequestEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host,
                      const StreamInfo::StreamInfo& info) override;
 
-    void setRequestEncoder(Http::StreamEncoder& request_encoder);
+    void setRequestEncoder(Http::RequestEncoder& request_encoder);
     void clearRequestEncoder();
 
     struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
@@ -463,7 +465,7 @@ private:
     bool grpc_rq_success_deferred_;
     Event::TimerPtr per_try_timeout_;
     Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
-    Http::StreamEncoder* request_encoder_{};
+    Http::RequestEncoder* request_encoder_{};
     absl::optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::WatermarkBufferPtr buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;

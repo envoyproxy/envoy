@@ -69,7 +69,7 @@ public:
 
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
-                                        public Http::StreamDecoder,
+                                        public Http::ResponseDecoder,
                                         public Http::StreamCallbacks {
     HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~HttpActiveHealthCheckSession() override;
@@ -85,15 +85,17 @@ private:
     void onDeferredDelete() final;
 
     // Http::StreamDecoder
-    void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
-    void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance&, bool end_stream) override {
       if (end_stream) {
         onResponseComplete();
       }
     }
-    void decodeTrailers(Http::HeaderMapPtr&&) override { onResponseComplete(); }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
+
+    // Http::ResponseDecoder
+    void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
+    void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
+    void decodeTrailers(Http::HeaderMapPtr&&) override { onResponseComplete(); }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -288,7 +290,7 @@ public:
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
-                                        public Http::StreamDecoder,
+                                        public Http::ResponseDecoder,
                                         public Http::StreamCallbacks {
     GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~GrpcActiveHealthCheckSession() override;
@@ -306,11 +308,13 @@ private:
     void onDeferredDelete() final;
 
     // Http::StreamDecoder
+    void decodeData(Buffer::Instance&, bool end_stream) override;
+    void decodeMetadata(Http::MetadataMapPtr&&) override {}
+
+    // Http::ResponseDecoder
     void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
     void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeData(Buffer::Instance&, bool end_stream) override;
     void decodeTrailers(Http::HeaderMapPtr&&) override;
-    void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -347,7 +351,7 @@ private:
     HttpConnectionCallbackImpl http_connection_callback_impl_{*this};
     GrpcHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
-    Http::StreamEncoder* request_encoder_;
+    Http::RequestEncoder* request_encoder_;
     Grpc::Decoder decoder_;
     std::unique_ptr<grpc::health::v1::HealthCheckResponse> health_check_response_;
     // If true, stream reset was initiated by us (GrpcActiveHealthCheckSession), not by HTTP stack,

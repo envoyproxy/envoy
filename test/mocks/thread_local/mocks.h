@@ -46,6 +46,7 @@ public:
   struct SlotImpl : public Slot {
     SlotImpl(MockInstance& parent, uint32_t index) : parent_(parent), index_(index) {
       parent_.data_.resize(index_ + 1);
+      parent_.deferred_data_.resize(index_ + 1);
     }
 
     ~SlotImpl() override {
@@ -71,15 +72,30 @@ public:
                               main_callback);
     }
 
-    void set(InitializeCb cb) override { parent_.data_[index_] = cb(parent_.dispatcher_); }
+    void set(InitializeCb cb) override {
+      if (parent_.defer_data) {
+        parent_.deferred_data_[index_] = cb;
+      } else {
+        parent_.data_[index_] = cb(parent_.dispatcher_);
+      }
+    }
 
     MockInstance& parent_;
     const uint32_t index_;
   };
 
+  void call() {
+    for (unsigned i = 0; i < deferred_data_.size(); i++) {
+      data_[i] = deferred_data_[i](dispatcher_);
+    }
+    deferred_data_.clear();
+  }
+
   uint32_t current_slot_{};
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<ThreadLocalObjectSharedPtr> data_;
+  std::vector<Slot::InitializeCb> deferred_data_;
+  bool defer_data{};
   bool shutdown_{};
   bool registered_{true};
 };

@@ -46,6 +46,7 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/memory/stats.h"
+#include "common/memory/utils.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
@@ -1491,6 +1492,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
         }
       }
       code = handler.handler_(path_and_query, response_headers, response, admin_stream);
+      Memory::Utils::tryShrinkHeap();
       break;
     }
   }
