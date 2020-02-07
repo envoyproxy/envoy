@@ -42,7 +42,5 @@ envoy_cc_library(
     deps = [
         "//include/envoy/api:os_sys_calls_interface",
         "//source/common/singleton:threadsafe_singleton",
-    ] + select({
-        "//conditions:default": [],
-    }),
+    ],
 )
