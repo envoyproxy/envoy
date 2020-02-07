@@ -126,7 +126,7 @@ api_listener:
   http_api_listener.readCallbacksForTest().connection().addConnectionCallbacks(
       network_connection_callbacks);
 
-  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   // Shutting down the ApiListener should raise an event on all connection callback targets.
   http_api_listener.shutdown();
 }
