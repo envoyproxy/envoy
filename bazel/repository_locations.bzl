@@ -196,9 +196,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/pallets/markupsafe/archive/1.1.1.tar.gz"],
     ),
     com_github_tencent_rapidjson = dict(
-        sha256 = "bf7ced29704a1e696fbccf2a2b4ea068e7774fa37f6d7dd4039d0787f8bed98e",
-        strip_prefix = "rapidjson-1.1.0",
-        urls = ["https://github.com/Tencent/rapidjson/archive/v1.1.0.tar.gz"],
+        sha256 = "a2faafbc402394df0fa94602df4b5e4befd734aad6bb55dfef46f62fcaf1090b",
+        strip_prefix = "rapidjson-dfbe1db9da455552f7a9ad5d2aea17dd9d832ac1",
+        # Changes through 2019-12-02
+        urls = ["https://github.com/Tencent/rapidjson/archive/dfbe1db9da455552f7a9ad5d2aea17dd9d832ac1.tar.gz"],
     ),
     com_github_twitter_common_lang = dict(
         sha256 = "56d1d266fd4767941d11c27061a57bc1266a3342e551bde3780f9e9eb5ad0ed1",

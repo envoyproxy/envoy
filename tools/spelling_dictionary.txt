@@ -9,6 +9,7 @@ AFAICT
 ALPN
 ALS
 AMZ
+APC
 API
 ASAN
 ASCII
@@ -323,6 +324,7 @@ WIP
 WKT
 WRR
 WS
+WSA
 Welford's
 Wi
 XDS

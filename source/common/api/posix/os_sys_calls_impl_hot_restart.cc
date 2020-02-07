@@ -1,6 +1,6 @@
-#include "common/api/os_sys_calls_impl_hot_restart.h"
-
 #include <cerrno>
+
+#include "common/api/os_sys_calls_impl_hot_restart.h"
 
 namespace Envoy {
 namespace Api {
