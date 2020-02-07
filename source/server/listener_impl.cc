@@ -316,16 +316,11 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
 
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
+    // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
+    // listener constructor so that this listener's children entities could register their targets
+    // with their parent's initManager.
     parent_.server_.initManager().add(listener_init_target_);
   }
-}
-
-ListenerImpl::~ListenerImpl() {
-  // The filter factories may have pending initialize actions (like in the case of RDS). Those
-  // actions will fire in the destructor to avoid blocking initial server startup. If we are using
-  // a local init manager we should block the notification from trying to move us from warming to
-  // active. This is done here explicitly by resetting the watcher and then clearing the factory
-  // vector for clarity.
 }
 
 AccessLog::AccessLogManager& ListenerImpl::accessLogManager() {
@@ -412,7 +407,7 @@ void ListenerImpl::initialize() {
   // by resetting the watcher.
   if (workers_started_) {
     // If workers_started_ is true, dynamic_init_manager_ should be initialized by listener manager
-    // directly..
+    // directly.
     dynamic_init_manager_.initialize(init_watcher_);
   }
 }

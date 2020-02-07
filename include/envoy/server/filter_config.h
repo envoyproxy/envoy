@@ -56,7 +56,7 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
-   * @return ProtobufMessage::ValidationContext& validation visitor for xDS&static configuration
+   * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
    *         messages.
    */
   virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;

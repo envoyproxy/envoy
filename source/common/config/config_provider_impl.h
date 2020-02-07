@@ -243,7 +243,8 @@ private:
   Init::TargetImpl parent_init_target_;
   // Watcher that marks parent_init_target_ ready when the local init manager is ready.
   Init::WatcherImpl local_init_watcher_;
-  // Local manager that tracks the subscription's sub-resources(RDS subscriptions) initialization.
+  // Local manager that tracks the subscription initialization, it could also used for
+  // a sub-resource' initialization if it's not initialized.
   Init::ManagerImpl local_init_manager_;
 
   const uint64_t manager_identifier_;
