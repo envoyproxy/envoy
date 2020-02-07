@@ -131,6 +131,25 @@ TEST(VarUInt32Deserializer, ShouldSerializeMaxUint32Properly) {
   ASSERT_EQ(static_cast<uint8_t>(data[4]), 0x0F); // Bits 29-32.
 }
 
+TEST(VarUInt32Deserializer, ShouldThrowIfNoEndWith5Bytes) {
+  // given
+  VarUInt32Deserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  // The buffer makes no sense, it's 5 times 0xFF, while varint encoding ensures that in the worst
+  // case 5th byte has the highest bit clear.
+  for (int i = 0; i < 5; ++i) {
+    const uint8_t all_bits_set = 0xFF;
+    buffer.add(&all_bits_set, sizeof(all_bits_set));
+  }
+
+  absl::string_view data = {getRawData(buffer), 1024};
+
+  // when
+  // then
+  EXPECT_THROW(testee.feed(data), EnvoyException);
+}
+
 // String tests.
 
 TEST(StringDeserializer, ShouldDeserialize) {

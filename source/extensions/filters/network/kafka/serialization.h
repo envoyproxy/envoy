@@ -170,6 +170,10 @@ private:
  * Integer deserializer for uint32_t that was encoded as variable-length byte array.
  * Encoding documentation:
  * https://cwiki.apache.org/confluence/display/KAFKA/KIP-482%3A+The+Kafka+Protocol+should+Support+Optional+Tagged+Fields#KIP-482:TheKafkaProtocolshouldSupportOptionalTaggedFields-UnsignedVarints
+ *
+ * Impl note:
+ * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 5-byte
+ * inputs, the data at bits 5-7 in 5th byte are *ignored* (as long as 8th bit is unset).
  */
 class VarUInt32Deserializer : public Deserializer<uint32_t> {
 public:
@@ -178,16 +182,27 @@ public:
   uint32_t feed(absl::string_view& data) override {
     uint32_t processed = 0;
     while (!ready_ && !data.empty()) {
+
+      // Read next byte from input.
       uint8_t el;
       memcpy(&el, data.data(), sizeof(uint8_t));
       data = {data.data() + 1, data.size() - 1};
-      result_ |= ((el & 0x7f) << offset_);
-      offset_ += 7;
       processed++;
+
+      // Put the 7 bits where they should have been.
+      result_ |= ((el & 0x7f) << offset_);
       if ((el & 0x80) == 0) {
+        // If this was the last byte to process (what is marked by unset highest bit), we are done.
         ready_ = true;
+        break;
+      } else {
+        // Otherwise, we need to read next byte.
+        offset_ += 7;
+        // Valid input can have at most 5 bytes.
+        if (offset_ >= 5 * 7) {
+          throw EnvoyException("VarUInt32 is too long (5th byte has highest bit set)");
+        }
       }
-      // missing sanity check
     }
     return processed;
   }
