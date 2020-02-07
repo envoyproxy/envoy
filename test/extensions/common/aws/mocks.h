@@ -24,6 +24,7 @@ public:
   ~MockSigner() override;
 
   MOCK_METHOD(void, sign, (Http::Message&, bool));
+  MOCK_METHOD(void, sign, (Http::HeaderMap&));
 };
 
 class MockMetadataFetcher {
