@@ -158,9 +158,9 @@ message Permission {
     //
     //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
     //     filter is not added, and if a `FilterChainMatch` is not defined for
-    //     the :ref:`server name
-    //     <envoy_api_field_config.listener.v3.FilterChainMatch.server_names>`, a TLS connection's
-    //     requested SNI server name will be treated as if it wasn't present.
+    //     the :ref:`server name <envoy_api_field_config.listener.v3.FilterChainMatch.server_names>`,
+    //     a TLS connection's requested SNI server name will be treated as if it
+    //     wasn't present.
     //
     //   * A :ref:`listener filter <arch_overview_listener_filters>` may
     //     overwrite a connection's requested server name within Envoy.

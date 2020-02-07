@@ -8,8 +8,7 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/stack_array.h"
-
+#include "absl/container/fixed_array.h"
 #include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
@@ -57,7 +56,7 @@ private:
 template <typename ConsumeFunction>
 QuicByteCount QuicMemSliceSpanImpl::ConsumeAll(ConsumeFunction consume) {
   uint64_t num_slices = buffer_->getRawSlices(nullptr, 0);
-  Envoy::STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
+  absl::FixedArray<Envoy::Buffer::RawSlice> slices(num_slices);
   buffer_->getRawSlices(slices.begin(), num_slices);
   size_t saved_length = 0;
   for (auto& slice : slices) {

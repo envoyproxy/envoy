@@ -9,6 +9,7 @@ AFAICT
 ALPN
 ALS
 AMZ
+APC
 API
 ASAN
 ASCII
@@ -17,6 +18,7 @@ AST
 AWS
 BACKTRACE
 BSON
+BPF
 CAS
 CB
 CDS
@@ -41,6 +43,7 @@ CRC
 CRL
 CRLFs
 CRT
+CSDS
 CSRF
 CSS
 CSV
@@ -57,6 +60,7 @@ DFATAL
 DGRAM
 DLOG
 DNS
+DQUOTE
 DRYs
 DS
 DST
@@ -74,6 +78,7 @@ EDESTRUCTION
 EDF
 EINVAL
 ELB
+ENOTFOUND
 ENOTSUP
 ENV
 EOF
@@ -120,6 +125,7 @@ HCM
 HDS
 HMAC
 HPACK
+HTAB
 HTML
 HTTP
 HTTPS
@@ -159,6 +165,7 @@ LEV
 LF
 LHS
 LLVM
+LPT
 LRS
 MB
 MD
@@ -177,6 +184,7 @@ NDEBUG
 NEXTHDR
 NGHTTP
 NOAUTH
+NOCHECKRESP
 NODELAY
 NOLINT
 NOLINTNEXTLINE
@@ -272,6 +280,7 @@ SSL
 STDSTRING
 STL
 STRLEN
+STS
 SVG
 TBD
 TCLAP
@@ -295,6 +304,7 @@ UA
 UBSAN
 UDP
 UDS
+UNC
 URI
 URL
 USEVC
@@ -303,6 +313,7 @@ UTF
 UUID
 UUIDs
 VC
+VCHAR
 VH
 VHDS
 VLOG
@@ -313,6 +324,7 @@ WIP
 WKT
 WRR
 WS
+WSA
 Welford's
 Wi
 XDS
@@ -351,6 +363,7 @@ args
 argv
 artisanal
 ary
+asctime
 async
 atoi
 atomicity
@@ -558,6 +571,7 @@ filenames
 fileno
 filesystem
 firefox
+fixdate
 fixup
 fld
 fmt
@@ -650,9 +664,12 @@ istio
 istream
 istringstream
 iteratively
+ja
 javascript
 jitter
 jittered
+jlt
+jne
 kafka
 keepalive
 keepalives
@@ -664,6 +681,8 @@ kv
 kvs
 lala
 latencies
+ld
+ldb
 len
 lenenc
 lexically
@@ -691,6 +710,7 @@ lookups
 loopback
 lossy
 lowp
+lstat
 ltrim
 lua
 lyft
@@ -699,6 +719,7 @@ malloc
 matchable
 matcher
 matchers
+maxage
 maxbuffer
 megamiss
 mem
@@ -719,6 +740,7 @@ mixin
 mkdir
 mmap
 mmaping
+mod
 mongo
 moveable
 msec
@@ -845,6 +867,7 @@ pts
 pubkey
 pwd
 py
+qdtext
 qps
 quantile
 quantiles
@@ -911,6 +934,7 @@ resync
 ret
 retriable
 retriggers
+rmdir
 rollout
 roundtrip
 rpcs
@@ -921,6 +945,8 @@ ruleset
 runfiles
 runtime
 runtimes
+rver
+rxhash
 sandboxed
 sanitization
 sanitizer
@@ -1013,6 +1039,8 @@ syscalls
 sysctl
 sz
 tbl
+tchar
+tchars
 tcmalloc
 tcpdump
 teardown
@@ -1076,6 +1104,7 @@ unejection
 unescape
 unescaped
 unescaping
+unfreed
 unhandled
 unicast
 unicode

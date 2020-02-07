@@ -116,10 +116,7 @@ message HealthCheck {
     // range are required. Only statuses in the range [100, 600) are allowed.
     repeated type.Int64Range expected_statuses = 9;
 
-    // Use specified application protocol for health checks. This is to replace
-    // :ref:`use_http2
-    // <envoy_api_field_core.HealthCheck.HttpHealthCheck.use_http2>` in light of
-    // HTTP3.
+    // Use specified application protocol for health checks.
     type.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
 
     // An optional service name parameter which is used to validate the identity of

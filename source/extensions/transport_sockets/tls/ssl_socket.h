@@ -7,6 +7,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
+#include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -39,12 +40,23 @@ struct SslSocketFactoryStats {
 enum class InitialState { Client, Server };
 enum class SocketState { PreHandshake, HandshakeInProgress, HandshakeComplete, ShutdownSent };
 
+class SslExtendedSocketInfoImpl : public Envoy::Ssl::SslExtendedSocketInfo {
+public:
+  void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
+  Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
+
+private:
+  Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
+      Envoy::Ssl::ClientValidationStatus::NotValidated};
+};
+
 class SslSocketInfo : public Envoy::Ssl::ConnectionInfo {
 public:
-  SslSocketInfo(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
+  SslSocketInfo(bssl::UniquePtr<SSL> ssl, ContextImplSharedPtr ctx);
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
+  bool peerCertificateValidated() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   const std::string& serialNumberPeerCertificate() const override;
@@ -81,6 +93,7 @@ private:
   mutable std::vector<std::string> cached_dns_san_local_certificate_;
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
+  mutable SslExtendedSocketInfoImpl extended_socket_info_;
 };
 
 class SslSocket : public Network::TransportSocket,

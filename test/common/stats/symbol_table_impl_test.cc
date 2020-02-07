@@ -60,9 +60,6 @@ protected:
   SymbolVec getSymbols(StatName stat_name) {
     return SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
-  std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
-    return real_symbol_table_->decodeSymbolVec(symbol_vec);
-  }
   Symbol monotonicCounter() { return real_symbol_table_->monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
     return table_->toString(makeStat(stat_name));
@@ -89,6 +86,10 @@ TEST_P(StatNameTest, SerializeBytes) {
   EXPECT_EQ((std::vector<uint8_t>{128, 1}), serializeDeserialize(128));
   EXPECT_EQ((std::vector<uint8_t>{129, 1}), serializeDeserialize(129));
   EXPECT_EQ((std::vector<uint8_t>{255, 1}), serializeDeserialize(255));
+
+  // This is the example from the image in stats.md.
+  EXPECT_EQ((std::vector<uint8_t>{0x80 + 5, 2}), serializeDeserialize(261));
+
   EXPECT_EQ((std::vector<uint8_t>{255, 127}), serializeDeserialize(16383));
   EXPECT_EQ((std::vector<uint8_t>{128, 128, 1}), serializeDeserialize(16384));
   EXPECT_EQ((std::vector<uint8_t>{129, 128, 1}), serializeDeserialize(16385));
@@ -138,6 +139,55 @@ TEST_P(StatNameTest, TestEmpty) {
   EXPECT_TRUE(makeStat("").empty());
   EXPECT_FALSE(makeStat("x").empty());
   EXPECT_TRUE(StatName().empty());
+}
+
+TEST_P(StatNameTest, TestDynamic100k) {
+  // Tests 100k different sizes of dynamic stat, covering all kinds of
+  // corner cases of spilling over into multi-byte lengths.
+
+  std::string stat_str("dynamic_stat.x");
+  for (int i = 0; i < 100 * 1000; ++i) {
+    char ch = i % 256;
+    if (ch == '.') {
+      ch = 'x';
+    }
+    stat_str += ch;
+    StatNameDynamicStorage storage(stat_str, *table_);
+    StatName dynamic = storage.statName();
+    EXPECT_EQ(stat_str, table_->toString(dynamic));
+    SymbolTable::StoragePtr joined = table_->join({makeStat("a.b"), dynamic, makeStat("c.d")});
+    EXPECT_EQ(absl::StrCat("a.b.", stat_str, ".c.d"), table_->toString(StatName(joined.get())));
+  }
+}
+
+TEST_P(StatNameTest, TestDynamicPools) {
+  // Same test for a dynamically allocated name. The only difference between
+  // the behavior with a remembered vs dynamic name is that when looking
+  // up a remembered name, a mutex is not taken. But we have no easy way
+  // to test for that. So we'll at least cover the code.
+  StatNameDynamicPool d1(*table_);
+  const StatName dynamic = d1.add("dynamic");
+  EXPECT_EQ("dynamic", table_->toString(dynamic));
+
+  // The nature of the StatNameDynamicPool is that there is no sharing (and also no locks).
+  EXPECT_NE(dynamic.data(), d1.add("dynamic").data());
+
+  // Make sure blanks are always the same.
+  const StatName blank = d1.add("");
+  EXPECT_EQ("", table_->toString(blank));
+  EXPECT_NE(blank.data(), d1.add("").data());
+  EXPECT_NE(blank.data(), d1.add("").data());
+  EXPECT_NE(blank.data(), d1.add(absl::string_view()).data());
+
+  // There's another corner case for the same "dynamic" name from a
+  // different set. Here we will get a different StatName object
+  // out of the second set, though it will share the same underlying
+  // symbol-table symbol.
+  StatNameDynamicPool d2(*table_);
+  const StatName dynamic2 = d2.add("dynamic");
+  EXPECT_EQ("dynamic", table_->toString(dynamic2));
+  EXPECT_NE(dynamic2.data(), d2.add("dynamic").data()); // No storage sharing.
+  EXPECT_NE(dynamic2.data(), dynamic.data());
 }
 
 TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
@@ -191,7 +241,17 @@ TEST_P(StatNameTest, TestSuccessfulDecode) {
   EXPECT_EQ(table_->toString(stat_name_1), stat_name);
 }
 
-class StatNameDeathTest : public StatNameTest {};
+class StatNameDeathTest : public StatNameTest {
+public:
+  void decodeSymbolVec(const SymbolVec& symbol_vec) {
+    Thread::LockGuard lock(real_symbol_table_->lock_);
+    for (Symbol symbol : symbol_vec) {
+      real_symbol_table_->fromSymbol(symbol);
+    }
+  }
+};
+INSTANTIATE_TEST_SUITE_P(StatNameDeathTest, StatNameDeathTest,
+                         testing::ValuesIn({SymbolTableType::Real}));
 
 TEST_P(StatNameDeathTest, TestBadDecodes) {
   if (GetParam() == SymbolTableType::Fake) {
@@ -274,11 +334,11 @@ TEST_P(StatNameTest, FreePoolTest) {
     makeStat("3a");
     makeStat("4a");
     makeStat("5a");
-    EXPECT_EQ(monotonicCounter(), 5);
+    EXPECT_EQ(monotonicCounter(), 6);
     EXPECT_EQ(table_->numSymbols(), 5);
     clearStorage();
   }
-  EXPECT_EQ(monotonicCounter(), 5);
+  EXPECT_EQ(monotonicCounter(), 6);
   EXPECT_EQ(table_->numSymbols(), 0);
 
   // These are different strings being encoded, but they should recycle through the same symbols as
@@ -288,11 +348,11 @@ TEST_P(StatNameTest, FreePoolTest) {
   makeStat("3b");
   makeStat("4b");
   makeStat("5b");
-  EXPECT_EQ(monotonicCounter(), 5);
+  EXPECT_EQ(monotonicCounter(), 6);
   EXPECT_EQ(table_->numSymbols(), 5);
 
   makeStat("6");
-  EXPECT_EQ(monotonicCounter(), 6);
+  EXPECT_EQ(monotonicCounter(), 7);
   EXPECT_EQ(table_->numSymbols(), 6);
 }
 
@@ -352,7 +412,7 @@ TEST_P(StatNameTest, TestShrinkingExpectation) {
 // you don't free all the StatNames you've allocated bytes for. StatNameList
 // provides this capability.
 TEST_P(StatNameTest, List) {
-  absl::string_view names[] = {"hello.world", "goodbye.world"};
+  StatName names[] = {makeStat("hello.world"), makeStat("goodbye.world")};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
   table_->populateList(names, ARRAY_SIZE(names), name_list);
@@ -613,31 +673,6 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_EQ("remembered", table_->toString(remembered));
   EXPECT_EQ(remembered.data(), set->getBuiltin("remembered", fallback).data());
   EXPECT_EQ(fallback.data(), set->getBuiltin("not_remembered", fallback).data());
-
-  // Same test for a dynamically allocated name. The only difference between
-  // the behavior with a remembered vs dynamic name is that when looking
-  // up a remembered name, a mutex is not taken. But we have no easy way
-  // to test for that. So we'll at least cover the code.
-  const Stats::StatName dynamic = set->getDynamic("dynamic");
-  EXPECT_EQ("dynamic", table_->toString(dynamic));
-  EXPECT_EQ(dynamic.data(), set->getDynamic("dynamic").data());
-
-  // Make sure blanks are always the same.
-  const Stats::StatName blank = set->getDynamic("");
-  EXPECT_EQ("", table_->toString(blank));
-  EXPECT_EQ(blank.data(), set->getDynamic("").data());
-  EXPECT_EQ(blank.data(), set->getDynamic("").data());
-  EXPECT_EQ(blank.data(), set->getDynamic(absl::string_view()).data());
-
-  // There's another corner case for the same "dynamic" name from a
-  // different set. Here we will get a different StatName object
-  // out of the second set, though it will share the same underlying
-  // symbol-table symbol.
-  StatNameSetPtr set2(table_->makeSet("set2"));
-  const Stats::StatName dynamic2 = set2->getDynamic("dynamic");
-  EXPECT_EQ("dynamic", table_->toString(dynamic2));
-  EXPECT_EQ(dynamic2.data(), set2->getDynamic("dynamic").data());
-  EXPECT_NE(dynamic2.data(), dynamic.data());
 }
 
 TEST_P(StatNameTest, StorageCopy) {
@@ -651,7 +686,7 @@ TEST_P(StatNameTest, StorageCopy) {
 
 TEST_P(StatNameTest, RecentLookups) {
   if (GetParam() == SymbolTableType::Fake) {
-    // touch these cover coverage for fake symbol tables, but they'll have no effect.
+    // Touch these for coverage of fake symbol tables, but they'll have no effect.
     table_->clearRecentLookups();
     table_->setRecentLookupCapacity(0);
     return;
@@ -660,21 +695,20 @@ TEST_P(StatNameTest, RecentLookups) {
   StatNameSetPtr set1(table_->makeSet("set1"));
   table_->setRecentLookupCapacity(10);
   StatNameSetPtr set2(table_->makeSet("set2"));
-  set1->getDynamic("dynamic.stat1");
-  set2->getDynamic("dynamic.stat2");
+  StatNameDynamicPool d1(*table_);
+  d1.add("dynamic.stat1");
+  StatNameDynamicPool d2(*table_);
+  d2.add("dynamic.stat2");
   encodeDecode("direct.stat");
 
   std::vector<std::string> accum;
   uint64_t total = table_->getRecentLookups([&accum](absl::string_view name, uint64_t count) {
     accum.emplace_back(absl::StrCat(count, ": ", name));
   });
-  EXPECT_EQ(5, total);
+  EXPECT_EQ(1, total); // Dynamic pool adds don't count as recent lookups.
   std::string recent_lookups_str = absl::StrJoin(accum, " ");
 
-  EXPECT_EQ("1: direct.stat "
-            "2: dynamic.stat1 " // Combines entries from set and symbol-table.
-            "2: dynamic.stat2",
-            recent_lookups_str);
+  EXPECT_EQ("1: direct.stat", recent_lookups_str); // No dynamic-pool lookups take locks.
 
   table_->clearRecentLookups();
   uint32_t num_calls = 0;

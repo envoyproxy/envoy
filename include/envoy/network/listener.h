@@ -47,7 +47,7 @@ public:
   /**
    * @return the socket shared by worker threads if any; otherwise return null.
    */
-  virtual absl::optional<std::reference_wrapper<Socket>> sharedSocket() const PURE;
+  virtual SocketOptRef sharedSocket() const PURE;
 };
 
 using ListenSocketFactorySharedPtr = std::shared_ptr<ListenSocketFactory>;
@@ -130,7 +130,7 @@ public:
    * @return factory pointer if listening on UDP socket, otherwise return
    * nullptr.
    */
-  virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
+  virtual ActiveUdpListenerFactory* udpListenerFactory() PURE;
 
   /**
    * @return traffic direction of the listener.

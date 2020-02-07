@@ -29,14 +29,14 @@ public:
                                                   const std::string& body);
   bool sawGoAway() const { return saw_goaway_; }
   bool connected() const { return connected_; }
-  void sendData(Http::StreamEncoder& encoder, absl::string_view data, bool end_stream);
-  void sendData(Http::StreamEncoder& encoder, Buffer::Instance& data, bool end_stream);
-  void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
-  void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
-  void sendReset(Http::StreamEncoder& encoder);
+  void sendData(Http::RequestEncoder& encoder, absl::string_view data, bool end_stream);
+  void sendData(Http::RequestEncoder& encoder, Buffer::Instance& data, bool end_stream);
+  void sendData(Http::RequestEncoder& encoder, uint64_t size, bool end_stream);
+  void sendTrailers(Http::RequestEncoder& encoder, const Http::HeaderMap& trailers);
+  void sendReset(Http::RequestEncoder& encoder);
   // Intentionally makes a copy of metadata_map.
-  void sendMetadata(Http::StreamEncoder& encoder, Http::MetadataMap metadata_map);
-  std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
+  void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::HeaderMap& headers);
   bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
@@ -231,7 +231,7 @@ protected:
   // A placeholder for the first request received at upstream.
   FakeStreamPtr upstream_request_;
   // A pointer to the request encoder, if used.
-  Http::StreamEncoder* request_encoder_{nullptr};
+  Http::RequestEncoder* request_encoder_{nullptr};
   // The response headers sent by sendRequestAndWaitForResponse() by default.
   Http::TestHeaderMapImpl default_response_headers_{{":status", "200"}};
   Http::TestHeaderMapImpl default_request_headers_{

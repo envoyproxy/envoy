@@ -25,7 +25,7 @@ ThriftProxy::FilterStatus Filter::messageBegin(ThriftProxy::MessageMetadataShare
 }
 
 void Filter::initiateCall(const ThriftProxy::MessageMetadata& metadata) {
-  ThriftProxy::Router::RouteConstSharedPtr route = callbacks_->route();
+  ThriftProxy::Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (!route || !route->routeEntry()) {
     return;
   }
@@ -77,10 +77,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     if (!config_->failureModeAllow()) {
       state_ = State::Responded;
-      callbacks_->sendLocalReply(
+      decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "limiter error"),
           false);
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError);
+      decoder_callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::RateLimitServiceError);
       return;
     }
     cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
@@ -89,17 +90,17 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
     if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
       state_ = State::Responded;
-      callbacks_->sendLocalReply(
+      decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),
           false);
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
       return;
     }
     break;
   }
 
   if (!initiating_call_) {
-    callbacks_->continueDecoding();
+    decoder_callbacks_->continueDecoding();
   }
 }
 
@@ -117,7 +118,8 @@ void Filter::populateRateLimitDescriptors(
       continue;
     }
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   metadata, *callbacks_->streamInfo().downstreamRemoteAddress());
+                                   metadata,
+                                   *decoder_callbacks_->streamInfo().downstreamRemoteAddress());
   }
 }
 
