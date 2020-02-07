@@ -128,6 +128,9 @@ public:
     return nullptr;
   }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+    if (secret()) {
+      callback();
+    }
     return update_callback_manager_.add(callback);
   }
 
@@ -180,6 +183,9 @@ public:
     return certificate_validation_context_secrets_.get();
   }
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+    if (secret()) {
+      callback();
+    }
     return update_callback_manager_.add(callback);
   }
 
@@ -247,6 +253,9 @@ public:
   }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+    if (secret()) {
+      callback();
+    }
     return update_callback_manager_.add(callback);
   }
 
