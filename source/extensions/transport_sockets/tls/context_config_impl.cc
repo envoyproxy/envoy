@@ -166,33 +166,39 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)) {
-  if (default_cvc_ && certificate_validation_context_provider_ != nullptr) {
-    // We need to validate combined certificate validation context.
-    // The default certificate validation context and dynamic certificate validation
-    // context could only contain partial fields, which is okay to fail the validation.
-    // But the combined certificate validation context should pass validation. If
-    // validation of combined certificate validation context fails,
-    // getCombinedValidationContextConfig() throws exception, validation_context_config_ will not
-    // get updated.
-    cvc_validation_callback_handle_ =
-        certificate_validation_context_provider_->addValidationCallback(
-            [this](
-                const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
-                    dynamic_cvc) { getCombinedValidationContextConfig(dynamic_cvc); });
+  if (certificate_validation_context_provider_ != nullptr) {
+    if (default_cvc_) {
+      // We need to validate combined certificate validation context.
+      // The default certificate validation context and dynamic certificate validation
+      // context could only contain partial fields, which is okay to fail the validation.
+      // But the combined certificate validation context should pass validation. If
+      // validation of combined certificate validation context fails,
+      // getCombinedValidationContextConfig() throws exception, validation_context_config_ will not
+      // get updated.
+      cvc_validation_callback_handle_ =
+          certificate_validation_context_provider_->addValidationCallback(
+              [this](
+                  const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
+                      dynamic_cvc) { getCombinedValidationContextConfig(dynamic_cvc); });
+    }
+    // Load inlined, static or dynamic secret that's already available.
+    if (certificate_validation_context_provider_->secret() != nullptr) {
+      if (default_cvc_) {
+        validation_context_config_ =
+            getCombinedValidationContextConfig(*certificate_validation_context_provider_->secret());
+      } else {
+        validation_context_config_ = std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
+            *certificate_validation_context_provider_->secret(), api_);
+      }
+    }
   }
-  // Load inline or static secret into tls_certificate_config_.
+  // Load inlined, static or dynamic secrets that are already available.
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
         tls_certificate_configs_.emplace_back(*provider->secret(), &factory_context, api_);
       }
     }
-  }
-  // Load inline or static secret into validation_context_config_.
-  if (certificate_validation_context_provider_ != nullptr &&
-      certificate_validation_context_provider_->secret() != nullptr) {
-    validation_context_config_ = std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
-        *certificate_validation_context_provider_->secret(), api_);
   }
 }
 
@@ -381,12 +387,10 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         [this](const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& keys) {
           getSessionTicketKeys(keys);
         });
-  }
-
-  // Load inline or static secrets.
-  if (session_ticket_keys_provider_ != nullptr &&
-      session_ticket_keys_provider_->secret() != nullptr) {
-    session_ticket_keys_ = getSessionTicketKeys(*session_ticket_keys_provider_->secret());
+    // Load inlined, static or dynamic secret that's already available.
+    if (session_ticket_keys_provider_->secret() != nullptr) {
+      session_ticket_keys_ = getSessionTicketKeys(*session_ticket_keys_provider_->secret());
+    }
   }
 
   if ((config.common_tls_context().tls_certificates().size() +
