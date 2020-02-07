@@ -19,7 +19,6 @@ option (udpa.annotations.file_migrate).move_to_package =
 // [#protodoc-title: HTTP Cache Filter]
 // [#extension: envoy.filters.http.cache]
 
-// [#next-free-field: 6]
 message CacheConfig {
   // [#not-implemented-hide:]
   // Modifies cache key creation by restricting which parts of the URL are included.
@@ -46,10 +45,6 @@ message CacheConfig {
   // Config specific to the cache storage implementation.
   google.protobuf.Any typed_config = 1;
 
-  // Name of cache implementation to use, as specified in the intended HttpCacheFactory
-  // implementation. Cache names should use reverse DNS format, though this is not enforced.
-  string name = 2;
-
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement *vary* headers>
   //
@@ -65,18 +60,18 @@ message CacheConfig {
   //
   // During lookup, *allowed_vary_headers* controls what request headers will be
   // sent to the cache storage implementation.
-  repeated type.matcher.StringMatcher allowed_vary_headers = 3;
+  repeated type.matcher.StringMatcher allowed_vary_headers = 2;
 
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement key customization>
   //
   // Modifies cache key creation by restricting which parts of the URL are included.
-  KeyCreatorParams key_creator_params = 4;
+  KeyCreatorParams key_creator_params = 3;
 
   // [#not-implemented-hide:]
   // <TODO(toddmgreer) implement size limit>
   //
   // Max body size the cache filter will insert into a cache. 0 means unlimited (though the cache
   // storage implementation may have its own limit beyond which it will reject insertions).
-  uint32 max_body_bytes = 5;
+  uint32 max_body_bytes = 4;
 }
