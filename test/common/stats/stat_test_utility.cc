@@ -135,6 +135,88 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
+Counter& TestStore::counter(const std::string& name) {
+  Counter*& counter_ref = counter_map_[name];
+  if (counter_ref == nullptr) {
+    counter_ref = &IsolatedStoreImpl::counter(name);
+  }
+  return *counter_ref;
+}
+
+Counter& TestStore::counterFromStatName(StatName stat_name) {
+  std::string name = symbolTable().toString(stat_name);
+  Counter*& counter_ref = counter_map_[name];
+  if (counter_ref == nullptr) {
+    counter_ref = &IsolatedStoreImpl::counterFromStatName(stat_name);
+  } else {
+    // Ensures StatNames with the same string representation are specified
+    // consistently using symbolic/dynamic components on every access.
+    ASSERT(counter_ref->statName() == stat_name);
+  }
+  return *counter_ref;
+}
+
+Gauge& TestStore::gauge(const std::string& name, Gauge::ImportMode mode) {
+  Gauge*& gauge_ref = gauge_map_[name];
+  if (gauge_ref == nullptr) {
+    gauge_ref = &IsolatedStoreImpl::gauge(name, mode);
+  }
+  return *gauge_ref;
+}
+
+Gauge& TestStore::gaugeFromStatName(StatName stat_name, Gauge::ImportMode mode) {
+  std::string name = symbolTable().toString(stat_name);
+  Gauge*& gauge_ref = gauge_map_[name];
+  if (gauge_ref == nullptr) {
+    gauge_ref = &IsolatedStoreImpl::gaugeFromStatName(stat_name, mode);
+  } else {
+    ASSERT(gauge_ref->statName() == stat_name);
+  }
+  return *gauge_ref;
+}
+
+Histogram& TestStore::histogram(const std::string& name, Histogram::Unit unit) {
+  Histogram*& histogram_ref = histogram_map_[name];
+  if (histogram_ref == nullptr) {
+    histogram_ref = &IsolatedStoreImpl::histogram(name, unit);
+  }
+  return *histogram_ref;
+}
+
+Histogram& TestStore::histogramFromStatName(StatName stat_name, Histogram::Unit unit) {
+  std::string name = symbolTable().toString(stat_name);
+  Histogram*& histogram_ref = histogram_map_[name];
+  if (histogram_ref == nullptr) {
+    histogram_ref = &IsolatedStoreImpl::histogramFromStatName(stat_name, unit);
+  } else {
+    ASSERT(histogram_ref->statName() == stat_name);
+  }
+  return *histogram_ref;
+}
+
+template <class StatType>
+static absl::optional<std::reference_wrapper<const StatType>>
+findByString(const std::string& name, const absl::flat_hash_map<std::string, StatType*>& map) {
+  absl::optional<std::reference_wrapper<const StatType>> ret;
+  auto iter = map.find(name);
+  if (iter != map.end()) {
+    ret = *iter->second;
+  }
+  return ret;
+}
+
+CounterOptConstRef TestStore::findCounterByString(const std::string& name) const {
+  return findByString<Counter>(name, counter_map_);
+}
+
+GaugeOptConstRef TestStore::findGaugeByString(const std::string& name) const {
+  return findByString<Gauge>(name, gauge_map_);
+}
+
+HistogramOptConstRef TestStore::findHistogramByString(const std::string& name) const {
+  return findByString<Histogram>(name, histogram_map_);
+}
+
 // TODO(jmarantz): this utility is intended to be used both for unit tests
 // and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs
 // FUZZ_ASSERT.

@@ -63,7 +63,7 @@ How to disable HTTP/1.1 reverse bridge filter per route
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             access_log:
-            - name: envoy.file_access_log
+            - name: envoy.access_loggers.file
               typed_config:
                 "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
                 path: /dev/stdout

@@ -34,13 +34,13 @@ ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
 class ProviderVerifierTest : public testing::Test {
 public:
   void createVerifier() {
-    filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
+    filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
                                  *filter_config_);
   }
 
   JwtAuthentication proto_config_;
-  FilterConfigSharedPtr filter_config_;
+  std::shared_ptr<FilterConfigImpl> filter_config_;
   VerifierConstPtr verifier_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;
@@ -175,8 +175,7 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
   proto_config_.mutable_rules(0)->mutable_requires()->set_provider_name("nosuchprovider");
 
-  EXPECT_THROW(::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_),
-               EnvoyException);
+  EXPECT_THROW(FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_), EnvoyException);
 }
 
 } // namespace

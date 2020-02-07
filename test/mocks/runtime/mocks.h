@@ -30,7 +30,7 @@ public:
   ~MockSnapshot() override;
 
   // Provide a default implementation of mocked featureEnabled/2.
-  bool featureEnabledDefault(const std::string&, uint64_t default_value) {
+  bool featureEnabledDefault(absl::string_view, uint64_t default_value) {
     if (default_value == 0) {
       return false;
     } else if (default_value == 100) {
@@ -41,27 +41,27 @@ public:
     }
   }
 
-  MOCK_METHOD(bool, deprecatedFeatureEnabled, (const std::string& key, bool default_enabled),
+  MOCK_METHOD(bool, deprecatedFeatureEnabled, (absl::string_view key, bool default_enabled),
               (const));
   MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
-  MOCK_METHOD(bool, featureEnabled, (const std::string& key, uint64_t default_value), (const));
+  MOCK_METHOD(bool, featureEnabled, (absl::string_view key, uint64_t default_value), (const));
   MOCK_METHOD(bool, featureEnabled,
-              (const std::string& key, uint64_t default_value, uint64_t random_value), (const));
+              (absl::string_view key, uint64_t default_value, uint64_t random_value), (const));
   MOCK_METHOD(bool, featureEnabled,
-              (const std::string& key, uint64_t default_value, uint64_t random_value,
+              (absl::string_view key, uint64_t default_value, uint64_t random_value,
                uint64_t num_buckets),
               (const));
   MOCK_METHOD(bool, featureEnabled,
-              (const std::string& key, const envoy::type::v3::FractionalPercent& default_value),
+              (absl::string_view key, const envoy::type::v3::FractionalPercent& default_value),
               (const));
   MOCK_METHOD(bool, featureEnabled,
-              (const std::string& key, const envoy::type::v3::FractionalPercent& default_value,
+              (absl::string_view key, const envoy::type::v3::FractionalPercent& default_value,
                uint64_t random_value),
               (const));
-  MOCK_METHOD(const std::string&, get, (const std::string& key), (const));
-  MOCK_METHOD(bool, exists, (const std::string& key), (const));
-  MOCK_METHOD(uint64_t, getInteger, (const std::string& key, uint64_t default_value), (const));
-  MOCK_METHOD(double, getDouble, (const std::string& key, double default_value), (const));
+  MOCK_METHOD(const std::string&, get, (absl::string_view key), (const));
+  MOCK_METHOD(bool, exists, (absl::string_view key), (const));
+  MOCK_METHOD(uint64_t, getInteger, (absl::string_view key, uint64_t default_value), (const));
+  MOCK_METHOD(double, getDouble, (absl::string_view key, double default_value), (const));
   MOCK_METHOD(bool, getBoolean, (absl::string_view key, bool default_value), (const));
   MOCK_METHOD(const std::vector<OverrideLayerConstPtr>&, getLayers, (), (const));
 };

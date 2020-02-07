@@ -31,6 +31,8 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
       callbacks_->connection().ssl()
           ? "uriSanPeerCertificate: " +
                 absl::StrJoin(callbacks_->connection().ssl()->uriSanPeerCertificate(), ",") +
+                ", dnsSanPeerCertificate: " +
+                absl::StrJoin(callbacks_->connection().ssl()->dnsSansPeerCertificate(), ",") +
                 ", subjectPeerCertificate: " +
                 callbacks_->connection().ssl()->subjectPeerCertificate()
           : "none",

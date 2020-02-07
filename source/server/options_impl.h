@@ -146,9 +146,11 @@ public:
    * factories.
    */
   static void disableExtensions(const std::vector<std::string>&);
+  static std::string allowedLogLevels();
 
 private:
   void logError(const std::string& error) const;
+  spdlog::level::level_enum parseAndValidateLogLevel(absl::string_view log_level);
 
   uint64_t base_id_;
   uint32_t concurrency_;

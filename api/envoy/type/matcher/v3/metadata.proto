@@ -72,6 +72,8 @@ option java_multiple_files = true;
 // enforce access control based on dynamic metadata in a request. See :ref:`Permission
 // <envoy_api_msg_config.rbac.v3.Permission>` and :ref:`Principal
 // <envoy_api_msg_config.rbac.v3.Principal>`.
+
+// [#next-major-version: MetadataMatcher should use StructMatcher]
 message MetadataMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.MetadataMatcher";
 

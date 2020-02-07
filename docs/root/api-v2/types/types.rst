@@ -17,6 +17,7 @@ Types
   ../type/matcher/number.proto
   ../type/matcher/regex.proto
   ../type/matcher/string.proto
+  ../type/matcher/struct.proto
   ../type/matcher/value.proto
   ../type/metadata/v2/metadata.proto
   ../type/tracing/v2/custom_tag.proto
