@@ -135,8 +135,8 @@ TEST_P(ApiListenerIntegrationTest, DestroyWithActiveStreams) {
     done.Notify();
   });
   ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
-  // The ApiListener should drain appropriately on server termination such that no crashes happen
-  // when streams have not terminated cleanly.
+  // The server should shutdown the ApiListener at the right time during server termination such
+  // that no crashes occur if termination happens when the ApiListener still has ongoing streams.
 }
 
 } // namespace

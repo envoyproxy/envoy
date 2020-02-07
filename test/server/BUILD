@@ -23,6 +23,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/server:api_listener_lib",
         "//source/server:listener_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

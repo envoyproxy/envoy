@@ -164,6 +164,8 @@ public:
   Http::ApiListenerOptRef http() override;
   void shutdown() override;
 
+  Network::ReadFilterCallbacks& readCallbacksForTest() { return read_callbacks_; }
+
 private:
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
   // route config manager, scoped route config manager.
