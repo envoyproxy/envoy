@@ -5,8 +5,8 @@
 #include "server/api_listener_impl.h"
 #include "server/listener_manager_impl.h"
 
-#include "test/mocks/server/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/utility.h"
 
