@@ -16,7 +16,6 @@ option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: HTTP Cache Filter]
-// HTTP Cache Filter :ref:`overview <config_http_filters_cache>`.
 // [#extension: envoy.filters.http.cache]
 
 // [#next-free-field: 6]
