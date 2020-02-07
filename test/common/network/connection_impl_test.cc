@@ -1801,7 +1801,7 @@ TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   connection_->write(buffer, false);
 
-  // A read event triggers underlying socke to ask for more data.
+  // A read event triggers underlying socket to ask for more data.
   EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
     transport_socket_callbacks_->flushWriteBuffer();
     return IoResult{PostIoAction::KeepOpen, 0, false};
