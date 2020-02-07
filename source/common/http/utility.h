@@ -22,6 +22,7 @@ namespace Envoy {
 namespace Http2 {
 namespace Utility {
 
+// Limits and defaults for `envoy::config::core::v3::Http2ProtocolOptions` protos.
 struct OptionsLimits {
   // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
@@ -69,7 +70,8 @@ struct OptionsLimits {
 };
 
 /**
- * TODO(AndresGuedez):
+ * Validates settings/options already set in |options| and initializes any remaining fields with
+ * defaults.
  */
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options);
