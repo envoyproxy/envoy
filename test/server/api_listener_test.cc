@@ -121,6 +121,8 @@ api_listener:
   ASSERT_TRUE(http_api_listener.http().has_value());
 
   Network::MockConnectionCallbacks network_connection_callbacks;
+  // TODO(junr03): potentially figure out a way of unit testing this behavior without exposing a
+  // ForTest function.
   http_api_listener.readCallbacksForTest().connection().addConnectionCallbacks(
       network_connection_callbacks);
 

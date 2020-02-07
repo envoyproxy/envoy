@@ -55,7 +55,7 @@ void HttpApiListener::shutdown() {
   // The Http::ConnectionManagerImpl is a callback target for the read_callback_.connection_. By
   // raising connection closure, Http::ConnectionManagerImpl::onEvent is fired. In that case the
   // Http::ConnectionManagerImpl will reset any ActiveStreams it has.
-  read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::LocalClose);
+  read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 } // namespace Server
