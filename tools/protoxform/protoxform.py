@@ -224,7 +224,8 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options.Extensions[migrate_pb2.file_migrate].CopyFrom(
         file_proto.options.Extensions[migrate_pb2.file_migrate])
 
-  if file_proto.options.HasExtension(status_pb2.file_status):
+  if file_proto.options.HasExtension(
+      status_pb2.file_status) and file_proto.package.endswith('alpha'):
     options.Extensions[status_pb2.file_status].CopyFrom(
         file_proto.options.Extensions[status_pb2.file_status])
 
@@ -247,7 +248,6 @@ def FormatHeaderFromFile(source_code_info, file_proto):
         'envoy/annotations/resource.proto',
         'envoy/annotations/deprecation.proto',
         'udpa/annotations/migrate.proto',
-        'udpa/annotations/status.proto',
     ]:
       infra_imports.append(d)
     elif d.startswith('envoy/'):
@@ -258,11 +258,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       google_imports.append(d)
     elif d.startswith('validate/'):
       infra_imports.append(d)
-    elif d in ['udpa/annotations/versioning.proto']:
-      # Skip, we decide to add this based on requires_versioning_import
+    elif d in ['udpa/annotations/versioning.proto', 'udpa/annotations/status.proto']:
+      # Skip, we decide to add this based on requires_versioning_import and options.
       pass
     else:
       misc_imports.append(d)
+
+  if options.HasExtension(status_pb2.file_status):
+    misc_imports.append('udpa/annotations/status.proto')
 
   if requires_versioning_import:
     misc_imports.append('udpa/annotations/versioning.proto')

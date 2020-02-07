@@ -67,13 +67,8 @@ experience a backward compatible break on a change. Specifically:
     may be granted for scenarios in which these stricter conditions model behavior already implied
     structurally or by documentation.
 
-The exceptions to the above policy are for:
-
-* API versions tagged `vNalpha`. Within an alpha major version, arbitrary
-  breaking changes are allowed.
-
-* Any `.proto` file with the `(udpa.annotations.file_status).work_in_progress`
-  set to true.
+The exception to the above policy is for API versions tagged `vNalpha`. Within an alpha major
+version, arbitrary breaking changes are allowed.
 
 Note that changes to default values for wrapped types, e.g. `google.protobuf.UInt32Value` are not
 governed by the above policy. Any management server requiring stability across Envoy API or
