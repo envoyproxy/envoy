@@ -25,6 +25,13 @@ ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::List
       factory_context_(parent_.server_, config_, *this, *global_scope_, *listener_scope_),
       read_callbacks_(SyntheticReadCallbacks(*this)) {}
 
+void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConnectionEvent(
+    Network::ConnectionEvent event) {
+  for (Network::ConnectionCallbacks* callback : callbacks_) {
+    callback->onEvent(event);
+  }
+}
+
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  ListenerManagerImpl& parent, const std::string& name)
     : ApiListenerImplBase(config, parent, name) {
@@ -42,6 +49,13 @@ Http::ApiListenerOptRef HttpApiListener::http() {
     http_connection_manager_ = http_connection_manager_factory_();
   }
   return Http::ApiListenerOptRef(std::ref(*http_connection_manager_));
+}
+
+void HttpApiListener::shutdown() {
+  // The Http::ConnectionManagerImpl is a callback target for the read_callback_.connection_. By
+  // raising connection closure, the Http::ConnectionManagerImpl will reset all active streams it
+  // has in Http::ConnectionManagerImpl::onEvent.
+  read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::LocalClose);
 }
 
 } // namespace Server

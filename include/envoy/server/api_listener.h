@@ -22,6 +22,12 @@ public:
   virtual absl::string_view name() const PURE;
 
   /**
+   * Shutdown the ApiListener during of server termination. This functions as an interrupt, not a
+   * clean drain.
+   */
+  virtual void shutdown() PURE;
+
+  /**
    * @return the Type of the ApiListener.
    */
   virtual Type type() const PURE;
