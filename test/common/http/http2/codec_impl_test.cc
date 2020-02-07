@@ -59,7 +59,7 @@ public:
     }
   }
 
-  // Returns the value of the SETTINGS parameter with |identifier|.
+  // Returns the value of the SETTINGS parameter keyed by |identifier| sent by the remote endpoint.
   absl::optional<uint32_t> getRemoteSettingsParameterValue(int32_t identifier) const {
     const auto it = settings_.find({identifier, 0});
     if (it == settings_.end()) {
