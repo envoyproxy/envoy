@@ -47,7 +47,7 @@ public:
   // Examples: RawByteRange(0,4) requests the first 5 bytes.
   //           RawByteRange(UINT64_MAX,4) requests the last 4 bytes.
   RawByteRange(uint64_t first, uint64_t last) : first_byte_pos_(first), last_byte_pos_(last) {
-    RELEASE_ASSERT(isSuffix() || first <= last, "Illegal byte range.");
+    ASSERT(isSuffix() || first <= last, "Illegal byte range.");
   }
   bool isSuffix() const { return first_byte_pos_ == UINT64_MAX; }
   uint64_t firstBytePos() const {
@@ -64,8 +64,8 @@ public:
   }
 
 private:
-  uint64_t first_byte_pos_;
-  uint64_t last_byte_pos_;
+  const uint64_t first_byte_pos_;
+  const uint64_t last_byte_pos_;
 };
 
 // Byte range from an HTTP request, adjusted for a known response body size, and converted from an
@@ -83,13 +83,13 @@ public:
   uint64_t end() const { return last_; }
   uint64_t length() const { return last_ - first_; }
   void trimFront(uint64_t n) {
-    RELEASE_ASSERT(n <= length(), "Attempt to trim too much from range.");
+    ASSERT(n <= length(), "Attempt to trim too much from range.");
     first_ += n;
   }
 
 private:
   uint64_t first_;
-  uint64_t last_;
+  const uint64_t last_;
 };
 
 inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rhs) {

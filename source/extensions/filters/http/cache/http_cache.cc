@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <ostream>
 
+#include "envoy/http/codes.h"
+
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
@@ -40,6 +42,8 @@ LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime 
       request_cache_control_(request_headers.CacheControl() == nullptr
                                  ? ""
                                  : request_headers.CacheControl()->value().getStringView()) {
+  // These ASSERTs check prerequisites. A request without these headers can't be looked up in cache;
+  // CacheFilter doesn't create LookupRequests for such requests.
   ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::HeaderMap "
                                  "with null Path.");
   ASSERT(request_headers.ForwardedProto(),
@@ -92,7 +96,7 @@ LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_heade
   result.headers_ = std::move(response_headers);
   result.content_length_ = content_length;
   if (!adjustByteRangeSet(result.response_ranges_, request_range_spec_, content_length)) {
-    result.headers_->setStatus(416); // Range Not Satisfiable
+    result.headers_->setStatus(static_cast<uint64_t>(Http::Code::RangeNotSatisfiable));
   }
   result.has_trailers_ = false;
   return result;
