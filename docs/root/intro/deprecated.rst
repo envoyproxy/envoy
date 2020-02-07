@@ -12,6 +12,20 @@ Deprecated items below are listed in chronological order.
 
 1.14.0 (Pending)
 ================
+* The previous behavior for upstream connection pool circuit breaking described
+  `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>` has
+  been deprecated in favor of the new behavior described :ref:`here <arch_overview_circuit_break>`.
+* Access Logger names have been deprecated in favor of the extension name from the envoy build
+  system.
+
+  .. csv-table::
+    :header: Canonical Names, Deprecated Names
+    :widths: 1, 1
+
+    envoy.access_loggers.file, envoy.file_access_log
+    envoy.access_loggers.http_grpc, envoy.http_grpc_access_log
+    envoy.access_loggers.tcp_grpc, envoy.tcp_grpc_access_log
+
 * The use of lowercase string matcher for headers matching in HTTP-based `ext_authz` is deprecated. The
   :ref:`use_lowercase_string_matcher <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.use_lowercase_string_matcher>`
   runtime key can be used to temporarily enable this feature once the deprecation becomes fail by default.

@@ -1460,7 +1460,9 @@ TEST_P(DeprecatedFieldsTest,
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
-      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
+      "warning",
+      "Using runtime overrides to continue using now fatal-by-default deprecated option "
+      "'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
       checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
@@ -1602,7 +1604,13 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_FATAL", "true"}});
 
-  checkForDeprecation(base);
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using runtime overrides to continue using now fatal-by-default deprecated value "
+      "DEPRECATED_FATAL for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' "
+      "from file deprecated.proto. This enum value will be removed from Envoy soon.",
+      checkForDeprecation(base));
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
@@ -1645,8 +1653,9 @@ TEST(StatusCode, Strings) {
   for (int i = 0; i < last_code; ++i) {
     EXPECT_NE(MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(i)), "");
   }
-  ASSERT_EQ("",
+  ASSERT_EQ("UNKNOWN",
             MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+  ASSERT_EQ("OK", MessageUtil::CodeEnumToString(ProtobufUtil::error::OK));
 }
 
 TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {

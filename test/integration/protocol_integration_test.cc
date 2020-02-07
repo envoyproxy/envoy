@@ -580,6 +580,9 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  // Regression test https://github.com/envoyproxy/envoy/issues/9881 by making
+  // sure this path does standard HCM header transformations.
+  EXPECT_TRUE(response->headers().Date() != nullptr);
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("500"));
   test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
 }
@@ -958,6 +961,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   // Default header (and trailer) count limit is 100.
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   Http::TestHeaderMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
     request_trailers.addCopy("trailer", std::string(1, 'a'));

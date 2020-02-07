@@ -79,6 +79,11 @@ If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", the
 
 .. _arch_overview_http_routing_route_table:
 
+For a key to match a :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`, the number of fragments in the computed key has to match that of
+the :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`.
+Then fragments are matched in order. A missing fragment(treated as NULL) in the built key makes the request unable to match any scope,
+i.e. no route entry can be found for the request.
+
 Route table
 -----------
 

@@ -34,10 +34,9 @@ public:
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
-  Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
-                          const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                          std::chrono::milliseconds init_fetch_timeout) override;
-  void removeWatch(const std::string& type_url, Watch* watch) override;
+  GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                           SubscriptionCallbacks& callbacks,
+                           std::chrono::milliseconds init_fetch_timeout) override;
 
   // TODO(fredlas) PR #8478 will remove this.
   bool isDelta() const override { return true; }
@@ -56,9 +55,7 @@ public:
 
   void kickOffAck(UpdateAck ack);
 
-  // TODO(fredlas) remove these two from the GrpcMux interface.
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            SubscriptionCallbacks&) override;
+  // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
   struct SubscriptionStuff {
@@ -81,8 +78,31 @@ public:
   }
 
 private:
-  Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                  SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout);
+  class WatchImpl : public GrpcMuxWatch {
+  public:
+    WatchImpl(const std::string& type_url, Watch* watch, NewGrpcMuxImpl& parent)
+        : type_url_(type_url), watch_(watch), parent_(parent) {}
+
+    ~WatchImpl() { remove(); }
+
+    void remove() {
+      if (watch_) {
+        parent_.removeWatch(type_url_, watch_);
+        watch_ = nullptr;
+      }
+    }
+
+    void update(const std::set<std::string>& resources) override {
+      parent_.updateWatch(type_url_, watch_, resources);
+    }
+
+  private:
+    const std::string type_url_;
+    Watch* watch_;
+    NewGrpcMuxImpl& parent_;
+  };
+
+  void removeWatch(const std::string& type_url, Watch* watch);
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the

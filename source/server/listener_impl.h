@@ -42,7 +42,7 @@ public:
   /**
    * @return the socket shared by worker threads; otherwise return null.
    */
-  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+  Network::SocketOptRef sharedSocket() const override {
     if (!reuse_port_) {
       ASSERT(socket_ != nullptr);
       return *socket_;
@@ -146,7 +146,7 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
@@ -176,7 +176,7 @@ public:
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
+  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 

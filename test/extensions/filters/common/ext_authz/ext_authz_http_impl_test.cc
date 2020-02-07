@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
+#include "common/common/empty_string.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
@@ -45,7 +46,7 @@ public:
         .WillByDefault(ReturnRef(async_client_));
   }
 
-  ClientConfigSharedPtr createConfig(const std::string& yaml, uint32_t timeout = 250,
+  ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING, uint32_t timeout = 250,
                                      const std::string& path_prefix = "/bar") {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
     if (yaml.empty()) {
@@ -162,7 +163,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
 
 // Test default allowed headers in the HTTP client.
 TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
   http_service:
     server_uri:
       uri: "ext_authz:9000"
@@ -201,6 +202,38 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
 
 // Test the client when a request contains Content-Length greater than 0.
 TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
+  Http::MessagePtr message_ptr =
+      sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
+                   {Http::Headers::get().Method.get(), std::string{"POST"}}});
+
+  const auto* content_length = message_ptr->headers().get(Http::Headers::get().ContentLength);
+  ASSERT_NE(content_length, nullptr);
+  EXPECT_EQ(content_length->value().getStringView(), "0");
+
+  const auto* method = message_ptr->headers().get(Http::Headers::get().Method);
+  ASSERT_NE(method, nullptr);
+  EXPECT_EQ(method->value().getStringView(), "POST");
+}
+
+// Test the client when a request contains Content-Length greater than 0.
+TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    authorization_request:
+      allowed_headers:
+        patterns:
+        - exact: content-length
+  failure_mode_allow: true
+  )EOF";
+
+  initialize(yaml);
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+
   Http::MessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
                    {Http::Headers::get().Method.get(), std::string{"POST"}}});
@@ -334,7 +367,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::Denied, Http::Code::Forbidden, "", expected_headers);
+      CheckStatus::Denied, Http::Code::Forbidden, EMPTY_STRING, expected_headers);
 
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));

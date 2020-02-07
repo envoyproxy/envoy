@@ -86,8 +86,8 @@ public:
   void onGoAway() override;
 
   // Http::ServerConnectionCallbacks
-  StreamDecoder& newStream(StreamEncoder& response_encoder,
-                           bool is_internally_created = false) override;
+  RequestDecoder& newStream(ResponseEncoder& response_encoder,
+                            bool is_internally_created = false) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -438,7 +438,7 @@ private:
   struct ActiveStream : LinkedObject<ActiveStream>,
                         public Event::DeferredDeletable,
                         public StreamCallbacks,
-                        public StreamDecoder,
+                        public RequestDecoder,
                         public FilterChainFactoryCallbacks,
                         public Tracing::Config,
                         public ScopeTrackedObject {
@@ -480,13 +480,27 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
+    // As with most of the encode functions, this runs encodeHeaders on various
+    // filters before calling encodeHeadersInternal which does final header munging and passes the
+    // headers to the encoder.
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
-    // filter to start the iteration with.
+    // filter to start the iteration with, and finally calls encodeDataInternal
+    // to update stats, do end stream bookkeeping, and send the data to encoder.
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                     FilterIterationStartState filter_iteration_start_state);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
+
+    // This is a helper function for encodeHeaders and responseDataTooLarge which allows for shared
+    // code for the two headers encoding paths. It does header munging, updates timing stats, and
+    // sends the headers to the encoder.
+    void encodeHeadersInternal(HeaderMap& headers, bool end_stream);
+    // This is a helper function for encodeData and responseDataTooLarge which allows for shared
+    // code for the two data encoding paths. It does stats updates and tracks potential end of
+    // stream.
+    void encodeDataInternal(Buffer::Instance& data, bool end_stream);
+
     void maybeEndEncode(bool end_stream);
     // Returns true if new metadata is decoded. Otherwise, returns false.
     bool processNewlyAddedMetadata();
@@ -504,11 +518,12 @@ private:
     void onBelowWriteBufferLowWatermark() override;
 
     // Http::StreamDecoder
-    void decode100ContinueHeaders(HeaderMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
-    void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
-    void decodeTrailers(HeaderMapPtr&& trailers) override;
     void decodeMetadata(MetadataMapPtr&&) override;
+
+    // Http::RequestDecoder
+    void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
+    void decodeTrailers(HeaderMapPtr&& trailers) override;
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
@@ -654,7 +669,7 @@ private:
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
-    StreamEncoder* response_encoder_{};
+    ResponseEncoder* response_encoder_{};
     HeaderMapPtr continue_headers_;
     HeaderMapPtr response_headers_;
     Buffer::WatermarkBufferPtr buffered_response_data_;

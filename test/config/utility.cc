@@ -117,7 +117,7 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
             name: envoy.router
           codec_type: HTTP1
           access_log:
-            name: envoy.file_access_log
+            name: envoy.access_loggers.file
             filter:
               not_health_check_filter:  {}
             typed_config:
@@ -824,7 +824,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   const std::string lds_filename = bootstrap().dynamic_resources().lds_config().path();
   std::string file = TestEnvironment::writeStringToFileForTest(
       "new_lds_file", MessageUtil::getJsonStringFromMessage(lds));
-  TestUtility::renameFile(file, lds_filename);
+  TestEnvironment::renameFile(file, lds_filename);
 }
 
 void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames) {
@@ -857,7 +857,7 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   // FilesystemSubscriptionImpl is subscribed to.
   std::string path =
       TestEnvironment::writeStringToFileForTest("cds.update.pb_text", cds_response.DebugString());
-  TestUtility::renameFile(path, cds_path_);
+  TestEnvironment::renameFile(path, cds_path_);
 }
 
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
@@ -879,7 +879,7 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   // FilesystemSubscriptionImpl is subscribed to.
   std::string path =
       TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
-  TestUtility::renameFile(path, eds_path_);
+  TestEnvironment::renameFile(path, eds_path_);
 }
 
 void EdsHelper::setEdsAndWait(

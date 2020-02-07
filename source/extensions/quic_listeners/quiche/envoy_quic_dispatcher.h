@@ -48,8 +48,9 @@ public:
                       uint8_t expected_server_connection_id_length,
                       Network::ConnectionHandler& connection_handler,
                       Network::ListenerConfig& listener_config,
-                      Server::ListenerStats& listener_stats, Event::Dispatcher& dispatcher,
-                      Network::Socket& listen_socket);
+                      Server::ListenerStats& listener_stats,
+                      Server::PerHandlerListenerStats& per_worker_stats,
+                      Event::Dispatcher& dispatcher, Network::Socket& listen_socket);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -72,6 +73,7 @@ private:
   Network::ConnectionHandler& connection_handler_;
   Network::ListenerConfig& listener_config_;
   Server::ListenerStats& listener_stats_;
+  Server::PerHandlerListenerStats& per_worker_stats_;
   Event::Dispatcher& dispatcher_;
   Network::Socket& listen_socket_;
 };

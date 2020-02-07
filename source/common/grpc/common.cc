@@ -13,13 +13,13 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {

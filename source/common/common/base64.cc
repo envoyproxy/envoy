@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <string>
 
+#include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/common/stack_array.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace {
@@ -193,7 +195,7 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
   ret.reserve(output_length);
 
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
 
   uint64_t j = 0;

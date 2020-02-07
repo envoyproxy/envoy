@@ -88,7 +88,8 @@ public:
   }
 
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
-    ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
     stream_ = nullptr;
     control_plane_stats_.connected_state_.set(0);
     callbacks_->onEstablishmentFailure();

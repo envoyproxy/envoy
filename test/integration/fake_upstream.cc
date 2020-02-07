@@ -38,7 +38,7 @@ using testing::AssertionResult;
 using testing::AssertionSuccess;
 
 namespace Envoy {
-FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                        Event::TestTimeSystem& time_system)
     : parent_(parent), encoder_(encoder), time_system_(time_system) {
   encoder.getStream().addCallbacks(*this);
@@ -261,7 +261,7 @@ AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
       [enable](Network::Connection& connection) { connection.enableHalfClose(enable); }, timeout);
 }
 
-Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder, bool) {
+Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encoder, bool) {
   Thread::LockGuard lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
   connection_event_.notifyOne();

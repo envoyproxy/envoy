@@ -412,7 +412,7 @@ TEST_P(StatNameTest, TestShrinkingExpectation) {
 // you don't free all the StatNames you've allocated bytes for. StatNameList
 // provides this capability.
 TEST_P(StatNameTest, List) {
-  absl::string_view names[] = {"hello.world", "goodbye.world"};
+  StatName names[] = {makeStat("hello.world"), makeStat("goodbye.world")};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
   table_->populateList(names, ARRAY_SIZE(names), name_list);

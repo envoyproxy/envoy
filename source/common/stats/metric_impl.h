@@ -21,8 +21,8 @@ namespace Stats {
  */
 class MetricHelper {
 public:
-  MetricHelper(absl::string_view name, absl::string_view tag_extracted_name,
-               const std::vector<Tag>& tags, SymbolTable& symbol_table);
+  MetricHelper(StatName name, absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+               SymbolTable& symbol_table);
   ~MetricHelper();
 
   StatName statName() const;
@@ -55,21 +55,15 @@ private:
  */
 template <class BaseClass> class MetricImpl : public BaseClass {
 public:
-  MetricImpl(absl::string_view name, absl::string_view tag_extracted_name,
-             const std::vector<Tag>& tags, SymbolTable& symbol_table)
-      : helper_(name, tag_extracted_name, tags, symbol_table) {}
-
-  // Alternate API to take the name as a StatName, which is needed at most call-sites.
-  // TODO(jmarantz): refactor impl to either be able to pass string_view at call-sites
-  // always, or to make it more efficient to populate a StatNameList with a mixture of
-  // StatName and string_view.
+  // TODO(jmarantz): Use StatName for tag_extracted_name.
   MetricImpl(StatName name, absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
              SymbolTable& symbol_table)
-      : MetricImpl(symbol_table.toString(name), tag_extracted_name, tags, symbol_table) {}
+      : helper_(name, tag_extracted_name, tags, symbol_table) {}
 
+  // Empty construction of a MetricImpl; used for null stats.
   explicit MetricImpl(SymbolTable& symbol_table)
-      : MetricImpl("", "", std::vector<Tag>(), symbol_table) {}
-
+      : MetricImpl(StatNameManagedStorage("", symbol_table).statName(), "", std::vector<Tag>(),
+                   symbol_table) {}
   std::vector<Tag> tags() const override { return helper_.tags(constSymbolTable()); }
   StatName statName() const override { return helper_.statName(); }
   StatName tagExtractedStatName() const override { return helper_.tagExtractedStatName(); }

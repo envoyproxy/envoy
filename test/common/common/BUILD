@@ -137,6 +137,7 @@ envoy_cc_test(
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -188,14 +189,6 @@ envoy_cc_test(
     srcs = ["perf_annotation_disabled_test.cc"],
     deps = [
         "//source/common/common:perf_annotation_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "stack_array_test",
-    srcs = ["stack_array_test.cc"],
-    deps = [
-        "//source/common/common:stack_array",
     ],
 )
 

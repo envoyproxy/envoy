@@ -138,7 +138,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

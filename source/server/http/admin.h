@@ -362,9 +362,7 @@ private:
       return socket_;
     }
 
-    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-      return absl::nullopt;
-    }
+    Network::SocketOptRef sharedSocket() const override { return absl::nullopt; }
 
   private:
     Network::SocketSharedPtr socket_;
@@ -393,7 +391,7 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
     envoy::config::core::v3::TrafficDirection direction() const override {

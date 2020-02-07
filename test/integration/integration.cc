@@ -20,7 +20,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/config/api_version.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
@@ -37,6 +36,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
@@ -447,7 +447,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
     while ((test_server_->counter(success) == nullptr ||
-            test_server_->counter(success)->value() == 0) &&
+            test_server_->counter(success)->value() < concurrency_) &&
            (!allow_lds_rejection || test_server_->counter(rejected) == nullptr ||
             test_server_->counter(rejected)->value() == 0)) {
       if (time_system_.monotonicTime() >= end_time) {
