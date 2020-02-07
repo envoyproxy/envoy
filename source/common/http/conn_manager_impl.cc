@@ -1530,8 +1530,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     }
   }
 
-  const bool modified_end_stream =
-      state_.encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
+  const bool modified_end_stream = state_.encoding_headers_only_ ||
+                                   (end_stream && continue_data_entry == encoder_filters_.end());
   encodeHeadersInternal(headers, modified_end_stream);
 
   if (continue_data_entry != encoder_filters_.end() && !modified_end_stream) {
