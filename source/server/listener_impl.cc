@@ -412,6 +412,14 @@ void ListenerImpl::initialize() {
   }
 }
 
+ListenerImpl::~ListenerImpl() {
+  if (!workers_started_) {
+    // We need to remove the listener_init_target_ handle from parent's initManager(), to unblock
+    // parent's initManager to get ready().
+    listener_init_target_.ready();
+  }
+}
+
 Init::Manager& ListenerImpl::initManager() { return dynamic_init_manager_; }
 
 void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory) {
