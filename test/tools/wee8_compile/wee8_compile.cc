@@ -194,11 +194,16 @@ bool writeWasmModule(const char* path, const wasm::vec<byte_t>& module, size_t s
 #define WEE8_WASM_PRECOMPILE_PLATFORM "linux_x86_64"
 #endif
 
-int main(int argc, char* argv[]) {
 #ifndef WEE8_WASM_PRECOMPILE_PLATFORM
+
+int main(int, char**) {
   std::cerr << "Unsupported platform." << std::endl;
   return EXIT_FAILURE;
+}
+
 #else
+
+int main(int argc, char* argv[]) {
   if (argc != 3) {
     std::cerr << "Usage: " << argv[0] << " <input> <output>" << std::endl;
     return EXIT_FAILURE;
@@ -229,5 +234,6 @@ int main(int argc, char* argv[]) {
   }
 
   return EXIT_SUCCESS;
-#endif
 }
+
+#endif
