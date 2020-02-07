@@ -4,6 +4,8 @@ Version history
 1.12.3 (Pending)
 ================
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
+==========================
+* sds: fixed the SDS vulnerability that TLS validation context (e.g., subject alt name or hash) cannot be effectively validated in some cases.
 
 1.12.2 (December 10, 2019)
 ==========================
