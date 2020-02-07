@@ -190,9 +190,9 @@ public:
       processed++;
 
       // Put the 7 bits where they should have been.
-      // Impl note: the cast is done to avoid undefined behaviour when offset_ >= 28 and the highest
-      // bit in el is set (what might occur when garbage data is being sent and then it would be
-      // treated as negative signed integer).
+      // Impl note: the cast is done to avoid undefined behaviour when offset_ >= 28 and some bits
+      // at positions 5-7 are set (we would have left shift of signed value that does not fit in
+      // data type).
       result_ |= ((static_cast<uint32_t>(el) & 0x7f) << offset_);
       if ((el & 0x80) == 0) {
         // If this was the last byte to process (what is marked by unset highest bit), we are done.
