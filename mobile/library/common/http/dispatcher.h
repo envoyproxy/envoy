@@ -185,11 +185,6 @@ private:
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
     Dispatcher& parent_;
-
-    // TODO: because the client may send infinite metadata frames we need some ongoing way to
-    // free metadata ahead of object destruction.
-    // An implementation option would be to have drainable header maps, or done callbacks.
-    std::vector<HeaderMapPtr> metadata_;
   };
 
   using DirectStreamSharedPtr = std::shared_ptr<DirectStream>;
