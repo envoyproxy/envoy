@@ -38,8 +38,6 @@ void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
   const uint32_t written = encoder.encode(expected, buffer);
-  // Sanity check (expected serialized length should be equal to real serialized length.
-  ASSERT_EQ(written, encoder.computeSize(expected));
   // Insert garbage after serialized payload.
   const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
@@ -75,8 +73,6 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
   const uint32_t written = encoder.encode(expected, buffer);
-  // Sanity check (expected serialized length should be equal to real serialized length.
-  ASSERT_EQ(written, encoder.computeSize(expected));
   // Insert garbage after serialized payload.
   const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
@@ -119,8 +115,6 @@ void serializeCompactThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
   const uint32_t written = encoder.encodeCompact(expected, buffer);
-  // Sanity check (expected serialized length should be equal to real serialized length.
-  ASSERT_EQ(written, encoder.computeCompactSize(expected));
   // Insert garbage after serialized payload.
   const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
@@ -154,8 +148,6 @@ void serializeCompactThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
   const uint32_t written = encoder.encodeCompact(expected, buffer);
-  // Sanity check (expected serialized length should be equal to real serialized length.
-  ASSERT_EQ(written, encoder.computeCompactSize(expected));
   // Insert garbage after serialized payload.
   const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
