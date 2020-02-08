@@ -766,11 +766,11 @@ def checkFormat(file_path):
   if isBuildFile(file_path) or isSkylarkFile(file_path) or isWorkspaceFile(file_path):
     if try_to_fix:
       error_messages += fixBuildPath(file_path)
-    #error_messages += checkBuildPath(file_path)
+    error_messages += checkBuildPath(file_path)
   else:
     if try_to_fix:
       error_messages += fixSourcePath(file_path)
-    #error_messages += checkSourcePath(file_path)
+    error_messages += checkSourcePath(file_path)
 
   if error_messages:
     return ["From %s" % file_path] + error_messages
