@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -18,4 +19,10 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/http:header_map_interface",
     ],
+)
+
+envoy_cc_extension(
+    name = "config",
+    security_posture = "robust_to_untrusted_downstream_and_upstream",
+    status = "wip",
 )
