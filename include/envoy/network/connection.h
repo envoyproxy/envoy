@@ -333,7 +333,7 @@ public:
    * @return const DynamicSocketOptions& the instance for performing runtime configurable socket
    *         options on the socket file descriptor
    */
-  virtual Network::DynamicSocketOptionsPtr getDynamicSocketOptionsPtr() PURE;
+  virtual Network::DynamicSocketOptionsPtr& getDynamicSocketOptionsPtr() PURE;
 
 private:
 };

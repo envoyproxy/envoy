@@ -147,7 +147,7 @@ public:
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
-  Network::DynamicSocketOptionsPtr getDynamicSocketOptionsPtr() override {
+  Network::DynamicSocketOptionsPtr& getDynamicSocketOptionsPtr() override {
     if (dynamic_socket_options_ptr_ == nullptr) {
       dynamic_socket_options_ptr_ =
           std::make_shared<Network::DynamicSocketOptionsImpl>(id(), ioHandle());

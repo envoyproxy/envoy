@@ -33,6 +33,9 @@ public:
     // TCP proxy code.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  Network::DynamicSocketOptionsPtr& getDynamicSocketOptionsPtr() override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void enableHalfClose(bool enabled) override;
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }

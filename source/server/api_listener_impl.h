@@ -92,7 +92,7 @@ protected:
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
       }
-      Network::DynamicSocketOptionsPtr getDynamicSocketOptionsPtr() override {
+      Network::DynamicSocketOptionsPtr& getDynamicSocketOptionsPtr() override {
         NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
       }
       void enableHalfClose(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

@@ -84,7 +84,7 @@ public:
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
   MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));
-  MOCK_METHOD(Network::DynamicSocketOptionsPtr, getDynamicSocketOptionsPtr, ());
+  MOCK_METHOD(Network::DynamicSocketOptionsPtr&, getDynamicSocketOptionsPtr, ());
 };
 
 /**
