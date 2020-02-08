@@ -99,6 +99,7 @@ public:
   MOCK_METHOD(bool, wantsToWrite, ());
   MOCK_METHOD(void, onUnderlyingConnectionAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onUnderlyingConnectionBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(Network::DynamicSocketOptionsPtr&, getDynamicSocketOptionsPtr, ());
 
   // Http::ClientConnection
   MOCK_METHOD(RequestEncoder&, newStream, (ResponseDecoder & response_decoder));
