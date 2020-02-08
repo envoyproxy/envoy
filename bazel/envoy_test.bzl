@@ -106,9 +106,10 @@ def envoy_cc_fuzz_test(
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
         data = [corpus_name],
-        # No fuzzing on macOS.
+        # No fuzzing on macOS or Windows
         deps = select({
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],
+            "@envoy//bazel:windows_x86_64": [repository + "//test:dummy_main"],
             "//conditions:default": [
                 ":" + test_lib_name,
                 repository + "//test/fuzz:main",
@@ -237,7 +238,7 @@ def envoy_cc_test_binary(
         name,
         testonly = 1,
         linkopts = _envoy_test_linkopts(),
-        tags = tags + ["compilation_db_implied"],
+        tags = tags + ["compilation_db_dep"],
         **kargs
     )
 

@@ -52,7 +52,7 @@ which in this case is simply `0.0.0.0:9901`.
 
 The :ref:`static_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.static_resources>` contains everything that is configured statically when Envoy starts,
 as opposed to the means of configuring resources dynamically when Envoy is running.
-The :ref:`v2 API Overview <config_overview_v2>` describes this.
+The :ref:`v2 API Overview <config_overview>` describes this.
 
 .. code-block:: yaml
 

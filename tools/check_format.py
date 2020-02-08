@@ -32,7 +32,7 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
 REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
-                       "./source/extensions/filters/http/common/aws/utility.cc",
+                       "./source/extensions/common/aws/utility.cc",
                        "./source/common/event/real_time_system.cc",
                        "./source/common/event/real_time_system.h", "./source/exe/main_common.cc",
                        "./source/exe/main_common.h", "./source/server/config_validation/server.cc",
@@ -46,8 +46,10 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
+    "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
+    "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
 )
@@ -71,7 +73,9 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.h",
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc",
-                       "./tools/clang_tools/api_booster/main.cc")
+                       "./tools/clang_tools/api_booster/main.cc",
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
+                       "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -150,6 +154,7 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/ext_authz",
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
+  "extensions/filters/network/kafka/broker",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
@@ -159,13 +164,33 @@ UNOWNED_EXTENSIONS = {
 # yapf: enable
 
 
-# Map a line transformation function across each line of a file.
-# .bak temporaries.
-def replaceLines(path, line_xform):
+# Map a line transformation function across each line of a file,
+# writing the result lines as requested.
+# If there is a clang format nesting or mismatch error, return the first occurrence
+def evaluateLines(path, line_xform, write=True):
+  error_message = None
+  format_flag = True
+  output_lines = []
+  for line_number, line in enumerate(readLines(path)):
+    if line.find("// clang-format off") != -1:
+      if not format_flag and error_message is None:
+        error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested off")
+      format_flag = False
+    if line.find("// clang-format on") != -1:
+      if format_flag and error_message is None:
+        error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format nested on")
+      format_flag = True
+    if format_flag:
+      output_lines.append(line_xform(line, line_number))
+    else:
+      output_lines.append(line)
   # We used to use fileinput in the older Python 2.7 script, but this doesn't do
   # inplace mode and UTF-8 in Python 3, so doing it the manual way.
-  output_lines = [line_xform(line) for line in readLines(path)]
-  pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
+  if write:
+    pathlib.Path(path).write_text('\n'.join(output_lines), encoding='utf-8')
+  if not format_flag and error_message is None:
+    error_message = "%s:%d: %s" % (path, line_number + 1, "clang-format remains off")
+  return error_message
 
 
 # Obtain all the lines in a given file.
@@ -213,7 +238,7 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 8.x.x "
+        "Command {} not found. If you have clang-format in version 9.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
@@ -233,13 +258,13 @@ def checkTools():
                               "users".format(path))
     else:
 
-      error_messages.append(
-          "Command {} not found. If you have buildifier installed, but the binary "
-          "name is different or it's not available in $GOPATH/bin, please use "
-          "{} environment variable to specify the path. Example:\n"
-          "    export {}=/opt/bin/buildifier\n"
-          "If you don't have buildifier installed, you can install it by:\n"
-          "    go get -u github.com/bazelbuild/buildtools/{}".format(path, var, var, name))
+      error_messages.append("Command {} not found. If you have {} installed, but the binary "
+                            "name is different or it's not available in $GOPATH/bin, please use "
+                            "{} environment variable to specify the path. Example:\n"
+                            "    export {}=`which {}`\n"
+                            "If you don't have {} installed, you can install it by:\n"
+                            "    go get -u github.com/bazelbuild/buildtools/{}".format(
+                                path, name, var, var, name, name, name))
 
   checkBazelTool('buildifier', BUILDIFIER_PATH, 'BUILDIFIER_BIN')
   checkBazelTool('buildozer', BUILDOZER_PATH, 'BUILDOZER_BIN')
@@ -330,7 +355,7 @@ def errorIfNoSubstringFound(pattern, file_path, error_message):
 
 
 def isApiFile(file_path):
-  return file_path.startswith(args.api_prefix)
+  return file_path.startswith(args.api_prefix) or file_path.startswith(args.api_shadow_prefix)
 
 
 def isBuildFile(file_path):
@@ -404,19 +429,24 @@ def checkFileContents(file_path, checker):
     # notes have a different format.
     checkCurrentReleaseNotes(file_path, error_messages)
 
-  for line_number, line in enumerate(readLines(file_path)):
+  def checkFormatErrors(line, line_number):
 
     def reportError(message):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
 
     checker(line, file_path, reportError)
+
+  evaluate_failure = evaluateLines(file_path, checkFormatErrors, False)
+  if evaluate_failure is not None:
+    error_messages.append(evaluate_failure)
+
   return error_messages
 
 
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
 
 
-def fixSourceLine(line):
+def fixSourceLine(line, line_number):
   # Strip double space after '.'  This may prove overenthusiastic and need to
   # be restricted to comments and metadata files but works for now.
   line = re.sub(DOT_MULTI_SPACE_REGEX, ". ", line)
@@ -564,6 +594,9 @@ def checkSourceLine(line, file_path, reportError):
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
+  if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
+    reportError("Don't use mangled Protobuf names for enum constants")
+
   hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
   if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
     reportError(
@@ -598,7 +631,7 @@ def checkBuildLine(line, file_path, reportError):
     reportError("Superfluous '@envoy//' prefix")
 
 
-def fixBuildLine(file_path, line):
+def fixBuildLine(file_path, line, line_number):
   if (envoy_build_rule_check and not isSkylarkFile(file_path) and not isWorkspaceFile(file_path) and
       not isExternalBuildFile(file_path)):
     line = line.replace("@envoy//", "//")
@@ -606,7 +639,7 @@ def fixBuildLine(file_path, line):
 
 
 def fixBuildPath(file_path):
-  replaceLines(file_path, functools.partial(fixBuildLine, file_path))
+  evaluateLines(file_path, functools.partial(fixBuildLine, file_path))
 
   error_messages = []
 
@@ -629,7 +662,8 @@ def checkBuildPath(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
-  if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
+  if isBuildFile(file_path) and (file_path.startswith(args.api_prefix + "envoy") or
+                                 file_path.startswith(args.api_shadow_prefix + "envoy")):
     found = False
     for line in readLines(file_path):
       if "api_proto_package(" in line:
@@ -645,7 +679,7 @@ def checkBuildPath(file_path):
 
 
 def fixSourcePath(file_path):
-  replaceLines(file_path, fixSourceLine)
+  evaluateLines(file_path, fixSourceLine)
 
   error_messages = []
 
@@ -783,7 +817,7 @@ def checkFormatVisitor(arg, dir_name, names):
   # python lists are passed as references, this is used to collect the list of
   # async results (futures) from running checkFormat and passing them back to
   # the caller.
-  pool, result_list, owned_directories, error_messags = arg
+  pool, result_list, owned_directories, error_messages = arg
 
   # Sanity check CODEOWNERS.  This doesn't need to be done in a multi-threaded
   # manner as it is a small and limited list.
@@ -832,6 +866,10 @@ if __name__ == "__main__":
                       default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
+  parser.add_argument("--api-shadow-prefix",
+                      type=str,
+                      default="./generated_api_shadow/",
+                      help="path of the shadow API tree.")
   parser.add_argument("--skip_envoy_build_rule_check",
                       action="store_true",
                       help="skip checking for '@envoy//' prefix in build rules.")
@@ -860,7 +898,10 @@ if __name__ == "__main__":
   target_path = args.target_path
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
-  namespace_check_excluded_paths = args.namespace_check_excluded_paths
+  namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
+      "./tools/api_boost/testdata/",
+      "./tools/clang_tools/",
+  ]
   build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
       "./bazel/external/",
       "./bazel/toolchains/",
@@ -881,8 +922,8 @@ if __name__ == "__main__":
   def ownedDirectories(error_messages):
     owned = []
     maintainers = [
-        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
-        '@dnoe', '@dio', '@jmarantz'
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
+        '@junr03', '@dio', '@jmarantz'
     ]
 
     try:

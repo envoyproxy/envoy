@@ -30,7 +30,8 @@ A sample filter configuration for a gRPC authorization server:
 
   http_filters:
     - name: envoy.ext_authz
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
         grpc_service:
           envoy_grpc:
             cluster_name: ext-authz
@@ -65,7 +66,8 @@ A sample filter configuration for a raw HTTP authorization server:
 
   http_filters:
     - name: envoy.ext_authz
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
         http_service:
             server_uri:
               uri: 127.0.0.1:10003
@@ -137,5 +139,5 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
 Runtime
 -------
 The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
-<envoy_api_field_core.runtimefractionalpercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
 <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.filter_enabled>` field.

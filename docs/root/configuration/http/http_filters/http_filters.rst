@@ -7,6 +7,7 @@ HTTP filters
   :maxdepth: 2
 
   adaptive_concurrency_filter
+  aws_request_signing_filter
   buffer_filter
   cors_filter
   csrf_filter
@@ -25,6 +26,7 @@ HTTP filters
   ip_tagging_filter
   jwt_authn_filter
   lua_filter
+  on_demand_updates_filter
   original_src_filter
   rate_limit_filter
   rbac_filter

@@ -62,8 +62,8 @@ void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageMetadataSharedPtr
   SerializationType type = static_cast<SerializationType>(flag & SerializationTypeMask);
   if (!isValidSerializationType(type)) {
     throw EnvoyException(
-        fmt::format("invalid dubbo message serialization type {}",
-                    static_cast<std::underlying_type<SerializationType>::type>(type)));
+        absl::StrCat("invalid dubbo message serialization type ",
+                     static_cast<std::underlying_type<SerializationType>::type>(type)));
   }
 
   if (!is_two_way && metadata->message_type() != MessageType::HeartbeatRequest) {
@@ -78,8 +78,8 @@ void parseResponseInfoFromBuffer(Buffer::Instance& buffer, MessageMetadataShared
   ResponseStatus status = static_cast<ResponseStatus>(buffer.peekInt<uint8_t>(StatusOffset));
   if (!isValidResponseStatus(status)) {
     throw EnvoyException(
-        fmt::format("invalid dubbo message response status {}",
-                    static_cast<std::underlying_type<ResponseStatus>::type>(status)));
+        absl::StrCat("invalid dubbo message response status ",
+                     static_cast<std::underlying_type<ResponseStatus>::type>(status)));
   }
 
   metadata->setResponseStatus(status);
@@ -97,7 +97,7 @@ DubboProtocolImpl::decodeHeader(Buffer::Instance& buffer, MessageMetadataSharedP
 
   uint16_t magic_number = buffer.peekBEInt<uint16_t>();
   if (magic_number != MagicNumber) {
-    throw EnvoyException(fmt::format("invalid dubbo message magic number {}", magic_number));
+    throw EnvoyException(absl::StrCat("invalid dubbo message magic number ", magic_number));
   }
 
   uint8_t flag = buffer.peekInt<uint8_t>(FlagOffset);
@@ -109,7 +109,7 @@ DubboProtocolImpl::decodeHeader(Buffer::Instance& buffer, MessageMetadataSharedP
 
   // The body size of the heartbeat message is zero.
   if (body_size > MaxBodySize || body_size < 0) {
-    throw EnvoyException(fmt::format("invalid dubbo message size {}", body_size));
+    throw EnvoyException(absl::StrCat("invalid dubbo message size ", body_size));
   }
 
   metadata->setRequestId(request_id);

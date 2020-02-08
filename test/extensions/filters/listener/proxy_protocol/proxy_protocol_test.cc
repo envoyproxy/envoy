@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -82,9 +82,9 @@ public:
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
-  envoy::api::v2::core::TrafficDirection direction() const override {
-    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
@@ -946,9 +946,9 @@ public:
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
-  envoy::api::v2::core::TrafficDirection direction() const override {
-    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 

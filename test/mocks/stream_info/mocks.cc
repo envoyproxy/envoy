@@ -15,7 +15,7 @@ namespace Envoy {
 namespace StreamInfo {
 
 MockStreamInfo::MockStreamInfo()
-    : filter_state_(FilterState::LifeSpan::FilterChain),
+    : filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
       downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_direct_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
@@ -88,7 +88,12 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
-  ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(filter_state_));
+  ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(*filter_state_));
+  ON_CALL(*this, upstreamFilterState()).WillByDefault(ReturnRef(upstream_filter_state_));
+  ON_CALL(*this, setUpstreamFilterState(_))
+      .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
+        upstream_filter_state_ = filter_state;
+      }));
   ON_CALL(*this, setRequestedServerName(_))
       .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {
         requested_server_name_ = std::string(requested_server_name);

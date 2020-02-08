@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.v2;
+
+import "udpa/annotations/migrate.proto";
+
+option (udpa.annotations.file_migrate).move_to_package = "envoy.foo.v3";
+
+message Package {
+  message Entry {
+    string key = 1;
+    string value = 2;
+  }
+  repeated Entry entries = 1;
+}

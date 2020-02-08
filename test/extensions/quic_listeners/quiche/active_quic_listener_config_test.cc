@@ -20,7 +20,8 @@ public:
 TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   std::string listener_name = QuicListenerName;
   auto& config_factory =
-      Config::Utility::getAndCheckFactory<Server::ActiveUdpListenerConfigFactory>(listener_name);
+      Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
+          listener_name);
   ProtobufTypes::MessagePtr config = config_factory.createEmptyConfigProto();
 
   std::string yaml = R"EOF(
@@ -31,7 +32,7 @@ TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   )EOF";
   TestUtility::loadFromYaml(yaml, *config);
   Network::ActiveUdpListenerFactoryPtr listener_factory =
-      config_factory.createActiveUdpListenerFactory(*config);
+      config_factory.createActiveUdpListenerFactory(*config, /*concurrency=*/1);
   EXPECT_NE(nullptr, listener_factory);
   quic::QuicConfig& quic_config = ActiveQuicListenerFactoryPeer::quicConfig(
       dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));

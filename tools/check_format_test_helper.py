@@ -7,11 +7,11 @@
 
 from __future__ import print_function
 
+from run_command import runCommand
 import argparse
 import logging
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 
@@ -21,30 +21,13 @@ check_format = sys.executable + " " + os.path.join(tools, 'check_format.py')
 errors = 0
 
 
-# Echoes and runs an OS command, returning exit status and the captured
-# stdout+stderr as a string array.
-def runCommand(command):
-  stdout = []
-  status = 0
-  try:
-    out = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
-    if out:
-      stdout = out.decode('utf-8').split("\n")
-  except subprocess.CalledProcessError as e:
-    status = e.returncode
-    for line in e.output.splitlines():
-      stdout.append(line)
-  logging.info("%s" % command)
-  return status, stdout
-
-
 # Runs the 'check_format' operation, on the specified file, printing
 # the comamnd run and the status code as well as the stdout, and returning
 # all of that to the caller.
 def runCheckFormat(operation, filename):
   command = check_format + " " + operation + " " + filename
-  status, stdout = runCommand(command)
-  return (command, status, stdout)
+  status, stdout, stderr = runCommand(command)
+  return (command, status, stdout + stderr)
 
 
 def getInputFile(filename, extra_input_files=None):
@@ -80,10 +63,10 @@ def fixFileExpectingSuccess(file, extra_input_files=None):
     print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
-  status, stdout = runCommand('diff ' + outfile + ' ' + infile + '.gold')
+  status, stdout, stderr = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
     print("FAILED:")
-    emitStdoutAsError(stdout)
+    emitStdoutAsError(stdout + stderr)
     return 1
   return 0
 
@@ -92,7 +75,7 @@ def fixFileExpectingNoChange(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
   if status != 0:
     return 1
-  status, stdout = runCommand('diff ' + outfile + ' ' + infile)
+  status, stdout, stderr = runCommand('diff ' + outfile + ' ' + infile)
   if status != 0:
     logging.error(file + ': expected file to remain unchanged')
     return 1
@@ -100,7 +83,7 @@ def fixFileExpectingNoChange(file):
 
 
 def emitStdoutAsError(stdout):
-  logging.error("\n".join(line.decode('utf-8') for line in stdout))
+  logging.error("\n".join(stdout))
 
 
 def expectError(filename, status, stdout, expected_substring):
@@ -108,7 +91,7 @@ def expectError(filename, status, stdout, expected_substring):
     logging.error("%s: Expected failure `%s`, but succeeded" % (filename, expected_substring))
     return 1
   for line in stdout:
-    if expected_substring in line.decode('utf-8'):
+    if expected_substring in line:
       return 0
   logging.error("%s: Could not find '%s' in:\n" % (filename, expected_substring))
   emitStdoutAsError(stdout)
@@ -139,6 +122,10 @@ def checkToolNotFoundError():
   oldPath = os.environ["PATH"]
   os.environ["PATH"] = "/sbin:/usr/sbin"
   clang_format = os.getenv("CLANG_FORMAT", "clang-format-9")
+  # If CLANG_FORMAT points directly to the binary, skip this test.
+  if os.path.isfile(clang_format) and os.access(clang_format, os.X_OK):
+    os.environ["PATH"] = oldPath
+    return 0
   errors = checkFileExpectingError("no_namespace_envoy.cc", "Command %s not found." % clang_format)
   os.environ["PATH"] = oldPath
   return errors
@@ -222,10 +209,14 @@ def runChecks():
       "grpc_shutdown.cc",
       "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
       "See #8282")
-
+  errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
+  errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
+  errors += checkUnfixableError("clang_format_double_on.cc", "clang-format nested on")
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",
       "Unable to find package name for proto file: ./api/missing_package.proto")
+  errors += checkUnfixableError("proto_enum_mangling.cc",
+                                "Don't use mangled Protobuf names for enum constants")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
@@ -237,6 +228,8 @@ def runChecks():
   errors += checkAndFixError("proto_style.cc", "incorrect protobuf type reference")
   errors += checkAndFixError("long_line.cc", "clang-format check failed")
   errors += checkAndFixError("header_order.cc", "header_order.py check failed")
+  errors += checkAndFixError("clang_format_on.cc",
+                             "./clang_format_on.cc:7: over-enthusiastic spaces")
   # Validate that a missing license is added.
   errors += checkAndFixError("license.BUILD", "envoy_build_fixer check failed")
   # Validate that an incorrect license is replaced and reordered.
@@ -264,6 +257,7 @@ def runChecks():
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")
+  errors += checkFileExpectingOK("clang_format_off.cc")
   return errors
 
 

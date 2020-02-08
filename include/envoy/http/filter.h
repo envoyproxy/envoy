@@ -168,7 +168,7 @@ public:
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
    */
-  virtual uint64_t streamId() PURE;
+  virtual uint64_t streamId() const PURE;
 
   /**
    * @return streamInfo for logging purposes. Individual filter may add specific information to be
@@ -192,6 +192,22 @@ public:
    */
   virtual const ScopeTrackedObject& scope() PURE;
 };
+
+/**
+ * RouteConfigUpdatedCallback is used to notify an OnDemandRouteUpdate filter about completion of a
+ * RouteConfig update. The filter (and the associated ActiveStream) where the original on-demand
+ * request was originated can be destroyed before a response to an on-demand update request is
+ * received and updates are propagated. To handle this:
+ *
+ * OnDemandRouteUpdate filter instance holds a RouteConfigUpdatedCallbackSharedPtr to a callback.
+ * Envoy::Router::RdsRouteConfigProviderImpl holds a weak pointer to the RouteConfigUpdatedCallback
+ * above in an Envoy::Router::UpdateOnDemandCallback struct
+ *
+ * In RdsRouteConfigProviderImpl::onConfigUpdate(), before invoking the callback, a check is made to
+ * verify if the callback is still available.
+ */
+using RouteConfigUpdatedCallback = std::function<void(bool)>;
+using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
 
 /**
  * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to restart
@@ -436,6 +452,23 @@ public:
    * @return The socket options to be applied to the upstream request.
    */
   virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
+
+  /**
+   * Schedules a request for a RouteConfiguration update from the management server.
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to the worker thread.
+   */
+  virtual void
+  requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+  /**
+   *
+   * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS
+   * route config provider is used. Scoped RDS provides are not supported at the moment, as
+   * retrieval of a route configuration in their case requires passing of http request headers
+   * as a parameter.
+   */
+  virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
 };
 
 /**

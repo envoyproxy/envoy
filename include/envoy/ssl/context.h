@@ -3,13 +3,13 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2alpha/certs.pb.h"
+#include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Ssl {
 
-using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v2alpha::CertificateDetails>;
+using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v3::CertificateDetails>;
 
 /**
  * SSL Context is used as a template for SSL connection configuration.

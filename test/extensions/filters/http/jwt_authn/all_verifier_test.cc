@@ -1,4 +1,4 @@
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"
@@ -11,7 +11,7 @@
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using ::google::jwt_verify::Status;
 using ::testing::NiceMock;
 
@@ -73,7 +73,7 @@ public:
   }
 
   void createVerifier() {
-    filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
+    filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
                                  *filter_config_);
   }
@@ -83,7 +83,7 @@ public:
   }
 
   JwtAuthentication proto_config_;
-  FilterConfigSharedPtr filter_config_;
+  std::shared_ptr<FilterConfigImpl> filter_config_;
   VerifierConstPtr verifier_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;

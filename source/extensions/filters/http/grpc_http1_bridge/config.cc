@@ -9,9 +9,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-Http::FilterFactoryCb
-GrpcHttp1BridgeFilterConfig::createFilter(const std::string&,
-                                          Server::Configuration::FactoryContext& factory_context) {
+Http::FilterFactoryCb GrpcHttp1BridgeFilterConfig::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config&, const std::string&,
+    Server::Configuration::FactoryContext& factory_context) {
   return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<Http1BridgeFilter>(factory_context.grpcContext()));
   };

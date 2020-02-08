@@ -8,8 +8,9 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
@@ -33,22 +34,23 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
+#include "absl/time/time.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
+envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
   switch (type) {
   case Http::CodecClient::Type::HTTP1:
-    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         HTTP1;
   case Http::CodecClient::Type::HTTP2:
-    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         HTTP2;
   case Http::CodecClient::Type::HTTP3:
-    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         HTTP3;
   default:
     RELEASE_ASSERT(0, "");
@@ -75,7 +77,7 @@ void IntegrationCodecClient::flushWrite() {
 IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeHeaderOnlyRequest(const Http::HeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
-  Http::StreamEncoder& encoder = newStream(*response);
+  Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, true);
   flushWrite();
@@ -91,7 +93,7 @@ IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
                                             const std::string& body) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
-  Http::StreamEncoder& encoder = newStream(*response);
+  Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, false);
   Buffer::OwnedImpl data(body);
@@ -100,37 +102,37 @@ IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
   return response;
 }
 
-void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, absl::string_view data,
+void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, absl::string_view data,
                                       bool end_stream) {
   Buffer::OwnedImpl buffer_data(data.data(), data.size());
   encoder.encodeData(buffer_data, end_stream);
   flushWrite();
 }
 
-void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, Buffer::Instance& data,
+void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, Buffer::Instance& data,
                                       bool end_stream) {
   encoder.encodeData(data, end_stream);
   flushWrite();
 }
 
-void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, uint64_t size,
+void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, uint64_t size,
                                       bool end_stream) {
   Buffer::OwnedImpl data(std::string(size, 'a'));
   sendData(encoder, data, end_stream);
 }
 
-void IntegrationCodecClient::sendTrailers(Http::StreamEncoder& encoder,
+void IntegrationCodecClient::sendTrailers(Http::RequestEncoder& encoder,
                                           const Http::HeaderMap& trailers) {
   encoder.encodeTrailers(trailers);
   flushWrite();
 }
 
-void IntegrationCodecClient::sendReset(Http::StreamEncoder& encoder) {
+void IntegrationCodecClient::sendReset(Http::RequestEncoder& encoder) {
   encoder.getStream().resetStream(Http::StreamResetReason::LocalReset);
   flushWrite();
 }
 
-void IntegrationCodecClient::sendMetadata(Http::StreamEncoder& encoder,
+void IntegrationCodecClient::sendMetadata(Http::RequestEncoder& encoder,
                                           Http::MetadataMap metadata_map) {
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
   Http::MetadataMapVector metadata_map_vector;
@@ -139,10 +141,10 @@ void IntegrationCodecClient::sendMetadata(Http::StreamEncoder& encoder,
   flushWrite();
 }
 
-std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
+std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
 IntegrationCodecClient::startRequest(const Http::HeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
-  Http::StreamEncoder& encoder = newStream(*response);
+  Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, false);
   flushWrite();
@@ -260,7 +262,7 @@ std::string HttpIntegrationTest::waitForAccessLog(const std::string& filename) {
     if (contents.length() > 0) {
       return contents;
     }
-    usleep(1000);
+    absl::SleepFor(absl::Milliseconds(1));
   }
   RELEASE_ASSERT(0, "Timed out waiting for access log");
   return "";
@@ -272,14 +274,12 @@ void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstre
 }
 
 ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableDownstreamTrailersHttp1() {
-  return
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-        hcm.mutable_http_protocol_options()->set_enable_trailers(true);
-      };
+  return [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) { hcm.mutable_http_protocol_options()->set_enable_trailers(true); };
 }
 
 ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrailersHttp1() {
-  return [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  return [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -561,8 +561,8 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
 
 void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
     ConnectionCreationFunction* create_connection) {
-#ifdef __APPLE__
-  // Skip this test on macOS: we can't detect the early close on macOS, and we
+#if defined(__APPLE__) || defined(WIN32)
+  // Skip this test on OS/X + Windows: we can't detect the early close, and we
   // won't clean up the upstream connection until it times out. See #4294.
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     return;
@@ -810,8 +810,8 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
     config_helper_.addFilter("name: envoy.cors");
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-            -> void {
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
           auto* route_config = hcm.mutable_route_config();
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
           {
@@ -823,8 +823,8 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
         });
   }
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.set_proxy_100_continue(true); });
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -921,8 +921,8 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
   // due to default headers.
 
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_max_request_headers_kb()->set_value(max_size);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
@@ -966,8 +966,8 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   // and other headers.
 
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
   max_request_headers_kb_ = max_size;
   Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
   request_trailers.addCopy("big", std::string(size * 1024, 'a'));
@@ -1010,8 +1010,8 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
   max_request_headers_count_ = 20005;
 
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_max_request_headers_kb()->set_value(max_request_headers_kb_);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_request_headers_count_);

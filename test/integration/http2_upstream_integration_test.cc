@@ -2,8 +2,8 @@
 
 #include <iostream>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/http/header_map_impl.h"
 
@@ -148,7 +148,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                           {":path", "/test/long/url"},
                                                           {":scheme", "http"},
                                                           {":authority", "host"}});
-  Http::StreamEncoder* encoder1 = &encoder_decoder1.first;
+  Http::RequestEncoder* encoder1 = &encoder_decoder1.first;
   auto response1 = std::move(encoder_decoder1.second);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request1));
@@ -159,7 +159,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                           {":path", "/test/long/url"},
                                                           {":scheme", "http"},
                                                           {":authority", "host"}});
-  Http::StreamEncoder* encoder2 = &encoder_decoder2.first;
+  Http::RequestEncoder* encoder2 = &encoder_decoder2.first;
   auto response2 = std::move(encoder_decoder2.second);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
 
@@ -204,7 +204,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
 void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes, uint32_t) {
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;
-  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<int> response_bytes;
   autonomous_upstream_ = true;
@@ -264,7 +264,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
-  std::vector<Http::StreamEncoder*> encoders;
+  std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
   initialize();
@@ -320,8 +320,8 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
 // Regression test for https://github.com/envoyproxy/envoy/issues/6744
 TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         const std::string access_log_name =
             TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.
@@ -330,7 +330,7 @@ name: envoy.router
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
-    name: envoy.file_access_log
+    name: envoy.access_loggers.file
     filter:
       not_health_check_filter: {}
     typed_config:
@@ -400,7 +400,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 // Tests bootstrap configuration of max response headers.
 TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
   // Set max response header count to 200.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
@@ -445,8 +445,8 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
 // See https://github.com/envoyproxy/envoy/issues/8828.
 TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         const std::string access_log_name =
             TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.
@@ -455,7 +455,7 @@ name: envoy.router
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
-    name: envoy.http_grpc_access_log
+    name: envoy.access_loggers.http_grpc
     filter:
       not_health_check_filter: {}
     typed_config:

@@ -1,6 +1,6 @@
 #include "common/config/delta_subscription_impl.h"
 
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -13,12 +13,6 @@ DeltaSubscriptionImpl::DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::str
     : context_(std::move(context)), type_url_(type_url), callbacks_(callbacks), stats_(stats),
       init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated) {}
 
-DeltaSubscriptionImpl::~DeltaSubscriptionImpl() {
-  if (watch_) {
-    context_->removeWatch(type_url_, watch_);
-  }
-}
-
 void DeltaSubscriptionImpl::pause() { context_->pause(type_url_); }
 
 void DeltaSubscriptionImpl::resume() { context_->resume(type_url_); }
@@ -30,14 +24,13 @@ void DeltaSubscriptionImpl::start(const std::set<std::string>& resources) {
   if (!is_aggregated_) {
     context_->start();
   }
-  watch_ = context_->addOrUpdateWatch(type_url_, watch_, resources, *this, init_fetch_timeout_);
+  watch_ = context_->addWatch(type_url_, resources, *this, init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
 
 void DeltaSubscriptionImpl::updateResourceInterest(
     const std::set<std::string>& update_to_these_names) {
-  watch_ = context_->addOrUpdateWatch(type_url_, watch_, update_to_these_names, *this,
-                                      init_fetch_timeout_);
+  watch_->update(update_to_these_names);
   stats_.update_attempt_.inc();
 }
 
@@ -52,7 +45,7 @@ void DeltaSubscriptionImpl::onConfigUpdate(
 }
 
 void DeltaSubscriptionImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   stats_.update_attempt_.inc();

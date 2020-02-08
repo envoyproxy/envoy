@@ -31,7 +31,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_99, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_q099, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -47,7 +47,7 @@ public:
         stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}} {
-    quic_stream_->setDecoder(stream_decoder_);
+    quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _))
@@ -92,7 +92,7 @@ public:
       std::unique_ptr<char[]> data_buffer;
       quic::QuicByteCount data_frame_header_length =
           quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
-      quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+      quiche::QuicheStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
       data = absl::StrCat(data_frame_header, body);
     }
     return data;
@@ -138,7 +138,7 @@ protected:
   MockEnvoyQuicSession quic_session_;
   quic::QuicStreamId stream_id_;
   EnvoyQuicServerStream* quic_stream_;
-  Http::MockStreamDecoder stream_decoder_;
+  Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
   quic::QuicHeaderList request_headers_;
   Http::TestHeaderMapImpl response_headers_;

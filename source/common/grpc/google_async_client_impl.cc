@@ -1,6 +1,6 @@
 #include "common/grpc/google_async_client_impl.h"
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/base64.h"
@@ -72,7 +72,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleAsyncClientThreadLocal& tls,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
-                                             const envoy::api::v2::core::GrpcService& config,
+                                             const envoy::config::core::v3::GrpcService& config,
                                              Api::Api& api)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {
@@ -80,13 +80,12 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config, api);
-  std::shared_ptr<grpc::Channel> channel = CreateChannel(config.google_grpc().target_uri(), creds);
+  std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");
   for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::MaximumKnown; ++i) {
-    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
+    stats_.streams_closed_[i] = &scope_->counter(absl::StrCat("streams_closed_", i));
   }
 }
 

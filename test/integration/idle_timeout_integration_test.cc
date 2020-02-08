@@ -1,5 +1,5 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
@@ -14,8 +14,8 @@ public:
   void initialize() override {
     useAccessLog("%RESPONSE_CODE_DETAILS%");
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-            -> void {
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
           if (enable_global_idle_timeout_) {
             hcm.mutable_stream_idle_timeout()->set_seconds(0);
             hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
@@ -91,7 +91,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, IdleTimeoutIntegrationTest,
 // Tests idle timeout behaviour with single request and validates that idle timer kicks in
 // after given timeout.
 TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
@@ -123,7 +123,7 @@ TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
 // Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
 // after both the requests are done.
 TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
@@ -325,7 +325,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
-  // Omitting \r\n\n\n does not indicate incomplete request in HTTP2
+  // Omitting \r\n\r\n does not indicate incomplete request in HTTP2
   if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
     return;
   }
@@ -349,7 +349,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequ
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\n\n", &raw_response, true);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response, true);
   EXPECT_THAT(raw_response, testing::Not(testing::HasSubstr("request timeout")));
 }
 

@@ -12,14 +12,13 @@ various events. Draining occurs at the following times:
 * The server is being :ref:`hot restarted <arch_overview_hot_restart>`.
 * Individual listeners are being modified or removed via :ref:`LDS
   <arch_overview_dynamic_config_lds>`.
-* Admin initiated drain via :ref:`drain_listeners <operations_admin_interface_drain>`.
 
 Each :ref:`configured listener <arch_overview_listeners>` has a :ref:`drain_type
 <envoy_api_enum_Listener.DrainType>` setting which controls when draining takes place. The currently
 supported values are:
 
 default
-  Envoy will drain listeners in response to all three cases above (admin drain, hot restart, and
+  Envoy will drain listeners in response to all three cases above (admin health fail, hot restart, and
   LDS update/remove). This is the default setting.
 
 modify_only
@@ -34,3 +33,7 @@ level. Currently the only filters that support graceful draining are
 :ref:`HTTP connection manager <config_http_conn_man>`,
 :ref:`Redis <config_network_filters_redis_proxy>`, and
 :ref:`Mongo <config_network_filters_mongo_proxy>`.
+
+Listeners can also be stopped via :ref:`drain_listeners <operations_admin_interface_drain>`. In this case,
+they are directly stopped (with out going through the actual draining process) on worker threads,
+so that they will not accept any new requests.

@@ -1,5 +1,5 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/overload/v2alpha/overload.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -14,7 +14,7 @@ protected:
         file_updater_(injected_resource_filename_) {}
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       const std::string overload_config = fmt::format(R"EOF(
         refresh_interval:
           seconds: 0
@@ -43,8 +43,7 @@ protected:
       )EOF",
                                                       injected_resource_filename_);
       *bootstrap.mutable_overload_manager() =
-          TestUtility::parseYaml<envoy::config::overload::v2alpha::OverloadManager>(
-              overload_config);
+          TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
     });
     updateResource(0);
     HttpIntegrationTest::initialize();

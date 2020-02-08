@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":filter_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/server:filter_config_interface",
         "//source/common/common:macros",
         "//source/common/protobuf:cc_wkt_protos",
@@ -47,5 +48,13 @@ envoy_cc_library(
     hdrs = ["well_known_names.h"],
     deps = [
         "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "pass_through_filter_lib",
+    hdrs = ["pass_through_filter.h"],
+    deps = [
+        ":filter_interface",
     ],
 )

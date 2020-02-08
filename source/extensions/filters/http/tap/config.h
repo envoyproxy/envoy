@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/http/tap/v2alpha/tap.pb.h"
-#include "envoy/config/filter/http/tap/v2alpha/tap.pb.validate.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -15,13 +15,13 @@ namespace TapFilter {
  * Config registration for the tap filter.
  */
 class TapFilterFactory
-    : public Common::FactoryBase<envoy::config::filter::http::tap::v2alpha::Tap> {
+    : public Common::FactoryBase<envoy::extensions::filters::http::tap::v3::Tap> {
 public:
   TapFilterFactory() : FactoryBase(HttpFilterNames::get().Tap) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::tap::v2alpha::Tap& proto_config,
+      const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

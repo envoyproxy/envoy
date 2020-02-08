@@ -6,7 +6,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -43,11 +43,11 @@ class FakeHttpConnection;
 /**
  * Provides a fake HTTP stream for integration testing.
  */
-class FakeStream : public Http::StreamDecoder,
+class FakeStream : public Http::RequestDecoder,
                    public Http::StreamCallbacks,
                    Logger::Loggable<Logger::Id::testing> {
 public:
-  FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+  FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
              Event::TestTimeSystem& time_system);
 
   uint64_t bodyLength() { return body_.length(); }
@@ -152,11 +152,12 @@ public:
   }
 
   // Http::StreamDecoder
-  void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
-  void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
-  void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
+
+  // Http::RequestDecoder
+  void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
+  void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -178,7 +179,7 @@ protected:
 
 private:
   FakeHttpConnection& parent_;
-  Http::StreamEncoder& encoder_;
+  Http::ResponseEncoder& encoder_;
   Thread::MutexBasicLockable lock_;
   Thread::CondVar decoder_event_;
   Http::HeaderMapPtr trailers_;
@@ -430,7 +431,7 @@ public:
                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Http::ServerConnectionCallbacks
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
+  Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
   void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
@@ -629,9 +630,7 @@ private:
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }
-    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-      return *socket_;
-    }
+    Network::SocketOptRef sharedSocket() const override { return *socket_; }
 
   private:
     Network::SocketSharedPtr socket_;
@@ -677,8 +676,8 @@ private:
       return udp_listener_factory_.get();
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
-    envoy::api::v2::core::TrafficDirection direction() const override {
-      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    envoy::config::core::v3::TrafficDirection direction() const override {
+      return envoy::config::core::v3::UNSPECIFIED;
     }
 
     FakeUpstream& parent_;

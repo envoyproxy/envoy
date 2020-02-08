@@ -1,18 +1,18 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/router/string_accessor_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::network::http_connection_manager::v2::HttpFilter;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 
 namespace Envoy {
 namespace Extensions {
@@ -32,7 +32,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
     const Http::HeaderEntry* entry = headers.get(header_);
     if (entry) {
-      decoder_callbacks_->streamInfo().filterState().setData(
+      decoder_callbacks_->streamInfo().filterState()->setData(
           state_, std::make_unique<Router::StringAccessorImpl>(entry->value().getStringView()),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -314,7 +314,7 @@ public:
     config_helper_.addFilter(getFilterConfig(false));
 
     if (add_cluster) {
-      config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
         auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
         jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
         jwks_cluster->set_name("pubkey_cluster");

@@ -14,13 +14,13 @@ namespace Wasm {
 thread_local Envoy::Extensions::Common::Wasm::Context* current_context_ = nullptr;
 thread_local uint32_t effective_context_id_ = 0;
 
-WasmVmPtr createWasmVm(absl::string_view runtime) {
+WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& scope) {
   if (runtime.empty()) {
     throw WasmVmException("Failed to create WASM VM with unspecified runtime.");
   } else if (runtime == WasmRuntimeNames::get().Null) {
-    return Null::createVm();
+    return Null::createVm(scope);
   } else if (runtime == WasmRuntimeNames::get().V8) {
-    return V8::createVm();
+    return V8::createVm(scope);
   } else {
     throw WasmVmException(fmt::format(
         "Failed to create WASM VM using {} runtime. Envoy was compiled without support for it.",

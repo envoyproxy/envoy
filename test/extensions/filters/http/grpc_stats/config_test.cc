@@ -1,5 +1,5 @@
-#include "envoy/config/filter/http/grpc_stats/v2alpha/config.pb.h"
-#include "envoy/config/filter/http/grpc_stats/v2alpha/config.pb.validate.h"
+#include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 
 #include "common/grpc/common.h"
 
@@ -23,7 +23,7 @@ namespace {
 class GrpcStatsFilterConfigTest : public testing::Test {
 protected:
   void initialize(bool emit_filter_state) {
-    envoy::config::filter::http::grpc_stats::v2alpha::FilterConfig config{};
+    envoy::extensions::filters::http::grpc_stats::v3::FilterConfig config{};
     config.set_emit_filter_state(emit_filter_state);
     GrpcStatsFilterConfig factory;
     Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context_);
@@ -66,7 +66,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
@@ -90,7 +90,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
@@ -112,7 +112,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
@@ -139,8 +139,8 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                 ->statsScope()
                 .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
                 .value());
-  const auto& data =
-      stream_info_.filterState().getDataReadOnly<GrpcStatsObject>(HttpFilterNames::get().GrpcStats);
+  const auto& data = stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>(
+      HttpFilterNames::get().GrpcStats);
   EXPECT_EQ(2U, data.request_message_count);
   EXPECT_EQ(0U, data.response_message_count);
 
@@ -178,7 +178,7 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
   EXPECT_EQ(3U, data.response_message_count);
 
   auto filter_object =
-      *dynamic_cast<envoy::config::filter::http::grpc_stats::v2alpha::FilterObject*>(
+      *dynamic_cast<envoy::extensions::filters::http::grpc_stats::v3::FilterObject*>(
           data.serializeAsProto().get());
   EXPECT_EQ(2U, filter_object.request_message_count());
   EXPECT_EQ(3U, filter_object.response_message_count());

@@ -20,7 +20,7 @@ const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 
-AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                                    AutonomousUpstream& upstream, bool allow_incomplete_streams)
     : FakeStream(parent, encoder, upstream.timeSystem()), upstream_(upstream),
       allow_incomplete_streams_(allow_incomplete_streams) {}
@@ -58,7 +58,7 @@ void AutonomousStream::sendResponse() {
   int32_t response_body_length = 10;
   HeaderToInt(RESPONSE_SIZE_BYTES, response_body_length, headers);
 
-  encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  encodeHeaders(upstream_.responseHeaders(), false);
   encodeData(response_body_length, true);
 }
 
@@ -69,8 +69,8 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
                          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT),
       upstream_(upstream) {}
 
-Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,
-                                                         bool) {
+Http::RequestDecoder& AutonomousHttpConnection::newStream(Http::ResponseEncoder& response_encoder,
+                                                          bool) {
   auto stream =
       new AutonomousStream(*this, response_encoder, upstream_, upstream_.allow_incomplete_streams_);
   streams_.push_back(FakeStreamPtr{stream});
@@ -107,6 +107,18 @@ void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
 std::unique_ptr<Http::TestHeaderMapImpl> AutonomousUpstream::lastRequestHeaders() {
   Thread::LockGuard lock(headers_lock_);
   return std::move(last_request_headers_);
+}
+
+void AutonomousUpstream::setResponseHeaders(
+    std::unique_ptr<Http::TestHeaderMapImpl>&& response_headers) {
+  Thread::LockGuard lock(headers_lock_);
+  response_headers_ = std::move(response_headers);
+}
+
+Http::TestHeaderMapImpl AutonomousUpstream::responseHeaders() {
+  Thread::LockGuard lock(headers_lock_);
+  Http::TestHeaderMapImpl return_headers = *response_headers_;
+  return return_headers;
 }
 
 } // namespace Envoy

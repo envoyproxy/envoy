@@ -3,8 +3,8 @@
 #include <chrono>
 #include <vector>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -43,7 +43,7 @@ struct GradientControllerStats {
 class GradientControllerConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   GradientControllerConfig(
-      const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
+      const envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig&
           proto_config,
       Runtime::Loader& runtime);
 
