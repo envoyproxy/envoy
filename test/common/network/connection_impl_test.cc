@@ -663,11 +663,10 @@ TEST_P(ConnectionImplTest, HalfClose) {
   client_connection_->enableHalfClose(true);
   client_connection_->addReadFilter(client_read_filter);
 
-  EXPECT_CALL(*read_filter_, onData(_, true))
-      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
-        dispatcher_->exit();
-        return FilterStatus::StopIteration;
-      }));
+  EXPECT_CALL(*read_filter_, onData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+    dispatcher_->exit();
+    return FilterStatus::StopIteration;
+  }));
 
   Buffer::OwnedImpl empty_buffer;
   client_connection_->write(empty_buffer, true);
@@ -710,11 +709,10 @@ TEST_P(ConnectionImplTest, HalfCloseNoEarlyCloseDetection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   server_connection_->readDisable(false);
-  EXPECT_CALL(*read_filter_, onData(_, _))
-      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
-        dispatcher_->exit();
-        return FilterStatus::StopIteration;
-      }));
+  EXPECT_CALL(*read_filter_, onData(_, _)).WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+    dispatcher_->exit();
+    return FilterStatus::StopIteration;
+  }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
@@ -1812,11 +1810,10 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
   // A read event happens, resulting in handshake completion and
   // raiseEvent(Network::ConnectionEvent::Connected). Since we have data queued
   // in the write buffer, we should see a doWrite with this data.
-  EXPECT_CALL(*transport_socket_, doRead(_))
-      .WillOnce(InvokeWithoutArgs([this] {
-        transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
-        return IoResult{PostIoAction::KeepOpen, 0, false};
-      }));
+  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
+    transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    return IoResult{PostIoAction::KeepOpen, 0, false};
+  }));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   file_ready_cb_(Event::FileReadyType::Read);
@@ -1837,11 +1834,10 @@ TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
   connection_->write(buffer, false);
 
   // A read event triggers underlying socket to ask for more data.
-  EXPECT_CALL(*transport_socket_, doRead(_))
-      .WillOnce(InvokeWithoutArgs([this] {
-        transport_socket_callbacks_->flushWriteBuffer();
-        return IoResult{PostIoAction::KeepOpen, 0, false};
-      }));
+  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
+    transport_socket_callbacks_->flushWriteBuffer();
+    return IoResult{PostIoAction::KeepOpen, 0, false};
+  }));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   file_ready_cb_(Event::FileReadyType::Read);
