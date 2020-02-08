@@ -8,6 +8,8 @@ Version history
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
+* ext_authz: disabled the use of lowercase string matcher for headers matching in HTTP-based `ext_authz`.
+  Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_disable_lowercase_string_matcher` to false.
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 * router: added the ability to match a route based on whether a downstream TLS connection certificate has been
@@ -22,7 +24,7 @@ Version history
   "envoy.reloadable_features.new_http2_connection_pool_behavior" and then re-configure your clusters or
   restart Envoy. The behavior will not switch until the connection pools are recreated. The new
   circuit breaker behavior is described :ref:`here <arch_overview_circuit_break>`.
-* upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`. 
+* upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`.
 
 1.13.0 (January 20, 2020)
 =========================

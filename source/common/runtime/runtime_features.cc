@@ -32,6 +32,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_method_validation",
     "envoy.reloadable_features.new_http1_connection_pool_behavior",
     "envoy.reloadable_features.new_http2_connection_pool_behavior",
+    "envoy.reloadable_features.ext_authz_http_service_disable_lowercase_string_matcher",
 };
 
 // This is a section for officially sanctioned runtime features which are too

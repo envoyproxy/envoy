@@ -10,6 +10,7 @@
 #include "common/common/matchers.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -59,37 +60,37 @@ struct SuccessResponse {
 };
 
 envoy::type::matcher::v3::StringMatcher
-lowercaseStringMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) {
-  envoy::type::matcher::v3::StringMatcher lowercase;
+ignoreCaseStringMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) {
+  envoy::type::matcher::v3::StringMatcher ignore_case;
+  ignore_case.set_ignore_case(true);
   switch (matcher.match_pattern_case()) {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return matcher;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    lowercase.set_hidden_envoy_deprecated_regex(
-        StringUtil::toLower(matcher.hidden_envoy_deprecated_regex()));
+    ignore_case.set_hidden_envoy_deprecated_regex(matcher.hidden_envoy_deprecated_regex());
     break;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
-    lowercase.set_exact(StringUtil::toLower(matcher.exact()));
+    ignore_case.set_exact(matcher.exact());
     break;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
-    lowercase.set_prefix(StringUtil::toLower(matcher.prefix()));
+    ignore_case.set_prefix(matcher.prefix());
     break;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
-    lowercase.set_suffix(StringUtil::toLower(matcher.suffix()));
+    ignore_case.set_suffix(matcher.suffix());
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  return lowercase;
+  return ignore_case;
 }
 
 std::vector<Matchers::StringMatcherPtr>
 createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                     const bool use_lowercase_string_matcher) {
+                     const bool disable_lowercase_string_matcher) {
   std::vector<Matchers::StringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
     matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(
-        use_lowercase_string_matcher ? lowercaseStringMatcher(matcher) : matcher));
+        disable_lowercase_string_matcher ? matcher : ignoreCaseStringMatcher(matcher)));
   }
   return matchers;
 }
@@ -112,18 +113,18 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-                           Runtime::Loader& runtime, uint32_t timeout,
-                           absl::string_view path_prefix)
-    : use_lowercase_string_matcher_(config.http_service().use_lowercase_string_matcher(), runtime),
+                           uint32_t timeout, absl::string_view path_prefix)
+    : disable_lowercase_string_matcher_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.ext_authz_http_service_disable_lowercase_string_matcher")),
       request_header_matchers_(
           toRequestMatchers(config.http_service().authorization_request().allowed_headers(),
-                            use_lowercase_string_matcher_.enabled())),
+                            disable_lowercase_string_matcher_)),
       client_header_matchers_(
           toClientMatchers(config.http_service().authorization_response().allowed_client_headers(),
-                           use_lowercase_string_matcher_.enabled())),
+                           disable_lowercase_string_matcher_)),
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers(),
-          use_lowercase_string_matcher_.enabled())),
+          disable_lowercase_string_matcher_)),
       authorization_headers_to_add_(
           toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
@@ -132,13 +133,13 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                                const bool use_lowercase_string_matcher) {
+                                const bool disable_lowercase_string_matcher) {
   const std::vector<Http::LowerCaseString> keys{
       {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
        Http::Headers::get().Host}};
 
   std::vector<Matchers::StringMatcherPtr> matchers(
-      createStringMatchers(list, use_lowercase_string_matcher));
+      createStringMatchers(list, disable_lowercase_string_matcher));
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
@@ -150,9 +151,9 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatche
 
 MatcherSharedPtr
 ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                               const bool use_lowercase_string_matcher) {
+                               const bool disable_lowercase_string_matcher) {
   std::vector<Matchers::StringMatcherPtr> matchers(
-      createStringMatchers(list, use_lowercase_string_matcher));
+      createStringMatchers(list, disable_lowercase_string_matcher));
 
   // If list is empty, all authorization response headers, except Host, should be added to
   // the client response.
@@ -181,9 +182,9 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
 
 MatcherSharedPtr
 ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
-                                 const bool use_lowercase_string_matcher) {
+                                 const bool disable_lowercase_string_matcher) {
   return std::make_unique<HeaderKeyMatcher>(
-      createStringMatchers(list, use_lowercase_string_matcher));
+      createStringMatchers(list, disable_lowercase_string_matcher));
 }
 
 Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(

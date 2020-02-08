@@ -26,10 +26,6 @@ Deprecated items below are listed in chronological order.
     envoy.access_loggers.http_grpc, envoy.http_grpc_access_log
     envoy.access_loggers.tcp_grpc, envoy.tcp_grpc_access_log
 
-* The use of lowercase string matcher for headers matching in HTTP-based `ext_authz` is deprecated. The
-  :ref:`use_lowercase_string_matcher <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.use_lowercase_string_matcher>`
-  runtime key can be used to temporarily enable this feature once the deprecation becomes fail by default.
-
 1.13.0 (January 20, 2020)
 =========================
 * The `request_headers_for_tags` field in :ref:`HTTP connection manager

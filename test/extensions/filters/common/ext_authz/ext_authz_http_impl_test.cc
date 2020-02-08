@@ -61,7 +61,9 @@ public:
             allowed_headers:
               patterns:
               - exact: Baz
+                ignore_case: true
               - prefix: "X-"
+                ignore_case: true
               - safe_regex:
                   google_re2: {}
                   regex: regex-foo.?
@@ -75,18 +77,22 @@ public:
             allowed_upstream_headers:
               patterns:
               - exact: Bar
+                ignore_case: true
               - prefix: "X-"
+                ignore_case: true
             allowed_client_headers:
               patterns:
               - exact: Foo
+                ignore_case: true
               - prefix: "X-"
+                ignore_case: true
         )EOF";
       TestUtility::loadFromYaml(default_yaml, proto_config);
     } else {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
 
-    return std::make_shared<ClientConfig>(proto_config, runtime_, timeout, path_prefix);
+    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
   Http::MessagePtr sendRequest(std::unordered_map<std::string, std::string>&& headers) {
@@ -122,7 +128,6 @@ public:
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
   ClientConfigSharedPtr config_;
-  NiceMock<Runtime::MockLoader> runtime_;
   TimeSource& time_source_;
   std::unique_ptr<RawHttpClientImpl> client_;
   MockRequestCallbacks request_callbacks_;
@@ -534,40 +539,6 @@ TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
   client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, active_span_);
-}
-
-// Test the client when it is configured with disabled lowercase string matcher.
-TEST_F(ExtAuthzHttpClientTest, DisableLowercaseStringMatcher) {
-  std::string yaml = R"EOF(
-  http_service:
-    server_uri:
-      uri: "ext_authz:9000"
-      cluster: "ext_authz"
-      timeout: 0.25s
-    use_lowercase_string_matcher:
-      default_value: false
-      runtime_key: "ext_authz.use_lowercase_string_matcher"
-    authorization_request:
-      allowed_headers:
-        patterns:
-        - exact: Baz
-        - suffix: foo
-  failure_mode_allow: true
-  )EOF";
-
-  initialize(yaml);
-
-  // Check allowed request headers.
-  const Http::LowerCaseString baz{"baz"};
-  const Http::LowerCaseString foo{"foo"};
-
-  // Check allowed request headers.
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(baz.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
 }
 
 } // namespace

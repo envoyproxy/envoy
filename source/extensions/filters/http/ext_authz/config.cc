@@ -22,10 +22,9 @@ namespace ExtAuthz {
 Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& context_runtime = context.runtime();
   const auto filter_config =
       std::make_shared<FilterConfig>(proto_config, context.localInfo(), context.scope(),
-                                     context_runtime, context.httpContext(), stats_prefix);
+                                     context.runtime(), context.httpContext(), stats_prefix);
   Http::FilterFactoryCb callback;
 
   if (proto_config.has_http_service()) {
@@ -34,7 +33,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
                                                            timeout, DefaultTimeout);
     const auto client_config =
         std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
-            proto_config, context_runtime, timeout_ms, proto_config.http_service().path_prefix());
+            proto_config, timeout_ms, proto_config.http_service().path_prefix());
     callback = [filter_config, client_config,
                 &context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
