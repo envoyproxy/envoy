@@ -219,6 +219,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Prereq
 QUIC
 QoS
 RAII
@@ -484,6 +485,8 @@ deallocated
 deallocating
 deallocation
 dec
+dechunk
+dechunked
 dechunking
 decl
 decls
@@ -950,6 +953,7 @@ rxhash
 sandboxed
 sanitization
 sanitizer
+satisfiable
 scalability
 sched
 schemas
@@ -1130,6 +1134,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unsatisfiable
 unserializable
 unsetenv
 unsubscription
