@@ -282,8 +282,8 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       parent_.stream_info_.setResponseCodeDetails(details);
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
-                             grpc_status, details);
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
+                             parent_.state_.is_head_request_, grpc_status, details);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -548,8 +548,9 @@ private:
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_)
-         << DUMP_MEMBER(has_continue_headers_) << DUMP_MEMBER(is_head_request_)
-         << DUMP_MEMBER(decoding_headers_only_) << DUMP_MEMBER(encoding_headers_only_) << "\n";
+         << DUMP_MEMBER(state_.has_continue_headers_) << DUMP_MEMBER(state_.is_head_request_)
+         << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
+         << "\n";
 
       DUMP_DETAILS(request_headers_);
       DUMP_DETAILS(request_trailers_);
@@ -604,7 +605,8 @@ private:
       State()
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
-            is_internally_created_(false) {}
+            is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
+            is_head_request_(false), decoding_headers_only_(false), encoding_headers_only_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -626,6 +628,18 @@ private:
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
+
+      bool decorated_propagate_ : 1;
+      // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
+      // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
+      bool has_continue_headers_ : 1;
+      bool is_head_request_ : 1;
+      // Whether a filter has indicated that the request should be treated as a headers only
+      // request.
+      bool decoding_headers_only_;
+      // Whether a filter has indicated that the response should be treated as a headers only
+      // response.
+      bool encoding_headers_only_;
 
       // Used to track which filter is the latest filter that has received data.
       ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -698,15 +712,6 @@ private:
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};
-    // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
-    // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
-    bool has_continue_headers_{};
-    bool is_head_request_{};
-    // Whether a filter has indicated that the request should be treated as a headers only request.
-    bool decoding_headers_only_{};
-    // Whether a filter has indicated that the response should be treated as a headers only
-    // response.
-    bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
