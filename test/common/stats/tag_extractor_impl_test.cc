@@ -153,10 +153,34 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   // Cipher
   Tag cipher_name;
   cipher_name.name_ = tag_names.SSL_CIPHER;
-  cipher_name.value_ = "AES256-SHA";
+  cipher_name.value_ = "ECDHE-RSA-AES128-GCM-SHA256";
 
-  regex_tester.testRegex("listener.[__1]_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
-                         {listener_address, cipher_name});
+  regex_tester.testRegex("listener.[__1]_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
+                         "listener.ssl.ciphers", {listener_address, cipher_name});
+
+  // SSL curve
+  Tag ssl_curve;
+  ssl_curve.name_ = tag_names.SSL_CURVE;
+  ssl_curve.value_ = "X25519";
+
+  regex_tester.testRegex("listener.[__1]_0.ssl.curves.X25519", "listener.ssl.curves",
+                         {listener_address, ssl_curve});
+
+  // SSL signature algorithm
+  Tag ssl_sig_alg;
+  ssl_sig_alg.name_ = tag_names.SSL_SIGNATURE_ALGORITHM;
+  ssl_sig_alg.value_ = "rsa_pss_rsae_sha256";
+
+  regex_tester.testRegex("listener.[__1]_0.ssl.sigalgs.rsa_pss_rsae_sha256", "listener.ssl.sigalgs",
+                         {listener_address, ssl_sig_alg});
+
+  // SSL protocol version
+  Tag ssl_version;
+  ssl_version.name_ = tag_names.SSL_PROTOCOL_VERSION;
+  ssl_version.value_ = "TLSv1.2";
+
+  regex_tester.testRegex("listener.[__1]_0.ssl.versions.TLSv1.2", "listener.ssl.versions",
+                         {listener_address, ssl_version});
 
   // Cipher suite
   Tag cipher_suite;
@@ -166,16 +190,31 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("cluster.ratelimit.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
                          "cluster.ssl.ciphers", {cluster_tag, cipher_suite});
 
+  // SSL curve
+
+  regex_tester.testRegex("cluster.ratelimit.ssl.curves.X25519", "cluster.ssl.curves",
+                         {cluster_tag, ssl_curve});
+
+  // SSL signature algorithm
+
+  regex_tester.testRegex("cluster.ratelimit.ssl.sigalgs.rsa_pss_rsae_sha256", "cluster.ssl.sigalgs",
+                         {cluster_tag, ssl_sig_alg});
+
+  // SSL protocol version
+
+  regex_tester.testRegex("cluster.ratelimit.ssl.versions.TLSv1.2", "cluster.ssl.versions",
+                         {cluster_tag, ssl_version});
+
   // ipv6 non-loopback (for alphabetical chars)
   listener_address.value_ = "[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543";
-  regex_tester.testRegex(
-      "listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.cipher.AES256-SHA",
-      "listener.ssl.cipher", {listener_address, cipher_name});
+  regex_tester.testRegex("listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.ciphers."
+                         "ECDHE-RSA-AES128-GCM-SHA256",
+                         "listener.ssl.ciphers", {listener_address, cipher_name});
 
   // ipv4 address
   listener_address.value_ = "127.0.0.1_0";
-  regex_tester.testRegex("listener.127.0.0.1_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
-                         {listener_address, cipher_name});
+  regex_tester.testRegex("listener.127.0.0.1_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
+                         "listener.ssl.ciphers", {listener_address, cipher_name});
 
   // Mongo
   Tag mongo_prefix;
@@ -346,6 +385,37 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
                          "listener_manager.dispatcher.loop_duration_us", {worker_id});
+
+  // Listener worker id
+  listener_address.value_ = "127.0.0.1_33033";
+  worker_id.value_ = "worker_15";
+
+  regex_tester.testRegex("listener.127.0.0.1_33033.worker_15.downstream_cx_total",
+                         "listener.downstream_cx_total", {listener_address, worker_id});
+
+  // Server worker id
+  worker_id.value_ = "worker_3";
+
+  regex_tester.testRegex("server.worker_3.watchdog_mega_miss", "server.watchdog_mega_miss",
+                         {worker_id});
+
+  // Google GRPC Service
+
+  Tag google_grpc_service_prefix;
+  google_grpc_service_prefix.name_ = tag_names.GOOGLE_GRPC_SERVICE_PREFIX;
+  google_grpc_service_prefix.value_ = "sds_mesh_ca";
+
+  regex_tester.testRegex("grpc.sds_mesh_ca.streams_total", "grpc.streams_total",
+                         {google_grpc_service_prefix});
+
+  // GRPC status
+
+  Tag grpc_status;
+  grpc_status.name_ = tag_names.GRPC_STATUS;
+  grpc_status.value_ = "14";
+
+  regex_tester.testRegex("grpc.sds_mesh_ca.streams_closed_14", "grpc.streams_closed",
+                         {google_grpc_service_prefix, grpc_status});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {

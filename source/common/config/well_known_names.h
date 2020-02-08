@@ -82,6 +82,12 @@ public:
   const std::string SSL_CIPHER = "envoy.ssl_cipher";
   // SSL cipher suite
   const std::string SSL_CIPHER_SUITE = "cipher_suite";
+  // SSL curve
+  const std::string SSL_CURVE = "envoy.ssl_curve";
+  // SSL signature algorithm
+  const std::string SSL_SIGNATURE_ALGORITHM = "envoy.ssl_signature_alg";
+  // SSL protocol version
+  const std::string SSL_PROTOCOL_VERSION = "envoy.ssl_version";
   // Stats prefix for the Client SSL Auth network filter
   const std::string CLIENTSSL_PREFIX = "envoy.clientssl_prefix";
   // Stats prefix for the Mongo Proxy network filter
@@ -120,6 +126,10 @@ public:
   const std::string RDS_ROUTE_CONFIG = "envoy.rds_route_config";
   // Listener manager worker id
   const std::string WORKER_ID = "envoy.worker_id";
+  // Stats prefix for the Google GRPC Service
+  const std::string GOOGLE_GRPC_SERVICE_PREFIX = "envoy.google_grpc_service_prefix";
+  // GRPC status
+  const std::string GRPC_STATUS = "envoy.grpc_status";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;

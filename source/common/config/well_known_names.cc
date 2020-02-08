@@ -70,11 +70,32 @@ TagNameValues::TagNameValues() {
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)<base_stat>
   addRegex(FAULT_DOWNSTREAM_CLUSTER, R"(^http(?=\.).*?\.fault\.((.*?)\.)\w+?$)", ".fault.");
 
-  // listener.[<address>.]ssl.cipher.(<cipher>)
-  addRegex(SSL_CIPHER, R"(^listener(?=\.).*?\.ssl\.cipher(\.(.*?))$)");
+  // listener.[<address>.]ssl.ciphers.(<cipher>)
+  addRegex(SSL_CIPHER, R"(^listener(?=\.).*?\.ssl\.ciphers(\.(.*?))$)", ".ssl.ciphers.");
+
+  // listener.[<address>.]ssl.curves.(<curve>)
+  addRegex(SSL_CURVE, R"(^listener(?=\.).*?\.ssl\.curves(\.(.*?))$)", ".ssl.curves.");
+
+  // listener.[<address>.]ssl.sigalgs.(<sigalg>)
+  addRegex(SSL_SIGNATURE_ALGORITHM, R"(^listener(?=\.).*?\.ssl\.sigalgs(\.(.*?))$)",
+           ".ssl.sigalgs.");
+
+  // listener.[<address>.]ssl.versions.(<version>)
+  addRegex(SSL_PROTOCOL_VERSION, R"(^listener(?=\.).*?\.ssl\.versions(\.(.*?))$)",
+           ".ssl.versions.");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
   addRegex(SSL_CIPHER_SUITE, R"(^cluster(?=\.).*?\.ssl\.ciphers(\.(.*?))$)", ".ssl.ciphers.");
+
+  // cluster.[<cluster_name>.]ssl.curves.(<curve>)
+  addRegex(SSL_CURVE, R"(^cluster(?=\.).*?\.ssl\.curves(\.(.*?))$)", ".ssl.curves.");
+
+  // cluster.[<cluster_name>.]ssl.sigalgs.(<sigalg>)
+  addRegex(SSL_SIGNATURE_ALGORITHM, R"(^cluster(?=\.).*?\.ssl\.sigalgs(\.(.*?))$)",
+           ".ssl.sigalgs.");
+
+  // cluster.[<cluster_name>.]ssl.versions.(<version>)
+  addRegex(SSL_PROTOCOL_VERSION, R"(^cluster(?=\.).*?\.ssl\.versions(\.(.*?))$)", ".ssl.versions.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
   addRegex(GRPC_BRIDGE_SERVICE, R"(^cluster(?=\.).*?\.grpc\.((.*?)\.))", ".grpc.");
@@ -112,6 +133,18 @@ TagNameValues::TagNameValues() {
 
   // listener_manager.(worker_<id>.)*
   addRegex(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
+
+  // listener.[<address>.](worker_<id>.)*
+  addRegex(WORKER_ID, R"(^listener(?=\.).*?\.((worker_\d+)\.))", ".worker_");
+
+  // server.(worker_<id>.)*
+  addRegex(WORKER_ID, R"(^server\.((worker_\d+)\.))", "server.worker_");
+
+  // grpc.(<stat_prefix>.)*
+  addRegex(GOOGLE_GRPC_SERVICE_PREFIX, "^grpc\\.((.*?)\\.)");
+
+  // grpc.[<stat_prefix>.]streams_closed_<grpc_status>
+  addRegex(GRPC_STATUS, R"(^grpc(?=\.).*?\.streams_closed(_(\d+))$)", ".streams_closed_");
 }
 
 void TagNameValues::addRegex(const std::string& name, const std::string& regex,
