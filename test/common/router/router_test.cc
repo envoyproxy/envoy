@@ -14,6 +14,7 @@
 #include "common/network/application_protocol.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_subject_alt_names.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
@@ -296,7 +297,7 @@ public:
       : RouterTestBase(false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
-TEST_F(RouterTest, UpdateFilterState) {
+TEST_F(RouterTest, UpdateServerNameFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
@@ -318,6 +319,30 @@ TEST_F(RouterTest, UpdateFilterState) {
             stream_info.filterState()
                 ->getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
                 .value());
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, UpdateSubjectAltNamesFilterState) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_san_validation(true);
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
+      .WillByDefault(ReturnRef(dummy_option));
+  ON_CALL(callbacks_.stream_info_, filterState())
+      .WillByDefault(ReturnRef(stream_info.filterState()));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_EQ("host", stream_info.filterState()
+                        ->getDataReadOnly<Network::UpstreamSubjectAltNames>(
+                            Network::UpstreamSubjectAltNames::key())
+                        .value()[0]);
   EXPECT_CALL(cancellable_, cancel());
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));

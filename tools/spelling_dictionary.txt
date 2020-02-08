@@ -9,6 +9,7 @@ AFAICT
 ALPN
 ALS
 AMZ
+APC
 API
 ASAN
 ASCII
@@ -17,6 +18,7 @@ AST
 AWS
 BACKTRACE
 BSON
+BPF
 CAS
 CB
 CDS
@@ -217,6 +219,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Prereq
 QUIC
 QoS
 RAII
@@ -322,6 +325,7 @@ WIP
 WKT
 WRR
 WS
+WSA
 Welford's
 Wi
 XDS
@@ -481,6 +485,8 @@ deallocated
 deallocating
 deallocation
 dec
+dechunk
+dechunked
 dechunking
 decl
 decls
@@ -661,9 +667,12 @@ istio
 istream
 istringstream
 iteratively
+ja
 javascript
 jitter
 jittered
+jlt
+jne
 kafka
 keepalive
 keepalives
@@ -675,6 +684,8 @@ kv
 kvs
 lala
 latencies
+ld
+ldb
 len
 lenenc
 lexically
@@ -732,6 +743,7 @@ mixin
 mkdir
 mmap
 mmaping
+mod
 mongo
 moveable
 msec
@@ -937,9 +949,11 @@ runfiles
 runtime
 runtimes
 rver
+rxhash
 sandboxed
 sanitization
 sanitizer
+satisfiable
 scalability
 sched
 schemas
@@ -1120,6 +1134,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unsatisfiable
 unserializable
 unsetenv
 unsubscription
