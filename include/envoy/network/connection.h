@@ -72,47 +72,37 @@ enum class ConnectionCloseType {
 /**
  * Run-time modifiable connection options to alter socket settings
  */
-class DynamicSocketOptions : public Logger::Loggable<Logger::Id::connection> {
+class DynamicSocketOptions {
 public:
-  DynamicSocketOptions(uint64_t id) : conn_id(id) {}
-
   virtual ~DynamicSocketOptions() = default;
 
   /**
    * Set the receive buffer size for the socket to a value specified by the 'buffer_size'
    */
-  void setSocketRecvBufferSize(IoHandle& io_handle, uint32_t buffer_size) const;
+  virtual void setSocketRecvBufferSize(uint32_t buffer_size) const PURE;
 
   /**
    * Get the receive buffer size for the socket
    * @param recv_buf_size returns the size of the receive buffer configured
    */
-  void getSocketRecvBufferSize(IoHandle& io_handle, uint32_t& recv_buf_size) const;
+  virtual void getSocketRecvBufferSize(uint32_t& recv_buf_size) const PURE;
 
   /**
    * Set the receive buffer low water-mark size to a value specified by 'low_watermark'
    */
-  void setSocketRecvLoWat(IoHandle& io_handle, uint32_t low_watermark) const;
+  virtual void setSocketRecvLoWat(uint32_t low_watermark) const PURE;
 
   /**
    * Get the receive buffer low water-mark size to a value specified by 'low_watermark'
    * @param low_watermark_val returns the receive buffer 'low_watermark' configured
    */
-  void getSocketRecvLoWat(IoHandle& io_handle, uint32_t& low_watermark_val) const;
-
-  /**
-   * @return uint64_t the unique local ID of the invoking connection.
-   */
-  uint64_t id() const { return conn_id; }
-
-private:
-  /**
-   * Connection identifier for the connection performing operations on the socket.
-   * This 'id' is used for performing contextual logging, while performing operations.
-   */
-  uint64_t conn_id;
+  virtual void getSocketRecvLoWat(uint32_t& low_watermark_val) const PURE;
 };
-using DynamicSocketOptionsPtr = std::unique_ptr<DynamicSocketOptions>;
+using DynamicSocketOptionsPtr = std::shared_ptr<DynamicSocketOptions>;
+/**
+ * Forward Declaration for Implementation for DynamicSocketOptions
+ */
+class DynamicSocketOptionsImpl;
 
 /**
  * An abstract raw connection. Free the connection or call close() to disconnect.
@@ -339,18 +329,13 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
-  DynamicSocketOptions& getDynamicSocketOptionsPtr() {
-    if (dynamic_socket_options_ptr_ == nullptr) {
-      dynamic_socket_options_ptr_ = std::make_unique<DynamicSocketOptions>(id());
-    }
-    return *dynamic_socket_options_ptr_.get();
-  }
+  /**
+   * @return const DynamicSocketOptions& the instance for performing runtime configurable socket
+   *         options on the socket file descriptor
+   */
+  virtual Network::DynamicSocketOptionsPtr getDynamicSocketOptionsPtr() PURE;
 
 private:
-  /**
-   * Instance to perform run-time configurable operations on the socket
-   */
-  DynamicSocketOptionsPtr dynamic_socket_options_ptr_;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

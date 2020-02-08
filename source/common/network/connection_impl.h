@@ -41,6 +41,36 @@ public:
 };
 
 /**
+ * Implementation of Network::DynamicSocketOptions
+ */
+class DynamicSocketOptionsImpl : public DynamicSocketOptions,
+                                 public Logger::Loggable<Logger::Id::connection> {
+public:
+  DynamicSocketOptionsImpl(uint64_t conn_id, IoHandle& io_handle)
+      : conn_id_(conn_id), io_handle_(io_handle) {}
+
+  void setSocketRecvBufferSize(uint32_t buffer_size) const override;
+  void getSocketRecvBufferSize(uint32_t& recv_buf_size) const override;
+  void setSocketRecvLoWat(uint32_t low_watermark) const override;
+  void getSocketRecvLoWat(uint32_t& low_watermark_val) const override;
+  /**
+   * @return uint64_t the unique local ID of the invoking connection.
+   */
+  uint64_t id() const { return conn_id_; }
+
+private:
+  /**
+   * Connection identifier for the connection performing operations on the socket.
+   * This 'id' is used for performing contextual logging, while performing operations.
+   */
+  uint64_t conn_id_;
+  /**
+   * IO handle to retrieve the socket file descriptor to perform necessary operations.
+   */
+  IoHandle& io_handle_;
+};
+
+/**
  * Implementation of Network::Connection and Network::FilterManagerConnection.
  */
 class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
@@ -117,6 +147,14 @@ public:
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
+  Network::DynamicSocketOptionsPtr getDynamicSocketOptionsPtr() override {
+    if (dynamic_socket_options_ptr_ == nullptr) {
+      dynamic_socket_options_ptr_ =
+          std::make_shared<Network::DynamicSocketOptionsImpl>(id(), ioHandle());
+    }
+    return dynamic_socket_options_ptr_;
+  }
+
 protected:
   // Network::ConnectionImplBase
   void closeConnectionImmediately() override;
@@ -179,6 +217,10 @@ private:
   bool write_end_stream_ : 1;
   bool current_write_end_stream_ : 1;
   bool dispatch_buffered_data_ : 1;
+  /**
+   * Instance to perform run-time configurable operations on the socket
+   */
+  DynamicSocketOptionsPtr dynamic_socket_options_ptr_;
 };
 
 /**

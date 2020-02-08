@@ -663,10 +663,11 @@ TEST_P(ConnectionImplTest, HalfClose) {
   client_connection_->enableHalfClose(true);
   client_connection_->addReadFilter(client_read_filter);
 
-  EXPECT_CALL(*read_filter_, onData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
-    dispatcher_->exit();
-    return FilterStatus::StopIteration;
-  }));
+  EXPECT_CALL(*read_filter_, onData(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+        dispatcher_->exit();
+        return FilterStatus::StopIteration;
+      }));
 
   Buffer::OwnedImpl empty_buffer;
   client_connection_->write(empty_buffer, true);
@@ -709,10 +710,11 @@ TEST_P(ConnectionImplTest, HalfCloseNoEarlyCloseDetection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   server_connection_->readDisable(false);
-  EXPECT_CALL(*read_filter_, onData(_, _)).WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
-    dispatcher_->exit();
-    return FilterStatus::StopIteration;
-  }));
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+        dispatcher_->exit();
+        return FilterStatus::StopIteration;
+      }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose));
@@ -802,13 +804,13 @@ TEST_P(ConnectionImplTest, DynamicSocketOptions) {
   setUpBasicConnection();
   connect();
 
-  auto& dynamic_socket_object = client_connection_->getDynamicSocketOptionsPtr();
+  auto dynamic_sockopt_ptr = client_connection_->getDynamicSocketOptionsPtr();
   {
     // Test set and get socket receive buffer size
     uint32_t set_recv_buf_size = 4096;
     uint32_t get_recv_buf_size = 0;
-    dynamic_socket_object.setSocketRecvBufferSize(socket_->ioHandle(), set_recv_buf_size);
-    dynamic_socket_object.getSocketRecvBufferSize(socket_->ioHandle(), get_recv_buf_size);
+    dynamic_sockopt_ptr->setSocketRecvBufferSize(set_recv_buf_size);
+    dynamic_sockopt_ptr->getSocketRecvBufferSize(get_recv_buf_size);
 #ifdef __APPLE__
     // 'set_recv_buf_size' is equal to 'get_recv_buf_size' on macOS
     EXPECT_EQ(get_recv_buf_size, set_recv_buf_size);
@@ -822,8 +824,8 @@ TEST_P(ConnectionImplTest, DynamicSocketOptions) {
     // Test set and get socket receive low watermark size
     uint32_t set_recv_lowat = 4096;
     uint32_t get_recv_lowat = 0;
-    dynamic_socket_object.setSocketRecvLoWat(socket_->ioHandle(), set_recv_lowat);
-    dynamic_socket_object.getSocketRecvLoWat(socket_->ioHandle(), get_recv_lowat);
+    dynamic_sockopt_ptr->setSocketRecvLoWat(set_recv_lowat);
+    dynamic_sockopt_ptr->getSocketRecvLoWat(get_recv_lowat);
     EXPECT_EQ(set_recv_lowat, get_recv_lowat);
   }
   disconnect(true);
@@ -1810,10 +1812,11 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
   // A read event happens, resulting in handshake completion and
   // raiseEvent(Network::ConnectionEvent::Connected). Since we have data queued
   // in the write buffer, we should see a doWrite with this data.
-  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
-    transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
-    return IoResult{PostIoAction::KeepOpen, 0, false};
-  }));
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(InvokeWithoutArgs([this] {
+        transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+        return IoResult{PostIoAction::KeepOpen, 0, false};
+      }));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   file_ready_cb_(Event::FileReadyType::Read);
@@ -1834,10 +1837,11 @@ TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
   connection_->write(buffer, false);
 
   // A read event triggers underlying socket to ask for more data.
-  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
-    transport_socket_callbacks_->flushWriteBuffer();
-    return IoResult{PostIoAction::KeepOpen, 0, false};
-  }));
+  EXPECT_CALL(*transport_socket_, doRead(_))
+      .WillOnce(InvokeWithoutArgs([this] {
+        transport_socket_callbacks_->flushWriteBuffer();
+        return IoResult{PostIoAction::KeepOpen, 0, false};
+      }));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
       .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
   file_ready_cb_(Event::FileReadyType::Read);
