@@ -99,10 +99,6 @@ public:
   virtual void getSocketRecvLoWat(uint32_t& low_watermark_val) const PURE;
 };
 using DynamicSocketOptionsPtr = std::shared_ptr<DynamicSocketOptions>;
-/**
- * Forward Declaration for Implementation for DynamicSocketOptions
- */
-class DynamicSocketOptionsImpl;
 
 /**
  * An abstract raw connection. Free the connection or call close() to disconnect.
@@ -330,7 +326,7 @@ public:
    */
   virtual absl::string_view transportFailureReason() const PURE;
   /**
-   * @return const DynamicSocketOptions& the instance for performing runtime configurable socket
+   * @return DynamicSocketOptions& the instance for performing runtime configurable socket
    *         options on the socket file descriptor
    */
   virtual Network::DynamicSocketOptionsPtr& getDynamicSocketOptionsPtr() PURE;

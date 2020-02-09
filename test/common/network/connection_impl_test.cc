@@ -805,7 +805,7 @@ TEST_P(ConnectionImplTest, DynamicSocketOptions) {
   auto dynamic_sockopt_ptr = client_connection_->getDynamicSocketOptionsPtr();
   {
     // Test set and get socket receive buffer size
-    uint32_t set_recv_buf_size = 4096;
+    uint32_t set_recv_buf_size = 12288;
     uint32_t get_recv_buf_size = 0;
     dynamic_sockopt_ptr->setSocketRecvBufferSize(set_recv_buf_size);
     dynamic_sockopt_ptr->getSocketRecvBufferSize(get_recv_buf_size);
@@ -820,7 +820,7 @@ TEST_P(ConnectionImplTest, DynamicSocketOptions) {
 
   {
     // Test set and get socket receive low watermark size
-    uint32_t set_recv_lowat = 4096;
+    uint32_t set_recv_lowat = 12288;
     uint32_t get_recv_lowat = 0;
     dynamic_sockopt_ptr->setSocketRecvLoWat(set_recv_lowat);
     dynamic_sockopt_ptr->getSocketRecvLoWat(get_recv_lowat);
