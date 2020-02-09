@@ -28,7 +28,7 @@ envoy_py_test_binary(
 py_library(
     name = "run_command",
     srcs = [
-        "code_format/run_command.py",
+        "run_command.py",
     ],
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
