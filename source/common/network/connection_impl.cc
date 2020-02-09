@@ -47,7 +47,6 @@ void DynamicSocketOptionsImpl::setSocketRecvBufferSize(uint32_t buffer_size) con
   }
   // Modify the receive buffer size to 'buffer_size'
   rc = setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t));
-  std::cout << "set rc " << rc << std::endl;
   if (rc == -1) {
     ENVOY_CONN_LOG(trace, "Failed to modify socket receive buffer to size: buffer_size={}", *this,
                    buffer_size);
@@ -58,8 +57,6 @@ void DynamicSocketOptionsImpl::getSocketRecvBufferSize(uint32_t& recv_buf_size) 
   int rc = 0;
   socklen_t option_len = sizeof recv_buf_size;
 
-  std::cout << "get rbuf " << recv_buf_size << std::endl;
-
   if (io_handle_.fd() == -1) {
     ENVOY_CONN_LOG(trace, "Stale socket file handle, operation Get Receive Buffer Size aborted",
                    *this);
@@ -68,14 +65,9 @@ void DynamicSocketOptionsImpl::getSocketRecvBufferSize(uint32_t& recv_buf_size) 
   // Read the set receive buffer size as it is double the value configured through
   // 'setSocketRecvBufferSize' on some machines this value can not be lower than '2304' bytes
   rc = getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &option_len);
-  int errsrv = errno;
-  std::cout << "get rc " << rc << std::endl;
-  std::cout << "errno " << errsrv << std::endl;
   if (rc == -1) {
     ENVOY_CONN_LOG(trace, "Failed to read socket receive buffer size", *this);
   }
-
-  std::cout << "get rbuf si " << recv_buf_size << std::endl;
 }
 
 void DynamicSocketOptionsImpl::setSocketRecvLoWat(uint32_t low_watermark) const {
@@ -94,7 +86,8 @@ void DynamicSocketOptionsImpl::setSocketRecvLoWat(uint32_t low_watermark) const 
 }
 
 void DynamicSocketOptionsImpl::getSocketRecvLoWat(uint32_t& low_watermark_val) const {
-  uint32_t option_len;
+  int rc = 0;
+  socklen_t option_len = sizeof low_watermark_val;
 
   if (io_handle_.fd() == -1) {
     ENVOY_CONN_LOG(trace,
@@ -103,7 +96,8 @@ void DynamicSocketOptionsImpl::getSocketRecvLoWat(uint32_t& low_watermark_val) c
     return;
   }
   // Read the receive buffer low watermark value into 'low_watermark_val' variable
-  if (getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark_val, &option_len) == -1) {
+  rc = getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark_val, &option_len);
+  if (rc == -1) {
     ENVOY_CONN_LOG(trace, "Failed to get socket receive buffer low watermark size: buffer_size={}",
                    *this, low_watermark_val);
   }
