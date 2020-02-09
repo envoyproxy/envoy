@@ -40,12 +40,15 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 }
 
 void DynamicSocketOptionsImpl::setSocketRecvBufferSize(uint32_t buffer_size) const {
+  int rc = 0;
   if (io_handle_.fd() == -1) {
     ENVOY_CONN_LOG(trace, "Stale socket file handle, operation Set Receive Buffer aborted", *this);
     return;
   }
   // Modify the receive buffer size to 'buffer_size'
-  if (setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t)) == -1) {
+  rc = setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t));
+  std::cout<<"rc "<<rc<<std::endl;
+  if (rc == -1) {
     ENVOY_CONN_LOG(trace, "Failed to modify socket receive buffer to size: buffer_size={}", *this,
                    buffer_size);
   }
