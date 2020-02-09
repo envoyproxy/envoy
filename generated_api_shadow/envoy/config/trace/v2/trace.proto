@@ -202,6 +202,7 @@ message OpenCensusConfig {
 
   // The address of the OpenCensus Agent, if its exporter is enabled, in gRPC
   // format: https://github.com/grpc/grpc/blob/master/doc/naming.md
+  // [#comment:TODO: deprecate this field]
   string ocagent_address = 12;
 
   // (optional) The gRPC server hosted by the OpenCensus Agent. Only Google gRPC is supported.
