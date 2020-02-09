@@ -41,13 +41,14 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 
 void DynamicSocketOptionsImpl::setSocketRecvBufferSize(uint32_t buffer_size) const {
   int rc = 0;
+  int buf_s = buffer_size;
   if (io_handle_.fd() == -1) {
     ENVOY_CONN_LOG(trace, "Stale socket file handle, operation Set Receive Buffer aborted", *this);
     return;
   }
   // Modify the receive buffer size to 'buffer_size'
-  rc = setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t));
-  std::cout << "rc " << rc << std::endl;
+  rc = setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buf_s, sizeof(int));
+  std::cout << "set rc " << rc << std::endl;
   if (rc == -1) {
     ENVOY_CONN_LOG(trace, "Failed to modify socket receive buffer to size: buffer_size={}", *this,
                    buffer_size);
@@ -55,7 +56,11 @@ void DynamicSocketOptionsImpl::setSocketRecvBufferSize(uint32_t buffer_size) con
 }
 
 void DynamicSocketOptionsImpl::getSocketRecvBufferSize(uint32_t& recv_buf_size) const {
-  uint32_t option_len;
+  int rc = 0;
+  socklen_t option_len;
+  int r_buf = 0;
+
+  std::cout << "get rbuf " << recv_buf_size << std::endl;
 
   if (io_handle_.fd() == -1) {
     ENVOY_CONN_LOG(trace, "Stale socket file handle, operation Get Receive Buffer Size aborted",
@@ -64,9 +69,13 @@ void DynamicSocketOptionsImpl::getSocketRecvBufferSize(uint32_t& recv_buf_size) 
 
   // Read the set receive buffer size as it is double the value configured through
   // 'setSocketRecvBufferSize' on some machines this value can not be lower than '2304' bytes
-  if (getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &option_len) == -1) {
+  rc = getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &r_buf, &option_len);
+  std::cout << "get rc "<< rc << std::endl;
+  if (rc == -1) {
     ENVOY_CONN_LOG(trace, "Failed to read socket receive buffer size", *this);
   }
+
+  std::cout << "get rbuf si " << r_buf << std::endl;
 }
 
 void DynamicSocketOptionsImpl::setSocketRecvLoWat(uint32_t low_watermark) const {
