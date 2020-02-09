@@ -47,7 +47,7 @@ void DynamicSocketOptionsImpl::setSocketRecvBufferSize(uint32_t buffer_size) con
   }
   // Modify the receive buffer size to 'buffer_size'
   rc = setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t));
-  std::cout<<"rc "<<rc<<std::endl;
+  std::cout << "rc " << rc << std::endl;
   if (rc == -1) {
     ENVOY_CONN_LOG(trace, "Failed to modify socket receive buffer to size: buffer_size={}", *this,
                    buffer_size);
