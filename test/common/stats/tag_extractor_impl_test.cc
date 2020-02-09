@@ -191,17 +191,14 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "cluster.ssl.ciphers", {cluster_tag, cipher_suite});
 
   // SSL curve
-
   regex_tester.testRegex("cluster.ratelimit.ssl.curves.X25519", "cluster.ssl.curves",
                          {cluster_tag, ssl_curve});
 
   // SSL signature algorithm
-
   regex_tester.testRegex("cluster.ratelimit.ssl.sigalgs.rsa_pss_rsae_sha256", "cluster.ssl.sigalgs",
                          {cluster_tag, ssl_sig_alg});
 
   // SSL protocol version
-
   regex_tester.testRegex("cluster.ratelimit.ssl.versions.TLSv1.2", "cluster.ssl.versions",
                          {cluster_tag, ssl_version});
 
@@ -400,7 +397,6 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {worker_id});
 
   // Google GRPC Service
-
   Tag google_grpc_service_prefix;
   google_grpc_service_prefix.name_ = tag_names.GOOGLE_GRPC_SERVICE_PREFIX;
   google_grpc_service_prefix.value_ = "sds_mesh_ca";
@@ -409,7 +405,6 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {google_grpc_service_prefix});
 
   // GRPC status
-
   Tag grpc_status;
   grpc_status.name_ = tag_names.GRPC_STATUS;
   grpc_status.value_ = "14";
