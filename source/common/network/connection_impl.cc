@@ -71,6 +71,7 @@ void DynamicSocketOptionsImpl::getSocketRecvBufferSize(uint32_t& recv_buf_size) 
   // 'setSocketRecvBufferSize' on some machines this value can not be lower than '2304' bytes
   rc = getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &r_buf, &option_len);
   std::cout << "get rc " << rc << std::endl;
+  std::cout << "errno " << errno << std::endl;
   if (rc == -1) {
     ENVOY_CONN_LOG(trace, "Failed to read socket receive buffer size", *this);
   }
