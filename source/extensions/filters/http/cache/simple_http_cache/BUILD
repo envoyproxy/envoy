@@ -4,17 +4,19 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension",
     "envoy_package",
     "envoy_proto_library",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "simple_http_cache_lib",
     srcs = ["simple_http_cache.cc"],
     hdrs = ["simple_http_cache.h"],
+    security_posture = "robust_to_untrusted_downstream_and_upstream",
+    status = "wip",
     deps = [
         ":config_cc_proto",
         "//include/envoy/registry",
