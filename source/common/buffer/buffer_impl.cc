@@ -103,6 +103,11 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
     }
   }
 
+  // In case an extra slice was reserved, remove empty slices from the end of the buffer.
+  while (!slices_.empty() && slices_.back()->dataSize() == 0) {
+    slices_.pop_back();
+  }
+
   ASSERT(num_slices_committed > 0);
 }
 
@@ -481,6 +486,14 @@ void OwnedImpl::appendSliceForTest(const void* data, uint64_t size) {
 
 void OwnedImpl::appendSliceForTest(absl::string_view data) {
   appendSliceForTest(data.data(), data.size());
+}
+
+std::vector<OwnedSlice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const {
+  std::vector<OwnedSlice::SliceRepresentation> slices;
+  for (const auto& slice : slices_) {
+    slices.push_back(slice->describeSliceForTest());
+  }
+  return slices;
 }
 
 } // namespace Buffer

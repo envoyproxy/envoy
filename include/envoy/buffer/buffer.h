@@ -102,8 +102,8 @@ public:
   /**
    * Commit a set of slices originally obtained from reserve(). The number of slices should match
    * the number obtained from reserve(). The size of each slice can also be altered. Commit must
-   * occur following a reserve() without any mutating operations in between other than to the iovecs
-   * len_ fields.
+   * occur once following a reserve() without any mutating operations in between other than to the
+   * iovecs len_ fields.
    * @param iovecs supplies the array of slices to commit.
    * @param num_iovecs supplies the size of the slices array.
    */
