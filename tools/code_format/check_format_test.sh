@@ -1,6 +1,6 @@
 #!/bin/bash
 
-tools=$(dirname $(realpath $0))
+tools=$(dirname $(dirname $(realpath $0)))
 root=$(realpath $tools/..)
 ci=$root/ci
 cd $root
