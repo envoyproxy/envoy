@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace TcpProxy {
 
-// Interface for a generic ConnectionHandle, which can wrapper a TcpConnectionHandle
+// Interface for a generic ConnectionHandle, which can wrap a TcpConnectionHandle
 // or an HttpConnectionHandle
 class ConnectionHandle {
 public:
@@ -29,7 +29,7 @@ private:
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
 };
 
-// Interface for a generic Upstream, which can communicate with a Tcp or HTTP
+// Interface for a generic Upstream, which can communicate with a TCP or HTTP
 // upstream.
 class GenericUpstream {
 public:

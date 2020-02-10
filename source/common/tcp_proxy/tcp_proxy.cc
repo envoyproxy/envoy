@@ -420,9 +420,17 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   connecting_ = true;
   connect_attempts_++;
 
-  // Because we never return open connections to the pool, this should either return a handle while
-  // a connection completes or it invokes onPoolFailure inline. Either way, stop iteration.
-  upstream_handle_.reset(new TcpConnectionHandle(conn_pool->newConnection(*this)));
+  // Given this function is reentrant, make sure we only reset the upstream_handle_ if given a valid
+  // connection handle. If newConnection fails inline it may result in attempting to select a new
+  // host, and a recursive call to initializeUpstreamConnection. In this case the first call to
+  // newConnection will return null and the inner call will persist.
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool->newConnection(*this);
+  if (handle) {
+    ASSERT(upstream_handle_.get() == nullptr);
+    upstream_handle_.reset(new TcpConnectionHandle(handle));
+  }
+  // Because we never return open connections to the pool, this either has a handle waiting on
+  // connection completion, or onPoolFailure has been invoked. Either way, stop iteration.
   return Network::FilterStatus::StopIteration;
 }
 
@@ -489,6 +497,9 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   if (upstream_) {
     upstream_->encodeData(data, end_stream);
   }
+  // The upstream should consume all of the data.
+  // Before there is an upstream the connection should be readDisabled.  If the upstream is
+  // destroyed, there should be no further reads as well.
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
