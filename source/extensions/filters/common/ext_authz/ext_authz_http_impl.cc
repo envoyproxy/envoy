@@ -115,7 +115,7 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            uint32_t timeout, absl::string_view path_prefix)
     : disable_lowercase_string_matcher_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.ext_authz_http_service_disable_lowercase_string_matcher")),
+          "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher")),
       request_header_matchers_(
           toRequestMatchers(config.http_service().authorization_request().allowed_headers(),
                             disable_lowercase_string_matcher_)),
