@@ -150,13 +150,13 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   // ipv6 loopback address
   listener_address.value_ = "[__1]_0";
 
-  // Cipher
-  Tag cipher_name;
-  cipher_name.name_ = tag_names.SSL_CIPHER;
-  cipher_name.value_ = "ECDHE-RSA-AES128-GCM-SHA256";
+  // Cipher suite
+  Tag cipher_suite;
+  cipher_suite.name_ = tag_names.SSL_CIPHER_SUITE;
+  cipher_suite.value_ = "ECDHE-RSA-AES128-GCM-SHA256";
 
   regex_tester.testRegex("listener.[__1]_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
-                         "listener.ssl.ciphers", {listener_address, cipher_name});
+                         "listener.ssl.ciphers", {listener_address, cipher_suite});
 
   // SSL curve
   Tag ssl_curve;
@@ -183,10 +183,6 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {listener_address, ssl_version});
 
   // Cipher suite
-  Tag cipher_suite;
-  cipher_suite.name_ = tag_names.SSL_CIPHER_SUITE;
-  cipher_suite.value_ = "ECDHE-RSA-AES128-GCM-SHA256";
-
   regex_tester.testRegex("cluster.ratelimit.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
                          "cluster.ssl.ciphers", {cluster_tag, cipher_suite});
 
@@ -206,12 +202,12 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   listener_address.value_ = "[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543";
   regex_tester.testRegex("listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.ciphers."
                          "ECDHE-RSA-AES128-GCM-SHA256",
-                         "listener.ssl.ciphers", {listener_address, cipher_name});
+                         "listener.ssl.ciphers", {listener_address, cipher_suite});
 
   // ipv4 address
   listener_address.value_ = "127.0.0.1_0";
   regex_tester.testRegex("listener.127.0.0.1_0.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256",
-                         "listener.ssl.ciphers", {listener_address, cipher_name});
+                         "listener.ssl.ciphers", {listener_address, cipher_suite});
 
   // Mongo
   Tag mongo_prefix;

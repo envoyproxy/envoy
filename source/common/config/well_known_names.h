@@ -78,15 +78,13 @@ public:
   const std::string HTTP_CONN_MANAGER_PREFIX = "envoy.http_conn_manager_prefix";
   // User agent for a connection
   const std::string HTTP_USER_AGENT = "envoy.http_user_agent";
-  // SSL cipher for a connection
-  const std::string SSL_CIPHER = "envoy.ssl_cipher";
-  // SSL cipher suite
+  // SSL cipher suite for a connection
   const std::string SSL_CIPHER_SUITE = "cipher_suite";
-  // SSL curve
+  // SSL curve for a connection
   const std::string SSL_CURVE = "envoy.ssl_curve";
-  // SSL signature algorithm
+  // SSL signature algorithm for a connection
   const std::string SSL_SIGNATURE_ALGORITHM = "envoy.ssl_signature_alg";
-  // SSL protocol version
+  // SSL protocol version for a connection
   const std::string SSL_PROTOCOL_VERSION = "envoy.ssl_version";
   // Stats prefix for the Client SSL Auth network filter
   const std::string CLIENTSSL_PREFIX = "envoy.clientssl_prefix";

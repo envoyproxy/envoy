@@ -71,7 +71,7 @@ TagNameValues::TagNameValues() {
   addRegex(FAULT_DOWNSTREAM_CLUSTER, R"(^http(?=\.).*?\.fault\.((.*?)\.)\w+?$)", ".fault.");
 
   // listener.[<address>.]ssl.ciphers.(<cipher>)
-  addRegex(SSL_CIPHER, R"(^listener(?=\.).*?\.ssl\.ciphers(\.(.*?))$)", ".ssl.ciphers.");
+  addRegex(SSL_CIPHER_SUITE, R"(^listener(?=\.).*?\.ssl\.ciphers(\.(.*?))$)", ".ssl.ciphers.");
 
   // listener.[<address>.]ssl.curves.(<curve>)
   addRegex(SSL_CURVE, R"(^listener(?=\.).*?\.ssl\.curves(\.(.*?))$)", ".ssl.curves.");
