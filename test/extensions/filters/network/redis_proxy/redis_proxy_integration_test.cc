@@ -616,23 +616,25 @@ TEST_P(RedisProxyIntegrationTest, SimpleRequestAndResponse) {
 TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
   initialize();
   std::string request = makeBulkStringArray({"mget", "foo"});
-  std::string mget_response = "";
+  std::string upstream_response = "$3\r\nbar\r\n";
+  std::string downstream_response = "*1\r\n" + upstream_response; // Downstream response is array of length 1
 
   // Make MGET request from downstream
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   redis_client->clearData();
   redis_client->write(request);
-  redis_client->waitForData(mget_response); // MGET returns no response; proxy turns it into GETs
-  EXPECT_EQ(mget_response, redis_client->data());
 
-  // Make GET request to upstream
+  // Make GET request to upstream (MGET is turned into GETs for upstream)
   FakeUpstreamPtr& upstream = fake_upstreams_[0];
   FakeRawConnectionPtr fake_upstream_connection;
   std::string auth_password = "";
   std::string upstream_request = makeBulkStringArray({"get", "foo"});
-  std::string response = "$3\r\nbar\r\n";
-  expectUpstreamRequestResponse(upstream, upstream_request, response, fake_upstream_connection,
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response, fake_upstream_connection,
                                 auth_password);
+
+  // Downstream response for MGET
+  redis_client->waitForData(downstream_response);
+  EXPECT_EQ(downstream_response, redis_client->data());
 
   // Cleanup
   EXPECT_TRUE(fake_upstream_connection->close());
