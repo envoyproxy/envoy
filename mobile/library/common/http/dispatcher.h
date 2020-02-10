@@ -99,7 +99,7 @@ private:
    * DirectStreamCallbacks can continue to receive events until the remote to local stream is
    * closed, or resetStream is called.
    */
-  class DirectStreamCallbacks : public StreamEncoder, public Logger::Loggable<Logger::Id::http> {
+  class DirectStreamCallbacks : public ResponseEncoder, public Logger::Loggable<Logger::Id::http> {
   public:
     DirectStreamCallbacks(DirectStream& direct_stream, envoy_http_callbacks bridge_callbacks,
                           Dispatcher& http_dispatcher);
@@ -108,7 +108,7 @@ private:
     void onCancel();
     void closeRemote(bool end_stream);
 
-    // StreamEncoder
+    // ResponseEncoder
     void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const HeaderMap& trailers) override;
@@ -181,7 +181,7 @@ private:
     bool local_closed_{};
 
     // Used to issue outgoing HTTP stream operations.
-    StreamDecoder* stream_decoder_;
+    RequestDecoder* request_decoder_;
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
     Dispatcher& parent_;
