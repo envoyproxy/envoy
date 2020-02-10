@@ -41,8 +41,8 @@ public:
   } callbacks_called;
 
   MockApiListener api_listener_;
-  MockStreamDecoder request_decoder_;
-  StreamEncoder* response_encoder_{};
+  MockRequestDecoder request_decoder_;
+  ResponseEncoder* response_encoder_{};
   NiceMock<Event::MockDispatcher> event_dispatcher_;
   envoy_http_callbacks bridge_callbacks_;
   std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
@@ -77,7 +77,7 @@ TEST_F(DispatcherTest, PreferredNetwork) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -190,7 +190,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -261,7 +261,7 @@ TEST_F(DispatcherTest, BasicStream) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the
   // dispatcher API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -347,7 +347,7 @@ TEST_F(DispatcherTest, MultipleDataStream) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -432,7 +432,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -448,8 +448,8 @@ TEST_F(DispatcherTest, MultipleStreams) {
 
   // Start stream2.
   // Setup bridge_callbacks to handle the response headers.
-  NiceMock<MockStreamDecoder> request_decoder2;
-  StreamEncoder* response_encoder2{};
+  NiceMock<MockRequestDecoder> request_decoder2;
+  ResponseEncoder* response_encoder2{};
   envoy_http_callbacks bridge_callbacks2;
   callbacks_called cc2 = {0, 0, 0, 0, 0};
   bridge_callbacks2.context = &cc2;
@@ -480,7 +480,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder2 = &encoder;
         return request_decoder2;
       }));
@@ -543,7 +543,7 @@ TEST_F(DispatcherTest, ResetStreamLocal) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -606,7 +606,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -668,7 +668,7 @@ TEST_F(DispatcherTest, StreamResetAfterOnComplete) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -740,7 +740,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRaceLocalWins) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -829,7 +829,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWinsDeletesStream) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -917,7 +917,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWins) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -1007,7 +1007,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRaceLocalWins) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -1093,7 +1093,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWinsDeletesStream) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -1178,7 +1178,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWins) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
@@ -1249,7 +1249,7 @@ TEST_F(DispatcherTest, ResetWhenRemoteClosesBeforeLocal) {
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
   // API.
   EXPECT_CALL(api_listener_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));

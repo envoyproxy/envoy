@@ -262,7 +262,7 @@ envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle,
         std::make_unique<DirectStreamCallbacks>(*direct_stream, bridge_callbacks, *this);
 
     // Only the initial setting of the api_listener_ is guarded.
-    direct_stream->stream_decoder_ =
+    direct_stream->request_decoder_ =
         &TS_UNCHECKED_READ(api_listener_)->newStream(*direct_stream->callbacks_);
 
     Thread::ReleasableLockGuard lock(streams_lock_);
@@ -290,7 +290,7 @@ envoy_status_t Dispatcher::sendHeaders(envoy_stream_t stream, envoy_headers head
       ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
                 *internal_headers);
       attachPreferredNetwork(*internal_headers);
-      direct_stream->stream_decoder_->decodeHeaders(std::move(internal_headers), end_stream);
+      direct_stream->request_decoder_->decodeHeaders(std::move(internal_headers), end_stream);
       direct_stream->closeLocal(end_stream);
     }
   });
@@ -315,7 +315,7 @@ envoy_status_t Dispatcher::sendData(envoy_stream_t stream, envoy_data data, bool
 
       ENVOY_LOG(debug, "[S{}] request data for stream (length={} end_stream={})\n", stream,
                 data.length, end_stream);
-      direct_stream->stream_decoder_->decodeData(*buf, end_stream);
+      direct_stream->request_decoder_->decodeData(*buf, end_stream);
       direct_stream->closeLocal(end_stream);
     }
   });
@@ -340,7 +340,7 @@ envoy_status_t Dispatcher::sendTrailers(envoy_stream_t stream, envoy_headers tra
     if (direct_stream) {
       HeaderMapPtr internal_trailers = Utility::toInternalHeaders(trailers);
       ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
-      direct_stream->stream_decoder_->decodeTrailers(std::move(internal_trailers));
+      direct_stream->request_decoder_->decodeTrailers(std::move(internal_trailers));
       direct_stream->closeLocal(true);
     }
   });
