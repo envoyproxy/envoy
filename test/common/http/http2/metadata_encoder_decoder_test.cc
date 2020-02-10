@@ -127,14 +127,14 @@ public:
   void submitMetadata(const MetadataMapVector& metadata_map_vector) {
     // Creates metadata payload.
     encoder_.createPayload(metadata_map_vector);
-    while (encoder_.hasNextFrame()) {
-      int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE,
-                                            encoder_.nextEndMetadata(), STREAM_ID, nullptr);
-      EXPECT_EQ(0, result);
-      // Sends METADATA to nghttp2.
-      result = nghttp2_session_send(session_);
+    for (uint8_t flags : encoder_.payloadFrameFlags()) {
+      int result =
+          nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flags, STREAM_ID, nullptr);
       EXPECT_EQ(0, result);
     }
+    // Triggers nghttp2 to populate the payloads of the METADATA frames.
+    int result = nghttp2_session_send(session_);
+    EXPECT_EQ(0, result);
   }
 
   nghttp2_session* session_ = nullptr;
@@ -322,29 +322,6 @@ TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
 
   // Verifies flag and payload are encoded correctly.
   nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
-
-  cleanUp();
-}
-
-TEST_F(MetadataEncoderDecoderTest, TestFrameCountUpperBound) {
-  int size = 10;
-  MetadataMapVector metadata_map_vector;
-  for (int i = 0; i < size; i++) {
-    MetadataMap metadata_map = {
-        {"header_key1", std::string(5, 'a')},
-        {"header_key2", std::string(5, 'b')},
-    };
-    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-    metadata_map_vector.push_back(std::move(metadata_map_ptr));
-  }
-
-  // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
-    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
-  });
-
-  encoder_.createPayload(metadata_map_vector);
-  EXPECT_LE(size, encoder_.frameCountUpperBound());
 
   cleanUp();
 }
