@@ -88,15 +88,13 @@ using LowerCaseStrPairVector =
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for
- * performance. It supports 3 different types of storage and can switch between them:
+ * performance. It supports 2 different types of storage and can switch between them:
  * 1) A reference.
- * 2) An InlinedVector (an optimized interned string for small strings, but
- * allows heap allocation if needed).
+ * 2) An InlinedVector (an optimized interned string for small strings, but allows heap
+ * allocation if needed).
  */
 class HeaderString {
 public:
-  enum class Type { Reference, Inline };
-
   /**
    * Default constructor. Sets up for inline storage.
    */
@@ -126,9 +124,18 @@ public:
   void append(const char* data, uint32_t size);
 
   /**
-   * @return the modifiable backing buffer (either inline or heap allocated).
+   * Transforms the inlined vector data using the given UnaryOperation (conforms
+   * to std::transform).
+   * @param unary_op the operations to be performed on each of the elements.
    */
-  char* buffer();
+  template <typename UnaryOperation>
+  void inlineTransform(UnaryOperation&& unary_op) {
+    ASSERT(type() == Type::Inline);
+    std::transform(absl::get<absl::InlinedVector<char, 128>>(buffer_).begin(),
+                   absl::get<absl::InlinedVector<char, 128>>(buffer_).end(),
+                   absl::get<absl::InlinedVector<char, 128>>(buffer_).begin(),
+                   unary_op);
+  }
 
   /**
    * Get an absl::string_view. It will NOT be NUL terminated!
@@ -146,7 +153,7 @@ public:
   /**
    * @return whether the string is empty or not.
    */
-  bool empty() const { return string_length_ == 0; }
+  bool empty() const { return size() == 0; }
 
   // Looking for find? Use getStringView().find()
 
@@ -173,14 +180,14 @@ public:
   void setReference(absl::string_view ref_value);
 
   /**
-   * @return the size of the string, not including the null terminator.
+   * @return whether the string is a reference or an InlinedVector.
    */
-  uint32_t size() const { return string_length_; }
+  bool isReference() const { return type() == Type::Reference; }
 
   /**
-   * @return the type of backing storage for the string.
+   * @return the size of the string, not including the null terminator.
    */
-  Type type() const { return Type(buffer_.index()); }
+  uint32_t size() const;
 
   bool operator==(const char* rhs) const {
     return getStringView() == absl::NullSafeStringView(rhs);
@@ -192,11 +199,16 @@ public:
   bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
 private:
+  enum class Type { Reference, Inline };
+
   absl::variant<absl::string_view, absl::InlinedVector<char, 128>> buffer_;
 
   bool valid() const;
 
-  uint32_t string_length_;
+  /**
+   * @return the type of backing storage for the string.
+   */
+  Type type() const { return Type(buffer_.index()); }
 };
 
 /**
