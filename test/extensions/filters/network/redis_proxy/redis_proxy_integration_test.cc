@@ -617,7 +617,8 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
   initialize();
   std::string request = makeBulkStringArray({"mget", "foo"});
   std::string upstream_response = "$3\r\nbar\r\n";
-  std::string downstream_response = "*1\r\n" + upstream_response; // Downstream response is array of length 1
+  std::string downstream_response =
+      "*1\r\n" + upstream_response; // Downstream response is array of length 1
 
   // Make MGET request from downstream
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -629,8 +630,8 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
   FakeRawConnectionPtr fake_upstream_connection;
   std::string auth_password = "";
   std::string upstream_request = makeBulkStringArray({"get", "foo"});
-  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response, fake_upstream_connection,
-                                auth_password);
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_password);
 
   // Downstream response for MGET
   redis_client->waitForData(downstream_response);
