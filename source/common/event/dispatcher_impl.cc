@@ -133,7 +133,7 @@ FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTrigger
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   ASSERT(isThreadSafe());
-  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
+  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, api_)};
 }
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,

@@ -126,9 +126,8 @@ void EnvoyQuicServerStream::switchStreamBlockState(bool should_block) {
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
-  ASSERT(decoder() != nullptr);
   ASSERT(headers_decompressed());
-  decoder()->decodeHeaders(quicHeadersToEnvoyHeaders(header_list), /*end_stream=*/fin);
+  request_decoder_->decodeHeaders(quicHeadersToEnvoyHeaders(header_list), /*end_stream=*/fin);
   if (fin) {
     end_stream_decoded_ = true;
   }
@@ -167,8 +166,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // already delivered it or decodeTrailers will be called.
   bool skip_decoding = empty_payload_with_fin && (end_stream_decoded_ || !finished_reading);
   if (!skip_decoding) {
-    ASSERT(decoder() != nullptr);
-    decoder()->decodeData(*buffer, finished_reading);
+    request_decoder_->decodeData(*buffer, finished_reading);
     if (finished_reading) {
       end_stream_decoded_ = true;
     }
@@ -188,7 +186,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
     // For Google QUIC implementation, trailers may arrived earlier and wait to
     // be consumed after reading all the body. Consume it here.
     // IETF QUIC shouldn't reach here because trailers are sent on same stream.
-    decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
+    request_decoder_->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
     MarkTrailersConsumed();
   }
   OnFinRead();
@@ -203,8 +201,7 @@ void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
       !FinishedReadingTrailers()) {
     // Before QPack trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
-    ASSERT(decoder() != nullptr);
-    decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
+    request_decoder_->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
     MarkTrailersConsumed();
   }
 }

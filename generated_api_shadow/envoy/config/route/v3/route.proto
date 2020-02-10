@@ -26,8 +26,8 @@ message RouteConfiguration {
 
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.Rds.route_config_name>`
-  // in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.Rds`.
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.Rds.route_config_name>` in
+  // :ref:`envoy_api_msg_extensions.filters.network.http_connection_manager.v3.Rds`.
   string name = 1;
 
   // An array of virtual hosts that make up the route table.
@@ -49,8 +49,8 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be added to each response that
   // the connection manager encodes. Headers specified at this level are applied
-  // after headers from any enclosed :ref:`envoy_api_msg_route.VirtualHost` or
-  // :ref:`envoy_api_msg_route.RouteAction`. For more information, including details on
+  // after headers from any enclosed :ref:`envoy_api_msg_config.route.v3.VirtualHost` or
+  // :ref:`envoy_api_msg_config.route.v3.RouteAction`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.v3.HeaderValueOption response_headers_to_add = 4
@@ -62,8 +62,8 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be added to each request
   // routed by the HTTP connection manager. Headers specified at this level are
-  // applied after headers from any enclosed :ref:`envoy_api_msg_route.VirtualHost` or
-  // :ref:`envoy_api_msg_route.RouteAction`. For more information, including details on
+  // applied after headers from any enclosed :ref:`envoy_api_msg_config.route.v3.VirtualHost` or
+  // :ref:`envoy_api_msg_config.route.v3.RouteAction`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.v3.HeaderValueOption request_headers_to_add = 6

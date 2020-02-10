@@ -19,9 +19,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
 
-// TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
-#include "extensions/health_checkers/well_known_names.h"
-
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -231,7 +228,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     expect_reset_ = false;
   }
 
-  Http::StreamEncoder* request_encoder = &client_->newStream(*this);
+  Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
 
   Http::HeaderMapImpl request_headers{

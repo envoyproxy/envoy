@@ -614,7 +614,7 @@ public:
   }
 
 protected:
-  void SetUp() override { Envoy::TestUtility::createDirectory(dir_path_); }
+  void SetUp() override { Envoy::TestEnvironment::createPath(dir_path_); }
 
   void TearDown() override {
     while (!files_to_remove_.empty()) {
@@ -627,7 +627,7 @@ protected:
   void addSubDirs(std::list<std::string> sub_dirs) {
     for (const std::string& dir_name : sub_dirs) {
       const std::string full_path = dir_path_ + "/" + dir_name;
-      Envoy::TestUtility::createDirectory(full_path);
+      Envoy::TestEnvironment::createPath(full_path);
       files_to_remove_.push(full_path);
     }
   }

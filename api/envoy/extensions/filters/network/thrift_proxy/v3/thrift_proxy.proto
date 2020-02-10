@@ -109,7 +109,7 @@ message ThriftFilter {
 
 // ThriftProtocolOptions specifies Thrift upstream protocol options. This object is used in
 // in
-// :ref:`extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.extension_protocol_options>`,
+// :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
 // keyed by the name `envoy.filters.network.thrift_proxy`.
 message ThriftProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =

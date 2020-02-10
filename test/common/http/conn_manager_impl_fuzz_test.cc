@@ -409,8 +409,8 @@ public:
 
   ConnectionManagerImpl& conn_manager_;
   FuzzConfig& config_;
-  StreamDecoder* decoder_{};
-  NiceMock<MockStreamEncoder> encoder_;
+  RequestDecoder* decoder_{};
+  NiceMock<MockResponseEncoder> encoder_;
   MockStreamDecoderFilter* decoder_filter_{};
   MockStreamEncoderFilter* encoder_filter_{};
   StreamState request_state_;

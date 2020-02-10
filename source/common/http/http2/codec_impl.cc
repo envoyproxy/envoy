@@ -14,11 +14,12 @@
 #include "common/common/cleanup.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Http {
@@ -87,12 +88,12 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
       &final_headers);
 }
 
-void ConnectionImpl::StreamImpl::encode100ContinueHeaders(const HeaderMap& headers) {
+void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);
 }
 
-void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   std::vector<nghttp2_nv> final_headers;
 
   // This must exist outside of the scope of isUpgrade as the underlying memory is
@@ -121,7 +122,7 @@ void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool en
   parent_.sendPendingFrames();
 }
 
-void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
+void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   if (pending_send_data_.length() > 0) {
@@ -184,9 +185,32 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   readDisable(false);
 }
 
-void ConnectionImpl::StreamImpl::decodeHeaders() {
-  maybeTransformUpgradeFromH2ToH1();
-  decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
+void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
+  if (!upgrade_type_.empty() && headers_->Status()) {
+    Http::Utility::transformUpgradeResponseFromH2toH1(*headers_, upgrade_type_);
+  }
+
+  if (headers_->Status()->value() == "100") {
+    ASSERT(!remote_end_stream_);
+    response_decoder_.decode100ContinueHeaders(std::move(headers_));
+  } else {
+    response_decoder_.decodeHeaders(std::move(headers_), remote_end_stream_);
+  }
+}
+
+void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
+  response_decoder_.decodeTrailers(std::move(headers_));
+}
+
+void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
+  if (Http::Utility::isH2UpgradeRequest(*headers_)) {
+    Http::Utility::transformUpgradeRequestFromH2toH1(*headers_);
+  }
+  request_decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
+}
+
+void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
+  request_decoder_->decodeTrailers(std::move(headers_));
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -343,31 +367,8 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
-  decoder_->decodeMetadata(std::move(metadata_map_ptr));
+  decoder().decodeMetadata(std::move(metadata_map_ptr));
 }
-
-namespace {
-
-const char InvalidHttpMessagingOverrideKey[] =
-    "envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging";
-const char MaxOutboundFramesOverrideKey[] =
-    "envoy.reloadable_features.http2_protocol_options.max_outbound_frames";
-const char MaxOutboundControlFramesOverrideKey[] =
-    "envoy.reloadable_features.http2_protocol_options.max_outbound_control_frames";
-const char MaxConsecutiveInboundFramesWithEmptyPayloadOverrideKey[] =
-    "envoy.reloadable_features.http2_protocol_options."
-    "max_consecutive_inbound_frames_with_empty_payload";
-const char MaxInboundPriorityFramesPerStreamOverrideKey[] =
-    "envoy.reloadable_features.http2_protocol_options.max_inbound_priority_frames_per_stream";
-const char MaxInboundWindowUpdateFramesPerDataFrameSentOverrideKey[] =
-    "envoy.reloadable_features.http2_protocol_options."
-    "max_inbound_window_update_frames_per_data_frame_sent";
-
-bool checkRuntimeOverride(bool config_value, const char* override_key) {
-  return Runtime::runtimeFeatureEnabled(override_key) ? true : config_value;
-}
-
-} // namespace
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                const Http2Settings& http2_settings, const uint32_t max_headers_kb,
@@ -375,28 +376,22 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
     : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))}, connection_(connection),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
       per_stream_buffer_limit_(http2_settings.initial_stream_window_size_),
-      stream_error_on_invalid_http_messaging_(checkRuntimeOverride(
-          http2_settings.stream_error_on_invalid_http_messaging_, InvalidHttpMessagingOverrideKey)),
-      flood_detected_(false),
-      max_outbound_frames_(
-          Runtime::getInteger(MaxOutboundFramesOverrideKey, http2_settings.max_outbound_frames_)),
+      stream_error_on_invalid_http_messaging_(
+          http2_settings.stream_error_on_invalid_http_messaging_),
+      flood_detected_(false), max_outbound_frames_(http2_settings.max_outbound_frames_),
       frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundFrame(fragment);
       }),
-      max_outbound_control_frames_(Runtime::getInteger(
-          MaxOutboundControlFramesOverrideKey, http2_settings.max_outbound_control_frames_)),
+      max_outbound_control_frames_(http2_settings.max_outbound_control_frames_),
       control_frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundControlFrame(fragment);
       }),
       max_consecutive_inbound_frames_with_empty_payload_(
-          Runtime::getInteger(MaxConsecutiveInboundFramesWithEmptyPayloadOverrideKey,
-                              http2_settings.max_consecutive_inbound_frames_with_empty_payload_)),
+          http2_settings.max_consecutive_inbound_frames_with_empty_payload_),
       max_inbound_priority_frames_per_stream_(
-          Runtime::getInteger(MaxInboundPriorityFramesPerStreamOverrideKey,
-                              http2_settings.max_inbound_priority_frames_per_stream_)),
-      max_inbound_window_update_frames_per_data_frame_sent_(Runtime::getInteger(
-          MaxInboundWindowUpdateFramesPerDataFrameSentOverrideKey,
-          http2_settings.max_inbound_window_update_frames_per_data_frame_sent_)),
+          http2_settings.max_inbound_priority_frames_per_stream_),
+      max_inbound_window_update_frames_per_data_frame_sent_(
+          http2_settings.max_inbound_window_update_frames_per_data_frame_sent_),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
@@ -404,7 +399,7 @@ ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   data.getRawSlices(slices.begin(), num_slices);
   for (const Buffer::RawSlice& slice : slices) {
     dispatching_ = true;
@@ -520,14 +515,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       if (CodeUtility::is1xx(Http::Utility::getResponseStatus(*stream->headers_))) {
         stream->waiting_for_non_informational_headers_ = true;
       }
-
-      if (stream->headers_->Status()->value() == "100") {
-        ASSERT(!stream->remote_end_stream_);
-        stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
-      } else {
-        stream->decodeHeaders();
-      }
-      break;
+      FALLTHRU;
     }
 
     case NGHTTP2_HCAT_REQUEST: {
@@ -550,7 +538,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
             stats_.too_many_header_frames_.inc();
             throw CodecProtocolException("Unexpected 'trailers' with no end stream.");
           } else {
-            stream->decoder_->decodeTrailers(std::move(stream->headers_));
+            stream->decodeTrailers();
           }
         } else {
           ASSERT(!nghttp2_session_check_server_session(session_));
@@ -580,7 +568,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // It's possible that we are waiting to send a deferred reset, so only raise data if local
     // is not complete.
     if (!stream->deferred_reset_) {
-      stream->decoder_->decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
+      stream->decoder().decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
     }
 
     stream->pending_recv_data_.drain(stream->pending_recv_data_.length());
@@ -1090,17 +1078,17 @@ ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
   allow_metadata_ = http2_settings.allow_metadata_;
 }
 
-Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
-  StreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_));
-  stream->decoder_ = &decoder;
+RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
+  ClientStreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_, decoder));
   // If the connection is currently above the high watermark, make sure to inform the new stream.
   // The connection can not pass this on automatically as it has no awareness that a new stream is
   // created.
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
+  ClientStreamImpl& stream_ref = *stream;
   stream->moveIntoList(std::move(stream), active_streams_);
-  return *active_streams_.front();
+  return stream_ref;
 }
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
@@ -1159,11 +1147,11 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
     return 0;
   }
 
-  StreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
+  ServerStreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
-  stream->decoder_ = &callbacks_.newStream(*stream);
+  stream->request_decoder_ = &callbacks_.newStream(*stream);
   stream->stream_id_ = frame->hd.stream_id;
   stream->moveIntoList(std::move(stream), active_streams_);
   nghttp2_session_set_stream_user_data(session_, frame->hd.stream_id,

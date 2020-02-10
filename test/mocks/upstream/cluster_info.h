@@ -33,15 +33,15 @@ public:
   ~MockLoadBalancerSubsetInfo() override;
 
   // Upstream::LoadBalancerSubsetInfo
-  MOCK_CONST_METHOD0(isEnabled, bool());
-  MOCK_CONST_METHOD0(fallbackPolicy,
-                     envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy());
-  MOCK_CONST_METHOD0(defaultSubset, const ProtobufWkt::Struct&());
-  MOCK_CONST_METHOD0(subsetSelectors, const std::vector<SubsetSelectorPtr>&());
-  MOCK_CONST_METHOD0(localityWeightAware, bool());
-  MOCK_CONST_METHOD0(scaleLocalityWeight, bool());
-  MOCK_CONST_METHOD0(panicModeAny, bool());
-  MOCK_CONST_METHOD0(listAsAny, bool());
+  MOCK_METHOD(bool, isEnabled, (), (const));
+  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy,
+              fallbackPolicy, (), (const));
+  MOCK_METHOD(const ProtobufWkt::Struct&, defaultSubset, (), (const));
+  MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
+  MOCK_METHOD(bool, localityWeightAware, (), (const));
+  MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
+  MOCK_METHOD(bool, panicModeAny, (), (const));
+  MOCK_METHOD(bool, listAsAny, (), (const));
 
   std::vector<SubsetSelectorPtr> subset_selectors_;
 };
@@ -83,51 +83,49 @@ public:
   }
 
   // Upstream::ClusterInfo
-  MOCK_CONST_METHOD0(addedViaApi, bool());
-  MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(idleTimeout, const absl::optional<std::chrono::milliseconds>());
-  MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
-  MOCK_CONST_METHOD0(features, uint64_t());
-  MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
-  MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
-  MOCK_CONST_METHOD1(extensionProtocolOptions,
-                     ProtocolOptionsConfigConstSharedPtr(const std::string&));
-  MOCK_CONST_METHOD0(lbConfig, const envoy::config::cluster::v3::Cluster::CommonLbConfig&());
-  MOCK_CONST_METHOD0(lbType, LoadBalancerType());
-  MOCK_CONST_METHOD0(type, envoy::config::cluster::v3::Cluster::DiscoveryType());
-  MOCK_CONST_METHOD0(
-      clusterType, const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&());
-  MOCK_CONST_METHOD0(
-      lbRingHashConfig,
-      const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&());
-  MOCK_CONST_METHOD0(
-      lbLeastRequestConfig,
-      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&());
-  MOCK_CONST_METHOD0(
-      lbOriginalDstConfig,
-      const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&());
-  MOCK_CONST_METHOD0(maintenanceMode, bool());
-  MOCK_CONST_METHOD0(maxResponseHeadersCount, uint32_t());
-  MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
-  MOCK_CONST_METHOD0(name, const std::string&());
-  MOCK_CONST_METHOD1(resourceManager, ResourceManager&(ResourcePriority priority));
-  MOCK_CONST_METHOD0(transportSocketMatcher, TransportSocketMatcher&());
-  MOCK_CONST_METHOD0(stats, ClusterStats&());
-  MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
-  MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());
-  MOCK_CONST_METHOD0(timeoutBudgetStats, absl::optional<ClusterTimeoutBudgetStats>&());
-  MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
-  MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
-  MOCK_CONST_METHOD0(metadata, const envoy::config::core::v3::Metadata&());
-  MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
-  MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
-  MOCK_CONST_METHOD0(warmHosts, bool());
-  MOCK_CONST_METHOD0(upstreamHttpProtocolOptions,
-                     const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&());
-  MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
-  MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
-  MOCK_CONST_METHOD1(upstreamHttpProtocol, Http::Protocol(absl::optional<Http::Protocol>));
+  MOCK_METHOD(bool, addedViaApi, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
+  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
+  MOCK_METHOD(uint64_t, features, (), (const));
+  MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
+  MOCK_METHOD(const Http::Http2Settings&, http2Settings, (), (const));
+  MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
+              (const));
+  MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
+  MOCK_METHOD(LoadBalancerType, lbType, (), (const));
+  MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&,
+              clusterType, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&,
+              lbRingHashConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
+              lbLeastRequestConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
+              lbOriginalDstConfig, (), (const));
+  MOCK_METHOD(bool, maintenanceMode, (), (const));
+  MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
+  MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
+  MOCK_METHOD(const std::string&, name, (), (const));
+  MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
+  MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
+  MOCK_METHOD(ClusterStats&, stats, (), (const));
+  MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
+  MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
+  MOCK_METHOD(absl::optional<ClusterTimeoutBudgetStats>&, timeoutBudgetStats, (), (const));
+  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
+  MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, clusterSocketOptions, (),
+              (const));
+  MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
+  MOCK_METHOD(bool, warmHosts, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&,
+              upstreamHttpProtocolOptions, (), (const));
+  MOCK_METHOD(absl::optional<std::string>, eds_service_name, (), (const));
+  MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
+  MOCK_METHOD(Http::Protocol, upstreamHttpProtocol, (absl::optional<Http::Protocol>), (const));
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;

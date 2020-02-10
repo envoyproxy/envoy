@@ -36,8 +36,6 @@ public:
   ~GrpcMuxImpl() override;
 
   void start() override;
-  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            GrpcMuxCallbacks& callbacks) override;
 
   // GrpcMux
   // TODO(fredlas) PR #8478 will remove this.
@@ -46,11 +44,8 @@ public:
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
 
-  Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
-                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                           SubscriptionCallbacks& callbacks, std::chrono::milliseconds) override;
 
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
@@ -75,7 +70,7 @@ private:
   void setRetryTimer();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch, RaiiListElement<GrpcMuxWatchImpl*> {
-    GrpcMuxWatchImpl(const std::set<std::string>& resources, GrpcMuxCallbacks& callbacks,
+    GrpcMuxWatchImpl(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
                      const std::string& type_url, GrpcMuxImpl& parent)
         : RaiiListElement<GrpcMuxWatchImpl*>(parent.api_state_[type_url].watches_, this),
           resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
@@ -94,8 +89,10 @@ private:
       cancel();
     }
 
+    void update(const std::set<std::string>&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
     std::set<std::string> resources_;
-    GrpcMuxCallbacks& callbacks_;
+    SubscriptionCallbacks& callbacks_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
 
@@ -142,21 +139,14 @@ class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   void start() override {}
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
   // TODO(fredlas) PR #8478 will remove this.
   bool isDelta() const override { return false; }
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
   bool paused(const std::string&) const override { return false; }
 
-  Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
-                          SubscriptionCallbacks&, std::chrono::milliseconds) override {
-    throw EnvoyException("ADS must be configured to support an ADS config source");
-  }
-  void removeWatch(const std::string&, Watch*) override {
+  GrpcMuxWatchPtr addWatch(const std::string&, const std::set<std::string>&, SubscriptionCallbacks&,
+                           std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
 

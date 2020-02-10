@@ -70,10 +70,10 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicStream& stream) {
+void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) {
   ASSERT(http_connection_callbacks_ != nullptr);
-  Http::StreamDecoder& decoder = http_connection_callbacks_->newStream(stream);
-  stream.setDecoder(decoder);
+  Http::RequestDecoder& decoder = http_connection_callbacks_->newStream(stream);
+  stream.setRequestDecoder(decoder);
 }
 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,

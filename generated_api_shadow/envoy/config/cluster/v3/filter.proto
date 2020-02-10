@@ -13,8 +13,8 @@ option java_outer_classname = "FilterProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Upstream filters]
-//
 // Upstream filters apply to the connections to the upstream cluster hosts.
+
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.cluster.Filter";
 

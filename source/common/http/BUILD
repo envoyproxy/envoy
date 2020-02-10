@@ -115,6 +115,20 @@ envoy_cc_library(
     srcs = ["conn_pool_base.cc"],
     hdrs = ["conn_pool_base.h"],
     deps = [
+        ":codec_client_lib",
+        "//include/envoy/http:conn_pool_interface",
+        "//include/envoy/stats:timespan_interface",
+        "//source/common/common:linked_object",
+        "//source/common/stats:timespan_lib",
+        "//source/common/upstream:upstream_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "conn_pool_base_legacy_lib",
+    srcs = ["conn_pool_base_legacy.cc"],
+    hdrs = ["conn_pool_base_legacy.h"],
+    deps = [
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
@@ -162,6 +176,7 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/http:api_listener_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
@@ -274,7 +289,6 @@ envoy_cc_library(
         "//include/envoy/http:message_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:non_copyable",
-        "//source/common/common:stack_array",
     ],
 )
 

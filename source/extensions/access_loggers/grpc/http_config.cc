@@ -44,7 +44,8 @@ std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get(
 /**
  * Static registration for the HTTP gRPC access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(HttpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory);
+REGISTER_FACTORY(HttpGrpcAccessLogFactory,
+                 Server::Configuration::AccessLogInstanceFactory){"envoy.http_grpc_access_log"};
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers

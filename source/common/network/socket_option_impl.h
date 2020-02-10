@@ -98,6 +98,13 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 // receiving destination address.
 #define ENVOY_SELF_IPV6_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_RECVPKTINFO)
 
+#ifdef SO_ATTACH_REUSEPORT_CBPF
+#define ENVOY_ATTACH_REUSEPORT_CBPF                                                                \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_ATTACH_REUSEPORT_CBPF)
+#else
+#define ENVOY_ATTACH_REUSEPORT_CBPF Network::SocketOptionName()
+#endif
+
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
   SocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
@@ -145,6 +152,8 @@ private:
   // the buffer so its data() is not aligned in to alignof(void*).
   const std::vector<uint8_t> value_;
 };
+
+using SocketOptionImplOptRef = absl::optional<std::reference_wrapper<SocketOptionImpl>>;
 
 } // namespace Network
 } // namespace Envoy

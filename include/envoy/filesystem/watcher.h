@@ -8,6 +8,8 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Filesystem {
 
@@ -31,7 +33,7 @@ public:
    * @param events supplies the events to watch.
    * @param cb supplies the callback to invoke when a change occurs.
    */
-  virtual void addWatch(const std::string& path, uint32_t events, OnChangedCb cb) PURE;
+  virtual void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) PURE;
 };
 
 using WatcherPtr = std::unique_ptr<Watcher>;
