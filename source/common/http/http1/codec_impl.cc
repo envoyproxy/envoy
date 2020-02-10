@@ -538,7 +538,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
   }
-  auto& headers = headers();
+  HeaderMap& headers = headers();
   if (Utility::isUpgrade(headers)) {
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
@@ -923,7 +923,7 @@ void ClientConnectionImpl::onMessageComplete() {
 
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(
-          absl::get<ResponseHeaderMapImplPtr>(std::move(headers_or_trailers_)), true);
+          std::move(absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_)), true);
       deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
       response.decoder_->decodeTrailers(
