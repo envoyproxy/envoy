@@ -142,7 +142,6 @@ TEST_P(DispatcherIntegrationTest, Basic) {
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  Event::PostCb start_stream_post_cb;
   EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
   http_dispatcher_.sendHeaders(stream, c_headers, true);
 
@@ -151,6 +150,70 @@ TEST_P(DispatcherIntegrationTest, Basic) {
   ASSERT_EQ(cc.on_headers_calls, 1);
   ASSERT_EQ(cc.on_data_calls, 2);
   ASSERT_EQ(cc.on_complete_calls, 1);
+}
+
+TEST_P(DispatcherIntegrationTest, RaceDoesNotCauseDoubleDeletion) {
+  ConditionalInitializer ready_ran;
+  test_server_->server().dispatcher().post([this, &ready_ran]() -> void {
+    http_dispatcher_.ready(
+        test_server_->server().dispatcher(),
+        test_server_->server().listenerManager().apiListener()->get().http()->get());
+    ready_ran.setReady();
+  });
+  ready_ran.waitReady();
+
+  http_dispatcher_.synchronizer().enable();
+
+  envoy_stream_t stream = 1;
+  // Setup bridge_callbacks to handle the response.
+  envoy_http_callbacks bridge_callbacks;
+  callbacks_called cc = {0, 0, 0, 0, 0, nullptr};
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
+    ASSERT_FALSE(end_stream);
+    Http::HeaderMapPtr response_headers = Http::Utility::toInternalHeaders(c_headers);
+    EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_headers_calls++;
+  };
+  bridge_callbacks.on_data = [](envoy_data c_data, bool end_stream, void* context) -> void {
+    if (end_stream) {
+      ASSERT_EQ(Http::Utility::convertToString(c_data), "");
+    } else {
+      ASSERT_EQ(c_data.length, 10);
+    }
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_data_calls++;
+    c_data.release(c_data.context);
+  };
+  bridge_callbacks.on_complete = [](void* context) -> void {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+  };
+  bridge_callbacks.on_cancel = [](void* context) -> void {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_cancel_calls++;
+  };
+
+  // Build a set of request headers.
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+
+  // Create a stream.
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  http_dispatcher_.synchronizer().waitOn("dispatch_encode_final_data");
+  http_dispatcher_.sendHeaders(stream, c_headers, true);
+  http_dispatcher_.synchronizer().barrierOn("dispatch_encode_final_data");
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  ASSERT_EQ(cc.on_data_calls, 1);
+  ASSERT_EQ(cc.on_complete_calls, 0);
+
+  ASSERT_EQ(http_dispatcher_.resetStream(stream), ENVOY_SUCCESS);
+  ASSERT_EQ(cc.on_cancel_calls, 1);
+
+  http_dispatcher_.synchronizer().signal("dispatch_encode_final_data");
 }
 
 } // namespace

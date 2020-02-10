@@ -179,6 +179,7 @@ private:
     Thread::MutexBasicLockable dispatch_lock_;
     std::atomic<bool> closed_{};
     bool local_closed_{};
+    bool hcm_stream_pending_destroy_{};
 
     // Used to issue outgoing HTTP stream operations.
     RequestDecoder* request_decoder_;
