@@ -27,7 +27,7 @@ services:
         aliases:
           - lrs_server
     volumes:
-      - /go/src/github.com/envoyproxy/envoy/examples/load_reporting_service
+      - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service
     expose:
       - "18000"
     ports:
