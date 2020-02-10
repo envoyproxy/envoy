@@ -146,7 +146,7 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http:well_known_names",
-        "//source/extensions/filters/http/ip_tagging:config",
+        "//source/extensions/filters/http/buffer:config",
         "//source/server:options_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:environment_lib",
@@ -155,8 +155,8 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
     ],
 )
 
