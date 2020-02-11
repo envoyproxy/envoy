@@ -33,8 +33,7 @@ public:
 
   void getTrailers(LookupTrailersCallback&& cb) override {
     // TODO(toddmgreer): Support trailers.
-    ASSERT(false, "We didn't say there were trailers.");
-    cb(nullptr);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   const LookupRequest& request() const { return request_; }
@@ -72,7 +71,7 @@ public:
   }
 
   void insertTrailers(const Http::HeaderMap&) override {
-    ASSERT(false); // TODO(toddmgreer): support trailers
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(toddmgreer): support trailers
   }
 
 private:
@@ -98,7 +97,7 @@ void SimpleHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
   ASSERT(lookup_context);
   ASSERT(response_headers);
   // TODO(toddmgreer): Support updating headers.
-  ASSERT(false);
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
