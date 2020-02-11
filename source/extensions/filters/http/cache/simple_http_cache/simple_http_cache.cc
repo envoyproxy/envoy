@@ -136,7 +136,7 @@ public:
     return std::make_unique<
         envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig>();
   }
-  HttpCache& getCache() override { return cache_; }
+  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&) override { return cache_; }
 
 private:
   SimpleHttpCache cache_;

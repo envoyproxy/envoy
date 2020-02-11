@@ -208,7 +208,9 @@ TEST(Registration, GetFactory) {
   HttpCacheFactory* factory =
       Registry::FactoryRegistry<HttpCacheFactory>::getFactory("envoy.extensions.http.cache.simple");
   ASSERT_NE(factory, nullptr);
-  EXPECT_EQ(factory->getCache().cacheInfo().name_, "envoy.extensions.http.cache.simple");
+  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
+  EXPECT_EQ(factory->getCache(config).cacheInfo().name_, "envoy.extensions.http.cache.simple");
 }
 
 } // namespace
