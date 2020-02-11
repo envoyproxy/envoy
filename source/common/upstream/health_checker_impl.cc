@@ -231,19 +231,19 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
 
-  Http::HeaderMapImpl request_headers{
-      {Http::Headers::get().Method, "GET"},
-      {Http::Headers::get().Host, hostname_},
-      {Http::Headers::get().Path, parent_.path_},
-      {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
+  const auto request_headers = Http::HeaderMapImpl::create(
+      {{Http::Headers::get().Method, "GET"},
+       {Http::Headers::get().Host, hostname_},
+       {Http::Headers::get().Path, parent_.path_},
+       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}});
   Router::FilterUtility::setUpstreamScheme(
-      request_headers, host_->transportSocketFactory().implementsSecureTransport());
+      *request_headers, host_->transportSocketFactory().implementsSecureTransport());
   StreamInfo::StreamInfoImpl stream_info(protocol_, parent_.dispatcher_.timeSource());
   stream_info.setDownstreamLocalAddress(local_address_);
   stream_info.setDownstreamRemoteAddress(local_address_);
   stream_info.onUpstreamHostSelected(host_);
-  parent_.request_headers_parser_->evaluateHeaders(request_headers, stream_info);
-  request_encoder->encodeHeaders(request_headers, true);
+  parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
+  request_encoder->encodeHeaders(*request_headers, true);
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason,

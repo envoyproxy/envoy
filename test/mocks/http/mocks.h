@@ -521,7 +521,7 @@ public:
     *os << "is a subset of headers:\n" << expected_headers_;
   }
 
-  const HeaderMapImpl expected_headers_;
+  const TestHeaderMapImpl expected_headers_;
 };
 
 class IsSubsetOfHeadersMatcher {
@@ -540,7 +540,7 @@ public:
   }
 
 private:
-  HeaderMapImpl expected_headers_;
+  TestHeaderMapImpl expected_headers_;
 };
 
 IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers);
@@ -577,7 +577,7 @@ public:
     *os << "is a superset of headers:\n" << expected_headers_;
   }
 
-  const HeaderMapImpl expected_headers_;
+  const TestHeaderMapImpl expected_headers_;
 };
 
 class IsSupersetOfHeadersMatcher {
@@ -596,7 +596,7 @@ public:
   }
 
 private:
-  HeaderMapImpl expected_headers_;
+  TestHeaderMapImpl expected_headers_;
 };
 
 IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers);
@@ -604,22 +604,18 @@ IsSupersetOfHeadersMatcher IsSupersetOfHeaders(const HeaderMap& expected_headers
 } // namespace Http
 
 MATCHER_P(HeaderMapEqual, rhs, "") {
-  Http::HeaderMapImpl& lhs = *dynamic_cast<Http::HeaderMapImpl*>(arg.get());
-  bool equal = (lhs == *rhs);
+  const bool equal = (*arg == *rhs);
   if (!equal) {
     *result_listener << "\n"
                      << TestUtility::addLeftAndRightPadding("header map:") << "\n"
                      << *rhs << TestUtility::addLeftAndRightPadding("is not equal to:") << "\n"
-                     << lhs << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << *arg << TestUtility::addLeftAndRightPadding("") // line full of padding
                      << "\n";
   }
   return equal;
 }
 
-MATCHER_P(HeaderMapEqualRef, rhs, "") {
-  const Http::HeaderMapImpl& lhs = *dynamic_cast<const Http::HeaderMapImpl*>(&arg);
-  return lhs == *dynamic_cast<const Http::HeaderMapImpl*>(rhs);
-}
+MATCHER_P(HeaderMapEqualRef, rhs, "") { return arg == *rhs; }
 
 // Test that a HeaderMapPtr argument includes a given key-value pair, e.g.,
 //  HeaderHasValue("Upgrade", "WebSocket")
