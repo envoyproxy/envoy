@@ -498,7 +498,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     upstream_->encodeData(data, end_stream);
   }
   // The upstream should consume all of the data.
-  // Before there is an upstream the connection should be readDisabled.  If the upstream is
+  // Before there is an upstream the connection should be readDisabled. If the upstream is
   // destroyed, there should be no further reads as well.
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
