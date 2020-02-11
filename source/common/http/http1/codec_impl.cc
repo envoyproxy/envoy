@@ -538,33 +538,34 @@ int ConnectionImpl::onHeadersCompleteBase() {
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
   }
-  HeaderMap& headers = headers();
-  if (Utility::isUpgrade(headers)) {
+  HeaderMap& current_headers = headers();
+  if (Utility::isUpgrade(current_headers)) {
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
-    if (headers.Upgrade() && absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
-                                                    Http::Headers::get().UpgradeValues.H2c)) {
+    if (current_headers.Upgrade() &&
+        absl::EqualsIgnoreCase(current_headers.Upgrade()->value().getStringView(),
+                               Http::Headers::get().UpgradeValues.H2c)) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
-      headers.removeUpgrade();
-      if (headers.Connection()) {
+      current_headers.removeUpgrade();
+      if (current_headers.Connection()) {
         const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
         std::string new_value = StringUtil::removeTokens(
-            headers.Connection()->value().getStringView(), ",", tokens_to_remove, ",");
+            current_headers.Connection()->value().getStringView(), ",", tokens_to_remove, ",");
         if (new_value.empty()) {
-          headers.removeConnection();
+          current_headers.removeConnection();
         } else {
-          headers.setConnection(new_value);
+          current_headers.setConnection(new_value);
         }
       }
-      headers.remove(Headers::get().Http2Settings);
+      current_headers.remove(Headers::get().Http2Settings);
     } else {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
     }
-  } else if (connection_header_sanitization_ && headers.Connection()) {
+  } else if (connection_header_sanitization_ && current_headers.Connection()) {
     // If we fail to sanitize the request, return a 400 to the client
-    if (!Utility::sanitizeConnectionHeader(headers)) {
-      absl::string_view header_value = headers.Connection()->value().getStringView();
+    if (!Utility::sanitizeConnectionHeader(current_headers)) {
+      absl::string_view header_value = current_headers.Connection()->value().getStringView();
       ENVOY_CONN_LOG(debug, "Invalid nominated headers in Connection: {}", connection_,
                      header_value);
       error_code_ = Http::Code::BadRequest;
@@ -575,8 +576,8 @@ int ConnectionImpl::onHeadersCompleteBase() {
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
-  if (headers.TransferEncoding()) {
-    absl::string_view encoding = headers.TransferEncoding()->value().getStringView();
+  if (current_headers.TransferEncoding()) {
+    absl::string_view encoding = current_headers.TransferEncoding()->value().getStringView();
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
         encoding != Headers::get().TransferEncodingValues.Identity &&
