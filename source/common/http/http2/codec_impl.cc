@@ -869,7 +869,7 @@ void ConnectionImpl::sendSettings(
         /*nghttp2_settings_entry.value=*/http2_options.allow_connect()},
        /*default_value=*/0},
       {// Universally disable receiving push promise frames as we don't currently support
-       // them.  nghttp2 will fail the connection if the other side still sends them.
+       // them. nghttp2 will fail the connection if the other side still sends them.
        // TODO(mattklein123): Remove this when we correctly proxy push promise.
        {NGHTTP2_SETTINGS_ENABLE_PUSH, disable_push ? 0U : 1U},
        1},
