@@ -128,13 +128,11 @@ public:
    * to std::transform).
    * @param unary_op the operations to be performed on each of the elements.
    */
-  template <typename UnaryOperation>
-  void inlineTransform(UnaryOperation&& unary_op) {
+  template <typename UnaryOperation> void inlineTransform(UnaryOperation&& unary_op) {
     ASSERT(type() == Type::Inline);
     std::transform(absl::get<absl::InlinedVector<char, 128>>(buffer_).begin(),
                    absl::get<absl::InlinedVector<char, 128>>(buffer_).end(),
-                   absl::get<absl::InlinedVector<char, 128>>(buffer_).begin(),
-                   unary_op);
+                   absl::get<absl::InlinedVector<char, 128>>(buffer_).begin(), unary_op);
   }
 
   /**

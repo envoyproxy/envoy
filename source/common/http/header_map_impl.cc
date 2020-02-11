@@ -27,15 +27,18 @@ void validateCapacity(uint64_t new_capacity) {
                  "Trying to allocate overly large headers.");
 }
 
-absl::string_view get_str_view(const absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
+absl::string_view
+get_str_view(const absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
   return absl::get<absl::string_view>(buffer);
 }
 
-absl::InlinedVector<char, 128>& get_in_vec(absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
+absl::InlinedVector<char, 128>&
+get_in_vec(absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
   return absl::get<absl::InlinedVector<char, 128>>(buffer);
 }
 
-const absl::InlinedVector<char, 128>& get_in_vec(const absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
+const absl::InlinedVector<char, 128>&
+get_in_vec(const absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
   return absl::get<absl::InlinedVector<char, 128>>(buffer);
 }
 } // namespace
@@ -53,10 +56,7 @@ HeaderString::HeaderString(const LowerCaseString& ref_value)
 }
 
 // Initialize as a Type::Reference
-HeaderString::HeaderString(absl::string_view ref_value)
-    : buffer_(ref_value) {
-  ASSERT(valid());
-}
+HeaderString::HeaderString(absl::string_view ref_value) : buffer_(ref_value) { ASSERT(valid()); }
 
 HeaderString::HeaderString(HeaderString&& move_value) noexcept
     : buffer_(std::move(move_value.buffer_)) {

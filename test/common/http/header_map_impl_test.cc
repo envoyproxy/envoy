@@ -337,7 +337,7 @@ TEST(HeaderStringTest, All) {
     const std::string static_string = "HELLO";
     HeaderString string;
     string.setCopy(static_string);
-    string.inlineTransform([](char c){ return static_cast<uint8_t>(tolower(c)); });
+    string.inlineTransform([](char c) { return static_cast<uint8_t>(tolower(c)); });
     EXPECT_FALSE(string.isReference());
     EXPECT_EQ(5U, string.size());
     EXPECT_EQ(string.getStringView(), "hello");

@@ -391,7 +391,7 @@ void ConnectionImpl::completeLastHeader() {
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
   if (!current_header_field_.empty()) {
-    current_header_field_.inlineTransform([](char c){ return static_cast<uint8_t>(tolower(c)); });
+    current_header_field_.inlineTransform([](char c) { return static_cast<uint8_t>(tolower(c)); });
     current_header_map_->addViaMove(std::move(current_header_field_),
                                     std::move(current_header_value_));
   }
