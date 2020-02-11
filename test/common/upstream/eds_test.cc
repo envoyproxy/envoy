@@ -705,6 +705,64 @@ TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
   }
 }
 
+// Verify that a host is excluded when it is in excluded state, but has been previously
+// told by the EDS server to be passing health check.
+TEST_F(EdsTest, EndpointRemovalEdsSuccessButExcludedState) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [endpoints](int port) {
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    // Remove the pending HC flag. This is normally done by the health checker.
+    hosts[0]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+
+    // Mark the hosts as healthy
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+    hosts[0]->healthFlagSet(Host::HealthFlag::EXCLUDE_FROM_LB);
+  }
+
+  // Mark the first endpoint as healthy from EDS.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3::HEALTHY);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    EXPECT_EQ(hosts[0]->health(), Host::Health::Unhealthy);
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::EXCLUDE_FROM_LB));
+    EXPECT_EQ(hosts[1]->health(), Host::Health::Healthy);
+    EXPECT_EQ(
+        1,
+        cluster_->prioritySet().hostSetsPerPriority()[0]->excludedHostsPerLocality().get().size());
+  }
+}
+
 // Validate that onConfigUpdate() removes endpoints that are marked as healthy
 // when configured to drain on host removal.
 TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {

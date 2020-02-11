@@ -2500,8 +2500,8 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
 // When a locality has endpoints that have not yet been warmed, weight calculation should ignore
 // these hosts.
 TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
-  // We have two localities with 3 hosts in L1, 2 hosts in L2. Two of the hosts in L1 are not
-  // warmed yet, so even though they are unhealthy we should not adjust the locality weight.
+  // We have two localities with 3 hosts in L1, 2 hosts in L2. Two of the hosts in L1 are still
+  // excluded, so even though they are unhealthy we should not adjust the locality weight.
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts_[0], hosts_[1], hosts_[2]}, {hosts_[3], hosts_[4]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
@@ -2702,28 +2702,32 @@ TEST(HostPartitionTest, PartitionHosts) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   HostVector hosts{
       makeTestHost(info, "tcp://127.0.0.1:80"), makeTestHost(info, "tcp://127.0.0.1:81"),
-      makeTestHost(info, "tcp://127.0.0.1:82"), makeTestHost(info, "tcp://127.0.0.1:83")};
+      makeTestHost(info, "tcp://127.0.0.1:82"), makeTestHost(info, "tcp://127.0.0.1:83"),
+      makeTestHost(info, "tcp://127.0.0.1:84")};
 
   hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
   hosts[2]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
   hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDE_FROM_LB);
 
-  auto hosts_per_locality = makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3]}});
+  auto hosts_per_locality =
+      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4]}});
 
   auto update_hosts_params =
       HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
 
-  EXPECT_EQ(4, update_hosts_params.hosts->size());
+  EXPECT_EQ(5, update_hosts_params.hosts->size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
   EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
   EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
-  EXPECT_EQ(1, update_hosts_params.excluded_hosts->get().size());
+  EXPECT_EQ(2, update_hosts_params.excluded_hosts->get().size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
+  EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts->get()[1]);
 
   EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
-  EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[1].size());
+  EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
 
   EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
   EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
@@ -2734,8 +2738,9 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts_per_locality->get()[0][0]);
 
   EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(1, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(2, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
+  EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts_per_locality->get()[1][1]);
 }
 } // namespace
 } // namespace Upstream
