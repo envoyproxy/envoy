@@ -288,15 +288,15 @@ message CertificateValidationContext {
 
   // An optional list of Subject Alternative name matchers. Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified matches.
-  // 
-  // When a certificatee has wildcard DNS SAN entries, to match a specific client, it should be 
-  // configured with exact match type in the string matcher.For example if the certificate has 
+  //
+  // When a certificatee has wildcard DNS SAN entries, to match a specific client, it should be
+  // configured with exact match type in the string matcher.For example if the certificate has
   // "*.example.com" as DNS service entry, to allow only "api.example.com", it should be configured
   // as shown below.
-  // 
+  //
   // .. code-block:: yaml
   //
-  // match_subject_alt_names: 
+  // match_subject_alt_names:
   //   exact: "app.example.com"
   //
   // .. attention::

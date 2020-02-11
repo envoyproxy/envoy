@@ -358,7 +358,7 @@ actions:
   )EOF";
 
   setupTest(yaml);
-  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+  Http::TestHeaderMapImpl header{{"x-header-name-1", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
                                          default_remote_address_);
