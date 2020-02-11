@@ -377,10 +377,11 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
   simTime().sleep(std::chrono::milliseconds(300001));
-  // If resolution failed for the host, then no onDnsHostRemoved callback should be called because
-  // no onDnsHostAddOrUpdate callbacks was ever called as well.
+  // Because resolution failed for the host, onDnsHostAddOrUpdate was not called.
+  // Therefore, onDnsHostRemove should not be called either.
   EXPECT_CALL(update_callbacks_, onDnsHostRemove(_)).Times(0);
   resolve_timer->invokeCallback();
+  // DnsCacheImpl state is updated accordingly: the host is removed.
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 1 /* removed */, 0 /* num hosts */);
 }
