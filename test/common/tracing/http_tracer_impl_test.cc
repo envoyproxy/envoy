@@ -3,9 +3,8 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/request_id_utils/request_id_utils.h"
-#include "extensions/request_id_utils/uuid/uuid_impl.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
@@ -15,6 +14,8 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
+
+#include "extensions/request_id_utils/uuid/uuid_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -49,15 +50,13 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   std::string not_traceable_guid = random.uuid();
 
   auto ridUtils = std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
-    Envoy::Extensions::RequestIDUtils::UUIDUtils(random));
+      Envoy::Extensions::RequestIDUtils::UUIDUtils(random));
 
   ON_CALL(stream_info, getRequestIDUtils()).WillByDefault(Return(ridUtils));
-  
+
   std::string forced_guid = random.uuid();
-  std::cout << forced_guid << "\n";
   Http::TestHeaderMapImpl forced_header{{"x-request-id", forced_guid}};
   ridUtils->setTraceStatus(forced_header, Envoy::RequestIDUtils::TraceStatus::Forced);
-  std::cout << forced_header << "\n";
 
   std::string sampled_guid = random.uuid();
   Http::TestHeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};

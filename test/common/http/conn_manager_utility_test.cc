@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "extensions/request_id_utils/uuid/uuid_impl.h"
 #include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -12,6 +11,8 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
+
+#include "extensions/request_id_utils/uuid/uuid_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -118,7 +119,7 @@ public:
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
     auto ridUtils = std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
-      Envoy::Extensions::RequestIDUtils::UUIDUtils(random_));
+        Envoy::Extensions::RequestIDUtils::UUIDUtils(random_));
     ON_CALL(config_, requestIDUtils()).WillByDefault(Return(ridUtils));
   }
 
