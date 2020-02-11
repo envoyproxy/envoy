@@ -18,7 +18,7 @@ public:
   using DynamicSpans = std::vector<DynamicSpan>;
   using DynamicsMap = absl::flat_hash_map<std::string, DynamicSpans>;
 
-  // Holds state needed construct StatName with mixed dynamic/symbolic
+  // Holds state needed to construct StatName with mixed dynamic/symbolic
   // components, based on a map.
   class DynamicContext {
   public:
@@ -30,17 +30,17 @@ public:
      * pairs, indicating the begin/end of spans of tokens in the stat-name that
      * are created from StatNameDynamicStore or StatNameDynamicPool.
      *
-     * This is can be used to reconstruct the same exact StatNames in mergeStats(),
+     * This can be used to reconstruct the same exact StatNames in mergeStats(),
      * to enable stat continuity across hot-restart.
      *
      * @param stat_name the input stat name.
      * @return the array pair indicating the bounds.
      */
-    static DynamicSpans encodeComponents(StatName stat_name);
+    static DynamicSpans encodeSegments(StatName stat_name);
 
     /**
      * Generates a StatName with mixed dynamic/symbolic components based on
-     * the string and the dynamic_map obtained from encodeComponents.
+     * the string and the dynamic_map obtained from encodeSegments.
      *
      * @param name The string corresponding to the desired StatName.
      * @param map a map indicating which spans of tokens in the stat-name are dynamic.
@@ -60,12 +60,14 @@ public:
   // Merge the values of stats_proto into stats_store. Counters are always straightforward
   // addition, while gauges default to addition but have exceptions.
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
-                  const Protobuf::Map<std::string, uint64_t>& gauges, const DynamicsMap& dynamics);
+                  const Protobuf::Map<std::string, uint64_t>& gauges,
+                  const DynamicsMap& dynamics = DynamicsMap());
 
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
-                     const DynamicsMap&);
-  void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges, const DynamicsMap&);
+                     const DynamicsMap& dynamics_map);
+  void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
+                   const DynamicsMap& dynamics_map);
 
   StatNameHashMap<uint64_t> parent_gauge_values_;
   // A stats Scope for our in-the-merging-process counters to live in. Scopes conceptually hold

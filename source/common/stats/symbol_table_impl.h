@@ -286,7 +286,7 @@ private:
 };
 
 // Base class for holding the backing-storing for a StatName. The two derived
-// classes, StatNameStorage and StatNameDynamicStore, share a need to hold an
+// classes, StatNameStorage and StatNameDynamicStorage, share a need to hold an
 // array of bytes, but use different representations.
 class StatNameStorageBase {
 public:

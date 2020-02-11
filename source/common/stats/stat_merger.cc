@@ -7,7 +7,7 @@ namespace Stats {
 
 StatMerger::StatMerger(Store& target_store) : temp_scope_(target_store.createScope("")) {}
 
-StatMerger::DynamicSpans StatMerger::DynamicContext::encodeComponents(StatName stat_name) {
+StatMerger::DynamicSpans StatMerger::DynamicContext::encodeSegments(StatName stat_name) {
   DynamicSpans dynamic_spans;
   uint32_t index = 0;
   auto record_dynamic = [&dynamic_spans, &index](absl::string_view str) {
@@ -18,6 +18,15 @@ StatMerger::DynamicSpans StatMerger::DynamicContext::encodeComponents(StatName s
     ++index;
     dynamic_spans.push_back(span);
   };
+
+  // Use decodeTokens to suss out which components of stat_name are
+  // symbolic vs dynamic. The lambda that takes a Symbol is called
+  // for symbolic components. The lambda called with a string_view
+  // is called for dynamic components.
+  //
+  // Note that with fake symbol tables, the Symbol lambda is called
+  // once for each character in the string, and no dynamics will
+  // be recorded.
   SymbolTableImpl::Encoding::decodeTokens(
       stat_name.data(), stat_name.dataSize(), [&index](Symbol) { ++index; }, record_dynamic);
   return dynamic_spans;
@@ -34,36 +43,47 @@ StatName StatMerger::DynamicContext::makeDynamicStatName(const std::string& name
   auto dynamic = dynamic_spans.begin();
   auto dynamic_end = dynamic_spans.end();
 
-  // Name has embedded dynamic components; we'll need to join together the
-  // static/dynamic StatName components.
-  std::vector<StatName> components;
-  uint32_t component_index = 0;
-  std::vector<absl::string_view> dynamic_tokens;
+  // Name has embedded dynamic segments; we'll need to join together the
+  // static/dynamic StatName segments.
+  std::vector<StatName> segments;
+  uint32_t segment_index = 0;
+  std::vector<absl::string_view> dynamic_segments;
 
   for (auto segment : absl::StrSplit(name, '.')) {
-    if (dynamic != dynamic_end && dynamic->first == component_index) {
-      ASSERT(dynamic_tokens.empty());
-      if (dynamic->second == component_index) {
-        components.push_back(dynamic_pool_.add(segment));
+    if (dynamic != dynamic_end && dynamic->first == segment_index) {
+      // Handle start of dynamic span. We note that we are in a dynamic
+      // span by adding to dynamic_segments, which should of course be
+      // non-empty.
+      ASSERT(dynamic_segments.empty());
+      if (dynamic->second == segment_index) {
+        // Handle start==end (a one-segment span).
+        segments.push_back(dynamic_pool_.add(segment));
         ++dynamic;
       } else {
-        dynamic_tokens.push_back(segment);
+        // Handle start<end, so we save the first segment in dynamic_segments.
+        dynamic_segments.push_back(segment);
       }
-    } else if (dynamic != dynamic_end && dynamic->second == component_index) {
-      ASSERT(!dynamic_tokens.empty());
-      dynamic_tokens.push_back(segment);
-      components.push_back(dynamic_pool_.add(absl::StrJoin(dynamic_tokens, ".")));
-      dynamic_tokens.clear();
-      ++dynamic;
+    } else if (dynamic_segments.empty()) {
+      // Handle that we are not in dynamic mode; we are just allocating
+      // a symbolic segment.
+      segments.push_back(symbolic_pool_.add(segment));
     } else {
-      components.push_back(symbolic_pool_.add(segment));
+      // Handle the next dynamic segment.
+      dynamic_segments.push_back(segment);
+      if (dynamic->second == segment_index) {
+        // Handle that this dynamic segment is the last one, and we're flipping
+        // back to symbolic mode.
+        segments.push_back(dynamic_pool_.add(absl::StrJoin(dynamic_segments, ".")));
+        dynamic_segments.clear();
+        ++dynamic;
+      }
     }
-    ++component_index;
+    ++segment_index;
   }
-  ASSERT(dynamic_tokens.empty());
+  ASSERT(dynamic_segments.empty());
   ASSERT(dynamic == dynamic_end);
 
-  storage_ptr_ = symbol_table_.join(components);
+  storage_ptr_ = symbol_table_.join(segments);
   return StatName(storage_ptr_.get());
 }
 

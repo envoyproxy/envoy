@@ -51,7 +51,7 @@ public:
 
     std::string name = symbol_table.toString(stat_name);
     StatMerger::DynamicsMap dynamic_map;
-    dynamic_map[name] = StatMerger::DynamicContext::encodeComponents(stat_name);
+    dynamic_map[name] = StatMerger::DynamicContext::encodeSegments(stat_name);
     StatMerger::DynamicContext dynamic_context(symbol_table);
     StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
     EXPECT_EQ(stat_name, decoded) << name;
@@ -71,28 +71,28 @@ TEST_F(StatMergerTest, counterMerge) {
 
   Protobuf::Map<std::string, uint64_t> counter_deltas;
   counter_deltas["draculaer"] = 1;
-  stat_merger_.mergeStats(counter_deltas, empty_gauges_, StatMerger::DynamicsMap());
+  stat_merger_.mergeStats(counter_deltas, empty_gauges_);
   // Initial combined value: 1+1.
   EXPECT_EQ(2, store_.counter("draculaer").value());
   EXPECT_EQ(1, store_.counter("draculaer").latch());
 
   // The parent's counter increases by 1.
   counter_deltas["draculaer"] = 1;
-  stat_merger_.mergeStats(counter_deltas, empty_gauges_, StatMerger::DynamicsMap());
+  stat_merger_.mergeStats(counter_deltas, empty_gauges_);
   EXPECT_EQ(3, store_.counter("draculaer").value());
   EXPECT_EQ(1, store_.counter("draculaer").latch());
 
   // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
   store_.counter("draculaer").add(4);
   counter_deltas["draculaer"] = 0;
-  stat_merger_.mergeStats(counter_deltas, empty_gauges_, StatMerger::DynamicsMap());
+  stat_merger_.mergeStats(counter_deltas, empty_gauges_);
   EXPECT_EQ(7, store_.counter("draculaer").value());
   EXPECT_EQ(4, store_.counter("draculaer").latch());
 
   // Our counter and the parent's counter both increase by 2, total increase of 4.
   store_.counter("draculaer").add(2);
   counter_deltas["draculaer"] = 2;
-  stat_merger_.mergeStats(counter_deltas, empty_gauges_, StatMerger::DynamicsMap());
+  stat_merger_.mergeStats(counter_deltas, empty_gauges_);
   EXPECT_EQ(11, store_.counter("draculaer").value());
   EXPECT_EQ(4, store_.counter("draculaer").latch());
 }
@@ -100,7 +100,7 @@ TEST_F(StatMergerTest, counterMerge) {
 TEST_F(StatMergerTest, basicDefaultAccumulationImport) {
   Protobuf::Map<std::string, uint64_t> gauges;
   gauges["whywassixafraidofseven"] = 111;
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges, StatMerger::DynamicsMap());
+  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
   EXPECT_EQ(789, whywassixafraidofseven_.value());
 }
 
@@ -108,7 +108,7 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
   {
     Protobuf::Map<std::string, uint64_t> gauges;
     gauges["whywassixafraidofseven"] = 100;
-    stat_merger_.mergeStats(empty_counter_deltas_, gauges, StatMerger::DynamicsMap());
+    stat_merger_.mergeStats(empty_counter_deltas_, gauges);
     // Initial combined values: 678+100 and 1+2.
     EXPECT_EQ(778, whywassixafraidofseven_.value());
   }
@@ -116,7 +116,7 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
     Protobuf::Map<std::string, uint64_t> gauges;
     // The parent's gauge drops by 1, and its counter increases by 1.
     gauges["whywassixafraidofseven"] = 99;
-    stat_merger_.mergeStats(empty_counter_deltas_, gauges, StatMerger::DynamicsMap());
+    stat_merger_.mergeStats(empty_counter_deltas_, gauges);
     EXPECT_EQ(777, whywassixafraidofseven_.value());
   }
   {
@@ -124,7 +124,7 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
     // Our own gauge increases by 12, while the parent's stays constant. Total increase of 12.
     // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
     whywassixafraidofseven_.add(12);
-    stat_merger_.mergeStats(empty_counter_deltas_, gauges, StatMerger::DynamicsMap());
+    stat_merger_.mergeStats(empty_counter_deltas_, gauges);
     EXPECT_EQ(789, whywassixafraidofseven_.value());
   }
   {
@@ -133,7 +133,7 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
     // Our counter and the parent's counter both increase by 1, total increase of 2.
     whywassixafraidofseven_.sub(5);
     gauges["whywassixafraidofseven"] = 104;
-    stat_merger_.mergeStats(empty_counter_deltas_, gauges, StatMerger::DynamicsMap());
+    stat_merger_.mergeStats(empty_counter_deltas_, gauges);
     EXPECT_EQ(789, whywassixafraidofseven_.value());
   }
 }
@@ -150,7 +150,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   gauges["child.doesnt.have.this.version"] = 111; // This should never be populated.
 
   // Check defined values are not changed, and undefined remain undefined.
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges, StatMerger::DynamicsMap());
+  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
   EXPECT_EQ(12345, some_sort_of_version.value());
   EXPECT_FALSE(
       store_.gauge("child.doesnt.have.this.version", Gauge::ImportMode::NeverImport).used());
@@ -175,7 +175,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   gauges["listener_manager.total_listeners_active"] = 33;
   gauges["overload.something.pressure"] = 33;
 
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges, StatMerger::DynamicsMap());
+  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
 #define EXPECT_GAUGE_NOT_USED(name)                                                                \
   EXPECT_FALSE(store_.gauge(name, Gauge::ImportMode::NeverImport).used())
 
@@ -211,25 +211,34 @@ TEST_F(StatMergerTest, gaugeMergeImportMode) {
 
 class StatMergerDynamicTest : public testing::Test {
 public:
-  StatMergerDynamicTest() : store_(symbol_table_), stat_merger_(store_) {}
+  void init(SymbolTablePtr&& symbol_table) {
+    symbol_table_ = std::move(symbol_table);
+    //store_ = std::make_unique<IsolatedStoreImpl>(*symbol_table_);
+    //stat_merger_ = std::make_unique<StatMerger>(*store_);
+  }
 
-  // Test helper functions takes an input_descriptor. And input_descriptor is
-  // mostly like the stringified StatName, but each segment that is prefixed by
-  // "D:" is dynamic, and within a segment, we map "," to ".". The "D:" hack
-  // restricts the stat names we can test by making a prefix special. The ","
-  // hack does that too, allowing us to represent a single multi-segment dynamic
-  // token in the tests. These hacks were easy to implement (~ 3 lines of code)
-  // and provide a reasonably concise way to make a few test-cases.
-  //
-  // The test-helper ensures that a StatName created from a descriptor can
-  // be encoded into a DynamicsMap, and also decoded back into a StatName
-  // that compares as expected.
-  void dynamicEncodeDecodeTest(absl::string_view input_descriptor) {
+  /**
+   * Test helper function takes an input_descriptor. And input_descriptor is
+   * mostly like the stringified StatName, but each segment that is prefixed by
+   * "D:" is dynamic, and within a segment, we map "," to ".". The "D:" hack
+   * restricts the stat names we can test by maqking a prefix special. The ","
+   * hack does that too, allowing us to represent a single multi-segment dynamic
+   * token in the tests. These hacks were easy to implement (~ 3 lines of code)
+   * and provide a reasonably concise way to make a few test-cases.
+   *
+   * The test-helper ensures that a StatName created from a descriptor can
+   * be encoded into a DynamicsMap, and also decoded back into a StatName
+   * that compares as expected.
+   *
+   * @param a pattern describing a stat-name with dynamic and symbolic components.
+   * @return the number of elements in the dynamic map.
+   */
+  uint32_t dynamicEncodeDecodeTest(absl::string_view input_descriptor) {
     // Encode the input name into a joined StatName, using "D:" to indicate
     // a dynamic component.
     std::vector<StatName> components;
-    StatNamePool symbolic_pool(symbol_table_);
-    StatNameDynamicPool dynamic_pool(symbol_table_);
+    StatNamePool symbolic_pool(*symbol_table_);
+    StatNameDynamicPool dynamic_pool(*symbol_table_);
 
     for (absl::string_view segment : absl::StrSplit(input_descriptor, ".")) {
       if (absl::StartsWith(segment, "D:")) {
@@ -239,33 +248,82 @@ public:
         components.push_back(symbolic_pool.add(segment));
       }
     }
-    SymbolTable::StoragePtr joined = symbol_table_.join(components);
-    StatName stat_name(joined.get());
+    StatName stat_name;
+    SymbolTable::StoragePtr joined;
 
-    std::string name = symbol_table_.toString(stat_name);
+    if (components.size() == 1) {
+      stat_name = components[0];
+    } else {
+      joined = symbol_table_->join(components);
+      stat_name = StatName(joined.get());
+    }
+
+    std::string name = symbol_table_->toString(stat_name);
     StatMerger::DynamicsMap dynamic_map;
-    dynamic_map[name] = StatMerger::DynamicContext::encodeComponents(stat_name);
-
-    StatMerger::DynamicContext dynamic_context(symbol_table_);
+    StatMerger::DynamicSpans spans = StatMerger::DynamicContext::encodeSegments(stat_name);
+    //if (!spans.empty()) {
+      dynamic_map[name] = spans;
+      //}
+    StatMerger::DynamicContext dynamic_context(*symbol_table_);
     StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
-    EXPECT_EQ(name, symbol_table_.toString(decoded)) << "input=" << input_descriptor;
+    EXPECT_EQ(name, symbol_table_->toString(decoded)) << "input=" << input_descriptor;
     EXPECT_TRUE(stat_name == decoded) << "input=" << input_descriptor << ", name=" << name;
+
+    return dynamic_map[name].size();
   }
 
-  SymbolTableImpl symbol_table_;
-  IsolatedStoreImpl store_;
-  StatMerger stat_merger_;
+  SymbolTablePtr symbol_table_;
+  //std::unique_ptr<IsolatedStoreImpl> store_;
+  //std::unique_ptr<StatMerger> stat_merger_;
 };
 
-TEST_F(StatMergerDynamicTest, Dynamics) {
-  dynamicEncodeDecodeTest("normal");
-  dynamicEncodeDecodeTest("D:dynamic");
-  dynamicEncodeDecodeTest("hello.world");
-  dynamicEncodeDecodeTest("D:hello.world");
-  dynamicEncodeDecodeTest("hello.D:world");
-  dynamicEncodeDecodeTest("D:hello.D:world");
-  dynamicEncodeDecodeTest("D:hello,world");
-  dynamicEncodeDecodeTest("one.D:two.three.D:four.D:five.six.D:seven,eight.nine");
+TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
+  init(std::make_unique<SymbolTableImpl>());
+
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:dynamic"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello...world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello.world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("hello.D:world"));
+  EXPECT_EQ(2, dynamicEncodeDecodeTest("D:hello.D:world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,world"));
+  EXPECT_EQ(4, dynamicEncodeDecodeTest("one.D:two.three.D:four.D:five.six.D:seven,eight.nine"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:one,two,three"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello..world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("hello..D:world"));
+  EXPECT_EQ(2, dynamicEncodeDecodeTest("D:hello..D:world"));
+  EXPECT_EQ(3, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,,world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,,,world"));
+}
+
+TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
+  init(std::make_unique<FakeSymbolTableImpl>());
+
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:dynamic"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello...world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("one.D:two.three.D:four.D:five.six.D:seven,eight.nine"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:one,two,three"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
+
+  // TODO(#10008): these tests fail because fake/real symbol tables
+  // deal with empty components differently. Will file an issue.
+  // EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,,world"));
+  // EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,,,world"));
 }
 
 class StatMergerThreadLocalTest : public testing::Test {
@@ -302,7 +360,7 @@ TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
     counter_deltas["newcounter2"] = 2;
     gauges["newgauge1"] = 1;
     gauges["newgauge2"] = 2;
-    stat_merger.mergeStats(counter_deltas, gauges, StatMerger::DynamicsMap());
+    stat_merger.mergeStats(counter_deltas, gauges);
     EXPECT_EQ(0, store_.counter("newcounter0").value());
     EXPECT_EQ(0, store_.counter("newcounter0").latch());
     EXPECT_EQ(1, store_.counter("newcounter1").value());
@@ -331,7 +389,7 @@ TEST_F(StatMergerThreadLocalTest, retainImportModeAfterMerge) {
     Protobuf::Map<std::string, uint64_t> counter_deltas;
     Protobuf::Map<std::string, uint64_t> gauges;
     gauges["mygauge"] = 789;
-    stat_merger.mergeStats(counter_deltas, gauges, StatMerger::DynamicsMap());
+    stat_merger.mergeStats(counter_deltas, gauges);
   }
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
   EXPECT_EQ(789 + 42, gauge.value());
@@ -350,7 +408,7 @@ TEST_F(StatMergerThreadLocalTest, retainNeverImportModeAfterMerge) {
     Protobuf::Map<std::string, uint64_t> counter_deltas;
     Protobuf::Map<std::string, uint64_t> gauges;
     gauges["mygauge"] = 789;
-    stat_merger.mergeStats(counter_deltas, gauges, StatMerger::DynamicsMap());
+    stat_merger.mergeStats(counter_deltas, gauges);
   }
   EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge.importMode());
   EXPECT_EQ(42, gauge.value());

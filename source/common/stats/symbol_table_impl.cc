@@ -478,6 +478,9 @@ const uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
 
 StatName StatNamePool::add(absl::string_view str) { return StatName(addReturningStorage(str)); }
 
+// Double-dots are usually a mistake and may be handled inconsistently in
+//
+
 StatName StatNameDynamicPool::add(absl::string_view str) {
   storage_vector_.push_back(Stats::StatNameDynamicStorage(str, symbol_table_));
   return StatName(storage_vector_.back().bytes());

@@ -190,6 +190,14 @@ TEST_P(StatNameTest, TestDynamicPools) {
   EXPECT_NE(dynamic2.data(), dynamic.data());
 }
 
+TEST_P(StatNameTest, TestDoubleDots) {
+  StatNameDynamicPool dynamic(*table_);
+  EXPECT_EQ("double..triple...dots", table_->toString(dynamic.add("double..triple...dots")));
+
+  StatNamePool symbolic(*table_);
+  EXPECT_EQ("double..triple...dots", table_->toString(symbolic.add("double..triple...dots")));
+}
+
 TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
   for (int i = 0; i < 100 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);
