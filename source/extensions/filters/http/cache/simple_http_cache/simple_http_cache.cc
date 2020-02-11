@@ -31,7 +31,7 @@ public:
     cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.begin()], range.length()));
   }
 
-  void getTrailers(LookupTrailersCallback&& cb) override {
+  void getTrailers(LookupTrailersCallback&&) override {
     // TODO(toddmgreer): Support trailers.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
