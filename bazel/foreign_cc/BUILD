@@ -129,6 +129,14 @@ envoy_cmake_external(
     },
     lib_source = "@com_github_libevent_libevent//:all",
     static_libraries = select({
+        # OSX organization of libevent is different from Windows/Linux.
+        # Including libevent_core is a requirement on these platforms, but
+        # results in duplicate symbols when built on OSX.
+        # See https://github.com/lyft/envoy-mobile/issues/677 for details.
+        "//bazel:apple": [
+            "libevent.a",
+            "libevent_pthreads.a",
+        ],
         "//bazel:windows_x86_64": [
             "event.lib",
             "event_core.lib",
@@ -136,6 +144,7 @@ envoy_cmake_external(
         "//conditions:default": [
             "libevent.a",
             "libevent_pthreads.a",
+            "libevent_core.a",
         ],
     }),
 )
