@@ -690,6 +690,7 @@ bool ContextImpl::matchSubjectAltName(
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = generalNameAsString(general_name);
     for (auto& config_san_matcher : subject_alt_name_matchers) {
+      // For DNS SAN, if it exact, we have to follow DNS matching semantics.
       if (general_name->type == GEN_DNS &&
                   config_san_matcher.matcher().match_pattern_case() ==
                       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
