@@ -24,6 +24,7 @@ namespace Runtime {
 // problem of the bugs being found after the old code path has been removed.
 constexpr const char* runtime_features[] = {
     // Enabled
+    "envoy.reloadable_features.http1_flood_protection",
     "envoy.reloadable_features.test_feature_true",
     "envoy.reloadable_features.strict_header_validation",
     "envoy.reloadable_features.connection_header_sanitization",

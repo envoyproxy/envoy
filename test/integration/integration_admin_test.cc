@@ -267,8 +267,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   case Http::CodecClient::Type::HTTP1:
     EXPECT_EQ("   Count Lookup\n"
               "       1 http1.metadata_not_supported_error\n"
+              "       1 http1.response_flood\n"
               "\n"
-              "total: 1\n",
+              "total: 2\n",
               response->body());
     break;
   case Http::CodecClient::Type::HTTP2:

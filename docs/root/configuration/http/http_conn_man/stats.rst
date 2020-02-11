@@ -111,6 +111,7 @@ All http1 statistics are rooted at *http1.*
    :widths: 1, 1, 2
 
    metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/1 encoding
+   response_flood, Counter, Total number of connections closed due to response flooding
 
 Http2 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~
