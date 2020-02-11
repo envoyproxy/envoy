@@ -580,6 +580,9 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  // Regression test https://github.com/envoyproxy/envoy/issues/9881 by making
+  // sure this path does standard HCM header transformations.
+  EXPECT_TRUE(response->headers().Date() != nullptr);
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("500"));
   test_server_->waitForCounterEq("http.config_test.downstream_rq_5xx", 1);
 }

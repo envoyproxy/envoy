@@ -86,10 +86,12 @@ private:
 class TlsCertificateSdsApi;
 class CertificateValidationContextSdsApi;
 class TlsSessionTicketKeysSdsApi;
+class GenericSecretSdsApi;
 using TlsCertificateSdsApiSharedPtr = std::shared_ptr<TlsCertificateSdsApi>;
 using CertificateValidationContextSdsApiSharedPtr =
     std::shared_ptr<CertificateValidationContextSdsApi>;
 using TlsSessionTicketKeysSdsApiSharedPtr = std::shared_ptr<TlsSessionTicketKeysSdsApi>;
+using GenericSecretSdsApiSharedPtr = std::shared_ptr<GenericSecretSdsApi>;
 
 /**
  * TlsCertificateSdsApi implementation maintains and updates dynamic TLS certificate secrets.
@@ -273,6 +275,62 @@ private:
   Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
   Common::CallbackManager<
       const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&>
+      validation_callback_manager_;
+};
+
+/**
+ * GenericSecretSdsApi implementation maintains and updates dynamic generic secret.
+ */
+class GenericSecretSdsApi : public SdsApi, public GenericSecretConfigProvider {
+public:
+  static GenericSecretSdsApiSharedPtr
+  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+         const envoy::config::core::v3::ConfigSource& sds_config,
+         const std::string& sds_config_name, std::function<void()> destructor_cb) {
+    // We need to do this early as we invoke the subscription factory during initialization, which
+    // is too late to throw.
+    Config::Utility::checkLocalInfo("GenericSecretSdsApi", secret_provider_context.localInfo());
+    return std::make_shared<GenericSecretSdsApi>(
+        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
+        secret_provider_context.dispatcher().timeSource(),
+        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
+        *secret_provider_context.initManager(), destructor_cb);
+  }
+
+  GenericSecretSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
+                      const std::string& sds_config_name,
+                      Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
+                      ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
+                      Init::Manager& init_manager, std::function<void()> destructor_cb)
+      : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
+               stats, init_manager, std::move(destructor_cb)) {}
+
+  // SecretProvider
+  const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
+    return generic_secret.get();
+  }
+  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+    return update_callback_manager_.add(callback);
+  }
+  Common::CallbackHandle* addValidationCallback(
+      std::function<void(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>
+          callback) override {
+    return validation_callback_manager_.add(callback);
+  }
+
+protected:
+  void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
+    generic_secret = std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
+        secret.generic_secret());
+  }
+  void
+  validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
+    validation_callback_manager_.runCallbacks(secret.generic_secret());
+  }
+
+private:
+  GenericSecretPtr generic_secret;
+  Common::CallbackManager<const envoy::extensions::transport_sockets::tls::v3::GenericSecret&>
       validation_callback_manager_;
 };
 

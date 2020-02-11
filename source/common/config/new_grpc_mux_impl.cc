@@ -7,6 +7,7 @@
 #include "common/common/token_bucket_impl.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/memory/utils.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -60,6 +61,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   }
 
   kickOffAck(sub->second->sub_state_.handleResponse(*message));
+  Memory::Utils::tryShrinkHeap();
 }
 
 void NewGrpcMuxImpl::onStreamEstablished() {

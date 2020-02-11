@@ -16,6 +16,7 @@
 #include "server/options_impl_platform.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
@@ -39,10 +40,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level)
     : signal_handling_enabled_(true) {
-  std::string log_levels_string = "Log levels: ";
-  for (auto level_string_view : spdlog::level::level_string_views) {
-    log_levels_string += fmt::format("[{}]", level_string_view);
-  }
+  std::string log_levels_string = fmt::format("Log levels: {}", allowedLogLevels());
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
 
@@ -161,11 +159,10 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
   cpuset_threads_ = cpuset_threads.getValue();
 
-  log_level_ = default_log_level;
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    if (log_level.getValue() == spdlog::level::level_string_views[i]) {
-      log_level_ = static_cast<spdlog::level::level_enum>(i);
-    }
+  if (log_level.isSet()) {
+    log_level_ = parseAndValidateLogLevel(log_level.getValue());
+  } else {
+    log_level_ = default_log_level;
   }
 
   log_format_ = log_format.getValue();
@@ -239,6 +236,38 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   }
 }
 
+spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(absl::string_view log_level) {
+  if (log_level == "warn") {
+    return spdlog::level::level_enum::warn;
+  }
+
+  size_t level_to_use = std::numeric_limits<size_t>::max();
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    spdlog::string_view_t spd_log_level = spdlog::level::level_string_views[i];
+    if (log_level == absl::string_view(spd_log_level.data(), spd_log_level.size())) {
+      level_to_use = i;
+      break;
+    }
+  }
+
+  if (level_to_use == std::numeric_limits<size_t>::max()) {
+    logError(fmt::format("error: invalid log level specified '{}'", log_level));
+  }
+  return static_cast<spdlog::level::level_enum>(level_to_use);
+}
+
+std::string OptionsImpl::allowedLogLevels() {
+  std::string allowed_log_levels;
+  for (auto level_string_view : spdlog::level::level_string_views) {
+    if (level_string_view == spdlog::level::to_string_view(spdlog::level::warn)) {
+      allowed_log_levels += fmt::format("[{}|warn]", level_string_view);
+    } else {
+      allowed_log_levels += fmt::format("[{}]", level_string_view);
+    }
+  }
+  return allowed_log_levels;
+}
+
 void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
   if (component_log_levels.empty()) {
     return;
@@ -251,23 +280,12 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
       logError(fmt::format("error: component log level not correctly specified '{}'", level));
     }
     std::string log_name = log_name_level[0];
-    std::string log_level = log_name_level[1];
-    size_t level_to_use = std::numeric_limits<size_t>::max();
-    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-      if (log_level == spdlog::level::level_string_views[i]) {
-        level_to_use = i;
-        break;
-      }
-    }
-    if (level_to_use == std::numeric_limits<size_t>::max()) {
-      logError(fmt::format("error: invalid log level specified '{}'", log_level));
-    }
+    spdlog::level::level_enum log_level = parseAndValidateLogLevel(log_name_level[1]);
     Logger::Logger* logger_to_change = Logger::Registry::logger(log_name);
     if (!logger_to_change) {
       logError(fmt::format("error: invalid component specified '{}'", log_name));
     }
-    component_log_levels_.push_back(
-        std::make_pair(log_name, static_cast<spdlog::level::level_enum>(level_to_use)));
+    component_log_levels_.push_back(std::make_pair(log_name, log_level));
   }
 }
 

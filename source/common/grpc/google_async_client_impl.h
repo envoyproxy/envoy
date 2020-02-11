@@ -184,9 +184,6 @@ public:
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
 private:
-  static std::shared_ptr<grpc::Channel>
-  createChannel(const envoy::config::core::v3::GrpcService::GoogleGrpc& config);
-
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
   // This is shared with child streams, so that they can cleanup independent of

@@ -64,6 +64,8 @@ public:
   const std::string OriginalSrc = "envoy.filters.http.original_src";
   // Dynamic forward proxy filter
   const std::string DynamicForwardProxy = "envoy.filters.http.dynamic_forward_proxy";
+  // AWS request signing filter
+  const std::string AwsRequestSigning = "envoy.filters.http.aws_request_signing";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

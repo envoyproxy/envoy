@@ -286,6 +286,7 @@ public:
 
   // Router::MockTlsContextMatchCriteria
   MOCK_METHOD(const absl::optional<bool>&, presented, (), (const));
+  MOCK_METHOD(const absl::optional<bool>&, validated, (), (const));
 };
 
 class MockPathMatchCriterion : public PathMatchCriterion {
@@ -370,6 +371,7 @@ public:
 
   // Router::Decorator
   MOCK_METHOD(const std::string&, getOperation, (), (const));
+  MOCK_METHOD(bool, propagate, (), (const));
   MOCK_METHOD(void, apply, (Tracing::Span & span), (const));
 
   std::string operation_{"fake_operation"};

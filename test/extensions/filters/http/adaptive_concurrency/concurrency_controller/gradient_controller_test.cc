@@ -219,29 +219,32 @@ min_rtt_calc_params:
     value: 0.0
   interval: 30s
   request_count: 50
-  min_concurrency: 1
+  min_concurrency: 7
 )EOF";
 
   auto controller = makeController(yaml);
   const auto min_rtt = std::chrono::milliseconds(13);
 
-  // The controller should be measuring minRTT upon creation, so the concurrency window is 1 (the
+  // The controller should be measuring minRTT upon creation, so the concurrency window is 7 (the
   // min concurrency).
   EXPECT_EQ(
       1,
       stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
           .value());
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
-  tryForward(controller, true);
-  tryForward(controller, false);
-  tryForward(controller, false);
-  controller->recordLatencySample(min_rtt);
-
-  // 49 more requests should cause the minRTT to be done calculating.
-  for (int i = 0; i < 49; ++i) {
-    EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 7);
+  for (int i = 0; i < 7; ++i) {
     tryForward(controller, true);
-    tryForward(controller, false);
+  }
+  tryForward(controller, false);
+  tryForward(controller, false);
+  for (int i = 0; i < 7; ++i) {
+    controller->recordLatencySample(min_rtt);
+  }
+
+  // 43 more requests should cause the minRTT to be done calculating.
+  for (int i = 0; i < 43; ++i) {
+    EXPECT_EQ(controller->concurrencyLimit(), 7);
+    tryForward(controller, true);
     controller->recordLatencySample(min_rtt);
   }
 
@@ -356,10 +359,11 @@ min_rtt_calc_params:
   request_count: 5
   buffer:
     value: 10
+  min_concurrency: 7
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 3);
+  EXPECT_EQ(controller->concurrencyLimit(), 7);
 
   // Force a minRTT of 5ms.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
@@ -370,8 +374,8 @@ min_rtt_calc_params:
   // the max gradient.
   time_system_.sleep(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_GE(controller->concurrencyLimit(), 3);
-  EXPECT_LE(controller->concurrencyLimit() / 3.0, 2.0);
+  EXPECT_GE(controller->concurrencyLimit(), 7);
+  EXPECT_LE(controller->concurrencyLimit() / 7.0, 2.0);
 
   // Make it seem as if the recorded latencies are consistently lower than the measured minRTT.
   // Ensure that it grows.
@@ -398,6 +402,7 @@ min_rtt_calc_params:
     time_system_.sleep(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     EXPECT_LT(controller->concurrencyLimit(), last_concurrency);
+    EXPECT_GE(controller->concurrencyLimit(), 7);
   }
 }
 

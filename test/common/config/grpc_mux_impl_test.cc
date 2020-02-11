@@ -237,6 +237,36 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   expectSendMessage("foo", {}, "");
 }
 
+TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
+  setup();
+  auto invalid_response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, std::chrono::milliseconds(0));
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, "", true);
+  grpc_mux_->start();
+
+  { // Large error message sent back to management server is truncated.
+    const std::string very_large_type_url(1 << 20, 'A');
+    invalid_response->set_type_url("foo");
+    invalid_response->mutable_resources()->Add()->set_type_url(very_large_type_url);
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
+        .WillOnce(Invoke([&very_large_type_url](Envoy::Config::ConfigUpdateFailureReason,
+                                                const EnvoyException* e) {
+          EXPECT_TRUE(IsSubstring(
+              "", "",
+              fmt::format("{} does not match the message-wide type URL foo in DiscoveryResponse",
+                          very_large_type_url), // Local error message is not truncated.
+              e->what()));
+        }));
+    expectSendMessage("foo", {"x", "y"}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Internal,
+                      fmt::format("{}...(truncated)", std::string(4096, 'A')));
+    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(invalid_response));
+  }
+  expectSendMessage("foo", {}, "");
+}
+
 // Validate behavior when watches has an unknown resource name.
 TEST_F(GrpcMuxImplTest, WildcardWatch) {
   setup();
