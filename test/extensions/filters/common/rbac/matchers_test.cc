@@ -375,6 +375,33 @@ TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
                conn);
 }
 
+TEST(PathMatcher, NoPathInHeader) {
+  Envoy::Http::HeaderMapImpl headers;
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_path()->mutable_safe_regex()->set_regex(".*");
+
+  headers.setPath("/path");
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.removePath();
+  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(PathMatcher, ValidPathInHeader) {
+  Envoy::Http::HeaderMapImpl headers;
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->set_exact("/exact");
+
+  headers.setPath("/exact");
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/exact?param=val");
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/exact#fragment");
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/exacz");
+  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common
