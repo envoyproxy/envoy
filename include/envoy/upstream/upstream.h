@@ -61,7 +61,7 @@ public:
   /* The host is pending its initial active health check. */                     \
   m(PENDING_ACTIVE_HC, 0x40)                                                     \
   /* The host is marked for removal due to immediate health check failure */     \
-  m(EXCLUDE_FROM_LB, 0x60)
+  m(EXCLUDE_FROM_LB, 0x80)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,

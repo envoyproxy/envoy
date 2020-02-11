@@ -217,7 +217,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
 }
 
 TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
-  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
+  EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(true));
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
   EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
@@ -227,7 +227,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
         filter_->encodeHeaders(headers, end_stream);
         EXPECT_EQ("cluster_name",
                   headers.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());
-        EXPECT_EQ(nullptr, headers.EnvoyImmediateHealthCheckFail());
+        EXPECT_EQ("true", headers.EnvoyImmediateHealthCheckFail()->value().getStringView());
       }));
 
   EXPECT_CALL(callbacks_.stream_info_,
@@ -248,6 +248,7 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
   Http::TestHeaderMapImpl service_hc_respnose{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
   EXPECT_EQ("cluster_name",
@@ -269,6 +270,7 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   Http::TestHeaderMapImpl service_hc_respnose{{":status", "200"}};
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(service_hc_respnose, true));
   EXPECT_EQ("cluster_name",
             service_hc_respnose.EnvoyUpstreamHealthCheckedCluster()->value().getStringView());

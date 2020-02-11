@@ -3248,7 +3248,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailure) {
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthChecker().setUnhealthy();
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthChecker().setUnhealthy();
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
+      Host::HealthFlag::EXCLUDE_FROM_LB));
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 

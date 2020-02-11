@@ -211,7 +211,8 @@ public:
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
         healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
-        healthFlagGet(HealthFlag::FAILED_EDS_HEALTH)) {
+        healthFlagGet(HealthFlag::FAILED_EDS_HEALTH) ||
+        healthFlagGet(HealthFlag::EXCLUDE_FROM_LB)) {
       return Host::Health::Unhealthy;
     }
 

@@ -31,12 +31,18 @@ TEST(HostUtilityTest, All) {
   host->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(*host));
 
+  host->healthFlagSet(Host::HealthFlag::EXCLUDE_FROM_LB);
+  EXPECT_EQ("/failed_outlier_check/exclude_from_lb", HostUtility::healthFlagsToString(*host));
+
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ("/exclude_from_lb", HostUtility::healthFlagsToString(*host));
+
   // Invokes healthFlagSet for each health flag.
 #define SET_HEALTH_FLAG(name, notused) host->healthFlagSet(Host::HealthFlag::name);
   HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
 #undef SET_HEALTH_FLAG
   EXPECT_EQ("/failed_active_hc/failed_outlier_check/failed_eds_health/degraded_active_hc/"
-            "degraded_eds_health/pending_dynamic_removal/pending_active_hc",
+            "degraded_eds_health/pending_dynamic_removal/pending_active_hc/exclude_from_lb",
             HostUtility::healthFlagsToString(*host));
 }
 
