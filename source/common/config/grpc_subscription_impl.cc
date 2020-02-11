@@ -29,7 +29,7 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ = grpc_mux_->subscribe(type_url_, resources, *this);
+  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, init_fetch_timeout_);
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
   // "attempt" for a given xDS API combined by ADS is not really that meaningful.
@@ -46,11 +46,11 @@ void GrpcSubscriptionImpl::updateResourceInterest(
   // previously watched resources and the new ones (we may have lost interest in some of the
   // previously watched ones).
   watch_.reset();
-  watch_ = grpc_mux_->subscribe(type_url_, update_to_these_names, *this);
+  watch_ = grpc_mux_->addWatch(type_url_, update_to_these_names, *this, init_fetch_timeout_);
   stats_.update_attempt_.inc();
 }
 
-// Config::GrpcMuxCallbacks
+// Config::SubscriptionCallbacks
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
@@ -65,6 +65,19 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   stats_.version_.set(HashUtil::xxHash64(version_info));
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
+}
+
+void GrpcSubscriptionImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+  // TODO(bgallagher): This is a broken abstraction. The issue is that there used to be 2 different
+  // callback interfaces, one for sotw and one for delta. Now they're merged. This method is the
+  // delta method. We also have 2 different classes that implement this interface. This class is the
+  // sotw implementation. It should never receive this callback. The next step will be to merge the
+  // DeltaSubscriptionImpl and GrpcSubscriptionImpl classes at which time this code will be needed.
+  // I think that adding the assert here is the easiest way to move forward without ending up with a
+  // massive change.
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,

@@ -14,7 +14,7 @@
 #include <memory>
 
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_stream.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -73,7 +73,7 @@ protected:
   bool hasDataToWrite() override;
 
 private:
-  void setUpRequestDecoder(EnvoyQuicStream& stream);
+  void setUpRequestDecoder(EnvoyQuicServerStream& stream);
 
   std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live

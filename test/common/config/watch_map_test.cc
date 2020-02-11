@@ -20,8 +20,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class NamedMockSubscriptionCallbacks
-    : public MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment> {
+class NamedMockSubscriptionCallbacks : public MockSubscriptionCallbacks {
 public:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)

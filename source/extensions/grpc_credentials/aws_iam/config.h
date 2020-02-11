@@ -7,7 +7,7 @@
 
 #include "common/http/message_impl.h"
 
-#include "extensions/filters/http/common/aws/signer.h"
+#include "extensions/common/aws/signer.h"
 #include "extensions/grpc_credentials/well_known_names.h"
 
 namespace Envoy {
@@ -39,8 +39,7 @@ private:
  */
 class AwsIamHeaderAuthenticator : public grpc::MetadataCredentialsPlugin {
 public:
-  AwsIamHeaderAuthenticator(HttpFilters::Common::Aws::SignerPtr signer)
-      : signer_(std::move(signer)) {}
+  AwsIamHeaderAuthenticator(Common::Aws::SignerPtr signer) : signer_(std::move(signer)) {}
 
   grpc::Status GetMetadata(grpc::string_ref, grpc::string_ref, const grpc::AuthContext&,
                            std::multimap<grpc::string, grpc::string>* metadata) override;
@@ -54,7 +53,7 @@ private:
   static void signedHeadersToMetadata(const Http::HeaderMap& headers,
                                       std::multimap<grpc::string, grpc::string>& metadata);
 
-  const HttpFilters::Common::Aws::SignerPtr signer_;
+  const Common::Aws::SignerPtr signer_;
 };
 
 } // namespace AwsIam

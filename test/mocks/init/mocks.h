@@ -18,7 +18,7 @@ namespace Init {
 class ExpectableWatcherImpl : public WatcherImpl {
 public:
   ExpectableWatcherImpl(absl::string_view name = "test");
-  MOCK_CONST_METHOD0(ready, void());
+  MOCK_METHOD(void, ready, (), (const));
 
   /**
    * Convenience method to provide a shorthand for EXPECT_CALL(watcher, ready()). Can be chained,
@@ -35,7 +35,7 @@ public:
 class ExpectableTargetImpl : public TargetImpl {
 public:
   ExpectableTargetImpl(absl::string_view name = "test");
-  MOCK_METHOD0(initialize, void());
+  MOCK_METHOD(void, initialize, ());
 
   /**
    * Convenience method to provide a shorthand for EXPECT_CALL(target, initialize()). Can be
@@ -57,7 +57,7 @@ class ExpectableSharedTargetImpl : public SharedTargetImpl {
 public:
   ExpectableSharedTargetImpl(absl::string_view name = "test");
   ExpectableSharedTargetImpl(absl::string_view name, InitializeFn fn);
-  MOCK_METHOD0(initialize, void());
+  MOCK_METHOD(void, initialize, ());
 
   ::testing::internal::TypedExpectation<void()>& expectInitialize();
 };
@@ -69,9 +69,9 @@ public:
  * invoking the saved target with the watcher argument.
  */
 struct MockManager : Manager {
-  MOCK_CONST_METHOD0(state, Manager::State());
-  MOCK_METHOD1(add, void(const Target&));
-  MOCK_METHOD1(initialize, void(const Watcher&));
+  MOCK_METHOD(Manager::State, state, (), (const));
+  MOCK_METHOD(void, add, (const Target&));
+  MOCK_METHOD(void, initialize, (const Watcher&));
 };
 
 } // namespace Init

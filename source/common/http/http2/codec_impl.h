@@ -140,7 +140,7 @@ protected:
   /**
    * Base class for client and server side streams.
    */
-  struct StreamImpl : public StreamEncoder,
+  struct StreamImpl : public virtual StreamEncoder,
                       public Stream,
                       public LinkedObject<StreamImpl>,
                       public Event::DeferredDeletable,
@@ -154,16 +154,16 @@ protected:
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
+    void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
+    void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
     void submitMetadata();
+    virtual StreamDecoder& decoder() PURE;
 
     // Http::StreamEncoder
-    void encode100ContinueHeaders(const HeaderMap& headers) override;
-    void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
-    void encodeTrailers(const HeaderMap& trailers) override;
     Stream& getStream() override { return *this; }
     void encodeMetadata(const MetadataMapVector& metadata_map_vector) override;
 
@@ -193,7 +193,8 @@ protected:
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
-    void decodeHeaders();
+    virtual void decodeHeaders() PURE;
+    virtual void decodeTrailers() PURE;
 
     // Get MetadataEncoder for this stream.
     MetadataEncoder& getMetadataEncoder();
@@ -203,13 +204,11 @@ protected:
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
     virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
-    virtual void maybeTransformUpgradeFromH2ToH1() PURE;
 
     bool buffers_overrun() const { return read_disable_count_ > 0; }
 
     ConnectionImpl& parent_;
     HeaderMapImplPtr headers_;
-    StreamDecoder* decoder_{};
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
@@ -238,8 +237,10 @@ protected:
   /**
    * Client side stream (request).
    */
-  struct ClientStreamImpl : public StreamImpl {
-    using StreamImpl::StreamImpl;
+  struct ClientStreamImpl : public StreamImpl, public RequestEncoder {
+    ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
+                     ResponseDecoder& response_decoder)
+        : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -248,37 +249,51 @@ protected:
       upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
       Http::Utility::transformUpgradeRequestFromH1toH2(headers);
     }
-    void maybeTransformUpgradeFromH2ToH1() override {
-      if (!upgrade_type_.empty() && headers_->Status()) {
-        Http::Utility::transformUpgradeResponseFromH2toH1(*headers_, upgrade_type_);
-      }
+    StreamDecoder& decoder() override { return response_decoder_; }
+    void decodeHeaders() override;
+    void decodeTrailers() override;
+
+    // RequestEncoder
+    void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
+      encodeHeadersBase(headers, end_stream);
     }
+    void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+
+    ResponseDecoder& response_decoder_;
     std::string upgrade_type_;
   };
+
+  using ClientStreamImplPtr = std::unique_ptr<ClientStreamImpl>;
 
   /**
    * Server side stream (response).
    */
-  struct ServerStreamImpl : public StreamImpl {
+  struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     using StreamImpl::StreamImpl;
 
     // StreamImpl
-    void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
-      // The contract is that client codecs must ensure that :status is present.
-      ASSERT(headers.Status() != nullptr);
-      StreamImpl::encodeHeaders(headers, end_stream);
-    }
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     void transformUpgradeFromH1toH2(HeaderMap& headers) override {
       Http::Utility::transformUpgradeResponseFromH1toH2(headers);
     }
-    void maybeTransformUpgradeFromH2ToH1() override {
-      if (Http::Utility::isH2UpgradeRequest(*headers_)) {
-        Http::Utility::transformUpgradeRequestFromH2toH1(*headers_);
-      }
+    StreamDecoder& decoder() override { return *request_decoder_; }
+    void decodeHeaders() override;
+    void decodeTrailers() override;
+
+    // ResponseEncoder
+    void encode100ContinueHeaders(const HeaderMap& headers) override;
+    void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
+      // The contract is that client codecs must ensure that :status is present.
+      ASSERT(headers.Status() != nullptr);
+      encodeHeadersBase(headers, end_stream);
     }
+    void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+
+    RequestDecoder* request_decoder_{};
   };
+
+  using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
 
   ConnectionImpl* base() { return this; }
   StreamImpl* getStream(int32_t stream_id);
@@ -403,7 +418,7 @@ public:
                        const uint32_t max_response_headers_count);
 
   // Http::ClientConnection
-  Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 
 private:
   // ConnectionImpl

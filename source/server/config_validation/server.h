@@ -98,7 +98,7 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  OptProcessContextRef processContext() override { return absl::nullopt; }
+  ProcessContextOptRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
@@ -109,7 +109,10 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
-  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+    return server_contexts_;
+  }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {
@@ -198,7 +201,7 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
-  ServerFactoryContextImpl server_context_;
+  ServerFactoryContextImpl server_contexts_;
 };
 
 } // namespace Server

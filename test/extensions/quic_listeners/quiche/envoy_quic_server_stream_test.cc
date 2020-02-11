@@ -47,7 +47,7 @@ public:
         stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}} {
-    quic_stream_->setDecoder(stream_decoder_);
+    quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _))
@@ -138,7 +138,7 @@ protected:
   MockEnvoyQuicSession quic_session_;
   quic::QuicStreamId stream_id_;
   EnvoyQuicServerStream* quic_stream_;
-  Http::MockStreamDecoder stream_decoder_;
+  Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
   quic::QuicHeaderList request_headers_;
   Http::TestHeaderMapImpl response_headers_;

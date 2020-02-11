@@ -448,6 +448,7 @@ The following optional features can be enabled on the Bazel build command-line:
   This is needed if the `version_info_lib` is compiled via a non-binary bazel rules, e.g `envoy_cc_library`.
   Otherwise, the linker will fail to resolve symbols that are included via the `linktamp` rule, which is only available to binary targets.
   This is being tracked as a feature in: https://github.com/envoyproxy/envoy/issues/6859.
+* Process logging for Android applications can be enabled with `--define logger=android`.
 
 ## Disabling extensions
 

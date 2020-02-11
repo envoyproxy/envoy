@@ -82,7 +82,7 @@ public:
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -946,7 +946,7 @@ public:
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }

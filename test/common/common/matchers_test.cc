@@ -1,3 +1,4 @@
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -6,6 +7,8 @@
 #include "common/common/matchers.h"
 #include "common/config/metadata.h"
 #include "common/protobuf/protobuf.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -258,6 +261,51 @@ TEST(MetadataTest, MatchDoubleListValue) {
   metadataValue.Clear();
 }
 
+TEST(StringMatcher, ExactMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("exact");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("exact"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("EXACT"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("exacz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("exact"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("EXACT"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("exacz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+}
+
+TEST(StringMatcher, PrefixMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix("prefix");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("prefix-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("PREFIX-ABC"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("prefiz-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("prefix-abc"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("PREFIX-ABC"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("prefiz-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+}
+
+TEST(StringMatcher, SuffixMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_suffix("suffix");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("abc-suffix"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("ABC-SUFFIX"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("abc-suffiz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("abc-suffix"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("ABC-SUFFIX"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("abc-suffiz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+}
+
 TEST(StringMatcher, SafeRegexValue) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.mutable_safe_regex()->mutable_google_re2();
@@ -265,6 +313,23 @@ TEST(StringMatcher, SafeRegexValue) {
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("foo"));
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("foobar"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("bar"));
+}
+
+TEST(StringMatcher, RegexValueIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_ignore_case(true);
+  matcher.set_hidden_envoy_deprecated_regex("foo");
+  EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
+                            "ignore_case has no effect for regex.");
+}
+
+TEST(StringMatcher, SafeRegexValueIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_ignore_case(true);
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex("foo");
+  EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
+                            "ignore_case has no effect for safe_regex.");
 }
 
 TEST(LowerCaseStringMatcher, MatchExactValue) {

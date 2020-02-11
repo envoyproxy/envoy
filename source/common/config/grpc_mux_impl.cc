@@ -6,6 +6,7 @@
 
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
+#include "common/memory/utils.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -75,11 +76,11 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 }
 
-GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
-                                       const std::set<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
-  GrpcMuxWatchPtr watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, type_url, *this);
-  ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
+GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
+                                      const std::set<std::string>& resources,
+                                      SubscriptionCallbacks& callbacks, std::chrono::milliseconds) {
+  auto watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, type_url, *this);
+  ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
 
   // Lazily kick off the requests based on first subscription. This has the
   // convenient side-effect that we order messages on the channel based on
@@ -165,7 +166,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // We have to walk all watches (and need an efficient map as a result) to
     // ensure we deliver empty config updates when a resource is dropped.
     std::unordered_map<std::string, ProtobufWkt::Any> resources;
-    GrpcMuxCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
+    SubscriptionCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
     for (const auto& resource : message->resources()) {
       if (type_url != resource.type_url()) {
         throw EnvoyException(
@@ -199,6 +200,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
     // would do that tracking here.
     api_state_[type_url].request_.set_version_info(message->version_info());
+    Memory::Utils::tryShrinkHeap();
   } catch (const EnvoyException& e) {
     for (auto watch : api_state_[type_url].watches_) {
       watch->callbacks_.onConfigUpdateFailed(
@@ -206,7 +208,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     }
     ::google::rpc::Status* error_detail = api_state_[type_url].request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
-    error_detail->set_message(e.what());
+    error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
   queueDiscoveryRequest(type_url);

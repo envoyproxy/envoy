@@ -42,7 +42,7 @@ public:
   void CreateAuthenticator(::google::jwt_verify::CheckAudience* check_audience = nullptr,
                            const absl::optional<std::string>& provider =
                                absl::make_optional<std::string>(ProviderName)) {
-    filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
+    filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
     raw_fetcher_ = new MockJwksFetcher;
     fetcher_.reset(raw_fetcher_);
     auth_ = Authenticator::create(
@@ -77,7 +77,7 @@ public:
 
   JwtAuthentication proto_config_;
   ExtractorConstPtr extractor_;
-  FilterConfigSharedPtr filter_config_;
+  std::shared_ptr<FilterConfigImpl> filter_config_;
   MockJwksFetcher* raw_fetcher_;
   JwksFetcherPtr fetcher_;
   AuthenticatorPtr auth_;

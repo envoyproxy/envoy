@@ -16,7 +16,7 @@ public:
   using ConnPoolMapType = ConnPoolMap<KEY_TYPE, POOL_TYPE>;
   using PoolFactory = typename ConnPoolMapType::PoolFactory;
   using DrainedCb = typename ConnPoolMapType::DrainedCb;
-  using OptPoolRef = typename ConnPoolMapType::OptPoolRef;
+  using PoolOptRef = typename ConnPoolMapType::PoolOptRef;
 
   PriorityConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host);
   ~PriorityConnPoolMap();
@@ -26,7 +26,7 @@ public:
    * is reached.
    * @return The pool corresponding to `key`, or `absl::nullopt`.
    */
-  OptPoolRef getPool(ResourcePriority priority, KEY_TYPE key, const PoolFactory& factory);
+  PoolOptRef getPool(ResourcePriority priority, KEY_TYPE key, const PoolFactory& factory);
 
   /**
    * @return the number of pools across all priorities.

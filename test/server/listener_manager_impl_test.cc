@@ -88,7 +88,7 @@ public:
 
 class MockLdsApi : public LdsApi {
 public:
-  MOCK_CONST_METHOD0(versionInfo, std::string());
+  MOCK_METHOD(std::string, versionInfo, (), (const));
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
@@ -359,9 +359,9 @@ public:
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
-  Registry::RegisterFactory<NonTerminalFilterFactory,
-                            Configuration::NamedNetworkFilterConfigFactory>
-      registered;
+  NonTerminalFilterFactory filter;
+  Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
+
   const std::string yaml = R"EOF(
 address:
   socket_address:
@@ -441,8 +441,8 @@ private:
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, StatsScopeTest) {
-  Registry::RegisterFactory<TestStatsConfigFactory, Configuration::NamedNetworkFilterConfigFactory>
-      registered;
+  TestStatsConfigFactory filter;
+  Registry::InjectFactory<Configuration::NamedNetworkFilterConfigFactory> registered(filter);
 
   const std::string yaml = R"EOF(
 address:
