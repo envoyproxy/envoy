@@ -22,10 +22,45 @@ struct RequestHeader {
   int16_t api_version_;
   int32_t correlation_id_;
   NullableString client_id_;
+  TaggedFields tagged_fields_;
+
+  RequestHeader(const int16_t api_key, const int16_t api_version, const int32_t correlation_id,
+                const NullableString& client_id)
+      : RequestHeader{api_key, api_version, correlation_id, client_id, TaggedFields{}} {};
+
+  RequestHeader(const int16_t api_key, const int16_t api_version, const int32_t correlation_id,
+                const NullableString& client_id, const TaggedFields& tagged_fields)
+      : api_key_{api_key}, api_version_{api_version}, correlation_id_{correlation_id},
+        client_id_{client_id}, tagged_fields_{tagged_fields} {};
+
+  uint32_t computeSize(const EncodingContext& context) const {
+    uint32_t result{0};
+    result += context.computeSize(api_key_);
+    result += context.computeSize(api_version_);
+    result += context.computeSize(correlation_id_);
+    result += context.computeSize(client_id_);
+    if (requestUsesTaggedFieldsInHeader(api_key_, api_version_)) {
+      result += context.computeCompactSize(tagged_fields_);
+    }
+    return result;
+  }
+
+  uint32_t encode(Buffer::Instance& dst, EncodingContext& context) const {
+    uint32_t written{0};
+    written += context.encode(api_key_, dst);
+    written += context.encode(api_version_, dst);
+    written += context.encode(correlation_id_, dst);
+    written += context.encode(client_id_, dst);
+    if (requestUsesTaggedFieldsInHeader(api_key_, api_version_)) {
+      written += context.encodeCompact(tagged_fields_, dst);
+    }
+    return written;
+  }
 
   bool operator==(const RequestHeader& rhs) const {
     return api_key_ == rhs.api_key_ && api_version_ == rhs.api_version_ &&
-           correlation_id_ == rhs.correlation_id_ && client_id_ == rhs.client_id_;
+           correlation_id_ == rhs.correlation_id_ && client_id_ == rhs.client_id_ &&
+           tagged_fields_ == rhs.tagged_fields_;
   };
 };
 
@@ -98,13 +133,7 @@ public:
     const EncodingContext context{request_header_.api_version_};
     uint32_t result{0};
     // Compute size of header.
-    result += context.computeSize(request_header_.api_key_);
-    result += context.computeSize(request_header_.api_version_);
-    result += context.computeSize(request_header_.correlation_id_);
-    result += context.computeSize(request_header_.client_id_);
-    if (requestUsesTaggedFieldsInHeader(request_header_.api_key_, request_header_.api_version_)) {
-      result += context.computeCompactSize(TaggedFields{});
-    }
+    result += context.computeSize(request_header_);
     // Compute size of request data.
     result += context.computeSize(data_);
     return result;
@@ -117,13 +146,7 @@ public:
     EncodingContext context{request_header_.api_version_};
     uint32_t written{0};
     // Encode request header.
-    written += context.encode(request_header_.api_key_, dst);
-    written += context.encode(request_header_.api_version_, dst);
-    written += context.encode(request_header_.correlation_id_, dst);
-    written += context.encode(request_header_.client_id_, dst);
-    if (requestUsesTaggedFieldsInHeader(request_header_.api_key_, request_header_.api_version_)) {
-      written += context.encodeCompact(TaggedFields{}, dst);
-    }
+    written += context.encode(request_header_, dst);
     // Encode request-specific data.
     written += context.encode(data_, dst);
     return written;

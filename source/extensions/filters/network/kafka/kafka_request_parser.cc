@@ -43,8 +43,11 @@ bool RequestHeaderDeserializer::ready() const {
 }
 
 RequestHeader RequestHeaderDeserializer::get() const {
-  // With current usage pattern, right now we do not need to capture tagged field values.
-  return common_part_deserializer_.get();
+  auto result = common_part_deserializer_.get();
+  if (tagged_fields_present_) {
+    result.tagged_fields_ = tagged_fields_deserializer_.get();
+  }
+  return result;
 }
 
 RequestParseResponse RequestHeaderParser::parse(absl::string_view& data) {
