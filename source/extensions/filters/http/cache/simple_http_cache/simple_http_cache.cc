@@ -123,19 +123,26 @@ InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_co
   return std::make_unique<SimpleInsertContext>(*lookup_context, *this);
 }
 
+constexpr absl::string_view Name = "envoy.extensions.http.cache.simple";
+
 CacheInfo SimpleHttpCache::cacheInfo() const {
   CacheInfo cache_info;
-  cache_info.name_ = "envoy.extensions.http.cache.simple";
+  cache_info.name_ = Name;
   return cache_info;
 }
 
 class SimpleHttpCacheFactory : public HttpCacheFactory {
 public:
-  SimpleHttpCacheFactory() : HttpCacheFactory("envoy.extensions.http.cache.simple") {}
+  // From UntypedFactory
+  std::string name() const override {
+    return std::string(Name);
+  }
+  // From TypedFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig>();
   }
+  // From HttpCacheFactory
   HttpCache& getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&) override { return cache_; }
 
 private:

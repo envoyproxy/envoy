@@ -303,9 +303,7 @@ public:
 // Factory interface for cache implementations to implement and register.
 class HttpCacheFactory : public Config::TypedFactory {
 public:
-  // name should be in reverse DNS format, though this is not enforced.
-  explicit HttpCacheFactory(std::string name) : name_(std::move(name)) {}
-  std::string name() const override { return name_; }
+  // From UntypedFactory
   std::string category() const override { return "http_cache_factory"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
