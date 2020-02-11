@@ -188,7 +188,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
-    : operation_(decorator.operation()) {}
+    : operation_(decorator.operation()),
+      propagate_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(decorator, propagate, true)) {}
 
 void DecoratorImpl::apply(Tracing::Span& span) const {
   if (!operation_.empty()) {
@@ -197,6 +198,8 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 }
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
+
+bool DecoratorImpl::propagate() const { return propagate_; }
 
 RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing) {
   if (!tracing.has_client_sampling()) {

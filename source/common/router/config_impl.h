@@ -336,8 +336,12 @@ public:
   // Decorator::getOperation
   const std::string& getOperation() const override;
 
+  // Decorator::getOperation
+  bool propagate() const override;
+
 private:
   const std::string operation_;
+  const bool propagate_;
 };
 
 /**

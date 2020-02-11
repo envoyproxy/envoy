@@ -28,6 +28,7 @@
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_subject_alt_names.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -519,17 +520,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
-  if (upstream_http_protocol_options.has_value() &&
-      upstream_http_protocol_options.value().auto_sni()) {
+  if (upstream_http_protocol_options.has_value()) {
     const auto parsed_authority =
         Http::Utility::parseAuthority(headers.Host()->value().getStringView());
-    if (!parsed_authority.is_ip_address_) {
-      // TODO: Add SAN verification here and use it from dynamic_forward_proxy
-      // Update filter state with the host/authority to use for setting SNI in the transport
-      // socket options. This is referenced during the getConnPool() call below.
+    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
           std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::StateType::Mutable);
+    }
+
+    if (upstream_http_protocol_options.value().auto_san_validation()) {
+      callbacks_->streamInfo().filterState()->setData(
+          Network::UpstreamSubjectAltNames::key(),
+          std::make_unique<Network::UpstreamSubjectAltNames>(
+              std::vector<std::string>{std::string(parsed_authority.host_)}),
           StreamInfo::FilterState::StateType::Mutable);
     }
   }

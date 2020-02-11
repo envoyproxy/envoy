@@ -30,7 +30,6 @@ public:
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(
           Server::parseListenerFromV2Yaml(api_listener_config()));
     });
-    BaseIntegrationTest::initialize();
   }
 
   void TearDown() override {
@@ -84,6 +83,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ApiListenerIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ApiListenerIntegrationTest, Basic) {
+  BaseIntegrationTest::initialize();
   absl::Notification done;
   test_server_->server().dispatcher().post([this, &done]() -> void {
     ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
@@ -109,6 +109,34 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
         true);
   });
   ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+}
+
+TEST_P(ApiListenerIntegrationTest, DestroyWithActiveStreams) {
+  autonomous_allow_incomplete_streams_ = true;
+  BaseIntegrationTest::initialize();
+  absl::Notification done;
+
+  test_server_->server().dispatcher().post([this, &done]() -> void {
+    ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
+    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
+    ASSERT_TRUE(test_server_->server().listenerManager().apiListener()->get().http().has_value());
+    auto& http_api_listener =
+        test_server_->server().listenerManager().apiListener()->get().http()->get();
+
+    ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
+    auto& stream_decoder = http_api_listener.newStream(stream_encoder_);
+
+    // Send a headers-only request
+    stream_decoder.decodeHeaders(
+        Http::HeaderMapPtr(new Http::TestHeaderMapImpl{
+            {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
+        false);
+
+    done.Notify();
+  });
+  ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+  // The server should shutdown the ApiListener at the right time during server termination such
+  // that no crashes occur if termination happens when the ApiListener still has ongoing streams.
 }
 
 } // namespace
