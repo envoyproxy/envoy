@@ -90,7 +90,7 @@ public:
 
 private:
   uint64_t first_;
-  const uint64_t last_;
+  uint64_t last_;
 };
 
 inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rhs) {

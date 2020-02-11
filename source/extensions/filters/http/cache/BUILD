@@ -12,6 +12,24 @@ load(
 
 envoy_package()
 
+envoy_cc_library(
+    name = "cache_filter_lib",
+    srcs = ["cache_filter.cc"],
+    hdrs = ["cache_filter.h"],
+    deps = [
+        ":http_cache_lib",
+        "//include/envoy/registry",
+        "//source/common/common:logger_lib",
+        "//source/common/common:macros",
+        "//source/common/config:utility_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+    ],
+)
+
 envoy_proto_library(
     name = "key",
     srcs = ["key.proto"],
