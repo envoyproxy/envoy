@@ -308,7 +308,8 @@ public:
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
-  virtual HttpCache& getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) PURE;
+  virtual HttpCache&
+  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) PURE;
   virtual ~HttpCacheFactory() = default;
 
 private:

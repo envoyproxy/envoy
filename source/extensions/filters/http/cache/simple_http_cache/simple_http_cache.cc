@@ -71,7 +71,7 @@ public:
   }
 
   void insertTrailers(const Http::HeaderMap&) override {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(toddmgreer): support trailers
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(toddmgreer): support trailers
   }
 
 private:
@@ -133,16 +133,17 @@ CacheInfo SimpleHttpCache::cacheInfo() const {
 class SimpleHttpCacheFactory : public HttpCacheFactory {
 public:
   // From UntypedFactory
-  std::string name() const override {
-    return std::string(Name);
-  }
+  std::string name() const override { return std::string(Name); }
   // From TypedFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&) override { return cache_; }
+  HttpCache&
+  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&) override {
+    return cache_;
+  }
 
 private:
   SimpleHttpCache cache_;
