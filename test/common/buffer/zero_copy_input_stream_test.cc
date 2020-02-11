@@ -3,6 +3,7 @@
 
 #include "test/common/buffer/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -37,15 +38,18 @@ TEST_F(ZeroCopyInputStreamTest, Next) {
 }
 
 TEST_F(ZeroCopyInputStreamTest, TwoSlices) {
-  Buffer::OwnedImpl buffer("efgh");
+  // Make content larger than 512 bytes so it would not be coalesced when
+  // moved into the stream_ buffer.
+  Buffer::OwnedImpl buffer(std::string(1024, 'A'));
   stream_.move(buffer);
 
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(4, size_);
   EXPECT_EQ(0, memcmp(slice_data_.data(), data_, size_));
   EXPECT_TRUE(stream_.Next(&data_, &size_));
-  EXPECT_EQ(4, size_);
-  EXPECT_EQ(0, memcmp("efgh", data_, size_));
+  EXPECT_EQ(1024, size_);
+  EXPECT_THAT(absl::string_view(static_cast<const char*>(data_), size_),
+              testing::Each(testing::AllOf('A')));
 }
 
 TEST_F(ZeroCopyInputStreamTest, BackUp) {
