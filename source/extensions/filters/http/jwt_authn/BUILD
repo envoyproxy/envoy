@@ -107,6 +107,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "filter_config_interface",
+    srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
         ":jwks_cache_lib",

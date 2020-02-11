@@ -1113,6 +1113,9 @@ message Decorator {
   //   by the :ref:`x-envoy-decorator-operation
   //   <config_http_filters_router_x-envoy-decorator-operation>` header.
   string operation = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Whether the decorated details should be propagated to the other party. The default is true.
+  google.protobuf.BoolValue propagate = 2;
 }
 
 message Tracing {

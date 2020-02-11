@@ -1,3 +1,5 @@
+#include <cstdlib>
+
 #pragma GCC diagnostic push
 // QUICHE allows unused parameters.
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -64,7 +66,7 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
 
     quic_listener_ = std::make_unique<ActiveQuicListener>(
-        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_);
+        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, nullptr);
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -212,6 +214,18 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersions, ActiveQuicListenerTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
+  auto option = std::make_unique<Network::MockSocketOption>();
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
+      .WillOnce(Return(false));
+  auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  options->emplace_back(std::move(option));
+  EXPECT_THROW_WITH_REGEX(std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
+                                                               listen_socket_, listener_config_,
+                                                               quic_config_, options),
+                          EnvoyException, "Failed to apply socket options.");
+}
 
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
   ConfigureMocks(/* connection_count = */ 1);

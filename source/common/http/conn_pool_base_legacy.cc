@@ -38,7 +38,7 @@ ConnPoolImplBase::ActiveClient::ConnectionState ConnPoolImplBase::ActiveClient::
   return Connected;
 }
 
-ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
+ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, ResponseDecoder& decoder,
                                                  ConnectionPool::Callbacks& callbacks)
     : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
   parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
@@ -52,7 +52,8 @@ ConnPoolImplBase::PendingRequest::~PendingRequest() {
 }
 
 ConnectionPool::Cancellable*
-ConnPoolImplBase::newPendingRequest(StreamDecoder& decoder, ConnectionPool::Callbacks& callbacks) {
+ConnPoolImplBase::newPendingRequest(ResponseDecoder& decoder,
+                                    ConnectionPool::Callbacks& callbacks) {
   ENVOY_LOG(debug, "queueing request due to no available connections");
   PendingRequestPtr pending_request(new PendingRequest(*this, decoder, callbacks));
   pending_request->moveIntoList(std::move(pending_request), pending_requests_);

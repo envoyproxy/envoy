@@ -877,7 +877,7 @@ http_filters:
 - name: envoy.http_dynamo_filter
   config: {}
 access_log:
-- name: envoy.file_access_log
+- name: envoy.access_loggers.file
   typed_config:
     "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
     path: "/dev/null"
@@ -906,7 +906,7 @@ http_filters:
 - name: envoy.http_dynamo_filter
   typed_config: {}
 access_log:
-- name: envoy.file_access_log
+- name: envoy.access_loggers.file
   typed_config:
     "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
     path: "/dev/null"
@@ -936,7 +936,7 @@ http_filters:
 - name: envoy.http_dynamo_filter
   typed_config: {}
 access_log:
-- name: envoy.file_access_log
+- name: envoy.access_loggers.file
   typed_config:
     "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
     path: "/dev/null"

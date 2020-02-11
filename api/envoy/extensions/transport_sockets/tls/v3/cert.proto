@@ -453,6 +453,13 @@ message DownstreamTlsContext {
   }];
 }
 
+message GenericSecret {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.GenericSecret";
+
+  // Secret of generic type and is available to filters.
+  config.core.v3.DataSource secret = 1 [(udpa.annotations.sensitive) = true];
+}
+
 message SdsSecretConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.SdsSecretConfig";
 
@@ -464,6 +471,7 @@ message SdsSecretConfig {
   config.core.v3.ConfigSource sds_config = 2;
 }
 
+// [#next-free-field: 6]
 message Secret {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.Secret";
 
@@ -476,5 +484,7 @@ message Secret {
     TlsSessionTicketKeys session_ticket_keys = 3;
 
     CertificateValidationContext validation_context = 4;
+
+    GenericSecret generic_secret = 5;
   }
 }

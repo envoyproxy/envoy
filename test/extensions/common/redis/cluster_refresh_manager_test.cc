@@ -127,23 +127,27 @@ TEST_F(ClusterRefreshManagerTest, Basic) {
   Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
     waitForTime(MonotonicTime(std::chrono::seconds(1)));
     EXPECT_TRUE(refresh_manager_->onRedirection(cluster_name_));
-    waitForTime(MonotonicTime(std::chrono::seconds(2)));
-    refresh_manager_->onRedirection(cluster_name_);
+    // wait for 3 ensures that thread_1's first onRedirection is completed,
+    // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
+    refresh_manager_->onRedirection(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
   Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
-    waitForTime(MonotonicTime(std::chrono::seconds(2)));
-    refresh_manager_->onRedirection(cluster_name_);
+    // wait for 3 ensures that thread_1's first onRedirection is completed,
+    // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
+    refresh_manager_->onRedirection(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
 
-  advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
+  advanceTime(MonotonicTime(std::chrono::seconds(4)), 2);
   thread_1->join();
   thread_2->join();
 
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->redirects_count_, 0);
-  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 2000);
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 3000);
   EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
   EXPECT_EQ(cluster_info->redirects_threshold_, 1);
   EXPECT_EQ(cluster_info->failure_threshold_, 1);
@@ -169,23 +173,27 @@ TEST_F(ClusterRefreshManagerTest, BasicFailureEvents) {
   Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
     waitForTime(MonotonicTime(std::chrono::seconds(1)));
     EXPECT_TRUE(refresh_manager_->onFailure(cluster_name_));
-    waitForTime(MonotonicTime(std::chrono::seconds(2)));
-    refresh_manager_->onFailure(cluster_name_);
+    // wait for 3 ensures that thread_1's first onRedirection is completed,
+    // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
+    refresh_manager_->onFailure(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
   Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
-    waitForTime(MonotonicTime(std::chrono::seconds(2)));
-    refresh_manager_->onFailure(cluster_name_);
+    // wait for 3 ensures that thread_1's first onRedirection is completed,
+    // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
+    refresh_manager_->onFailure(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
 
-  advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
+  advanceTime(MonotonicTime(std::chrono::seconds(4)), 2);
   thread_1->join();
   thread_2->join();
 
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->failures_count_, 0);
-  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 2000);
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 3000);
   EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
   EXPECT_EQ(cluster_info->redirects_threshold_, 1);
   EXPECT_EQ(cluster_info->failure_threshold_, 1);
@@ -211,23 +219,27 @@ TEST_F(ClusterRefreshManagerTest, BasicDegradedEvents) {
   Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
     waitForTime(MonotonicTime(std::chrono::seconds(1)));
     EXPECT_TRUE(refresh_manager_->onHostDegraded(cluster_name_));
-    waitForTime(MonotonicTime(std::chrono::seconds(2)));
-    refresh_manager_->onHostDegraded(cluster_name_);
+    // wait for 3 ensures that thread_1's first onRedirection is completed,
+    // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
+    refresh_manager_->onHostDegraded(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
   Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
-    waitForTime(MonotonicTime(std::chrono::seconds(2)));
-    refresh_manager_->onHostDegraded(cluster_name_);
+    // wait for 3 ensures that thread_1's first onRedirection is completed,
+    // as wait for 2 would only ensure onRedirection was started
     waitForTime(MonotonicTime(std::chrono::seconds(3)));
+    refresh_manager_->onHostDegraded(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(4)));
   });
 
-  advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
+  advanceTime(MonotonicTime(std::chrono::seconds(4)), 2);
   thread_1->join();
   thread_2->join();
 
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->host_degraded_count_, 0);
-  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 2000);
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 3000);
   EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
   EXPECT_EQ(cluster_info->redirects_threshold_, 1);
   EXPECT_EQ(cluster_info->failure_threshold_, 1);

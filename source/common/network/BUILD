@@ -316,6 +316,7 @@ envoy_cc_library(
     deps = [
         ":application_protocol_lib",
         ":upstream_server_name_lib",
+        ":upstream_subject_alt_names_lib",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:scalar_to_byte_vector_lib",
@@ -327,6 +328,16 @@ envoy_cc_library(
     name = "upstream_server_name_lib",
     srcs = ["upstream_server_name.cc"],
     hdrs = ["upstream_server_name.h"],
+    deps = [
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_subject_alt_names_lib",
+    srcs = ["upstream_subject_alt_names.cc"],
+    hdrs = ["upstream_subject_alt_names.h"],
     deps = [
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/common:macros",
