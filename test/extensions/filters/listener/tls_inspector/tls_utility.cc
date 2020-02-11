@@ -8,11 +8,12 @@ namespace Envoy {
 namespace Tls {
 namespace Test {
 
-std::vector<uint8_t> generateClientHello(const std::string& sni_name, const std::string& alpn) {
+std::vector<uint8_t> generateClientHello(uint16_t tls_min_version, uint16_t tls_max_version,
+                                         const std::string& sni_name, const std::string& alpn) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_with_buffers_method()));
 
-  const long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION;
-  SSL_CTX_set_options(ctx.get(), flags);
+  SSL_CTX_set_min_proto_version(ctx.get(), tls_min_version);
+  SSL_CTX_set_max_proto_version(ctx.get(), tls_max_version);
 
   bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
 

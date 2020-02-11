@@ -18,6 +18,7 @@ Version history
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A
   mapping of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
 * network filters: network filter extensions use the "envoy.filters.network" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.

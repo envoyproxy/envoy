@@ -22,6 +22,10 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
+// Min/max TLS version recognized by the underlying TLS/SSL library.
+const unsigned Config::TLS_MIN_SUPPORTED_VERSION = TLS1_VERSION;
+const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
+
 Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
@@ -32,6 +36,8 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
   }
 
+  SSL_CTX_set_min_proto_version(ssl_ctx_.get(), TLS_MIN_SUPPORTED_VERSION);
+  SSL_CTX_set_max_proto_version(ssl_ctx_.get(), TLS_MAX_SUPPORTED_VERSION);
   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
   SSL_CTX_set_select_certificate_cb(
