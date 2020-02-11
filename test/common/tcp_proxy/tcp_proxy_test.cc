@@ -895,7 +895,8 @@ public:
             .WillOnce(Invoke(
                 [=](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
                   conn_pool_callbacks_.push_back(&cb);
-                  return conn_pool_handles_.at(i).get();
+
+                  return onNewConnection(conn_pool_handles_.at(i).get());
                 }))
             .RetiresOnSaturation();
       }
@@ -904,7 +905,6 @@ public:
     }
 
     {
-      testing::InSequence sequence;
       filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
@@ -940,6 +940,15 @@ public:
     conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
   }
 
+  Tcp::ConnectionPool::Cancellable* onNewConnection(Tcp::ConnectionPool::Cancellable* connection) {
+    if (!new_connection_functions_.empty()) {
+      auto fn = new_connection_functions_.front();
+      new_connection_functions_.pop_front();
+      return fn(connection);
+    }
+    return connection;
+  }
+
   Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -957,6 +966,8 @@ public:
   StringViewSaver access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
+  std::list<std::function<Tcp::ConnectionPool::Cancellable*(Tcp::ConnectionPool::Cancellable*)>>
+      new_connection_functions_;
 };
 
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DefaultRoutes)) {
@@ -1044,6 +1055,31 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFail)) 
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_connect_attempts_exceeded")
                     .value());
+}
+
+// Make sure that the tcp proxy code handles reentrant calls to onPoolFailure.
+TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(ConnectAttemptsUpstreamLocalFailReentrant)) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_max_connect_attempts()->set_value(2);
+
+  // Set up a call to onPoolFailure from inside the first newConnection call.
+  // This simulates a connection failure from under the stack of newStream.
+  new_connection_functions_.push_back(
+      [&](Tcp::ConnectionPool::Cancellable*) -> Tcp::ConnectionPool::Cancellable* {
+        raiseEventUpstreamConnectFailed(
+            0, Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+        return nullptr;
+      });
+
+  setup(2, config);
+
+  // Make sure the last connection pool to be created is the one which gets the
+  // cancellation call.
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
+      .Times(0);
+  EXPECT_CALL(*conn_pool_handles_.at(1), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
+      .Times(1);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that reconnect is attempted after a remote connect failure
