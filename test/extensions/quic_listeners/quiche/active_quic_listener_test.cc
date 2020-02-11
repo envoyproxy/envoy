@@ -63,8 +63,6 @@ protected:
     Runtime::LoaderSingleton::initialize(&runtime_);
   }
 
-  ~ActiveQuicListenerTest() { Runtime::LoaderSingleton::clear(); }
-
   void SetUp() override {
     listen_socket_ =
         std::make_shared<Network::UdpListenSocket>(local_address_, nullptr, /*bind*/ true);
@@ -77,7 +75,7 @@ protected:
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
-  void ConfigureMocks(int connection_count) {
+  void ConfigureMocks(int connection_count, bool runtime_enabled) {
     EXPECT_CALL(listener_config_, filterChainManager())
         .Times(connection_count)
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
@@ -95,7 +93,8 @@ protected:
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
 
-    ON_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true)).WillByDefault(Return(true));
+    EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true))
+        .WillRepeatedly(Return(runtime_enabled));
 
     testing::Sequence seq;
     for (int i = 0; i < connection_count; ++i) {
@@ -194,9 +193,11 @@ protected:
     quic_listener_->onListenerShutdown();
     // Trigger alarm to fire before listener destruction.
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    Runtime::LoaderSingleton::clear();
   }
 
-  virtual envoy::config::core::v3::RuntimeFeatureFlag enabled_flag() const {
+protected:
+  envoy::config::core::v3::RuntimeFeatureFlag enabled_flag() const {
     envoy::config::core::v3::RuntimeFeatureFlag enabled_proto;
     std::string yaml(R"EOF(
 runtime_key: "quic.enabled"
@@ -205,6 +206,8 @@ default_value: true
     TestUtility::loadFromYamlAndValidate(yaml, enabled_proto);
     return enabled_proto;
   }
+
+  virtual bool enabled() const { return true; }
 
   Network::Address::IpVersion version_;
   Event::SimulatedTimeSystemHelper simulated_time_system_;
@@ -236,9 +239,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ActiveQuicListenerTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
-  ConfigureMocks(/* connection_count = */ 1);
+  EnvoyQuicDispatcher* const envoy_quic_dispatcher =
+      ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
+  quic::QuicBufferedPacketStore* const buffered_packets =
+      quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
+  ConfigureMocks(/* connection_count = */ 1, /* runtime_enabled = */ true);
   SendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(buffered_packets->HasChlosBuffered());
+  EXPECT_FALSE(envoy_quic_dispatcher->session_map().empty());
   ReadFromClientSockets();
 }
 
@@ -248,7 +257,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
 
-  ConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
+  ConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2, /* runtime_enabled = */ true);
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 1; ++i) {
@@ -264,6 +273,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   EXPECT_TRUE(buffered_packets->HasBufferedPackets(
       quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 1)));
   EXPECT_TRUE(buffered_packets->HasChlosBuffered());
+  EXPECT_FALSE(envoy_quic_dispatcher->session_map().empty());
 
   // Generate more data to trigger a socket read during the next event loop.
   SendFullCHLO(quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2));
@@ -278,20 +288,19 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   ReadFromClientSockets();
 }
 
-TEST_P(ActiveQuicListenerTest, QuicProcessingEnabled) {}
-
-class ActiveQuicListenerDisabledTest : public ActiveQuicListenerTest {
-protected:
-  envoy::config::core::v3::RuntimeFeatureFlag enabled_flag() const override {
-    envoy::config::core::v3::RuntimeFeatureFlag enabled_proto;
-    std::string yaml(R"EOF(
-runtime_key: "quic.enabled"
-default_value: false
-)EOF");
-    TestUtility::loadFromYamlAndValidate(yaml, enabled_proto);
-    return enabled_proto;
-  }
-};
+TEST_P(ActiveQuicListenerTest, QuicProcessingDisabled) {
+  EnvoyQuicDispatcher* const envoy_quic_dispatcher =
+      ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
+  // quic::QuicBufferedPacketStore* const buffered_packets =
+  //     quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true)).WillRepeatedly(Return(false));
+  SendFullCHLO(quic::test::TestConnectionId(1));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  // if listener was enabled, there should have been session created for active connection
+  EXPECT_TRUE(envoy_quic_dispatcher->session_map().empty());
+  // EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(1)));
+  ReadFromClientSockets();
+}
 
 } // namespace Quic
 } // namespace Envoy
