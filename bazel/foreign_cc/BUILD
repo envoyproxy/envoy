@@ -136,7 +136,6 @@ envoy_cmake_external(
         "//conditions:default": [
             "libevent.a",
             "libevent_pthreads.a",
-            "libevent_core.a",
         ],
     }),
 )
