@@ -219,6 +219,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Prereq
 QUIC
 QoS
 RAII
@@ -380,6 +381,7 @@ authz
 autoscale
 backend
 backends
+backgrounded
 backoff
 backpressure
 backticks
@@ -484,6 +486,8 @@ deallocated
 deallocating
 deallocation
 dec
+dechunk
+dechunked
 dechunking
 decl
 decls
@@ -834,6 +838,7 @@ preallocate
 preallocating
 preallocation
 precalculated
+precompile
 precompiled
 precompute
 precomputed
@@ -950,6 +955,7 @@ rxhash
 sandboxed
 sanitization
 sanitizer
+satisfiable
 scalability
 sched
 schemas
@@ -1130,6 +1136,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unsatisfiable
 unserializable
 unsetenv
 unsubscription
