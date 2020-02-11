@@ -227,7 +227,7 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
         host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_ACTIVE_HC));
     break;
   case Upstream::Host::HealthFlag::EXCLUDE_FROM_LB:
-    health_status.set_pending_dynamic_removal(
+    health_status.set_immediate_removal_from_lb(
         host.healthFlagGet(Upstream::Host::HealthFlag::EXCLUDE_FROM_LB));
     break;
   }
