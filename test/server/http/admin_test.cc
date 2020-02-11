@@ -1398,7 +1398,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       "failed_active_health_check": true,
       "failed_outlier_check": true,
       "failed_active_degraded_check": true,
-      "pending_dynamic_removal": true
+      "pending_dynamic_removal": true,
+      "immediate_removal_from_lb": true
      },
      "success_rate": {
       "value": 43.2
