@@ -120,7 +120,12 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
             primary_host_it->second->host_info_->last_used_time_.load().count());
   if (now_duration - primary_host_it->second->host_info_->last_used_time_.load() > host_ttl_) {
     ENVOY_LOG(debug, "host='{}' TTL expired, removing", host);
-    runRemoveCallbacks(host);
+    // If the host has no address then that means that the DnsCacheImpl has never
+    // runAddUpdateCallbacks for this host, and thus the callback targets are not aware of it.
+    // Therefore, runRemoveCallbacks should only be ran if the host's address != nullptr.
+    if (primary_host_it->second->host_info_->address_) {
+      runRemoveCallbacks(host);
+    }
     primary_hosts_.erase(primary_host_it);
     updateTlsHostsMap();
   } else {
