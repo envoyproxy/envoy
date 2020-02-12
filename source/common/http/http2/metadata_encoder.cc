@@ -116,7 +116,7 @@ ssize_t MetadataEncoder::packNextFramePayload(uint8_t* buf, const size_t len) {
   return current_payload_size;
 }
 
-std::vector<uint8_t> MetadataEncoder::payloadFrameFlags() {
+std::vector<uint8_t> MetadataEncoder::payloadFrameFlagBytes() {
   std::vector<uint8_t> flags;
   flags.reserve(payload_size_queue_.size());
   for (uint64_t payload_size : payload_size_queue_) {

@@ -51,9 +51,9 @@ public:
    * and the flags to be set in each frame. This counts only frames that the encoder has not already
    * packed; to get the full sequence of frames corresponding to the metadata map vector, call this
    * before submitting any frames to nghttp2.
-   * @return The number of frames in each metadata payload, in sequence.
+   * @return A vector indicating the header byte in each METADATA frame, in sequence.
    */
-  std::vector<uint8_t> payloadFrameFlags();
+  std::vector<uint8_t> payloadFrameFlagBytes();
 
 private:
   /**

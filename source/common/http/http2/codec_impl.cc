@@ -142,7 +142,7 @@ void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadat
   if (!metadata_encoder.createPayload(metadata_map_vector)) {
     return;
   }
-  for (uint8_t flags : metadata_encoder.payloadFrameFlags()) {
+  for (uint8_t flags : metadata_encoder.payloadFrameFlagBytes()) {
     submitMetadata(flags);
   }
   parent_.sendPendingFrames();
