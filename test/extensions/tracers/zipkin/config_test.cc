@@ -25,7 +25,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.zipkin
+    name: envoy.tracers.zipkin
     config:
       collector_cluster: fake_cluster
       collector_endpoint: /api/v1/spans
@@ -50,7 +50,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.zipkin
+    name: envoy.tracers.zipkin
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster
@@ -71,7 +71,15 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
 TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
       (Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>()),
-      EnvoyException, "Double registration for name: 'envoy.zipkin'");
+      EnvoyException, "Double registration for name: 'envoy.tracers.zipkin'");
+}
+
+// Test that the deprecated extension name still functions.
+TEST(ZipkinTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.zipkin";
+
+  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
+                         deprecated_name));
 }
 
 } // namespace

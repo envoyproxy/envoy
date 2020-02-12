@@ -753,9 +753,10 @@ TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{{"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
+  TestRequestHeaderMapImpl expected_headers{
+      {"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
-      .WillOnce(Invoke([&](Http::HeaderMapPtr&, bool) -> void {
+      .WillOnce(Invoke([&](Http::RequestHeaderMapPtr&, bool) -> void {
         connection_.state_ = Network::Connection::State::Closing;
       }));
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);

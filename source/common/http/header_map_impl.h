@@ -56,7 +56,7 @@ public:                                                                         
  * paths use O(1) direct access. In general, we try to copy as little as possible and allocate as
  * little as possible in any of the paths.
  */
-class HeaderMapImpl : public HeaderMap, NonCopyable {
+class HeaderMapImpl : public virtual HeaderMap, NonCopyable {
 public:
   HeaderMapImpl();
   explicit HeaderMapImpl(
@@ -239,6 +239,20 @@ protected:
 };
 
 using HeaderMapImplPtr = std::unique_ptr<HeaderMapImpl>;
+
+/**
+ * Typed derived classes for all header map types.
+ * TODO(mattklein123): In future changes we will be differentiating the implementation between
+ * these classes to both fix bugs and improve performance.
+ */
+class RequestHeaderMapImpl : public HeaderMapImpl, public RequestHeaderMap {};
+using RequestHeaderMapImplPtr = std::unique_ptr<RequestHeaderMapImpl>;
+class RequestTrailerMapImpl : public HeaderMapImpl, public RequestTrailerMap {};
+using RequestTrailerMapImplPtr = std::unique_ptr<RequestTrailerMapImpl>;
+class ResponseHeaderMapImpl : public HeaderMapImpl, public ResponseHeaderMap {};
+using ResponseHeaderMapImplPtr = std::unique_ptr<ResponseHeaderMapImpl>;
+class ResponseTrailerMapImpl : public HeaderMapImpl, public ResponseTrailerMap {};
+using ResponseTrailerMapImplPtr = std::unique_ptr<ResponseTrailerMapImpl>;
 
 } // namespace Http
 } // namespace Envoy

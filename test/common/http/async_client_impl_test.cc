@@ -119,8 +119,9 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   stream->sendData(*body, true);
 
   response_decoder_->decode100ContinueHeaders(
-      HeaderMapPtr(new TestHeaderMapImpl{{":status", "100"}}));
-  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, true);
 
   EXPECT_EQ(
@@ -154,7 +155,7 @@ TEST_F(AsyncClientImplTest, Basic) {
 
   client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
 
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 
@@ -200,7 +201,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
 
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 }
@@ -239,7 +240,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
 
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 }
@@ -279,7 +280,7 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
   options.setHashPolicy(hash_policy);
   client_.send(std::move(message_), callbacks_, options);
 
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
 }
@@ -308,7 +309,7 @@ TEST_F(AsyncClientImplTest, Retry) {
 
   // Expect retry and retry timer create.
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "503"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "503"}});
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 
   // Retry request.
@@ -326,7 +327,7 @@ TEST_F(AsyncClientImplTest, Retry) {
 
   // Normal response.
   expectSuccess(200);
-  HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
 }
 
@@ -356,7 +357,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
 
   // Expect retry and retry timer create.
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "503"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "503"}});
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 
   // Retry request.
@@ -375,7 +376,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   // Normal response.
   expectResponseHeaders(stream_callbacks_, 200, true);
   EXPECT_CALL(stream_callbacks_, onComplete());
-  HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
 }
 
@@ -429,11 +430,11 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
   stream2->sendData(*body2, true);
 
   // Finish stream 2.
-  HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "503"}});
+  ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "503"}});
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 
   // Finish stream 1.
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(*body, true);
 }
@@ -473,12 +474,12 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
   client_.send(std::move(message2), callbacks2, AsyncClient::RequestOptions());
 
   // Finish request 2.
-  HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "503"}});
+  ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(callbacks2, onSuccess_(_));
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 
   // Finish request 1.
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   expectSuccess(200);
   response_decoder_->decodeData(data, true);
@@ -529,12 +530,12 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
   stream->sendData(*body, true);
 
   // Finish stream.
-  HeaderMapPtr response_headers2(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder2->decodeHeaders(std::move(response_headers2), false);
   response_decoder2->decodeData(*body, true);
 
   // Finish request.
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   expectSuccess(200);
   response_decoder_->decodeData(data, true);
@@ -569,10 +570,11 @@ TEST_F(AsyncClientImplTest, StreamWithTrailers) {
   stream->sendData(*body, false);
   stream->sendTrailers(trailers);
 
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(*body, false);
-  response_decoder_->decodeTrailers(HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
+  response_decoder_->decodeTrailers(
+      ResponseTrailerMapPtr{new TestResponseTrailerMapImpl{{"some", "trailer"}}});
 }
 
 TEST_F(AsyncClientImplTest, Trailers) {
@@ -592,10 +594,11 @@ TEST_F(AsyncClientImplTest, Trailers) {
   expectSuccess(200);
 
   client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, false);
-  response_decoder_->decodeTrailers(HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
+  response_decoder_->decodeTrailers(
+      ResponseTrailerMapPtr{new TestResponseTrailerMapImpl{{"some", "trailer"}}});
 }
 
 TEST_F(AsyncClientImplTest, ImmediateReset) {
@@ -646,7 +649,8 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, false);
 
-  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, false);
 
   stream->reset();
@@ -679,7 +683,8 @@ TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers, false);
 
-  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, true);
 
   EXPECT_CALL(stream_encoder_, encodeData(_, _)).Times(0);
@@ -716,7 +721,8 @@ TEST_F(AsyncClientImplTest, SendTrailersRemoteClosure) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers, false);
 
-  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, true);
 
   EXPECT_CALL(stream_encoder_, encodeTrailers(_)).Times(0);
@@ -757,7 +763,8 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
 
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
-  filter_callbacks->encodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  filter_callbacks->encodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
 }
 
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
@@ -789,7 +796,8 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, false);
 
-  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, false);
 
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
@@ -808,7 +816,7 @@ TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
   EXPECT_CALL(callbacks_, onFailure(_));
 
   client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
-  HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
@@ -1159,7 +1167,8 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, false);
 
-  response_decoder_->decodeHeaders(HeaderMapPtr(new TestHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
   response_decoder_->decodeData(*body, false);
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body2.get()), true));

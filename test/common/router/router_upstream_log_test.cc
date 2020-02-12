@@ -147,14 +147,16 @@ public:
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
 
-    Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl(response_headers_init));
+    Http::ResponseHeaderMapPtr response_headers(
+        new Http::TestResponseHeaderMapImpl(response_headers_init));
     response_headers->setStatus(response_code);
 
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(response_code));
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
-    Http::HeaderMapPtr response_trailers(new Http::TestHeaderMapImpl(response_trailers_init));
+    Http::ResponseTrailerMapPtr response_trailers(
+        new Http::TestResponseTrailerMapImpl(response_trailers_init));
     response_decoder->decodeTrailers(std::move(response_trailers));
   }
 
@@ -209,7 +211,8 @@ public:
 
     // Normal response.
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-    Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+    Http::ResponseHeaderMapPtr response_headers(
+        new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(200));
     response_decoder->decodeHeaders(std::move(response_headers), true);

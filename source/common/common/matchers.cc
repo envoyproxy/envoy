@@ -8,6 +8,7 @@
 
 #include "common/common/regex.h"
 #include "common/config/metadata.h"
+#include "common/http/path_utility.h"
 
 #include "absl/strings/match.h"
 
@@ -168,9 +169,27 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher
   value_matcher_ = ValueMatcher::create(v);
 }
 
+PathMatcherConstSharedPtr PathMatcher::createExact(const std::string& exact, bool ignore_case) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact(exact);
+  matcher.set_ignore_case(ignore_case);
+  return std::make_shared<const PathMatcher>(matcher);
+}
+
+PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, bool ignore_case) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix(prefix);
+  matcher.set_ignore_case(ignore_case);
+  return std::make_shared<const PathMatcher>(matcher);
+}
+
 bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) const {
   const auto& value = Envoy::Config::Metadata::metadataValue(metadata, matcher_.filter(), path_);
   return value_matcher_ && value_matcher_->match(value);
+}
+
+bool PathMatcher::match(const absl::string_view path) const {
+  return matcher_.match(Http::PathUtil::removeQueryAndFragment(path));
 }
 
 } // namespace Matchers

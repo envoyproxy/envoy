@@ -364,6 +364,92 @@ TEST(LowerCaseStringMatcher, MatchRegexValue) {
   EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo.Bar"));
 }
 
+TEST(PathMatcher, MatchExactPath) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", false);
+
+  EXPECT_TRUE(matcher->match("/exact"));
+  EXPECT_TRUE(matcher->match("/exact?param=val"));
+  EXPECT_TRUE(matcher->match("/exact#fragment"));
+  EXPECT_TRUE(matcher->match("/exact#fragment?param=val"));
+  EXPECT_FALSE(matcher->match("/EXACT"));
+  EXPECT_FALSE(matcher->match("/exacz"));
+  EXPECT_FALSE(matcher->match("/exact-abc"));
+  EXPECT_FALSE(matcher->match("/exacz?/exact"));
+  EXPECT_FALSE(matcher->match("/exacz#/exact"));
+}
+
+TEST(PathMatcher, MatchExactPathIgnoreCase) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", true);
+
+  EXPECT_TRUE(matcher->match("/exact"));
+  EXPECT_TRUE(matcher->match("/EXACT"));
+  EXPECT_TRUE(matcher->match("/exact?param=val"));
+  EXPECT_TRUE(matcher->match("/Exact#fragment"));
+  EXPECT_TRUE(matcher->match("/EXACT#fragment?param=val"));
+  EXPECT_FALSE(matcher->match("/exacz"));
+  EXPECT_FALSE(matcher->match("/exact-abc"));
+  EXPECT_FALSE(matcher->match("/exacz?/exact"));
+  EXPECT_FALSE(matcher->match("/exacz#/exact"));
+}
+
+TEST(PathMatcher, MatchPrefixPath) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createPrefix("/prefix", false);
+
+  EXPECT_TRUE(matcher->match("/prefix"));
+  EXPECT_TRUE(matcher->match("/prefix-abc"));
+  EXPECT_TRUE(matcher->match("/prefix?param=val"));
+  EXPECT_TRUE(matcher->match("/prefix#fragment"));
+  EXPECT_TRUE(matcher->match("/prefix#fragment?param=val"));
+  EXPECT_FALSE(matcher->match("/PREFIX"));
+  EXPECT_FALSE(matcher->match("/prefiz"));
+  EXPECT_FALSE(matcher->match("/prefiz?/prefix"));
+  EXPECT_FALSE(matcher->match("/prefiz#/prefix"));
+}
+
+TEST(PathMatcher, MatchPrefixPathIgnoreCase) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createPrefix("/prefix", true);
+
+  EXPECT_TRUE(matcher->match("/prefix"));
+  EXPECT_TRUE(matcher->match("/prefix-abc"));
+  EXPECT_TRUE(matcher->match("/Prefix?param=val"));
+  EXPECT_TRUE(matcher->match("/Prefix#fragment"));
+  EXPECT_TRUE(matcher->match("/PREFIX#fragment?param=val"));
+  EXPECT_TRUE(matcher->match("/PREFIX"));
+  EXPECT_FALSE(matcher->match("/prefiz"));
+  EXPECT_FALSE(matcher->match("/prefiz?/prefix"));
+  EXPECT_FALSE(matcher->match("/prefiz#/prefix"));
+}
+
+TEST(PathMatcher, MatchSuffixPath) {
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->set_suffix("suffix");
+
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/abc-suffix"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix?param=val"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix#fragment"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix#fragment?param=val"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/suffiz"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/suffiz?param=suffix"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/suffiz#suffix"));
+}
+
+TEST(PathMatcher, MatchRegexPath) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex(".*regex.*");
+
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex/xyz"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/xyz/regex"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex?param=val"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex#fragment"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex#fragment?param=val"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez?param=regex"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez#regex"));
+}
+
 } // namespace
 } // namespace Matcher
 } // namespace Envoy
