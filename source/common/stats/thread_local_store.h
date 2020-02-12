@@ -325,11 +325,10 @@ private:
                                                            const std::vector<Tag>& tags)>;
 
     /**
-     * Combines the given name of a stat with its statically defined tags to create a unique identifier
-     * for the name/tags.
+     * Combines the given name of a stat with its statically defined tags to create a unique
+     * identifier for the name/tags.
      */
-    SymbolTable::StoragePtr finalStatName(StatName name,
-                                                        const StatNameTagVector& tags);
+    SymbolTable::StoragePtr finalStatName(StatName name, const StatNameTagVector& tags);
     /**
      * Makes a stat either by looking it up in the central cache,
      * generating it from the parent allocator, or as a last
