@@ -329,8 +329,6 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   HealthTransition changed_state = HealthTransition::Unchanged;
   if (type == envoy::data::core::v3::PASSIVE) {
     host_->healthFlagSet(Host::HealthFlag::EXCLUDE_FROM_LB);
-    host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-    num_unhealthy_ = parent_.unhealthy_threshold_;
     changed_state = HealthTransition::ChangePending;
   } else if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     if (type != envoy::data::core::v3::NETWORK ||

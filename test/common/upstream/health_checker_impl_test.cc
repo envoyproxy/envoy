@@ -709,6 +709,26 @@ public:
   const HostWithHealthCheckMap health_checker_map_{};
 };
 
+TEST_F(HttpHealthCheckerImplTest, PassiveFailure) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(1);
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  health_checker_->start();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthChecker().setUnhealthy();
+
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
+      Host::HealthFlag::EXCLUDE_FROM_LB));
+  EXPECT_EQ(Host::Health::Unhealthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
 TEST_F(HttpHealthCheckerImplTest, Success) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
@@ -3248,8 +3268,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailure) {
   cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthChecker().setUnhealthy();
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::EXCLUDE_FROM_LB));
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
+
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
@@ -3258,8 +3277,6 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailure) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
-      Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::EXCLUDE_FROM_LB));
   EXPECT_EQ(Host::Health::Unhealthy,
