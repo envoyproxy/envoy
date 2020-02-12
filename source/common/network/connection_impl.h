@@ -49,10 +49,10 @@ public:
   DynamicSocketOptionsImpl(uint64_t conn_id, IoHandle& io_handle)
       : conn_id_(conn_id), io_handle_(io_handle) {}
 
-  void setSocketRecvBufferSize(uint32_t buffer_size) const override;
-  void getSocketRecvBufferSize(uint32_t& recv_buf_size) const override;
-  void setSocketRecvLoWat(uint32_t low_watermark) const override;
-  void getSocketRecvLoWat(uint32_t& low_watermark_val) const override;
+  Api::SysCallIntResult setSocketRecvBufferSize(int buffer_size) const override;
+  Api::SysCallIntResult getSocketRecvBufferSize(int& recv_buf_size) const override;
+  Api::SysCallIntResult setSocketRecvLoWat(int low_watermark) const override;
+  Api::SysCallIntResult getSocketRecvLoWat(int& low_watermark_val) const override;
   /**
    * @return uint64_t the unique local ID of the invoking connection.
    */

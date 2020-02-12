@@ -17,6 +17,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
+#include "common/api/os_sys_calls_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -39,68 +40,88 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
   }
 }
 
-void DynamicSocketOptionsImpl::setSocketRecvBufferSize(uint32_t buffer_size) const {
-  int rc = 0;
-  if (io_handle_.fd() == -1) {
+Api::SysCallIntResult DynamicSocketOptionsImpl::setSocketRecvBufferSize(int buffer_size) const {
+  int rc = -1;
+  int errsrv = -1;
+  socklen_t option_len = sizeof(int);
+  if (-1 == io_handle_.fd()) {
     ENVOY_CONN_LOG(trace, "Stale socket file handle, operation Set Receive Buffer aborted", *this);
-    return;
+    return {rc, errsrv};
   }
   // Modify the receive buffer size to 'buffer_size'
-  rc = setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t));
-  if (rc == -1) {
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_syscalls.setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, option_len);
+  if (-1 == result.rc_) {
     ENVOY_CONN_LOG(trace, "Failed to modify socket receive buffer to size: buffer_size={}", *this,
                    buffer_size);
   }
+  return result;
 }
 
-void DynamicSocketOptionsImpl::getSocketRecvBufferSize(uint32_t& recv_buf_size) const {
-  int rc = 0;
+Api::SysCallIntResult DynamicSocketOptionsImpl::getSocketRecvBufferSize(int& recv_buf_size) const {
+  int rc = -1;
+  int errsrv = -1;
   socklen_t option_len = sizeof recv_buf_size;
 
-  if (io_handle_.fd() == -1) {
+  if (-1 == io_handle_.fd()) {
     ENVOY_CONN_LOG(trace, "Stale socket file handle, operation Get Receive Buffer Size aborted",
                    *this);
+    return {rc, errsrv};
   }
 
   // Read the set receive buffer size as it is double the value configured through
   // 'setSocketRecvBufferSize' on some machines this value can not be lower than '2304' bytes
-  rc = getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &option_len);
-  if (rc == -1) {
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_syscalls.getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &option_len);
+  if (-1 == result.rc_) {
     ENVOY_CONN_LOG(trace, "Failed to read socket receive buffer size", *this);
   }
+  return result;
 }
 
-void DynamicSocketOptionsImpl::setSocketRecvLoWat(uint32_t low_watermark) const {
-  if (io_handle_.fd() == -1) {
+Api::SysCallIntResult DynamicSocketOptionsImpl::setSocketRecvLoWat(int low_watermark) const {
+  int rc = -1;
+  int errsrv = -1;
+  socklen_t option_len = sizeof(int);
+  if (-1 == io_handle_.fd()) {
     ENVOY_CONN_LOG(trace,
                    "Stale socket file handle, operation Set Receive Buffer Low Watermark aborted",
                    *this);
-    return;
+    return {rc, errsrv};
   }
   // Modify the receive buffer low watermark to 'low_watermark' value
-  if (setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark, sizeof(uint32_t)) ==
-      -1) {
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_syscalls.setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark, option_len);
+  if (-1 == result.rc_) {
     ENVOY_CONN_LOG(trace, "Failed to set socket receive buffer low watermark size: buffer_size={}",
                    *this, low_watermark);
   }
+  return result;
 }
 
-void DynamicSocketOptionsImpl::getSocketRecvLoWat(uint32_t& low_watermark_val) const {
-  int rc = 0;
+Api::SysCallIntResult DynamicSocketOptionsImpl::getSocketRecvLoWat(int& low_watermark_val) const {
+  int rc = -1;
+  int errsrv = -1;
   socklen_t option_len = sizeof low_watermark_val;
 
-  if (io_handle_.fd() == -1) {
+  if (-1 == io_handle_.fd()) {
     ENVOY_CONN_LOG(trace,
                    "Stale socket file handle, operation Get Receive Buffer Low Watermark aborted",
                    *this);
-    return;
+    return {rc, errsrv};
   }
   // Read the receive buffer low watermark value into 'low_watermark_val' variable
-  rc = getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark_val, &option_len);
-  if (rc == -1) {
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result = os_syscalls.getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVLOWAT,
+                                                        &low_watermark_val, &option_len);
+  if (-1 == result.rc_) {
     ENVOY_CONN_LOG(trace, "Failed to get socket receive buffer low watermark size: buffer_size={}",
                    *this, low_watermark_val);
   }
+  return result;
 }
 
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;

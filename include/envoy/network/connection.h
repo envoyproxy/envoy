@@ -79,24 +79,24 @@ public:
   /**
    * Set the receive buffer size for the socket to a value specified by the 'buffer_size'
    */
-  virtual void setSocketRecvBufferSize(uint32_t buffer_size) const PURE;
+  virtual Api::SysCallIntResult setSocketRecvBufferSize(int buffer_size) const PURE;
 
   /**
    * Get the receive buffer size for the socket
    * @param recv_buf_size returns the size of the receive buffer configured
    */
-  virtual void getSocketRecvBufferSize(uint32_t& recv_buf_size) const PURE;
+  virtual Api::SysCallIntResult getSocketRecvBufferSize(int& recv_buf_size) const PURE;
 
   /**
    * Set the receive buffer low water-mark size to a value specified by 'low_watermark'
    */
-  virtual void setSocketRecvLoWat(uint32_t low_watermark) const PURE;
+  virtual Api::SysCallIntResult setSocketRecvLoWat(int low_watermark) const PURE;
 
   /**
    * Get the receive buffer low water-mark size to a value specified by 'low_watermark'
    * @param low_watermark_val returns the receive buffer 'low_watermark' configured
    */
-  virtual void getSocketRecvLoWat(uint32_t& low_watermark_val) const PURE;
+  virtual Api::SysCallIntResult getSocketRecvLoWat(int& low_watermark_val) const PURE;
 };
 using DynamicSocketOptionsPtr = std::shared_ptr<DynamicSocketOptions>;
 
@@ -330,8 +330,6 @@ public:
    *         options on the socket file descriptor
    */
   virtual Network::DynamicSocketOptionsPtr& getDynamicSocketOptionsPtr() PURE;
-
-private:
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

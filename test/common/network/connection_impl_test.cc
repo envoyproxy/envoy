@@ -797,35 +797,76 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   disconnect(true);
 }
 
-// Validate dynamic socket options
-TEST_P(ConnectionImplTest, DynamicSocketOptions) {
+// Validate dynamic socket options receive buffer size
+TEST_P(ConnectionImplTest, DynamicSocketOptionsRecvBuffer) {
   setUpBasicConnection();
   connect();
 
   auto dynamic_sockopt_ptr = client_connection_->getDynamicSocketOptionsPtr();
-  {
-    // Test set and get socket receive buffer size
-    uint32_t set_recv_buf_size = 81920;
-    uint32_t get_recv_buf_size = 0;
-    dynamic_sockopt_ptr->setSocketRecvBufferSize(set_recv_buf_size);
-    dynamic_sockopt_ptr->getSocketRecvBufferSize(get_recv_buf_size);
+  // Test set and get socket receive buffer size
+  // Get the default buffer receive buffer size and ensure it is not equal to the value
+  // configured
+  int set_recv_buf_size = 0;
+  int get_recv_buf_size = 0;
+  int get_recv_buf_default_size = 0;
+  Api::SysCallIntResult result;
+  result = dynamic_sockopt_ptr->getSocketRecvBufferSize(get_recv_buf_default_size);
+  EXPECT_EQ(result.rc_, 0);
+  // The default receive buffer size on Linux, Mac and Windows platforms is upwards of
+  // `32768` bytes. Therefore if the default size returned is more than `32768` bytes
+  // set the value to `32768` or add `4096` bytes otherwise.
+  if (get_recv_buf_default_size > 32768) {
+    set_recv_buf_size = 32768;
+  } else {
+    set_recv_buf_size = get_recv_buf_size + 4096;
+  }
+  result = dynamic_sockopt_ptr->setSocketRecvBufferSize(set_recv_buf_size);
+  EXPECT_EQ(result.rc_, 0);
+  result = dynamic_sockopt_ptr->getSocketRecvBufferSize(get_recv_buf_size);
+  EXPECT_EQ(result.rc_, 0);
+  // Ensure the default receive buffer size is not equal to the value configured
+  EXPECT_NE(get_recv_buf_size, get_recv_buf_default_size);
 #ifdef __APPLE__
-    // 'set_recv_buf_size' is equal to 'get_recv_buf_size' on macOS
-    EXPECT_EQ(get_recv_buf_size, set_recv_buf_size);
+  // 'set_recv_buf_size' is equal to 'get_recv_buf_size' on macOS
+  EXPECT_EQ(get_recv_buf_size, set_recv_buf_size);
 #else
-    // 'get_recv_buf_size' is double the value of 'set_recv_buf_size' of Linux
-    EXPECT_EQ(get_recv_buf_size, 2 * set_recv_buf_size);
+  // 'get_recv_buf_size' is double the value of 'set_recv_buf_size' on Linux
+  EXPECT_EQ(get_recv_buf_size, 2 * set_recv_buf_size);
 #endif
-  }
 
-  {
-    // Test set and get socket receive low watermark size
-    uint32_t set_recv_lowat = 81920;
-    uint32_t get_recv_lowat = 0;
-    dynamic_sockopt_ptr->setSocketRecvLoWat(set_recv_lowat);
-    dynamic_sockopt_ptr->getSocketRecvLoWat(get_recv_lowat);
-    EXPECT_EQ(set_recv_lowat, get_recv_lowat);
+  disconnect(true);
+}
+
+// Validate dynamic socket options receive low watermark size
+TEST_P(ConnectionImplTest, DynamicSocketOptionsRecvLowat) {
+  setUpBasicConnection();
+  connect();
+
+  auto dynamic_sockopt_ptr = client_connection_->getDynamicSocketOptionsPtr();
+  // Test set and get socket receive low watermark size
+  // Get the default receive low watermark size and ensure it is not equal to the value
+  // configured
+  int set_recv_lowat = 0;
+  int get_recv_lowat = 0;
+  int get_recv_lowat_default = 0;
+  Api::SysCallIntResult result;
+  result = dynamic_sockopt_ptr->getSocketRecvLoWat(get_recv_lowat_default);
+  EXPECT_EQ(result.rc_, 0);
+  // The default receive low water mark on most systems is around `4096` bytes.
+  // Therefore if the default size returned is less than or equal to `4096` bytes
+  // double the value to set, else set it to `4096` bytes.
+  if (get_recv_lowat_default <= 4096) {
+    set_recv_lowat = 2 * get_recv_lowat_default;
+  } else {
+    set_recv_lowat = 4096;
   }
+  result = dynamic_sockopt_ptr->setSocketRecvLoWat(set_recv_lowat);
+  EXPECT_EQ(result.rc_, 0);
+  result = dynamic_sockopt_ptr->getSocketRecvLoWat(get_recv_lowat);
+  EXPECT_EQ(result.rc_, 0);
+  EXPECT_NE(get_recv_lowat, get_recv_lowat_default);
+  EXPECT_EQ(set_recv_lowat, get_recv_lowat);
+
   disconnect(true);
 }
 
