@@ -111,7 +111,7 @@ public:
   virtual SysCallIntResult getpeername(os_fd_t sockfd, sockaddr* name, socklen_t* namelen) PURE;
 
   /**
-   * Toggle the blocking state bit using fdctl
+   * Toggle the blocking state bit using fcntl
    */
   virtual SysCallIntResult setsocketblocking(os_fd_t sockfd, bool blocking) PURE;
 

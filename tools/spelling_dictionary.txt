@@ -568,6 +568,7 @@ failover
 fallbacks
 fastbuild
 favicon
+fcntl
 fd
 fds
 filename
@@ -749,6 +750,7 @@ mongo
 moveable
 msec
 msg
+msghdr
 multi
 multicast
 multikill
@@ -978,6 +980,7 @@ sizeof
 smatch
 snapshotted
 sockaddr
+socketpair
 sockfd
 sockopt
 sockopts
