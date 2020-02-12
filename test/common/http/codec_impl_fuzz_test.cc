@@ -116,8 +116,7 @@ public:
     }
   } request_, response_;
 
-  HttpStream(ClientConnection& client, const Http::MetadataMapVector& metadata,
-             const TestHeaderMapImpl& request_headers, bool end_stream) {
+  HttpStream(ClientConnection& client, const TestHeaderMapImpl& request_headers, bool end_stream) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
     ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
@@ -154,7 +153,6 @@ public:
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
-    request_.request_encoder_->encodeMetadata(metadata);
     request_.request_encoder_->encodeHeaders(request_headers, end_stream);
     request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_.stream_state_ = StreamState::PendingHeaders;
@@ -249,8 +247,7 @@ public:
           state.response_encoder_->encodeMetadata(
               Fuzz::fromMetadata(directional_action.metadata()));
         } else {
-          state.request_encoder_->encodeMetadata(
-              Fuzz::fromMetadata(directional_action.metadata()));
+          state.request_encoder_->encodeMetadata(Fuzz::fromMetadata(directional_action.metadata()));
         }
       }
       break;
@@ -486,8 +483,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
           }
         }
         HttpStreamPtr stream = std::make_unique<HttpStream>(
-            *client, Fuzz::fromMetadata(action.new_stream().metadata()),
-            fromSanitizedHeaders(action.new_stream().request_headers()),
+            *client, fromSanitizedHeaders(action.new_stream().request_headers()),
             action.new_stream().end_stream());
         stream->moveIntoListBack(std::move(stream), pending_streams);
         break;
