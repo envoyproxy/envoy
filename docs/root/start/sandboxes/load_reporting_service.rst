@@ -5,7 +5,7 @@ Load Reporting Service (LRS)
 
 This simple example demonstrates Envoy's Load Reporting Service (LRS) capability and how to use it
 
-All incoming requests are routed via Envoy to a simple goLang web server aka http_server.
+All incoming requests are routed via Envoy to a simple goLang web server aka http_server. We scale up two containers and randomly send requests to each. 
 Envoy is configured to initiate the connection with LRS Server. LRS Server enables the stats by sending LoadStatsResponse.
 Sending requests to http_server will be counted towards successful requests and will be visible in LRS Server logs.
 
@@ -27,55 +27,55 @@ A simple way to achieve this is via the `Docker Desktop <https://www.docker.com/
 If you have not cloned the Envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
 or ``git clone https://github.com/envoyproxy/envoy.git``
 
-Terminal 1
-
-.. code-block:: console
+Terminal 1 ::
 
     $ pwd
     envoy/examples/load_reporting_service
     $ docker-compose pull
-    $ docker-compose up
+    $ docker-compose up --scale http_service=2
 
 
-Terminal 2
-
-.. code-block:: console
+Terminal 2 ::
 
     $ pwd
     envoy/examples/load_reporting_service
     $ docker-compose ps
 
-            Name                         Command             State                            Ports
+                                Name                               Command               State                           Ports
     --------------------------------------------------------------------------------------------------------------------------------------
-    load_reporting_service_http_service_1   /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 0.0.0.0:80->80/tcp, 0.0.0.0:8081->8081/tcp
-    load_reporting_service_lrs_server_1     go run main.go                   Up      0.0.0.0:18000->18000/tcp
+    load-reporting-service_http_service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:80->80/tcp, 0.0.0.0:8081->8081/tcp
+    load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:81->80/tcp, 0.0.0.0:8082->8081/tcp
+    load-reporting-service_lrs_server_1     go run main.go                   Up      0.0.0.0:18000->18000/tcp
 
 **Step 3: Start sending stream of HTTP requests**
 
-Terminal 2
-
-.. code-block:: console
+Terminal 2 ::
 
   $ pwd
   envoy/examples/load_reporting_service
-  $ docker-compose exec http_service bash
-  $ bash code/send_requests.sh
+  $ bash send_requests.sh
 
-The script above (``send_requests.sh``) sends a continuous stream of HTTP requests to Envoy, which in turn forwards the requests to the backend service.
+The script above (``send_requests.sh``) sends requests randomly to each Envoy, which in turn forwards the requests to the backend service.
 
 **Step 4: See Envoy Stats**
 
-In Terminal 1 you should see
+You should see
 
-Terminal 1
+Terminal 1 ::
 
-.. code-block:: console
-    lrs_server_1    | 2020/02/02 23:32:55 LRS Server is up and running on :18000
-    lrs_server_1    | 2020/02/02 23:32:59 Adding new cluster to cache `http_service`
-    lrs_server_1    | 2020/02/02 23:33:05 Creating LRS response with frequency - 7 secs
-    http_service_1  | 127.0.0.1 - - [02/Feb/2020 23:33:22] "GET /service HTTP/1.1" 200 -
-    http_service_1  | 127.0.0.1 - - [02/Feb/2020 23:33:23] "GET /service HTTP/1.1" 200 -
-    http_service_1  | 127.0.0.1 - - [02/Feb/2020 23:33:24] "GET /service HTTP/1.1" 200 -
-    http_service_1  | 127.0.0.1 - - [02/Feb/2020 23:33:25] "GET /service HTTP/1.1" 200 -
-    http_service_1  | 127.0.0.1 - - [02/Feb/2020 23:33:26] "GET /service HTTP/1.1" 200 -
-    lrs_server_1    | 2020/02/02 23:33:26 Got stats from cluster `http_service` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:5 total_issued_requests:5 > load_report_interval:<seconds:6 nanos:993629000 >
+    ............................
+    lrs_server_1    | 2020/02/12 17:08:20 LRS Server is up and running on :18000
+    lrs_server_1    | 2020/02/12 17:08:23 Adding new cluster to cache `http_service` with node `0022a319e1e2`
+    lrs_server_1    | 2020/02/12 17:08:24 Adding new node `2417806c9d9a` to existing cluster `http_service`
+    lrs_server_1    | 2020/02/12 17:08:25 Creating LRS response for cluster http_service, node 2417806c9d9a with frequency 2 secs
+    lrs_server_1    | 2020/02/12 17:08:25 Creating LRS response for cluster http_service, node 0022a319e1e2 with frequency 2 secs
+    http_service_2  | 127.0.0.1 - - [12/Feb/2020 17:09:06] "GET /service HTTP/1.1" 200 -
+    http_service_1  | 127.0.0.1 - - [12/Feb/2020 17:09:06] "GET /service HTTP/1.1" 200 -
+    ............................
+    lrs_server_1    | 2020/02/12 17:09:07 Got stats from cluster `http_service` node `0022a319e1e2` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:21 total_issued_requests:21 > load_report_interval:<seconds:1 nanos:998411000 >
+    lrs_server_1    | 2020/02/12 17:09:07 Got stats from cluster `http_service` node `2417806c9d9a` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:17 total_issued_requests:17 > load_report_interval:<seconds:1 nanos:994529000 >
+    http_service_2  | 127.0.0.1 - - [12/Feb/2020 17:09:07] "GET /service HTTP/1.1" 200 -
+    http_service_1  | 127.0.0.1 - - [12/Feb/2020 17:09:07] "GET /service HTTP/1.1" 200 -
+    ............................
+    lrs_server_1    | 2020/02/12 17:09:09 Got stats from cluster `http_service` node `0022a319e1e2` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:3 total_issued_requests:3 > load_report_interval:<seconds:2 nanos:2458000 >
+    lrs_server_1    | 2020/02/12 17:09:09 Got stats from cluster `http_service` node `2417806c9d9a` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:9 total_issued_requests:9 > load_report_interval:<seconds:2 nanos:6487000 >

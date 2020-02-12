@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
+	"log"
+	"net"
+	"time"
+
 	"github.com/envoyproxy/envoy/examples/load_reporting_service/server"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"log"
-	"net"
-	"time"
 
 	gcpLoadStats "github.com/envoyproxy/go-control-plane/envoy/service/load_stats/v2"
 )
@@ -29,7 +30,7 @@ func main() {
 
 		xdsServer := server.NewServer(ctx, &callbacks{})
 		gcpLoadStats.RegisterLoadReportingServiceServer(grpcServer, xdsServer)
-		startCollectingStats(xdsServer, "http_service", []string{"local_service"}, 7)
+		startCollectingStats(xdsServer, "http_service", []string{"local_service"}, 2)
 
 		log.Printf("LRS Server is up and running on %s", address)
 		reflection.Register(grpcServer)
@@ -42,8 +43,8 @@ func main() {
 }
 
 func startCollectingStats(server server.Server, cluster string, upstreamClusters []string, frequency int64) {
-    // Send LoadStatsResponse after 10 seconds to initiate the Load Reporting
-	ticker := time.NewTicker(time.Duration(10) * time.Second)
+	// Send LoadStatsResponse after 10 seconds to initiate the Load Reporting
+	ticker := time.NewTicker(time.Duration(5) * time.Second)
 	go func() {
 		for range ticker.C {
 			server.SendResponse(cluster, upstreamClusters, frequency)
@@ -56,7 +57,7 @@ type callbacks struct {
 }
 
 func (c *callbacks) OnStreamOpen(ctx context.Context, streamID int64) error {
-    return  nil
+	return nil
 }
 
 func (c *callbacks) OnStreamClosed(streamID int64) {

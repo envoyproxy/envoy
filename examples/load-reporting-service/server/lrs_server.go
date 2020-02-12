@@ -38,7 +38,7 @@ type Callbacks interface {
 
 // NewLrsServer creates handlers from a config watcher and callbacks.
 func NewServer(ctx context.Context, callbacks Callbacks) Server {
-	return &server{callbacks: callbacks, ctx: ctx, lrsCache: make(map[string]NodeMetadata)}
+	return &server{callbacks: callbacks, ctx: ctx, lrsCache: make(map[string]map[string]NodeMetadata)}
 }
 
 type server struct {
@@ -46,7 +46,7 @@ type server struct {
 	// streamCount for counting bi-di streams
 	streamCount int64
 	ctx         context.Context
-	lrsCache    map[string]NodeMetadata
+	lrsCache    map[string]map[string]NodeMetadata
 }
 
 type stream interface {
@@ -85,16 +85,24 @@ func (s *server) process(stream stream, reqCh <-chan *gcpLoadStats.LoadStatsRequ
             }
 
 			clusterName := req.GetNode().GetCluster()
+			nodeId := req.GetNode().GetId()
 			if _, exist := s.lrsCache[clusterName]; !exist {
-				log.Printf("Adding new cluster to cache `%s`", clusterName)
-				s.lrsCache[clusterName] = NodeMetadata{
-					node:   req.GetNode(),
-					stream: stream,
-				}
-			} else {
+				log.Printf("Adding new cluster to cache `%s` with node `%s`", clusterName, nodeId)
+				s.lrsCache[clusterName] = make(map[string]NodeMetadata)
+				s.lrsCache[clusterName][nodeId] = NodeMetadata{
+                    node:   req.GetNode(),
+                    stream: stream,
+                }
+			} else if _, exist := s.lrsCache[clusterName][nodeId]; !exist {
+			    log.Printf("Adding new node `%s` to existing cluster `%s`", nodeId, clusterName)
+			    s.lrsCache[clusterName][nodeId] = NodeMetadata{
+                    node:   req.GetNode(),
+                    stream: stream,
+                }
+			} else{
 				for i := 0; i < len(req.ClusterStats); i++ {
 					if len(req.ClusterStats[i].UpstreamLocalityStats) > 0 {
-						log.Printf("Got stats from cluster `%s` - %s", req.Node.Cluster, req.GetClusterStats()[i])
+						log.Printf("Got stats from cluster `%s` node `%s` - %s", req.Node.Cluster, req.Node.Id, req.GetClusterStats()[i])
 					}
 				}
 			}
@@ -138,14 +146,16 @@ func (s *server) SendResponse(cluster string, upstreamClusters []string, frequen
 		return
 	}
 
-	log.Printf("Creating LRS response with frequency - %d secs", frequency)
-	err := clusterDetails.stream.Send(&gcpLoadStats.LoadStatsResponse{
-		Clusters:                  upstreamClusters,
-		LoadReportingInterval:     &duration.Duration{Seconds: frequency},
-		ReportEndpointGranularity: true,
-	})
+    for nodeId, nodeDetails := range clusterDetails{
+        log.Printf("Creating LRS response for cluster %s, node %s with frequency %d secs", nodeDetails.node.Cluster, nodeId, frequency)
+        err := nodeDetails.stream.Send(&gcpLoadStats.LoadStatsResponse{
+            Clusters:                  upstreamClusters,
+            LoadReportingInterval:     &duration.Duration{Seconds: frequency},
+            ReportEndpointGranularity: true,
+        })
 
-	if err != nil {
-		log.Panicf("Unable to send response to cluster %s due to err: %s", clusterDetails.node.Cluster, err)
-	}
+        if err != nil {
+            log.Panicf("Unable to send response to cluster %s node %s due to err: %s", nodeDetails.node.Cluster, nodeId, err)
+        }
+    }
 }
