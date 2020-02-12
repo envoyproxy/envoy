@@ -229,8 +229,7 @@ class Filter : public Network::ReadFilter,
                Tcp::ConnectionPool::Callbacks,
                protected Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
-         TimeSource& time_source);
+  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~Filter() override;
 
   // Network::ReadFilter

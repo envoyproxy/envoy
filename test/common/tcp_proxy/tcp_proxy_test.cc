@@ -910,7 +910,7 @@ public:
     }
 
     {
-      filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+      filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -1259,7 +1259,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(RouteWithMetadataMatch)) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
   configure(config);
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
@@ -1307,7 +1307,7 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
   v2.set_string_value("v2");
   HashedValue hv0(v0), hv1(v1), hv2(v2);
 
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   // Expect filter to try to open a connection to cluster1.
@@ -1361,7 +1361,7 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
 
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(DisconnectBeforeData)) {
   configure(defaultConfig());
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -1400,7 +1400,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(UpstreamConnectionLimit)) {
       0, 0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+  filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -1789,7 +1789,7 @@ public:
   void initializeFilter() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -1945,7 +1945,7 @@ public:
   void initializeFilter() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
+    filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
