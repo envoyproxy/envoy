@@ -41,84 +41,73 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 }
 
 Api::SysCallIntResult DynamicSocketOptionsImpl::setSocketRecvBufferSize(int buffer_size) const {
-  int rc = -1;
-  int errsrv = -1;
-  socklen_t option_len = sizeof(int);
+  socklen_t option_len = sizeof(buffer_size);
   if (-1 == io_handle_.fd()) {
-    ENVOY_CONN_LOG(trace, "Stale socket file handle, operation Set Receive Buffer aborted", *this);
-    return {rc, errsrv};
+    ENVOY_CONN_LOG(debug, "Closed socket file handle, operation Set Receive Buffer aborted", *this);
+    return {-1, EBADF};
   }
   // Modify the receive buffer size to 'buffer_size'
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_syscalls.setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, option_len);
   if (-1 == result.rc_) {
-    ENVOY_CONN_LOG(trace, "Failed to modify socket receive buffer to size: buffer_size={}", *this,
+    ENVOY_CONN_LOG(debug, "Failed to modify socket receive buffer to size: buffer_size={}", *this,
                    buffer_size);
   }
   return result;
 }
 
 Api::SysCallIntResult DynamicSocketOptionsImpl::getSocketRecvBufferSize(int& recv_buf_size) const {
-  int rc = -1;
-  int errsrv = -1;
-  socklen_t option_len = sizeof recv_buf_size;
-
+  socklen_t option_len = sizeof(recv_buf_size);
   if (-1 == io_handle_.fd()) {
-    ENVOY_CONN_LOG(trace, "Stale socket file handle, operation Get Receive Buffer Size aborted",
+    ENVOY_CONN_LOG(debug, "Closed socket file handle, operation Get Receive Buffer Size aborted",
                    *this);
-    return {rc, errsrv};
+    return {-1, EBADF};
   }
-
   // Read the set receive buffer size as it is double the value configured through
   // 'setSocketRecvBufferSize' on some machines this value can not be lower than '2304' bytes
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_syscalls.getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &option_len);
   if (-1 == result.rc_) {
-    ENVOY_CONN_LOG(trace, "Failed to read socket receive buffer size", *this);
+    ENVOY_CONN_LOG(debug, "Failed to read socket receive buffer size", *this);
   }
   return result;
 }
 
 Api::SysCallIntResult DynamicSocketOptionsImpl::setSocketRecvLoWat(int low_watermark) const {
-  int rc = -1;
-  int errsrv = -1;
-  socklen_t option_len = sizeof(int);
+  socklen_t option_len = sizeof(low_watermark);
   if (-1 == io_handle_.fd()) {
-    ENVOY_CONN_LOG(trace,
-                   "Stale socket file handle, operation Set Receive Buffer Low Watermark aborted",
+    ENVOY_CONN_LOG(debug,
+                   "Closed socket file handle, operation Set Receive Buffer Low Watermark aborted",
                    *this);
-    return {rc, errsrv};
+    return {-1, EBADF};
   }
   // Modify the receive buffer low watermark to 'low_watermark' value
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_syscalls.setsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark, option_len);
   if (-1 == result.rc_) {
-    ENVOY_CONN_LOG(trace, "Failed to set socket receive buffer low watermark size: buffer_size={}",
+    ENVOY_CONN_LOG(debug, "Failed to set socket receive buffer low watermark size: buffer_size={}",
                    *this, low_watermark);
   }
   return result;
 }
 
 Api::SysCallIntResult DynamicSocketOptionsImpl::getSocketRecvLoWat(int& low_watermark_val) const {
-  int rc = -1;
-  int errsrv = -1;
-  socklen_t option_len = sizeof low_watermark_val;
-
+  socklen_t option_len = sizeof(low_watermark_val);
   if (-1 == io_handle_.fd()) {
-    ENVOY_CONN_LOG(trace,
-                   "Stale socket file handle, operation Get Receive Buffer Low Watermark aborted",
+    ENVOY_CONN_LOG(debug,
+                   "Closed socket file handle, operation Get Receive Buffer Low Watermark aborted",
                    *this);
-    return {rc, errsrv};
+    return {-1, EBADF};
   }
   // Read the receive buffer low watermark value into 'low_watermark_val' variable
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result = os_syscalls.getsockopt(io_handle_.fd(), SOL_SOCKET, SO_RCVLOWAT,
                                                         &low_watermark_val, &option_len);
   if (-1 == result.rc_) {
-    ENVOY_CONN_LOG(trace, "Failed to get socket receive buffer low watermark size: buffer_size={}",
+    ENVOY_CONN_LOG(debug, "Failed to get socket receive buffer low watermark size: buffer_size={}",
                    *this, low_watermark_val);
   }
   return result;

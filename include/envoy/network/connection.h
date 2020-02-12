@@ -78,23 +78,33 @@ public:
 
   /**
    * Set the receive buffer size for the socket to a value specified by the 'buffer_size'
+   * @param buffer_size the size of receive buffer intended to be modified to
+   * @return Api::SysCallIntResult an instance consisting of return code and error number
+   *         for executing the system call
    */
   virtual Api::SysCallIntResult setSocketRecvBufferSize(int buffer_size) const PURE;
 
   /**
    * Get the receive buffer size for the socket
    * @param recv_buf_size returns the size of the receive buffer configured
+   * @return Api::SysCallIntResult an instance consisting of return code and error number
+   *         for executing the system call
    */
   virtual Api::SysCallIntResult getSocketRecvBufferSize(int& recv_buf_size) const PURE;
 
   /**
    * Set the receive buffer low water-mark size to a value specified by 'low_watermark'
+   * @param low_watermark the size of receive low watermark to be configured
+   * @return Api::SysCallIntResult an instance consisting of return code and error number
+   *         for executing the system call
    */
   virtual Api::SysCallIntResult setSocketRecvLoWat(int low_watermark) const PURE;
 
   /**
    * Get the receive buffer low water-mark size to a value specified by 'low_watermark'
-   * @param low_watermark_val returns the receive buffer 'low_watermark' configured
+   * @param low_watermark_val returns the receive buffer low_watermark configured
+   * @return Api::SysCallIntResult an instance consisting of return code and error number
+   *         for executing the system call
    */
   virtual Api::SysCallIntResult getSocketRecvLoWat(int& low_watermark_val) const PURE;
 };
