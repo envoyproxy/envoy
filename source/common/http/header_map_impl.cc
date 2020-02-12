@@ -125,13 +125,8 @@ void HeaderString::setCopy(absl::string_view view) {
 }
 
 void HeaderString::setInteger(uint64_t value) {
-  /*
   // Initialize the size to the max length, copy the actual data, and then
   // reduce the size (but not the capacity) as needed
-  get_in_vec(buffer_).resize(MaxIntegerLength);
-  const uint32_t int_length = StringUtil::itoa(get_in_vec(buffer_).data(), MaxIntegerLength, value);
-  get_in_vec(buffer_).resize(int_length);
-  */
   char inner_buffer[MaxIntegerLength];
   const uint32_t int_length = StringUtil::itoa(inner_buffer, MaxIntegerLength, value);
 
