@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -16,6 +17,9 @@ struct Tag {
     return other.name_ == name_ && other.value_ == value_;
   };
 };
+
+using StatNameTag = std::pair<StatName, StatName>;
+using StatNameTagVector = std::vector<StatNameTag>;
 
 } // namespace Stats
 } // namespace Envoy

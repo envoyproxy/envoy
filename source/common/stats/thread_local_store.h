@@ -176,7 +176,7 @@ public:
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     return default_scope_->histogramFromStatName(name, unit);
   }
-  Histogram& histogramFromStatName(StatName name, const std::vector<Tag>& tags,
+  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
                                    Histogram::Unit unit) override {
     return default_scope_->histogramFromStatName(name, tags, unit);
   }
@@ -289,7 +289,7 @@ private:
     Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
       return histogramFromStatName(name, {}, unit);
     }
-    Histogram& histogramFromStatName(StatName name, const std::vector<Tag>& tags,
+    Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
                                      Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
@@ -328,8 +328,8 @@ private:
      * Combines the given name of a stat with its statically defined tags to create a unique identifier
      * for the name/tags.
      */
-    StatName finalStatName(StatName name,
-                                                        const std::vector<Tag>& tags);
+    SymbolTable::StoragePtr finalStatName(StatName name,
+                                                        const StatNameTagVector& tags);
     /**
      * Makes a stat either by looking it up in the central cache,
      * generating it from the parent allocator, or as a last

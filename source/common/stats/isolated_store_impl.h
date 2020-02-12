@@ -114,7 +114,7 @@ public:
     Histogram& histogram = histograms_.get(name, unit);
     return histogram;
   }
-  Histogram& histogramFromStatName(StatName name, const std::vector<Tag>&,
+  Histogram& histogramFromStatName(StatName name, const StatNameTagVector&,
                                    Histogram::Unit unit) override {
     Histogram& histogram = histograms_.get(name, unit);
     return histogram;

@@ -20,7 +20,7 @@ public:
   Counter& counterFromStatName(StatName name) override;
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
-  Histogram& histogramFromStatName(StatName name, const std::vector<Tag>&,
+  Histogram& histogramFromStatName(StatName name, const StatNameTagVector&,
                                    Histogram::Unit unit) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 

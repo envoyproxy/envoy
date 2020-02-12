@@ -93,7 +93,7 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(StatName name, const std::vector<Tag>& tags,
+  virtual Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
                                            Histogram::Unit unit) PURE;
 
   /**

@@ -303,7 +303,7 @@ public:
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     return histogram(symbol_table_->toString(name), unit);
   }
-  Histogram& histogramFromStatName(StatName name, const std::vector<Tag>&,
+  Histogram& histogramFromStatName(StatName name, const StatNameTagVector&,
                                    Histogram::Unit unit) override {
     // TODO(snowp): care about tags.
     return histogram(symbol_table_->toString(name), unit);

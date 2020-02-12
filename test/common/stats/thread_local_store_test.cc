@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
 
 #include "common/common/c_smart_ptr.h"
@@ -209,8 +208,7 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(0, found_gauge->get().value());
 
   Histogram& h1 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
-  Histogram& h12 = store_->histogram("h1", Stats::Histogram::Unit::Unspecified);
-  EXPECT_EQ(&h1, &h12);
+  EXPECT_EQ(&h1, &store_->histogram("h1", Stats::Histogram::Unit::Unspecified));
   StatNameManagedStorage h1_name("h1", *symbol_table_);
   auto found_histogram = store_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
@@ -331,10 +329,14 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_EQ(&h2, &found_histogram2->get());
 
   StatNameManagedStorage storage("h3", *symbol_table_);
-  Histogram& h3 = scope1->histogramFromStatName(StatName(storage.statName()), {Tag{"a", "b"}},
+  StatNameManagedStorage tag_key("a", *symbol_table_);
+  StatNameManagedStorage tag_value("b", *symbol_table_);
+  StatNameTagVector tags{{StatName(tag_key.statName()), StatName(tag_value.statName())}};
+  Histogram& h3 = scope1->histogramFromStatName(StatName(storage.statName()), tags,
                                                 Stats::Histogram::Unit::Unspecified);
   const std::vector<Tag> expectedTags = {Tag{"a", "b"}};
   EXPECT_EQ(expectedTags, h3.tags());
+  EXPECT_EQ(&h3, &scope1->histogramFromStatName(StatName(storage.statName()), tags, Stats::Histogram::Unit::Unspecified));
 
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);

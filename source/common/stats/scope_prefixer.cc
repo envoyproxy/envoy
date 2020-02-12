@@ -44,7 +44,7 @@ Histogram& ScopePrefixer::histogramFromStatName(StatName name, Histogram::Unit u
   return scope_.histogramFromStatName(StatName(stat_name_storage.get()), unit);
 }
 
-Histogram& ScopePrefixer::histogramFromStatName(StatName name, const std::vector<Tag>& tags,
+Histogram& ScopePrefixer::histogramFromStatName(StatName name, const StatNameTagVector& tags,
                                                 Histogram::Unit unit) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});

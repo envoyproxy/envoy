@@ -21,7 +21,6 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
-#include "include/envoy/stats/_virtual_includes/symbol_table_interface/envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -104,7 +103,6 @@ public:
         strings.push_back(toStringView(name));
       }
     }
-
     return encodeHelper(absl::StrJoin(strings, "."));
   }
 

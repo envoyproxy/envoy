@@ -10,7 +10,6 @@
 #include "common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
-#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
