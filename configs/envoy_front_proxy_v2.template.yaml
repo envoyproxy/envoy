@@ -157,7 +157,7 @@ cluster_manager:
 flags_path: /etc/envoy/flags
 tracing:
   http:
-    name: envoy.lightstep
+    name: envoy.tracers.lightstep
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
       collector_cluster: lightstep_saas
