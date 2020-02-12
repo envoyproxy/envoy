@@ -74,24 +74,6 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
  */
 #define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 
-#if defined(ENVOY_DEBUG_KNOWN_ISSUES)
-/**
- * Assert macro for an as-yet unidentified issue. Even with ASSERTS compiled in, it will be
- * excluded, unless ENVOY_DEBUG_KNOWN_ISSUES is defined. It represents a condition that
- * should always pass but that sometimes fails for an unknown reason. The macro allows it to
- * be temporarily compiled out while the failure is triaged and investigated.
- */
-#define KNOWN_ISSUE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort() DETAILS)
-#else
-// This non-implementation ensures that its argument is a valid expression that can be statically
-// casted to a bool, but the expression is never evaluated and will be compiled away.
-#define KNOWN_ISSUE_ASSERT(X, ...)                                                                 \
-  do {                                                                                             \
-    constexpr bool __assert_dummy_variable = false && static_cast<bool>(X);                        \
-    (void)__assert_dummy_variable;                                                                 \
-  } while (false)
-#endif // defined(ENVOY_DEBUG_KNOWN_ISSUES)
-
 #if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 #if !defined(NDEBUG) // If this is a debug build.
@@ -109,6 +91,28 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 // correctly when compiled with MSVC
 #define EXPAND(X) X
 
+// This non-implementation ensures that its argument is a valid expression that can be statically
+// casted to a bool, but the expression is never evaluated and will be compiled away.
+#define _NULL_ASSERT_IMPL(X, ...)                                                                  \
+  do {                                                                                             \
+    constexpr bool __assert_dummy_variable = false && static_cast<bool>(X);                        \
+    (void)__assert_dummy_variable;                                                                 \
+  } while (false)
+
+#if defined(ENVOY_DEBUG_KNOWN_ISSUES)
+/**
+ * Assert wrapper for an as-yet unidentified issue. Even with ASSERTS compiled in, it will be
+ * excluded, unless ENVOY_DEBUG_KNOWN_ISSUES is defined. It represents a condition that
+ * should always pass but that sometimes fails for an unknown reason. The macro allows it to
+ * be temporarily compiled out while the failure is triaged and investigated.
+ */
+#define KNOWN_ISSUE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort() DETAILS)
+#else
+// This non-implementation ensures that its argument is a valid expression that can be statically
+// casted to a bool, but the expression is never evaluated and will be compiled away.
+#define KNOWN_ISSUE_ASSERT(X, ...) EXPAND(_NULL_ASSERT_IMPL(X, __VA_ARGS__))
+#endif // defined(ENVOY_DEBUG_KNOWN_ISSUES)
+
 // If ASSERT is called with one argument, the ASSERT_SELECTOR will return
 // _ASSERT_ORIGINAL and this will call _ASSERT_ORIGINAL(__VA_ARGS__).
 // If ASSERT is called with two arguments, ASSERT_SELECTOR will return
@@ -116,13 +120,7 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 #define ASSERT(...)                                                                                \
   EXPAND(_ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__))
 #else
-// This non-implementation ensures that its argument is a valid expression that can be statically
-// casted to a bool, but the expression is never evaluated and will be compiled away.
-#define ASSERT(X, ...)                                                                             \
-  do {                                                                                             \
-    constexpr bool __assert_dummy_variable = false && static_cast<bool>(X);                        \
-    (void)__assert_dummy_variable;                                                                 \
-  } while (false)
+#define ASSERT(X, ...) EXPAND(_NULL_ASSERT_IMPL(X, __VA_ARGS__))
 #endif // !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 /**
