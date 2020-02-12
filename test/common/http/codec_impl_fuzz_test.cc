@@ -71,6 +71,7 @@ Http2Settings fromHttp2Settings(const test::common::http::Http2Settings& setting
       settings.initial_connection_window_size() %
           (1 + Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE -
            Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE);
+  h2_settings.allow_metadata_ = true;
   return h2_settings;
 }
 
@@ -115,7 +116,8 @@ public:
     }
   } request_, response_;
 
-  HttpStream(ClientConnection& client, const TestHeaderMapImpl& request_headers, bool end_stream) {
+  HttpStream(ClientConnection& client, const Http::MetadataMapVector& metadata,
+             const TestHeaderMapImpl& request_headers, bool end_stream) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
     ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
@@ -152,6 +154,7 @@ public:
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
+    request_.request_encoder_->encodeMetadata(metadata);
     request_.request_encoder_->encodeHeaders(request_headers, end_stream);
     request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_.stream_state_ = StreamState::PendingHeaders;
@@ -237,6 +240,18 @@ public:
         }
         state.stream_state_ = StreamState::Closed;
         state.closeLocal();
+      }
+      break;
+    }
+    case test::common::http::DirectionalAction::kMetadata: {
+      if (state.isLocalOpen() && state.stream_state_ != StreamState::Closed) {
+        if (response) {
+          state.response_encoder_->encodeMetadata(
+              Fuzz::fromMetadata(directional_action.metadata()));
+        } else {
+          state.request_encoder_->encodeMetadata(
+              Fuzz::fromMetadata(directional_action.metadata()));
+        }
       }
       break;
     }
@@ -471,7 +486,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
           }
         }
         HttpStreamPtr stream = std::make_unique<HttpStream>(
-            *client, fromSanitizedHeaders(action.new_stream().request_headers()),
+            *client, Fuzz::fromMetadata(action.new_stream().metadata()),
+            fromSanitizedHeaders(action.new_stream().request_headers()),
             action.new_stream().end_stream());
         stream->moveIntoListBack(std::move(stream), pending_streams);
         break;
