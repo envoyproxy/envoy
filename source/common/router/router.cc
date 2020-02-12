@@ -1493,14 +1493,14 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+void Filter::UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
   parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
-void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void Filter::UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
@@ -1525,7 +1525,7 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
-void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+void Filter::UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   maybeEndDecode(true);

@@ -372,7 +372,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& st
                                HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers)
     : connection_(connection), stats_{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http1."))},
       header_key_formatter_(std::move(header_key_formatter)), processing_trailers_(false),
-      handling_upgrade_(false), reset_stream_called_(false),
+      handling_upgrade_(false), reset_stream_called_(false), deferred_end_stream_headers_(false),
       strict_header_validation_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_header_validation")),
       connection_header_sanitization_(Runtime::runtimeFeatureEnabled(
@@ -392,12 +392,11 @@ void ConnectionImpl::completeLastHeader() {
 
   if (!current_header_field_.empty()) {
     toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
-    current_header_map_->addViaMove(std::move(current_header_field_),
-                                    std::move(current_header_value_));
+    headers().addViaMove(std::move(current_header_field_), std::move(current_header_value_));
   }
 
   // Check if the number of headers exceeds the limit.
-  if (current_header_map_->size() > max_headers_count_) {
+  if (headers().size() > max_headers_count_) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders);
     const absl::string_view header_type =
@@ -494,9 +493,10 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
-  if (!current_header_map_) {
-    current_header_map_ = std::make_unique<HeaderMapImpl>();
+  if (processing_trailers_) {
+    maybeAllocTrailers();
   }
+
   // Work around a bug in http_parser where trailing whitespace is not trimmed
   // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4
   const absl::string_view header_value = StringUtil::trim(absl::string_view(data, length));
@@ -520,7 +520,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   current_header_value_.append(header_value.data(), header_value.length());
 
   const uint32_t total =
-      current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
+      current_header_field_.size() + current_header_value_.size() + headers().byteSize();
   if (total > (max_headers_kb_ * 1024)) {
     const absl::string_view header_type =
         processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
@@ -541,33 +541,34 @@ int ConnectionImpl::onHeadersCompleteBase() {
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
   }
-  if (Utility::isUpgrade(*current_header_map_)) {
+  HeaderMap& current_headers = headers();
+  if (Utility::isUpgrade(current_headers)) {
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
-    if (current_header_map_->Upgrade() &&
-        absl::EqualsIgnoreCase(current_header_map_->Upgrade()->value().getStringView(),
+    if (current_headers.Upgrade() &&
+        absl::EqualsIgnoreCase(current_headers.Upgrade()->value().getStringView(),
                                Http::Headers::get().UpgradeValues.H2c)) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
-      current_header_map_->removeUpgrade();
-      if (current_header_map_->Connection()) {
+      current_headers.removeUpgrade();
+      if (current_headers.Connection()) {
         const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
         std::string new_value = StringUtil::removeTokens(
-            current_header_map_->Connection()->value().getStringView(), ",", tokens_to_remove, ",");
+            current_headers.Connection()->value().getStringView(), ",", tokens_to_remove, ",");
         if (new_value.empty()) {
-          current_header_map_->removeConnection();
+          current_headers.removeConnection();
         } else {
-          current_header_map_->setConnection(new_value);
+          current_headers.setConnection(new_value);
         }
       }
-      current_header_map_->remove(Headers::get().Http2Settings);
+      current_headers.remove(Headers::get().Http2Settings);
     } else {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
     }
-  } else if (connection_header_sanitization_ && current_header_map_->Connection()) {
+  } else if (connection_header_sanitization_ && current_headers.Connection()) {
     // If we fail to sanitize the request, return a 400 to the client
-    if (!Utility::sanitizeConnectionHeader(*current_header_map_)) {
-      absl::string_view header_value = current_header_map_->Connection()->value().getStringView();
+    if (!Utility::sanitizeConnectionHeader(current_headers)) {
+      absl::string_view header_value = current_headers.Connection()->value().getStringView();
       ENVOY_CONN_LOG(debug, "Invalid nominated headers in Connection: {}", connection_,
                      header_value);
       error_code_ = Http::Code::BadRequest;
@@ -578,8 +579,8 @@ int ConnectionImpl::onHeadersCompleteBase() {
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
-  if (current_header_map_->TransferEncoding()) {
-    absl::string_view encoding = current_header_map_->TransferEncoding()->value().getStringView();
+  if (current_headers.TransferEncoding()) {
+    absl::string_view encoding = current_headers.TransferEncoding()->value().getStringView();
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
         encoding != Headers::get().TransferEncodingValues.Identity &&
@@ -590,9 +591,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
     }
   }
 
-  int rc = onHeadersComplete(std::move(current_header_map_));
-  current_header_map_.reset();
-
+  int rc = onHeadersComplete();
   header_parsing_state_ = HeaderParsingState::Done;
 
   // Returning 2 informs http_parser to not expect a body or further data on this connection.
@@ -617,7 +616,7 @@ void ConnectionImpl::onMessageCompleteBase() {
     completeLastHeader();
   }
 
-  onMessageComplete(std::move(current_header_map_));
+  onMessageComplete();
 }
 
 void ConnectionImpl::onMessageBeginBase() {
@@ -626,9 +625,9 @@ void ConnectionImpl::onMessageBeginBase() {
   // protocol for each request. Envoy defaults to 1.1 but sets the protocol to 1.0 where applicable
   // in onHeadersCompleteBase
   protocol_ = Protocol::Http11;
-  ASSERT(!current_header_map_);
-  current_header_map_ = std::make_unique<HeaderMapImpl>();
+  processing_trailers_ = false;
   header_parsing_state_ = HeaderParsingState::Field;
+  allocHeaders();
   onMessageBegin();
 }
 
@@ -700,13 +699,13 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   active_request_->request_url_.clear();
 }
 
-int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
-  ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
-
+int ServerConnectionImpl::onHeadersComplete() {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
+    auto& headers = absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_);
+    ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
 
     // Inform the response encoder about any HEAD method, so it can set content
@@ -743,9 +742,8 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
       if (connection_.state() != Network::Connection::State::Open) {
         http_parser_pause(&parser_, 1);
       }
-
     } else {
-      deferred_end_stream_headers_ = std::move(headers);
+      deferred_end_stream_headers_ = true;
     }
   }
 
@@ -775,19 +773,23 @@ void ServerConnectionImpl::onBody(const char* data, size_t length) {
   }
 }
 
-void ServerConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
+void ServerConnectionImpl::onMessageComplete() {
   if (active_request_) {
     active_request_->remote_complete_ = true;
     if (deferred_end_stream_headers_) {
-      active_request_->request_decoder_->decodeHeaders(std::move(deferred_end_stream_headers_),
-                                                       true);
-      deferred_end_stream_headers_.reset();
+      active_request_->request_decoder_->decodeHeaders(
+          std::move(absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_)), true);
+      deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
-      active_request_->request_decoder_->decodeTrailers(std::move(trailers));
+      active_request_->request_decoder_->decodeTrailers(
+          std::move(absl::get<RequestTrailerMapImplPtr>(headers_or_trailers_)));
     } else {
       Buffer::OwnedImpl buffer;
       active_request_->request_decoder_->decodeData(buffer, true);
     }
+
+    // Reset for assertion purposes.
+    headers_or_trailers_.emplace<RequestHeaderMapImplPtr>(nullptr);
   }
 
   // Always pause the parser so that the calling code can process 1 request at a time and apply
@@ -866,23 +868,24 @@ void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
   }
 }
 
-int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
-  ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
-  headers->setStatus(parser_.status_code);
-
+int ClientConnectionImpl::onHeadersComplete() {
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
   if (pending_responses_.empty() && !resetStreamCalled()) {
-    throw PrematureResponseException(std::move(headers));
+    throw PrematureResponseException(static_cast<Http::Code>(parser_.status_code));
   } else if (!pending_responses_.empty()) {
+    auto& headers = absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_);
+    ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
+    headers->setStatus(parser_.status_code);
+
     if (parser_.status_code == 100) {
       // http-parser treats 100 continue headers as their own complete response.
       // Swallow the spurious onMessageComplete and continue processing.
       ignore_message_complete_for_100_continue_ = true;
       pending_responses_.front().decoder_->decode100ContinueHeaders(std::move(headers));
     } else if (cannotHaveBody()) {
-      deferred_end_stream_headers_ = std::move(headers);
+      deferred_end_stream_headers_ = true;
     } else {
       pending_responses_.front().decoder_->decodeHeaders(std::move(headers), false);
     }
@@ -902,7 +905,7 @@ void ClientConnectionImpl::onBody(const char* data, size_t length) {
   }
 }
 
-void ClientConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
+void ClientConnectionImpl::onMessageComplete() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (ignore_message_complete_for_100_continue_) {
     ignore_message_complete_for_100_continue_ = false;
@@ -910,7 +913,7 @@ void ClientConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
   }
   if (!pending_responses_.empty()) {
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
-    PendingResponse response = pending_responses_.front();
+    PendingResponse response = std::move(pending_responses_.front());
     pending_responses_.pop_front();
 
     // Streams are responsible for unwinding any outstanding readDisable(true)
@@ -926,14 +929,19 @@ void ClientConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
     }
 
     if (deferred_end_stream_headers_) {
-      response.decoder_->decodeHeaders(std::move(deferred_end_stream_headers_), true);
-      deferred_end_stream_headers_.reset();
+      response.decoder_->decodeHeaders(
+          std::move(absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_)), true);
+      deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
-      response.decoder_->decodeTrailers(std::move(trailers));
+      response.decoder_->decodeTrailers(
+          std::move(absl::get<ResponseTrailerMapImplPtr>(headers_or_trailers_)));
     } else {
       Buffer::OwnedImpl buffer;
       response.decoder_->decodeData(buffer, true);
     }
+
+    // Reset for assertion purposes.
+    headers_or_trailers_.emplace<ResponseHeaderMapImplPtr>(nullptr);
   }
 }
 

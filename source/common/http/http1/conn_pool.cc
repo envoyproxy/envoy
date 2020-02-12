@@ -81,7 +81,7 @@ ConnPoolImpl::StreamWrapper::~StreamWrapper() {
 
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
 
-void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void ConnPoolImpl::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
   // If Connection: close OR
   //    Http/1.0 and not Connection: keep-alive OR
   //    Proxy-Connection: close

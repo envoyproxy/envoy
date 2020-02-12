@@ -161,6 +161,8 @@ protected:
     void submitTrailers(const HeaderMap& trailers);
     void submitMetadata();
     virtual StreamDecoder& decoder() PURE;
+    virtual HeaderMapImpl& headers() PURE;
+    virtual void allocTrailers() PURE;
 
     // Http::StreamEncoder
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -208,7 +210,6 @@ protected:
     bool buffers_overrun() const { return read_disable_count_ > 0; }
 
     ConnectionImpl& parent_;
-    HeaderMapImplPtr headers_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
@@ -218,7 +219,7 @@ protected:
     Buffer::WatermarkBuffer pending_send_data_{
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); }};
-    HeaderMapPtr pending_trailers_;
+    HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;
     absl::optional<StreamResetReason> deferred_reset_;
@@ -240,7 +241,8 @@ protected:
   struct ClientStreamImpl : public StreamImpl, public RequestEncoder {
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
                      ResponseDecoder& response_decoder)
-        : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder) {}
+        : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
+          headers_or_trailers_(std::make_unique<ResponseHeaderMapImpl>()) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -252,6 +254,24 @@ protected:
     StreamDecoder& decoder() override { return response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
+    HeaderMapImpl& headers() override {
+      if (absl::holds_alternative<ResponseHeaderMapImplPtr>(headers_or_trailers_)) {
+        return *absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_);
+      } else {
+        return *absl::get<ResponseTrailerMapImplPtr>(headers_or_trailers_);
+      }
+    }
+    void allocTrailers() override {
+      // If we are waiting for informational headers, make a new response header map, otherwise
+      // we are about to receive trailers. The codec makes sure this is the only valid sequence.
+      if (waiting_for_non_informational_headers_) {
+        headers_or_trailers_.emplace<ResponseHeaderMapImplPtr>(
+            std::make_unique<ResponseHeaderMapImpl>());
+      } else {
+        headers_or_trailers_.emplace<ResponseTrailerMapImplPtr>(
+            std::make_unique<ResponseTrailerMapImpl>());
+      }
+    }
 
     // RequestEncoder
     void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
@@ -260,6 +280,7 @@ protected:
     void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
 
     ResponseDecoder& response_decoder_;
+    absl::variant<ResponseHeaderMapImplPtr, ResponseTrailerMapImplPtr> headers_or_trailers_;
     std::string upgrade_type_;
   };
 
@@ -269,7 +290,9 @@ protected:
    * Server side stream (response).
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
-    using StreamImpl::StreamImpl;
+    ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
+        : StreamImpl(parent, buffer_limit),
+          headers_or_trailers_(std::make_unique<RequestHeaderMapImpl>()) {}
 
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
@@ -280,6 +303,17 @@ protected:
     StreamDecoder& decoder() override { return *request_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
+    HeaderMapImpl& headers() override {
+      if (absl::holds_alternative<RequestHeaderMapImplPtr>(headers_or_trailers_)) {
+        return *absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_);
+      } else {
+        return *absl::get<RequestTrailerMapImplPtr>(headers_or_trailers_);
+      }
+    }
+    void allocTrailers() override {
+      headers_or_trailers_.emplace<RequestTrailerMapImplPtr>(
+          std::make_unique<RequestTrailerMapImpl>());
+    }
 
     // ResponseEncoder
     void encode100ContinueHeaders(const HeaderMap& headers) override;
@@ -291,6 +325,7 @@ protected:
     void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
 
     RequestDecoder* request_decoder_{};
+    absl::variant<RequestHeaderMapImplPtr, RequestTrailerMapImplPtr> headers_or_trailers_;
   };
 
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;

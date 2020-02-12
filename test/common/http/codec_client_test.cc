@@ -101,7 +101,7 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
   Http::MockResponseDecoder outer_decoder;
   client_->newStream(outer_decoder);
 
-  Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 }
@@ -118,7 +118,7 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
   Http::MockResponseDecoder outer_decoder;
   client_->newStream(outer_decoder);
 
-  Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
 
@@ -164,7 +164,7 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
   request_encoder.getStream().addCallbacks(callbacks);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
 
-  Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
 
@@ -240,8 +240,7 @@ TEST_F(CodecClientTest, ProtocolError) {
 
 TEST_F(CodecClientTest, 408Response) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> void {
-    Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "408"}}};
-    throw PrematureResponseException(std::move(response_headers));
+    throw PrematureResponseException(Code::RequestTimeout);
   }));
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -254,8 +253,7 @@ TEST_F(CodecClientTest, 408Response) {
 
 TEST_F(CodecClientTest, PrematureResponse) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([](Buffer::Instance&) -> void {
-    Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
-    throw PrematureResponseException(std::move(response_headers));
+    throw PrematureResponseException(Code::OK);
   }));
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
