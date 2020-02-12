@@ -1,6 +1,9 @@
 Version history
 ---------------
 
+1.13.1 (Pending)
+================
+
 1.13.0 (January 20, 2020)
 =========================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
