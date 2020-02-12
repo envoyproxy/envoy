@@ -94,6 +94,14 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
 }
 
+// Test that the deprecated extension name still functions.
+TEST(DogStatsdConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.dog_statsd";
+
+  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
+                         deprecated_name));
+}
+
 } // namespace
 } // namespace DogStatsd
 } // namespace StatSinks

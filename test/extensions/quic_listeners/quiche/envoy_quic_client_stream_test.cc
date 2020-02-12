@@ -114,7 +114,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   quic_stream_->encodeData(request_body_, true);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([](const Http::HeaderMapPtr& headers, bool) {
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
         EXPECT_EQ("200", headers->Status()->value().getStringView());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/false, response_headers_.uncompressed_header_bytes(),
@@ -145,7 +145,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   quic_stream_->OnStreamFrame(frame);
 
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
-      .WillOnce(Invoke([](const Http::HeaderMapPtr& headers) {
+      .WillOnce(Invoke([](const Http::ResponseTrailerMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
         EXPECT_EQ("value1", headers->get(key1)->value().getStringView());
@@ -161,7 +161,7 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
   }
   quic_stream_->encodeHeaders(request_headers_, true);
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([](const Http::HeaderMapPtr& headers, bool) {
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
         EXPECT_EQ("200", headers->Status()->value().getStringView());
       }));
   quic_stream_->OnStreamHeaderList(/*fin=*/false, response_headers_.uncompressed_header_bytes(),
@@ -194,7 +194,7 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
       }));
 
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
-      .WillOnce(Invoke([](const Http::HeaderMapPtr& headers) {
+      .WillOnce(Invoke([](const Http::ResponseTrailerMapPtr& headers) {
         Http::LowerCaseString key1("key1");
         Http::LowerCaseString key2(":final-offset");
         EXPECT_EQ("value1", headers->get(key1)->value().getStringView());

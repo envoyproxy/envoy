@@ -30,9 +30,9 @@ message Tracing {
     // The name of the HTTP trace driver to instantiate. The name must match a
     // supported HTTP trace driver. Built-in trace drivers:
     //
-    // - *envoy.lightstep*
-    // - *envoy.zipkin*
-    // - *envoy.dynamic.ot*
+    // - *envoy.tracers.lightstep*
+    // - *envoy.tracers.zipkin*
+    // - *envoy.tracers.dynamic_ot*
     // - *envoy.tracers.datadog*
     // - *envoy.tracers.opencensus*
     // - *envoy.tracers.xray*

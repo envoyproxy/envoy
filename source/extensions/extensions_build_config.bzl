@@ -160,6 +160,12 @@ EXTENSIONS = {
     #
 
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
+
+    #
+    # CacheFilter plugins
+    #
+
+    "envoy.filters.http.cache.simple_http_cache":       "//source/extensions/filters/http/cache/simple_http_cache:simple_http_cache_lib",
 }
 
 WINDOWS_EXTENSIONS = {
