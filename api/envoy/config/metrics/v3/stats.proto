@@ -31,9 +31,9 @@ message StatsSink {
   // The name of the stats sink to instantiate. The name must match a supported
   // stats sink. The built-in stats sinks are:
   //
-  // * :ref:`envoy.statsd <envoy_api_msg_config.metrics.v3.StatsdSink>`
-  // * :ref:`envoy.dog_statsd <envoy_api_msg_config.metrics.v3.DogStatsdSink>`
-  // * :ref:`envoy.metrics_service <envoy_api_msg_config.metrics.v3.MetricsServiceConfig>`
+  // * :ref:`envoy.stat_sinks.statsd <envoy_api_msg_config.metrics.v3.StatsdSink>`
+  // * :ref:`envoy.stat_sinks.dog_statsd <envoy_api_msg_config.metrics.v3.DogStatsdSink>`
+  // * :ref:`envoy.stat_sinks.metrics_service <envoy_api_msg_config.metrics.v3.MetricsServiceConfig>`
   // * :ref:`envoy.stat_sinks.hystrix <envoy_api_msg_config.metrics.v3.HystrixSink>`
   //
   // Sinks optionally support tagged/multiple dimensional metrics.
@@ -258,7 +258,7 @@ message TagSpecifier {
   }
 }
 
-// Stats configuration proto schema for built-in *envoy.statsd* sink. This sink does not support
+// Stats configuration proto schema for built-in *envoy.stat_sinks.statsd* sink. This sink does not support
 // tagged metrics.
 // [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
@@ -307,7 +307,7 @@ message StatsdSink {
   string prefix = 3;
 }
 
-// Stats configuration proto schema for built-in *envoy.dog_statsd* sink.
+// Stats configuration proto schema for built-in *envoy.stat_sinks.dog_statsd* sink.
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_api_msg_config.metrics.v3.StatsConfig>`.

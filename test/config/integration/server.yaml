@@ -155,14 +155,14 @@ dynamic_resources: {}
 cluster_manager: {}
 flags_path: "/invalid_flags"
 stats_sinks:
-- name: envoy.statsd
+- name: envoy.stat_sinks.statsd
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     address:
       socket_address:
         address: {{ ip_loopback_address }}
         port_value: 8125
-- name: envoy.statsd
+- name: envoy.stat_sinks.statsd
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd

@@ -8,16 +8,16 @@
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/utility.h"
 
 #include "server/options_impl.h"
 
-#include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
+#include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #if defined(__linux__)
@@ -553,17 +553,17 @@ TEST(DisableExtensions, IsDisabled) {
 }
 
 TEST(FactoryByTypeTest, EarlierVersionConfigType) {
-  envoy::config::filter::http::ip_tagging::v2::IPTagging v2_config;
+  envoy::config::filter::http::buffer::v2::Buffer v2_config;
   auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v2_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().IpTagging);
+  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
 
-  envoy::extensions::filters::http::ip_tagging::v3::IPTagging v3_config;
+  envoy::extensions::filters::http::buffer::v3::Buffer v3_config;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v3_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().IpTagging);
+  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
 
   ProtobufWkt::Any non_api_type;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
