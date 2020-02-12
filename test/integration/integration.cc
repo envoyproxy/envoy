@@ -94,14 +94,15 @@ void IntegrationStreamDecoder::waitForReset() {
   }
 }
 
-void IntegrationStreamDecoder::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+void IntegrationStreamDecoder::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
   continue_headers_ = std::move(headers);
   if (waiting_for_continue_headers_) {
     dispatcher_.exit();
   }
 }
 
-void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void IntegrationStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                             bool end_stream) {
   saw_end_stream_ = end_stream;
   headers_ = std::move(headers);
   if ((end_stream && waiting_for_end_stream_) || waiting_for_headers_) {
@@ -123,7 +124,7 @@ void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_strea
   }
 }
 
-void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+void IntegrationStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   saw_end_stream_ = true;
   trailers_ = std::move(trailers);
   if (waiting_for_end_stream_) {
