@@ -86,8 +86,8 @@ public:
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
-  MOCK_METHOD(const std::shared_ptr<envoy::config::core::v3::Metadata>, metadata, (), (const));
-  MOCK_METHOD(void, metadata, (const envoy::config::core::v3::Metadata&));
+  MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
+  MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
@@ -157,8 +157,8 @@ public:
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
-  MOCK_METHOD(const std::shared_ptr<envoy::config::core::v3::Metadata>, metadata, (), (const));
-  MOCK_METHOD(void, metadata, (const envoy::config::core::v3::Metadata&));
+  MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
+  MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
   MOCK_METHOD((std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>),
               counters, (), (const));

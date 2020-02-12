@@ -235,8 +235,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   for (const auto& host : cluster.load_assignment().endpoints(0).lb_endpoints()) {
     initial_hosts_->emplace_back(
         new HostImpl(info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()),
-                     envoy::config::core::v3::Metadata::default_instance(), 1,
-                     envoy::config::core::v3::Locality().default_instance(),
+                     nullptr, 1, envoy::config::core::v3::Locality().default_instance(),
                      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
                      0, envoy::config::core::v3::UNKNOWN));
   }

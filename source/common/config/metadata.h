@@ -36,7 +36,7 @@ public:
    * @param key for filter metadata.
    * @return const ProtobufWkt::Value& value if found, empty if not found.
    */
-  static const ProtobufWkt::Value& metadataValue(const envoy::config::core::v3::Metadata& metadata,
+  static const ProtobufWkt::Value& metadataValue(const envoy::config::core::v3::Metadata* metadata,
                                                  const std::string& filter, const std::string& key);
   /**
    * Lookup value by a multi-key path for a given filter in Metadata. If path is empty
@@ -46,7 +46,7 @@ public:
    * @param path multi-key path.
    * @return const ProtobufWkt::Value& value if found, empty if not found.
    */
-  static const ProtobufWkt::Value& metadataValue(const envoy::config::core::v3::Metadata& metadata,
+  static const ProtobufWkt::Value& metadataValue(const envoy::config::core::v3::Metadata* metadata,
                                                  const std::string& filter,
                                                  const std::vector<std::string>& path);
   /**
@@ -55,7 +55,7 @@ public:
    * @param metadata_key with key name and path to retrieve the value.
    * @return const ProtobufWkt::Value& value if found, empty if not found.
    */
-  static const ProtobufWkt::Value& metadataValue(const envoy::config::core::v3::Metadata& metadata,
+  static const ProtobufWkt::Value& metadataValue(const envoy::config::core::v3::Metadata* metadata,
                                                  const MetadataKey& metadata_key);
 
   /**
@@ -80,7 +80,7 @@ public:
    * the element equals to the input label_set, it's considered as match.
    */
   static bool metadataLabelMatch(const LabelSet& label_set,
-                                 const envoy::config::core::v3::Metadata& host_metadata,
+                                 const envoy::config::core::v3::Metadata* host_metadata,
                                  const std::string& filter_key, bool list_as_any);
 };
 

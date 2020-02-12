@@ -102,7 +102,8 @@ public:
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
-  envoy::config::core::v3::Metadata buildMetadata(const std::string& version) const {
+  std::shared_ptr<const envoy::config::core::v3::Metadata>
+  buildMetadata(const std::string& version) const {
     envoy::config::core::v3::Metadata metadata;
 
     if (!version.empty()) {
@@ -111,7 +112,7 @@ public:
           .set_string_value(version);
     }
 
-    return metadata;
+    return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
   }
 
   Event::SimulatedTimeSystem time_system_;
