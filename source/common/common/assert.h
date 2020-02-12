@@ -106,7 +106,7 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
  * should always pass but that sometimes fails for an unknown reason. The macro allows it to
  * be temporarily compiled out while the failure is triaged and investigated.
  */
-#define KNOWN_ISSUE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort() DETAILS)
+#define KNOWN_ISSUE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 #else
 // This non-implementation ensures that its argument is a valid expression that can be statically
 // casted to a bool, but the expression is never evaluated and will be compiled away.
