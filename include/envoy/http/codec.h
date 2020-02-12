@@ -27,25 +27,14 @@ const char MaxResponseHeadersCountOverrideKey[] =
 class Stream;
 
 /**
- * Encodes an HTTP stream.
+ * Encodes an HTTP stream. This interface contains methods common to both the request and response
+ * path.
+ * TODO(mattklein123): Consider removing the StreamEncoder interface entirely and just duplicating
+ * the methods in both the request/response path for simplicity.
  */
 class StreamEncoder {
 public:
   virtual ~StreamEncoder() = default;
-
-  /**
-   * Encode 100-Continue headers.
-   * @param headers supplies the 100-Continue header map to encode.
-   */
-  virtual void encode100ContinueHeaders(const HeaderMap& headers) PURE;
-
-  /**
-   * Encode headers, optionally indicating end of stream. Response headers must
-   * have a valid :status set.
-   * @param headers supplies the header map to encode.
-   * @param end_stream supplies whether this is a header only request/response.
-   */
-  virtual void encodeHeaders(const HeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Encode a data frame.
@@ -53,12 +42,6 @@ public:
    * @param end_stream supplies whether this is the last data frame.
    */
   virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
-
-  /**
-   * Encode trailers. This implicitly ends the stream.
-   * @param trailers supplies the trailers to encode.
-   */
-  virtual void encodeTrailers(const HeaderMap& trailers) PURE;
 
   /**
    * @return Stream& the backing stream.
@@ -73,24 +56,66 @@ public:
 };
 
 /**
- * Decodes an HTTP stream. These are callbacks fired into a sink.
+ * Stream encoder used for sending a request (client to server). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ * TODO(mattklein123): In a future change the header types will be changed to differentiate from
+ * the response path.
+ */
+class RequestEncoder : public virtual StreamEncoder {
+public:
+  /**
+   * Encode headers, optionally indicating end of stream. Response headers must
+   * have a valid :status set.
+   * @param headers supplies the header map to encode.
+   * @param end_stream supplies whether this is a header only request.
+   */
+  virtual void encodeHeaders(const HeaderMap& headers, bool end_stream) PURE;
+
+  /**
+   * Encode trailers. This implicitly ends the stream.
+   * @param trailers supplies the trailers to encode.
+   */
+  virtual void encodeTrailers(const HeaderMap& trailers) PURE;
+};
+
+/**
+ * Stream encoder used for sending a response (server to client). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ * TODO(mattklein123): In a future change the header types will be changed to differentiate from
+ * the request path.
+ */
+class ResponseEncoder : public virtual StreamEncoder {
+public:
+  /**
+   * Encode 100-Continue headers.
+   * @param headers supplies the 100-Continue header map to encode.
+   */
+  virtual void encode100ContinueHeaders(const HeaderMap& headers) PURE;
+
+  /**
+   * Encode headers, optionally indicating end of stream. Response headers must
+   * have a valid :status set.
+   * @param headers supplies the header map to encode.
+   * @param end_stream supplies whether this is a header only response.
+   */
+  virtual void encodeHeaders(const HeaderMap& headers, bool end_stream) PURE;
+
+  /**
+   * Encode trailers. This implicitly ends the stream.
+   * @param trailers supplies the trailers to encode.
+   */
+  virtual void encodeTrailers(const HeaderMap& trailers) PURE;
+};
+
+/**
+ * Decodes an HTTP stream. These are callbacks fired into a sink. This interface contains methods
+ * common to both the request and response path.
+ * TODO(mattklein123): Consider removing the StreamDecoder interface entirely and just duplicating
+ * the methods in both the request/response path for simplicity.
  */
 class StreamDecoder {
 public:
   virtual ~StreamDecoder() = default;
-
-  /**
-   * Called with decoded 100-Continue headers.
-   * @param headers supplies the decoded 100-Continue headers map that is moved into the callee.
-   */
-  virtual void decode100ContinueHeaders(HeaderMapPtr&& headers) PURE;
-
-  /**
-   * Called with decoded headers, optionally indicating end of stream.
-   * @param headers supplies the decoded headers map that is moved into the callee.
-   * @param end_stream supplies whether this is a header only request/response.
-   */
-  virtual void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with a decoded data frame.
@@ -100,16 +125,56 @@ public:
   virtual void decodeData(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
-   * Called with a decoded trailers frame. This implicitly ends the stream.
-   * @param trailers supplies the decoded trailers.
-   */
-  virtual void decodeTrailers(HeaderMapPtr&& trailers) PURE;
-
-  /**
    * Called with decoded METADATA.
    * @param decoded METADATA.
    */
   virtual void decodeMetadata(MetadataMapPtr&& metadata_map) PURE;
+};
+
+/**
+ * Stream decoder used for receiving a request (client to server). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ */
+class RequestDecoder : public virtual StreamDecoder {
+public:
+  /**
+   * Called with decoded headers, optionally indicating end of stream.
+   * @param headers supplies the decoded headers map.
+   * @param end_stream supplies whether this is a header only request.
+   */
+  virtual void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) PURE;
+
+  /**
+   * Called with a decoded trailers frame. This implicitly ends the stream.
+   * @param trailers supplies the decoded trailers.
+   */
+  virtual void decodeTrailers(RequestTrailerMapPtr&& trailers) PURE;
+};
+
+/**
+ * Stream decoder used for receiving a response (server to client). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ */
+class ResponseDecoder : public virtual StreamDecoder {
+public:
+  /**
+   * Called with decoded 100-Continue headers.
+   * @param headers supplies the decoded 100-Continue headers map.
+   */
+  virtual void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
+
+  /**
+   * Called with decoded headers, optionally indicating end of stream.
+   * @param headers supplies the decoded headers map.
+   * @param end_stream supplies whether this is a header only response.
+   */
+  virtual void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
+
+  /**
+   * Called with a decoded trailers frame. This implicitly ends the stream.
+   * @param trailers supplies the decoded trailers.
+   */
+  virtual void decodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
 };
 
 /**
@@ -198,14 +263,14 @@ public:
    */
   virtual void readDisable(bool disable) PURE;
 
-  /*
+  /**
    * Return the number of bytes this stream is allowed to buffer, or 0 if there is no limit
    * configured.
    * @return uint32_t the stream's configured buffer limits.
    */
   virtual uint32_t bufferLimit() PURE;
 
-  /*
+  /**
    * @return string_view optionally return the reason behind codec level errors.
    *
    * This information is communicated via direct accessor rather than passed with the
@@ -214,7 +279,7 @@ public:
    */
   virtual absl::string_view responseDetails() { return ""; }
 
-  /*
+  /**
    * @return const Address::InstanceConstSharedPtr& the local address of the connection associated
    * with the stream.
    */
@@ -421,17 +486,17 @@ public:
    *                         response are backed by the same Stream object.
    * @param is_internally_created indicates if this stream was originated by a
    *   client, or was created by Envoy, by example as part of an internal redirect.
-   * @return StreamDecoder& supplies the decoder callbacks to fire into for stream decoding events.
+   * @return RequestDecoder& supplies the decoder callbacks to fire into for stream decoding
+   *   events.
    */
-  virtual StreamDecoder& newStream(StreamEncoder& response_encoder,
-                                   bool is_internally_created = false) PURE;
+  virtual RequestDecoder& newStream(ResponseEncoder& response_encoder,
+                                    bool is_internally_created = false) PURE;
 };
 
 /**
  * A server side HTTP connection.
  */
 class ServerConnection : public virtual Connection {};
-
 using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
@@ -442,9 +507,9 @@ public:
   /**
    * Create a new outgoing request stream.
    * @param response_decoder supplies the decoder callbacks to fire response events into.
-   * @return StreamEncoder& supplies the encoder to write the request into.
+   * @return RequestEncoder& supplies the encoder to write the request into.
    */
-  virtual StreamEncoder& newStream(StreamDecoder& response_decoder) PURE;
+  virtual RequestEncoder& newStream(ResponseDecoder& response_decoder) PURE;
 };
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;

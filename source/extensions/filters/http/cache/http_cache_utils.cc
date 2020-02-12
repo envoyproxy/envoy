@@ -45,7 +45,7 @@ bool Utils::tchar(char c) {
 //
 // token           = 1*tchar
 bool Utils::eatToken(absl::string_view& s) {
-  const absl::string_view::iterator token_end = c_find_if_not(s, &tchar);
+  const absl::string_view::iterator token_end = absl::c_find_if_not(s, &tchar);
   if (token_end == s.begin()) {
     return false;
   }
@@ -84,7 +84,7 @@ void Utils::eatDirectiveArgument(absl::string_view& s) {
 // SystemTime::duration::zero(). If parsing overflows, returns
 // SystemTime::duration::max().
 SystemTime::duration Utils::eatLeadingDuration(absl::string_view& s) {
-  const absl::string_view::iterator digits_end = c_find_if_not(s, &absl::ascii_isdigit);
+  const absl::string_view::iterator digits_end = absl::c_find_if_not(s, &absl::ascii_isdigit);
   const size_t digits_length = digits_end - s.begin();
   if (digits_length == 0) {
     return SystemTime::duration::zero();
@@ -118,26 +118,26 @@ SystemTime::duration Utils::effectiveMaxAge(absl::string_view cache_control) {
   while (!cache_control.empty()) {
     // Each time through the loop, we eat one cache-directive. Each branch
     // either returns or completely eats a cache-directive.
-    if (ConsumePrefix(&cache_control, "no-cache")) {
+    if (absl::ConsumePrefix(&cache_control, "no-cache")) {
       if (eatToken(cache_control)) {
         // The token wasn't no-cache; it just started that way, so we must
         // finish eating this cache-directive.
-        if (ConsumePrefix(&cache_control, "=")) {
+        if (absl::ConsumePrefix(&cache_control, "=")) {
           eatDirectiveArgument(cache_control);
         }
       } else {
         // Found a no-cache directive, so validation is required.
         return SystemTime::duration::zero();
       }
-    } else if (ConsumePrefix(&cache_control, "s-maxage=")) {
+    } else if (absl::ConsumePrefix(&cache_control, "s-maxage=")) {
       max_age = eatLeadingDuration(cache_control);
       found_s_maxage = true;
-      cache_control = StripLeadingAsciiWhitespace(cache_control);
+      cache_control = absl::StripLeadingAsciiWhitespace(cache_control);
       if (!cache_control.empty() && cache_control[0] != ',') {
         // Unexpected text at end of directive
         return SystemTime::duration::zero();
       }
-    } else if (!found_s_maxage && ConsumePrefix(&cache_control, "max-age=")) {
+    } else if (!found_s_maxage && absl::ConsumePrefix(&cache_control, "max-age=")) {
       max_age = eatLeadingDuration(cache_control);
       if (!cache_control.empty() && cache_control[0] != ',') {
         // Unexpected text at end of directive
@@ -145,7 +145,7 @@ SystemTime::duration Utils::effectiveMaxAge(absl::string_view cache_control) {
       }
     } else if (eatToken(cache_control)) {
       // Unknown directive--ignore.
-      if (ConsumePrefix(&cache_control, "=")) {
+      if (absl::ConsumePrefix(&cache_control, "=")) {
         eatDirectiveArgument(cache_control);
       }
     } else {
@@ -154,8 +154,8 @@ SystemTime::duration Utils::effectiveMaxAge(absl::string_view cache_control) {
     }
     // Whichever branch we took should have consumed the entire cache-directive,
     // so we just need to eat the delimiter and optional whitespace.
-    ConsumePrefix(&cache_control, ",");
-    cache_control = StripLeadingAsciiWhitespace(cache_control);
+    absl::ConsumePrefix(&cache_control, ",");
+    cache_control = absl::StripLeadingAsciiWhitespace(cache_control);
   }
   return max_age;
 }

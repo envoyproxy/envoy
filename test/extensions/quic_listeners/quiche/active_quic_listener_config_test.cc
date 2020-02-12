@@ -32,7 +32,7 @@ TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   )EOF";
   TestUtility::loadFromYaml(yaml, *config);
   Network::ActiveUdpListenerFactoryPtr listener_factory =
-      config_factory.createActiveUdpListenerFactory(*config);
+      config_factory.createActiveUdpListenerFactory(*config, /*concurrency=*/1);
   EXPECT_NE(nullptr, listener_factory);
   quic::QuicConfig& quic_config = ActiveQuicListenerFactoryPeer::quicConfig(
       dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));

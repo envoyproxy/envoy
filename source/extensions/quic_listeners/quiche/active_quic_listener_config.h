@@ -16,7 +16,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   Network::ActiveUdpListenerFactoryPtr
-  createActiveUdpListenerFactory(const Protobuf::Message&) override;
+  createActiveUdpListenerFactory(const Protobuf::Message&, uint32_t concurrency) override;
 
   std::string name() const override;
 };

@@ -55,9 +55,9 @@ enum class RecordType { A, AAAA };
 class TestDnsServerQuery {
 public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
-                     const CNameMap& cnames, const std::chrono::seconds& record_ttl)
+                     const CNameMap& cnames, const std::chrono::seconds& record_ttl, bool refused)
       : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
-        cnames_(cnames), record_ttl_(record_ttl) {
+        cnames_(cnames), record_ttl_(record_ttl), refused_(refused) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -171,7 +171,11 @@ private:
         memcpy(response_base, request, response_base_len);
         DNS_HEADER_SET_QR(response_base, 1);
         DNS_HEADER_SET_AA(response_base, 0);
-        DNS_HEADER_SET_RCODE(response_base, answer_size > 0 ? NOERROR : NXDOMAIN);
+        if (parent_.refused_) {
+          DNS_HEADER_SET_RCODE(response_base, REFUSED);
+        } else {
+          DNS_HEADER_SET_RCODE(response_base, answer_size > 0 ? NOERROR : NXDOMAIN);
+        }
         DNS_HEADER_SET_ANCOUNT(response_base, answer_size);
         DNS_HEADER_SET_NSCOUNT(response_base, 0);
         DNS_HEADER_SET_ARCOUNT(response_base, 0);
@@ -253,6 +257,7 @@ private:
   const HostMap& hosts_aaaa_;
   const CNameMap& cnames_;
   const std::chrono::seconds& record_ttl_;
+  bool refused_{};
 };
 
 class TestDnsServer : public ListenerCallbacks {
@@ -263,7 +268,7 @@ public:
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
         std::move(socket), Network::Test::createRawBufferSocket());
     TestDnsServerQuery* query = new TestDnsServerQuery(std::move(new_connection), hosts_a_,
-                                                       hosts_aaaa_, cnames_, record_ttl_);
+                                                       hosts_aaaa_, cnames_, record_ttl_, refused_);
     queries_.emplace_back(query);
   }
 
@@ -280,6 +285,7 @@ public:
   }
 
   void setRecordTtl(const std::chrono::seconds& ttl) { record_ttl_ = ttl; }
+  void setRefused(bool refused) { refused_ = refused; }
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -288,6 +294,7 @@ private:
   HostMap hosts_aaaa_;
   CNameMap cnames_;
   std::chrono::seconds record_ttl_;
+  bool refused_{};
   // All queries are tracked so we can do resource reclamation when the test is
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
@@ -300,6 +307,7 @@ public:
   DnsResolverImplPeer(DnsResolverImpl* resolver) : resolver_(resolver) {}
 
   ares_channel channel() const { return resolver_->channel_; }
+  bool isChannelDirty() const { return resolver_->dirty_channel_; }
   const std::unordered_map<int, Event::FileEventPtr>& events() { return resolver_->events_; }
   // Reset the channel state for a DnsResolverImpl such that it will only use
   // TCP and optionally has a zero timeout (for validating timeout behavior).
@@ -580,6 +588,64 @@ TEST_P(DnsImplTest, CallbackException) {
                                             /*results*/) -> void { throw std::string(); }));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "unknown");
+}
+
+// Validate that the c-ares channel is destroyed and re-initialized when c-ares returns
+// ARES_ECONNREFUSED as its callback status.
+TEST_P(DnsImplTest, DestroyChannelOnRefused) {
+  ASSERT_FALSE(peer_->isChannelDirty());
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->setRefused(true);
+
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  EXPECT_NE(nullptr, resolver_->resolve("", DnsLookupFamily::V4Only,
+                                        [&](std::list<DnsResponse>&& results) -> void {
+                                          address_list = getAddressList(results);
+                                          dispatcher_->exit();
+                                        }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // The c-ares channel should be dirty because the TestDnsServer replied with return code REFUSED;
+  // This test, and the way the TestDnsServerQuery is setup, relies on the fact that Envoy's
+  // c-ares channel is configured **without** the ARES_FLAG_NOCHECKRESP flag. This causes c-ares to
+  // discard packets with REFUSED, and thus Envoy receives ARES_ECONNREFUSED due to the code here:
+  // https://github.com/c-ares/c-ares/blob/d7e070e7283f822b1d2787903cce3615536c5610/ares_process.c#L654
+  // If that flag needs to be set, or c-ares changes its handling this test will need to be updated
+  // to create another condition where c-ares invokes onAresGetAddrInfoCallback with status ==
+  // ARES_ECONNREFUSED.
+  EXPECT_TRUE(peer_->isChannelDirty());
+  EXPECT_TRUE(address_list.empty());
+
+  server_->setRefused(false);
+
+  // Resolve will destroy the original channel and create a new one.
+  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::V4Only,
+                                        [&](std::list<DnsResponse>&& results) -> void {
+                                          address_list = getAddressList(results);
+                                          dispatcher_->exit();
+                                        }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // However, the fresh channel initialized by production code does not point to the TestDnsServer.
+  // This means that resolution will return ARES_ENOTFOUND. This should not dirty the channel.
+  EXPECT_FALSE(peer_->isChannelDirty());
+  EXPECT_TRUE(address_list.empty());
+
+  // Reset the channel to point to the TestDnsServer, and make sure resolution is healthy.
+  if (tcp_only()) {
+    peer_->resetChannelTcpOnly(zero_timeout());
+  }
+  ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+
+  EXPECT_NE(nullptr, resolver_->resolve("some.good.domain", DnsLookupFamily::Auto,
+                                        [&](std::list<DnsResponse>&& results) -> void {
+                                          address_list = getAddressList(results);
+                                          dispatcher_->exit();
+                                        }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(peer_->isChannelDirty());
+  EXPECT_TRUE(hasAddress(address_list, "201.134.56.7"));
 }
 
 TEST_P(DnsImplTest, DnsIpAddressVersion) {

@@ -8,10 +8,9 @@
 
 namespace Envoy {
 namespace Http {
-
 namespace ConnectionPool {
-class MockCancellable : public Cancellable {
 
+class MockCancellable : public Cancellable {
 public:
   MockCancellable();
   ~MockCancellable() override;
@@ -30,8 +29,7 @@ public:
   MOCK_METHOD(void, addDrainedCallback, (DrainedCb cb));
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(bool, hasActiveConnections, (), (const));
-  MOCK_METHOD(Cancellable*, newStream,
-              (Http::StreamDecoder & response_decoder, Http::ConnectionPool::Callbacks& callbacks));
+  MOCK_METHOD(Cancellable*, newStream, (ResponseDecoder & response_decoder, Callbacks& callbacks));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;

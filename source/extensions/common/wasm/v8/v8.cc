@@ -11,6 +11,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/match.h"
+#include "v8-version.h"
 #include "wasm-api/wasm.hh"
 
 namespace Envoy {
@@ -43,6 +44,7 @@ public:
 
   bool load(const std::string& code, bool allow_precompiled) override;
   absl::string_view getCustomSection(absl::string_view name) override;
+  absl::string_view getPrecompiledSectionName() override;
   void link(absl::string_view debug_name) override;
 
   Cloneable cloneable() override { return Cloneable::CompiledBytecode; }
@@ -70,6 +72,8 @@ public:
 #undef _GET_MODULE_FUNCTION
 
 private:
+  wasm::vec<byte_t> getStrippedSource();
+
   template <typename... Args>
   void registerHostFunctionImpl(absl::string_view module_name, absl::string_view function_name,
                                 void (*function)(void*, Args...));
@@ -239,14 +243,46 @@ template <typename T, typename U> constexpr T convertValTypesToArgsTuple(const U
 
 // V8 implementation.
 
-bool V8::load(const std::string& code, bool /* allow_precompiled */) {
+bool V8::load(const std::string& code, bool allow_precompiled) {
   ENVOY_LOG(trace, "load()");
   store_ = wasm::Store::make(engine());
+
+  // Wasm file header is 8 bytes (magic number + version).
+  static const uint8_t magic_number[4] = {0x00, 0x61, 0x73, 0x6d};
+  if (code.size() < 8 || ::memcmp(code.data(), magic_number, 4) != 0) {
+    return false;
+  }
 
   source_ = wasm::vec<byte_t>::make_uninitialized(code.size());
   ::memcpy(source_.get(), code.data(), code.size());
 
-  module_ = wasm::Module::make(store_.get(), source_);
+  if (allow_precompiled) {
+    const auto section_name = getPrecompiledSectionName();
+    if (!section_name.empty()) {
+      const auto precompiled = getCustomSection(section_name);
+      if (!precompiled.empty()) {
+        auto vec = wasm::vec<byte_t>::make_uninitialized(precompiled.size());
+        ::memcpy(vec.get(), precompiled.data(), precompiled.size());
+
+        // TODO(PiotrSikora): fuzz loading of precompiled Wasm modules.
+        // See: https://github.com/envoyproxy/envoy/issues/9731
+        module_ = wasm::Module::deserialize(store_.get(), vec);
+        if (!module_) {
+          // Precompiled module that cannot be loaded is considered a hard error,
+          // so don't fallback to compiling the bytecode.
+          return false;
+        }
+      }
+    }
+  }
+
+  if (!module_) {
+    // TODO(PiotrSikora): fuzz loading of Wasm modules.
+    // See: https://github.com/envoyproxy/envoy/issues/9731
+    const auto stripped_source = getStrippedSource();
+    module_ = wasm::Module::make(store_.get(), stripped_source ? stripped_source : source_);
+  }
+
   if (module_) {
     shared_module_ = module_->share();
   }
@@ -266,37 +302,93 @@ WasmVmPtr V8::clone() {
   return clone;
 }
 
+// Get Wasm module without Custom Sections to save some memory in workers.
+wasm::vec<byte_t> V8::getStrippedSource() {
+  ENVOY_LOG(trace, "getStrippedSource()");
+  ASSERT(source_.get() != nullptr);
+
+  std::vector<byte_t> stripped;
+
+  const byte_t* pos = source_.get() + 8 /* Wasm header */;
+  const byte_t* end = source_.get() + source_.size();
+  while (pos < end) {
+    const auto section_start = pos;
+    if (pos + 1 > end) {
+      return wasm::vec<byte_t>::invalid();
+    }
+    const auto section_type = *pos++;
+    const auto section_len = parseVarint(pos, end);
+    if (section_len == static_cast<uint32_t>(-1) || pos + section_len > end) {
+      return wasm::vec<byte_t>::invalid();
+    }
+    pos += section_len;
+    if (section_type == 0 /* custom section */) {
+      if (stripped.empty()) {
+        const byte_t* start = source_.get();
+        stripped.insert(stripped.end(), start, section_start);
+      }
+    } else if (!stripped.empty()) {
+      stripped.insert(stripped.end(), section_start, pos /* section end */);
+    }
+  }
+
+  // No custom sections found, use the original source.
+  if (stripped.empty()) {
+    return wasm::vec<byte_t>::invalid();
+  }
+
+  // Return stripped source, without custom sections.
+  return wasm::vec<byte_t>::make(stripped.size(), stripped.data());
+}
+
 absl::string_view V8::getCustomSection(absl::string_view name) {
   ENVOY_LOG(trace, "getCustomSection(\"{}\")", name);
   ASSERT(source_.get() != nullptr);
 
+  const byte_t* pos = source_.get() + 8 /* Wasm header */;
   const byte_t* end = source_.get() + source_.size();
-  const byte_t* pos = source_.get() + 8; // skip header
   while (pos < end) {
     if (pos + 1 > end) {
       throw WasmVmException("Failed to parse corrupted WASM module");
     }
-    auto type = *pos++;
-    auto rest = parseVarint(pos, end);
-    if (pos + rest > end) {
+    const auto section_type = *pos++;
+    const auto section_len = parseVarint(pos, end);
+    if (section_len == static_cast<uint32_t>(-1) || pos + section_len > end) {
       throw WasmVmException("Failed to parse corrupted WASM module");
     }
-    if (type == 0 /* custom section */) {
-      auto start = pos;
-      auto len = parseVarint(pos, end);
-      if (pos + len > end) {
+    if (section_type == 0 /* custom section */) {
+      const auto section_data_start = pos;
+      const auto section_name_len = parseVarint(pos, end);
+      if (section_name_len == static_cast<uint32_t>(-1) || pos + section_name_len > end) {
         throw WasmVmException("Failed to parse corrupted WASM module");
       }
-      pos += len;
-      rest -= (pos - start);
-      if (len == name.size() && ::memcmp(pos - len, name.data(), len) == 0) {
-        ENVOY_LOG(trace, "getCustomSection(\"{}\") found, size: {}", name, rest);
-        return {pos, rest};
+      if (section_name_len == name.size() && ::memcmp(pos, name.data(), section_name_len) == 0) {
+        pos += section_name_len;
+        ENVOY_LOG(trace, "getCustomSection(\"{}\") found, size: {}", name,
+                  section_data_start + section_len - pos);
+        return {pos, static_cast<size_t>(section_data_start + section_len - pos)};
       }
+      pos = section_data_start + section_len;
+    } else {
+      pos += section_len;
     }
-    pos += rest;
   }
   return "";
+}
+
+#if defined(__linux__) && defined(__x86_64__)
+#define WEE8_WASM_PRECOMPILE_PLATFORM "linux_x86_64"
+#endif
+
+absl::string_view V8::getPrecompiledSectionName() {
+#ifndef WEE8_WASM_PRECOMPILE_PLATFORM
+  return "";
+#else
+  static const auto name =
+      absl::StrCat("precompiled_v8_v", V8_MAJOR_VERSION, ".", V8_MINOR_VERSION, ".",
+                   V8_BUILD_NUMBER, ".", V8_PATCH_LEVEL, "_", WEE8_WASM_PRECOMPILE_PLATFORM);
+  return name;
+#endif
 }
 
 void V8::link(absl::string_view debug_name) {

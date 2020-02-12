@@ -87,7 +87,7 @@ void ConnPoolImpl::checkForDrained() {
   }
 }
 
-void ConnPoolImpl::newClientStream(Http::StreamDecoder& response_decoder,
+void ConnPoolImpl::newClientStream(ResponseDecoder& response_decoder,
                                    ConnectionPool::Callbacks& callbacks) {
   if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
     ENVOY_LOG(debug, "max requests overflow");
@@ -108,7 +108,7 @@ void ConnPoolImpl::newClientStream(Http::StreamDecoder& response_decoder,
   }
 }
 
-ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& response_decoder,
+ConnectionPool::Cancellable* ConnPoolImpl::newStream(ResponseDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
   ASSERT(drained_callbacks_.empty());
 

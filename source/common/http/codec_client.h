@@ -100,7 +100,7 @@ public:
    * @param response_decoder supplies the decoder to use for response callbacks.
    * @return StreamEncoder& the encoder to use for encoding the request.
    */
-  StreamEncoder& newStream(StreamDecoder& response_decoder);
+  RequestEncoder& newStream(ResponseDecoder& response_decoder);
 
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) {
     connection_->setConnectionStats(stats);
@@ -186,9 +186,9 @@ private:
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
                          public StreamCallbacks,
-                         public StreamDecoderWrapper {
-    ActiveRequest(CodecClient& parent, StreamDecoder& inner)
-        : StreamDecoderWrapper(inner), parent_(parent) {}
+                         public ResponseDecoderWrapper {
+    ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
+        : ResponseDecoderWrapper(inner), parent_(parent) {}
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -201,7 +201,7 @@ private:
     void onPreDecodeComplete() override { parent_.responseDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
-    StreamEncoder* encoder_{};
+    RequestEncoder* encoder_{};
     CodecClient& parent_;
   };
 

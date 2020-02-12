@@ -12,10 +12,10 @@
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 
-#include "extensions/filters/http/common/aws/credentials_provider_impl.h"
-#include "extensions/filters/http/common/aws/region_provider_impl.h"
-#include "extensions/filters/http/common/aws/signer_impl.h"
-#include "extensions/filters/http/common/aws/utility.h"
+#include "extensions/common/aws/credentials_provider_impl.h"
+#include "extensions/common/aws/region_provider_impl.h"
+#include "extensions/common/aws/signer_impl.h"
+#include "extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,10 +45,9 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
-        auto credentials_provider =
-            std::make_shared<HttpFilters::Common::Aws::DefaultCredentialsProviderChain>(
-                api, HttpFilters::Common::Aws::Utility::metadataFetcher);
-        auto signer = std::make_unique<HttpFilters::Common::Aws::SignerImpl>(
+        auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
+            api, Common::Aws::Utility::metadataFetcher);
+        auto signer = std::make_unique<Common::Aws::SignerImpl>(
             config.service_name(), getRegion(config), credentials_provider, api.timeSource());
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<AwsIamHeaderAuthenticator>(std::move(signer)));
@@ -75,12 +74,11 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
 
 std::string AwsIamGrpcCredentialsFactory::getRegion(
     const envoy::config::grpc_credential::v3::AwsIamConfig& config) {
-  std::unique_ptr<HttpFilters::Common::Aws::RegionProvider> region_provider;
+  std::unique_ptr<Common::Aws::RegionProvider> region_provider;
   if (!config.region().empty()) {
-    region_provider =
-        std::make_unique<HttpFilters::Common::Aws::StaticRegionProvider>(config.region());
+    region_provider = std::make_unique<Common::Aws::StaticRegionProvider>(config.region());
   } else {
-    region_provider = std::make_unique<HttpFilters::Common::Aws::EnvironmentRegionProvider>();
+    region_provider = std::make_unique<Common::Aws::EnvironmentRegionProvider>();
   }
 
   if (!region_provider->getRegion().has_value()) {

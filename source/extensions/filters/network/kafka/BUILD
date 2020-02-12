@@ -205,6 +205,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tagged_fields_lib",
+    hdrs = ["tagged_fields.h"],
+    deps = [":serialization_lib"],
+)
+
+envoy_cc_library(
     name = "serialization_lib",
     srcs = [
         "serialization.cc",

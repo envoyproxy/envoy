@@ -138,7 +138,7 @@ public:
     }
   }
 
-  EnvoyQuicClientStream& sendGetRequest(Http::StreamDecoder& response_decoder,
+  EnvoyQuicClientStream& sendGetRequest(Http::ResponseDecoder& response_decoder,
                                         Http::StreamCallbacks& stream_callbacks) {
     auto& stream =
         dynamic_cast<EnvoyQuicClientStream&>(http_connection_.newStream(response_decoder));
@@ -178,7 +178,7 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest
                          testing::ValuesIn({true, false}));
 
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
-  Http::MockStreamDecoder response_decoder;
+  Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
@@ -188,14 +188,14 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([](const Http::HeaderMapPtr& decoded_headers, bool) {
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->Status()->value().getStringView());
       }));
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
 TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
-  Http::MockStreamDecoder response_decoder;
+  Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
@@ -220,7 +220,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
-  Http::MockStreamDecoder response_decoder;
+  Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
   EXPECT_CALL(*quic_connection_,
