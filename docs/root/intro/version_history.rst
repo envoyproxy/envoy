@@ -1,6 +1,9 @@
 Version history
 ---------------
 
+1.12.3 (Pending)
+================
+
 1.12.2 (December 10, 2019)
 ==========================
 * http: fixed CVE-2019-18801 by allocating sufficient memory for request headers.
