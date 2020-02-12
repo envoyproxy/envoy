@@ -457,8 +457,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   return gauge;
 }
 
-SymbolTable::StoragePtr ThreadLocalStoreImpl::ScopeImpl::finalStatName(StatName name,
-                                                        const StatNameTagVector& tags) {
+SymbolTable::StoragePtr
+ThreadLocalStoreImpl::ScopeImpl::finalStatName(StatName name, const StatNameTagVector& tags) {
 
   std::vector<StatName> stat_names;
   stat_names.reserve(2 + 2 * tags.size());
@@ -469,7 +469,6 @@ SymbolTable::StoragePtr ThreadLocalStoreImpl::ScopeImpl::finalStatName(StatName 
     stat_names.emplace_back(tag.first);
     stat_names.emplace_back(tag.second);
   }
-
 
   return symbolTable().join(stat_names);
 }
@@ -490,10 +489,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
 
-auto stat_name_no_tags = StatName(symbolTable().join({prefix_.statName(), name}).get());
+  auto stat_name_no_tags = StatName(symbolTable().join({prefix_.statName(), name}).get());
   auto final_stat = finalStatName(name, tags);
   auto final_stat_name = StatName(final_stat.get());
- std::cout << "here: " << symbolTable().toString(final_stat_name) << std::endl;
+  std::cout << "here: " << symbolTable().toString(final_stat_name) << std::endl;
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
@@ -522,10 +521,11 @@ auto stat_name_no_tags = StatName(symbolTable().join({prefix_.statName(), name})
 
     // Combine the provided tags with the extracted tags.
     std::vector<Tag> allTags;
-    std::transform(
-        tags.begin(), tags.end(), allTags.end(), [this](const auto& stat_name_tag) -> Tag {
-          return Tag{symbolTable().toString(stat_name_tag.first), symbolTable().toString(stat_name_tag.second)};
-        });
+    std::transform(tags.begin(), tags.end(), allTags.end(),
+                   [this](const auto& stat_name_tag) -> Tag {
+                     return Tag{symbolTable().toString(stat_name_tag.first),
+                                symbolTable().toString(stat_name_tag.second)};
+                   });
     allTags.insert(allTags.end(), extraction.tags().begin(), extraction.tags().end());
 
     RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
@@ -549,13 +549,6 @@ GaugeOptConstRef ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const
 }
 
 HistogramOptConstRef ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
-    auto mutable_this = const_cast<ThreadLocalStoreImpl::ScopeImpl*>(this);
-  std::cout << "requesting: " << std::endl;
-  std::cout << mutable_this->symbolTable().toString(name) << std::endl;
-  std::cout << "all histograms: " << std::endl;
-  for (const auto& h : central_cache_->histograms_) {
-    std::cout << mutable_this->symbolTable().toString(h.first) << std::endl;
-  }
   auto iter = central_cache_->histograms_.find(name);
   if (iter == central_cache_->histograms_.end()) {
     return absl::nullopt;
