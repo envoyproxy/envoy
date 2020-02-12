@@ -275,9 +275,9 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     // If this is the first time we ever got a check result on this host, we immediately move
     // it to healthy. This makes startup faster with a small reduction in overall reliability
     // depending on the HC settings.
+    host_->healthFlagClear(Host::HealthFlag::EXCLUDE_FROM_LB);
     if (first_check_ || ++num_healthy_ == parent_.healthy_threshold_) {
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-      host_->healthFlagClear(Host::HealthFlag::EXCLUDE_FROM_LB);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {
