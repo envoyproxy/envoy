@@ -17,16 +17,41 @@ bool responseUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api
  */
 struct ResponseMetadata {
   ResponseMetadata(const int16_t api_key, const int16_t api_version, const int32_t correlation_id)
-      : api_key_{api_key}, api_version_{api_version}, correlation_id_{correlation_id} {};
+      : ResponseMetadata{api_key, api_version, correlation_id, TaggedFields{}} {};
+
+  ResponseMetadata(const int16_t api_key, const int16_t api_version, const int32_t correlation_id,
+                   const TaggedFields& tagged_fields)
+      : api_key_{api_key}, api_version_{api_version}, correlation_id_{correlation_id},
+        tagged_fields_{tagged_fields} {};
+
+  uint32_t computeSize(const EncodingContext& context) const {
+    uint32_t result{0};
+    result += context.computeSize(correlation_id_);
+    if (responseUsesTaggedFieldsInHeader(api_key_, api_version_) && 18 != api_key_) {
+      result += context.computeCompactSize(tagged_fields_);
+    }
+    return result;
+  }
+
+  uint32_t encode(Buffer::Instance& dst, EncodingContext& context) const {
+    uint32_t written{0};
+    // Encode correlation id (api key / version are not present in responses).
+    written += context.encode(correlation_id_, dst);
+    if (responseUsesTaggedFieldsInHeader(api_key_, api_version_) && 18 != api_key_) {
+      written += context.encodeCompact(tagged_fields_, dst);
+    }
+    return written;
+  }
 
   bool operator==(const ResponseMetadata& rhs) const {
     return api_key_ == rhs.api_key_ && api_version_ == rhs.api_version_ &&
-           correlation_id_ == rhs.correlation_id_;
+           correlation_id_ == rhs.correlation_id_ && tagged_fields_ == rhs.tagged_fields_;
   };
 
   const int16_t api_key_;
   const int16_t api_version_;
   const int32_t correlation_id_;
+  const TaggedFields tagged_fields_;
 };
 
 using ResponseMetadataSharedPtr = std::shared_ptr<ResponseMetadata>;
@@ -81,11 +106,9 @@ public:
   uint32_t computeSize() const override {
     const EncodingContext context{metadata_.api_version_};
     uint32_t result{0};
-    result += context.computeSize(metadata_.correlation_id_);
-    if (responseUsesTaggedFieldsInHeader(metadata_.api_key_, metadata_.api_version_) &&
-        18 != metadata_.api_key_) {
-      result += context.computeCompactSize(TaggedFields{});
-    }
+    // Compute size of header.
+    result += context.computeSize(metadata_);
+    // Compute size of response data.
     result += context.computeSize(data_);
     return result;
   }
@@ -96,12 +119,8 @@ public:
   uint32_t encode(Buffer::Instance& dst) const override {
     EncodingContext context{metadata_.api_version_};
     uint32_t written{0};
-    // Encode correlation id (api key / version are not present in responses).
-    written += context.encode(metadata_.correlation_id_, dst);
-    if (responseUsesTaggedFieldsInHeader(metadata_.api_key_, metadata_.api_version_) &&
-        18 != metadata_.api_key_) {
-      written += context.encodeCompact(TaggedFields{}, dst);
-    }
+    // Encode response header.
+    written += context.encode(metadata_, dst);
     // Encode response-specific data.
     written += context.encode(data_, dst);
     return written;
