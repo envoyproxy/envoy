@@ -9,7 +9,7 @@ jobs:
   android_aar_sonatype_deploy:
     name: android_deploy
     runs-on: ubuntu-18.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
         with:
