@@ -212,8 +212,8 @@ config_setting(
 )
 
 config_setting(
-    name = "debug_known_issues",
-    values = {"define": "known_issues=debug"},
+    name = "include_known_issue_asserts",
+    values = {"define": "include_known_issue_asserts=true"},
 )
 
 config_setting(

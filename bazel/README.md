@@ -449,6 +449,8 @@ The following optional features can be enabled on the Bazel build command-line:
   Otherwise, the linker will fail to resolve symbols that are included via the `linktamp` rule, which is only available to binary targets.
   This is being tracked as a feature in: https://github.com/envoyproxy/envoy/issues/6859.
 * Process logging for Android applications can be enabled with `--define logger=android`.
+* Debugging known issues with `--include_known_issue_asserts=true`.
+  A KNOWN_ISSUE_ASSERT is an assertion that should pass (like all assertions), but sometimes fails for some as-yet unidentified or unresolved reason. Because it is known to potentially fail, it will be compiled out even when DEBUG is true, unless this flag is set. This allows Envoy to be run in production with assertions generally enabled, without crashing for known issues. KNOWN_ISSUE_ASSERT should only be used for newly-discovered issues that represent benign violations of expectations.
 
 ## Disabling extensions
 
