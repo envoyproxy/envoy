@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+
 #include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
