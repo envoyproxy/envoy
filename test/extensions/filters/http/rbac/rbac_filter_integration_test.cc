@@ -229,9 +229,7 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragment) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  const std::vector<std::string> paths{"/allow",           "/allow?p1=v1&p2=v2", "/allow#seg",
-                                       "/allow?p1=v1#seg", "/allow#seg?p1=v1",   "/allow?#",
-                                       "/allow#?"};
+  const std::vector<std::string> paths{"/allow", "/allow?p1=v1&p2=v2", "/allow?p1=v1#seg"};
 
   for (const auto& path : paths) {
     auto response = codec_client_->makeRequestWithBody(
