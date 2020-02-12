@@ -15,8 +15,8 @@ Deprecated items below are listed in chronological order.
 * The previous behavior for upstream connection pool circuit breaking described
   `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_ has
   been deprecated in favor of the new behavior described :ref:`here <arch_overview_circuit_break>`.
-* Access Logger names have been deprecated in favor of the extension name from the envoy build
-  system.
+* Access Logger, Stats Sink, and Tracer names have been deprecated in favor of the extension name
+  from the envoy build system.
 
   .. csv-table::
     :header: Canonical Names, Deprecated Names
@@ -25,6 +25,12 @@ Deprecated items below are listed in chronological order.
     envoy.access_loggers.file, envoy.file_access_log
     envoy.access_loggers.http_grpc, envoy.http_grpc_access_log
     envoy.access_loggers.tcp_grpc, envoy.tcp_grpc_access_log
+    envoy.stat_sinks.dog_statsd, envoy.dog_statsd
+    envoy.stat_sinks.metrics_service, envoy.metrics_service
+    envoy.stat_sinks.statsd, envoy.statsd
+    envoy.tracers.dynamic_ot, envoy.dynamic.ot
+    envoy.tracers.lightstep, envoy.lightstep
+    envoy.tracers.zipkin, envoy.zipkin
 
 1.13.0 (January 20, 2020)
 =========================

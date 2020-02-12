@@ -75,9 +75,8 @@ stream timeouts already introduced above.
   and does the same thing.
 * The route :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` can be
   configured when using retries so that individual tries using a shorter timeout than the overall
-  request timeout described above. This type of timeout will not work with streaming APIs (in which
-  retries are typically not possible) but is useful for decreasing the tail latency of non-streaming
-  APIs.
+  request timeout described above. This timeout only applies before any part of the response
+  is sent to the downstream, which normally happens after the upstream has sent response headers.
 
 TCP
 ---

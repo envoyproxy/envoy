@@ -11,11 +11,11 @@ namespace Http {
 class ResponseDecoderWrapper : public ResponseDecoder {
 public:
   // ResponseDecoder
-  void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
+  void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     inner_.decode100ContinueHeaders(std::move(headers));
   }
 
-  void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
+  void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
     if (end_stream) {
       onPreDecodeComplete();
     }
@@ -39,7 +39,7 @@ public:
     }
   }
 
-  void decodeTrailers(HeaderMapPtr&& trailers) override {
+  void decodeTrailers(ResponseTrailerMapPtr&& trailers) override {
     onPreDecodeComplete();
     inner_.decodeTrailers(std::move(trailers));
     onDecodeComplete();

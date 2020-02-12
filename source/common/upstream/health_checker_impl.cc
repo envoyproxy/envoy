@@ -199,7 +199,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
-    Http::HeaderMapPtr&& headers, bool end_stream) {
+    Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!response_headers_);
   response_headers_ = std::move(headers);
   if (end_stream) {
@@ -539,7 +539,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onDeferredDelete() {
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
-    Http::HeaderMapPtr&& headers, bool end_stream) {
+    Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   const auto http_response_status = Http::Utility::getResponseStatus(*headers);
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
@@ -607,7 +607,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeData(Buffer::Ins
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeTrailers(
-    Http::HeaderMapPtr&& trailers) {
+    Http::ResponseTrailerMapPtr&& trailers) {
   auto maybe_grpc_status = Grpc::Common::getGrpcStatus(*trailers);
   auto grpc_status =
       maybe_grpc_status
