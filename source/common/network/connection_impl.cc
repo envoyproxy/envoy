@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -17,7 +18,6 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/api/os_sys_calls_impl.h"
 
 namespace Envoy {
 namespace Network {
