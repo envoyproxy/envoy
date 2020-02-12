@@ -214,6 +214,9 @@ protected:
   bool processing_trailers_ : 1;
   bool handling_upgrade_ : 1;
   bool reset_stream_called_ : 1;
+  // Deferred end stream headers indicate that we are not going to raise headers until the full
+  // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
+  // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
@@ -223,7 +226,8 @@ private:
   enum class HeaderParsingState { Field, Value, Done };
 
   virtual HeaderMapImpl& headers() PURE;
-  virtual void maybeAllocHeadersOrTrailers() PURE;
+  virtual void allocHeaders() PURE;
+  virtual void maybeAllocTrailers() PURE;
 
   /**
    * Called in order to complete an in progress header decode.
@@ -375,19 +379,15 @@ private:
       return *absl::get<RequestTrailerMapImplPtr>(headers_or_trailers_);
     }
   }
-  void maybeAllocHeadersOrTrailers() override {
-    if (!processing_trailers_) {
-      if (!absl::holds_alternative<RequestHeaderMapImplPtr>(headers_or_trailers_) ||
-          nullptr == absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_)) {
-        headers_or_trailers_.emplace<RequestHeaderMapImplPtr>(
-            std::make_unique<RequestHeaderMapImpl>());
-      }
-    } else {
-      if (!absl::holds_alternative<RequestTrailerMapImplPtr>(headers_or_trailers_) ||
-          nullptr == absl::get<RequestTrailerMapImplPtr>(headers_or_trailers_)) {
-        headers_or_trailers_.emplace<RequestTrailerMapImplPtr>(
-            std::make_unique<RequestTrailerMapImpl>());
-      }
+  void allocHeaders() override {
+    ASSERT(nullptr == absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_));
+    headers_or_trailers_.emplace<RequestHeaderMapImplPtr>(std::make_unique<RequestHeaderMapImpl>());
+  }
+  void maybeAllocTrailers() override {
+    ASSERT(processing_trailers_);
+    if (!absl::holds_alternative<RequestTrailerMapImplPtr>(headers_or_trailers_)) {
+      headers_or_trailers_.emplace<RequestTrailerMapImplPtr>(
+          std::make_unique<RequestTrailerMapImpl>());
     }
   }
 
@@ -395,7 +395,10 @@ private:
   std::unique_ptr<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
-  // thought as some of the reset and no header code paths make this difficult.
+  // thought as some of the reset and no header code paths make this difficult. Headers are
+  // populated on message begin. Trailers are populated on the first parsed trailer field (if
+  // trailers are enabled). The variant is reset to null headers on message complete for assertion
+  // purposes.
   absl::variant<RequestHeaderMapImplPtr, RequestTrailerMapImplPtr> headers_or_trailers_;
 };
 
@@ -440,19 +443,16 @@ private:
       return *absl::get<ResponseTrailerMapImplPtr>(headers_or_trailers_);
     }
   }
-  void maybeAllocHeadersOrTrailers() override {
-    if (!processing_trailers_) {
-      if (!absl::holds_alternative<ResponseHeaderMapImplPtr>(headers_or_trailers_) ||
-          nullptr == absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_)) {
-        headers_or_trailers_.emplace<ResponseHeaderMapImplPtr>(
-            std::make_unique<ResponseHeaderMapImpl>());
-      }
-    } else {
-      if (!absl::holds_alternative<ResponseTrailerMapImplPtr>(headers_or_trailers_) ||
-          nullptr == absl::get<ResponseTrailerMapImplPtr>(headers_or_trailers_)) {
-        headers_or_trailers_.emplace<ResponseTrailerMapImplPtr>(
-            std::make_unique<ResponseTrailerMapImpl>());
-      }
+  void allocHeaders() override {
+    ASSERT(nullptr == absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_));
+    headers_or_trailers_.emplace<ResponseHeaderMapImplPtr>(
+        std::make_unique<ResponseHeaderMapImpl>());
+  }
+  void maybeAllocTrailers() override {
+    ASSERT(processing_trailers_);
+    if (!absl::holds_alternative<ResponseTrailerMapImplPtr>(headers_or_trailers_)) {
+      headers_or_trailers_.emplace<ResponseTrailerMapImplPtr>(
+          std::make_unique<ResponseTrailerMapImpl>());
     }
   }
 
@@ -461,7 +461,10 @@ private:
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated
-  // thought as some of the reset and no header code paths make this difficult.
+  // thought as some of the reset and no header code paths make this difficult. Headers are
+  // populated on message begin. Trailers are populated on the first parsed trailer field (if
+  // trailers are enabled). The variant is reset to null headers on message complete for assertion
+  // purposes.
   absl::variant<ResponseHeaderMapImplPtr, ResponseTrailerMapImplPtr> headers_or_trailers_;
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.

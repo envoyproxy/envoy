@@ -493,7 +493,10 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
-  maybeAllocHeadersOrTrailers();
+  if (processing_trailers_) {
+    maybeAllocTrailers();
+  }
+
   // Work around a bug in http_parser where trailing whitespace is not trimmed
   // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4
   const absl::string_view header_value = StringUtil::trim(absl::string_view(data, length));
@@ -624,7 +627,7 @@ void ConnectionImpl::onMessageBeginBase() {
   protocol_ = Protocol::Http11;
   processing_trailers_ = false;
   header_parsing_state_ = HeaderParsingState::Field;
-  maybeAllocHeadersOrTrailers();
+  allocHeaders();
   onMessageBegin();
 }
 
@@ -784,6 +787,9 @@ void ServerConnectionImpl::onMessageComplete() {
       Buffer::OwnedImpl buffer;
       active_request_->request_decoder_->decodeData(buffer, true);
     }
+
+    // Reset for assertion purposes.
+    headers_or_trailers_.emplace<RequestHeaderMapImplPtr>(nullptr);
   }
 
   // Always pause the parser so that the calling code can process 1 request at a time and apply
@@ -933,6 +939,9 @@ void ClientConnectionImpl::onMessageComplete() {
       Buffer::OwnedImpl buffer;
       response.decoder_->decodeData(buffer, true);
     }
+
+    // Reset for assertion purposes.
+    headers_or_trailers_.emplace<ResponseHeaderMapImplPtr>(nullptr);
   }
 }
 
