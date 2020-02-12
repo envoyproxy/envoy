@@ -7,6 +7,7 @@
 #include "envoy/common/regex.h"
 #include "envoy/type/matcher/metadata.pb.h"
 #include "envoy/type/matcher/number.pb.h"
+#include "envoy/type/matcher/path.pb.h"
 #include "envoy/type/matcher/string.pb.h"
 #include "envoy/type/matcher/value.pb.h"
 
@@ -18,6 +19,9 @@ namespace Matchers {
 
 class ValueMatcher;
 using ValueMatcherConstSharedPtr = std::shared_ptr<const ValueMatcher>;
+
+class PathMatcher;
+using PathMatcherConstSharedPtr = std::shared_ptr<const PathMatcher>;
 
 class ValueMatcher {
 public:
@@ -130,6 +134,20 @@ private:
   std::vector<std::string> path_;
 
   ValueMatcherConstSharedPtr value_matcher_;
+};
+
+class PathMatcher : public StringMatcher {
+public:
+  PathMatcher(const envoy::type::matcher::PathMatcher& path) : matcher_(path.path()) {}
+  PathMatcher(const envoy::type::matcher::StringMatcher& matcher) : matcher_(matcher) {}
+
+  static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
+  static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
+
+  bool match(const absl::string_view path) const override;
+
+private:
+  const StringMatcherImpl matcher_;
 };
 
 } // namespace Matchers

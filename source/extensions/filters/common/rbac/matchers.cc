@@ -28,6 +28,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2::Permission&
     return std::make_shared<const NotMatcher>(permission.not_rule());
   case envoy::config::rbac::v2::Permission::RuleCase::kRequestedServerName:
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
+  case envoy::config::rbac::v2::Permission::RuleCase::kUrlPath:
+    return std::make_shared<const PathMatcher>(permission.url_path());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -51,6 +53,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2::Principal& 
     return std::make_shared<const MetadataMatcher>(principal.metadata());
   case envoy::config::rbac::v2::Principal::IdentifierCase::kNotId:
     return std::make_shared<const NotMatcher>(principal.not_id());
+  case envoy::config::rbac::v2::Principal::IdentifierCase::kUrlPath:
+    return std::make_shared<const PathMatcher>(principal.url_path());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -175,6 +179,14 @@ bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
                                          const Envoy::Http::HeaderMap&,
                                          const StreamInfo::StreamInfo&) const {
   return match(connection.requestedServerName());
+}
+
+bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap& headers,
+                          const StreamInfo::StreamInfo&) const {
+  if (headers.Path() == nullptr) {
+    return false;
+  }
+  return path_matcher_.match(headers.Path()->value().getStringView());
 }
 
 } // namespace RBAC

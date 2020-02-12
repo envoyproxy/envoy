@@ -2,6 +2,8 @@
 
 #include "envoy/http/header_map.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -15,6 +17,9 @@ public:
   static bool canonicalPath(HeaderEntry& path_header);
   // Merges two or more adjacent slashes in path part of URI into one.
   static void mergeSlashes(HeaderEntry& path_header);
+  // Removes the query and/or fragment string (if present) from the input path.
+  // For example, this function returns "/data" for the input path "/data#fragment?param=value".
+  static absl::string_view removeQueryAndFragment(const absl::string_view path);
 };
 
 } // namespace Http
