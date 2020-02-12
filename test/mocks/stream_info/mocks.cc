@@ -23,9 +23,6 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
     response_flags_ |= response_flag;
   }));
-  ON_CALL(*this, onUpstreamHostSelected(_))
-      .WillByDefault(
-          Invoke([this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
@@ -99,14 +96,8 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, hasResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag flag) {
     return response_flags_ & flag;
   }));
-  ON_CALL(*this, upstreamHost()).WillByDefault(Invoke([this]() {
-    if (upstream_host_) {
-      return upstream_host_;
-    }
-    ReturnPointee(&host_);
-    // Call should not reach here and is just to make compiler happy.
-    return upstream_host_;
-  }));
+  ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
+  
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
