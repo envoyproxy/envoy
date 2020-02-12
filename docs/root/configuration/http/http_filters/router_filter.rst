@@ -242,7 +242,8 @@ Setting this header on egress requests will cause Envoy to set a *per try* timeo
 requests. This timeout must be <= the global route timeout (see
 :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`) or it is ignored. This allows a
 caller to set a tight per try timeout to allow for retries while maintaining a reasonable overall
-timeout.
+timeout. This timeout only applies before any part of the response is sent to the downstream,
+which normally happens after the upstream has sent response headers.
 
 x-envoy-hedge-on-per-try-timeout
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
