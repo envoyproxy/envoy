@@ -99,7 +99,7 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
     (void)__assert_dummy_variable;                                                                 \
   } while (false)
 
-#if defined(ENVOY_DEBUG_KNOWN_ISSUES)
+#if !defined(ENVOY_DISABLE_KNOWN_ISSUE_ASSERTS)
 /**
  * Assert wrapper for an as-yet unidentified issue. Even with ASSERTS compiled in, it will be
  * excluded, unless ENVOY_DEBUG_KNOWN_ISSUES is defined. It represents a condition that

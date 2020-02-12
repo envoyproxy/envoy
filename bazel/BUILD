@@ -212,8 +212,8 @@ config_setting(
 )
 
 config_setting(
-    name = "include_known_issue_asserts",
-    values = {"define": "include_known_issue_asserts=true"},
+    name = "disable_known_issue_asserts",
+    values = {"define": "disable_known_issue_asserts=true"},
 )
 
 config_setting(
