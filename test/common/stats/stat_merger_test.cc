@@ -221,7 +221,7 @@ public:
    * Test helper function takes an input_descriptor. And input_descriptor is
    * mostly like the stringified StatName, but each segment that is prefixed by
    * "D:" is dynamic, and within a segment, we map "," to ".". The "D:" hack
-   * restricts the stat names we can test by maqking a prefix special. The ","
+   * restricts the stat names we can test by making a prefix special. The ","
    * hack does that too, allowing us to represent a single multi-segment dynamic
    * token in the tests. These hacks were easy to implement (~ 3 lines of code)
    * and provide a reasonably concise way to make a few test-cases.
