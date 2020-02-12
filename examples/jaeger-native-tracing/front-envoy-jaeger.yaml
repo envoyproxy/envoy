@@ -47,7 +47,7 @@ static_resources:
                 port_value: 80
 tracing:
   http:
-    name: envoy.dynamic.ot
+    name: envoy.tracers.dynamic_ot
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
       library: /usr/local/lib/libjaegertracing_plugin.so

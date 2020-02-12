@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
@@ -302,14 +303,13 @@ public:
 // Factory interface for cache implementations to implement and register.
 class HttpCacheFactory : public Config::TypedFactory {
 public:
-  // name should be in reverse DNS format, though this is not enforced.
-  explicit HttpCacheFactory(std::string name) : name_(std::move(name)) {}
-  std::string name() const override { return name_; }
+  // From UntypedFactory
   std::string category() const override { return "http_cache_factory"; }
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
-  virtual HttpCache& getCache() PURE;
+  virtual HttpCache&
+  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) PURE;
   virtual ~HttpCacheFactory() = default;
 
 private:

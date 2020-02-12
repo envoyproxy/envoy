@@ -546,14 +546,14 @@ dynamic_resources:
 cluster_manager: {}
 flags_path: "/etc/envoy/flags"
 stats_sinks:
-  - name: envoy.statsd
+  - name: envoy.stat_sinks.statsd
     typed_config:
       "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
       tcp_cluster_name: statsd
 watchdog: {}
 tracing:
   http:
-    name: envoy.lightstep
+    name: envoy.tracers.lightstep
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
       access_token_file: "/etc/envoy/lightstep_access_token"

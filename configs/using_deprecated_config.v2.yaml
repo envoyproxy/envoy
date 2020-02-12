@@ -58,7 +58,7 @@ static_resources:
         sni: www.google.com
 tracing:
   http:
-    name: envoy.zipkin
+    name: envoy.tracers.zipkin
     config:
       collector_cluster: service_google
       collector_endpoint: /api/v1/spans
