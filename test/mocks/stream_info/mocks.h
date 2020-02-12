@@ -90,7 +90,7 @@ public:
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::HeaderMap&));
   MOCK_METHOD(const Http::HeaderMap*, getRequestHeaders, (), (const));
-  MOCK_METHOD(const RequestIDUtils::UtilitiesSharedPtr, getRequestIDUtils, ());
+  MOCK_METHOD(RequestIDUtils::UtilitiesSharedPtr, getRequestIDUtils, (), (const));
   MOCK_METHOD(void, setRequestIDUtils, (RequestIDUtils::UtilitiesSharedPtr));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
