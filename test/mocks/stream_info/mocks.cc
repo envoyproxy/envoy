@@ -97,7 +97,7 @@ MockStreamInfo::MockStreamInfo()
     return response_flags_ & flag;
   }));
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
-  
+
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));

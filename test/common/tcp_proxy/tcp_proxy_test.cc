@@ -828,10 +828,10 @@ public:
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, onUpstreamHostSelected(_))
-      .WillByDefault(
-          Invoke([this](Upstream::HostDescriptionConstSharedPtr host) { 
-            upstream_host_ = host; }));
-    ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost()).WillByDefault(ReturnPointee(&upstream_host_));
+        .WillByDefault(Invoke(
+            [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
+    ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
+        .WillByDefault(ReturnPointee(&upstream_host_));
   }
 
   ~TcpProxyTest() override {
