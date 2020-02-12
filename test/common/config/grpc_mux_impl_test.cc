@@ -233,7 +233,7 @@ TEST_F(GrpcMuxImplTest, RpcErrorMessageTruncated) {
   setup();
   auto invalid_response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   InSequence s;
-  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, std::chrono::milliseconds(0));
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "", true);
