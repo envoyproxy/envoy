@@ -336,7 +336,8 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
                                                 Stats::Histogram::Unit::Unspecified);
   const std::vector<Tag> expectedTags = {Tag{"a", "b"}};
   EXPECT_EQ(expectedTags, h3.tags());
-  EXPECT_EQ(&h3, &scope1->histogramFromStatName(StatName(storage.statName()), tags, Stats::Histogram::Unit::Unspecified));
+  EXPECT_EQ(&h3, &scope1->histogramFromStatName(StatName(storage.statName()), tags,
+                                                Stats::Histogram::Unit::Unspecified));
 
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);
