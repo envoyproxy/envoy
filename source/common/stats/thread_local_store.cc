@@ -489,7 +489,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
 
-  SymbolTable::StoragePtr prefixed_stat_name_storage = symbolTable().join({prefix_.statName(), name});
+  SymbolTable::StoragePtr prefixed_stat_name_storage =
+      symbolTable().join({prefix_.statName(), name});
   StatName prefixed_stat_name = StatName(prefixed_stat_name_storage.get());
   SymbolTable::StoragePtr final_stat = finalStatName(name, tags);
   StatName final_stat_name = StatName(final_stat.get());
