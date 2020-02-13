@@ -489,10 +489,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
 
-  auto stat_name_no_tags = StatName(symbolTable().join({prefix_.statName(), name}).get());
-  auto final_stat = finalStatName(name, tags);
-  auto final_stat_name = StatName(final_stat.get());
-  std::cout << "here: " << symbolTable().toString(final_stat_name) << std::endl;
+  SymbolTable::StoragePtr prefixed_stat_name_storage = symbolTable().join({prefix_.statName(), name});
+  StatName prefixed_stat_name = StatName(prefixed_stat_name_storage.get());
+  SymbolTable::StoragePtr final_stat = finalStatName(name, tags);
+  StatName final_stat_name = StatName(final_stat.get());
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
@@ -517,25 +517,29 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
                                                tls_rejected_stats)) {
     return parent_.null_histogram_;
   } else {
-    TagExtraction extraction(parent_, stat_name_no_tags);
+    TagExtraction extraction(parent_, prefixed_stat_name);
 
     // Combine the provided tags with the extracted tags.
     std::vector<Tag> allTags;
-    std::transform(tags.begin(), tags.end(), allTags.end(),
-                   [this](const auto& stat_name_tag) -> Tag {
-                     return Tag{symbolTable().toString(stat_name_tag.first),
-                                symbolTable().toString(stat_name_tag.second)};
-                   });
-    allTags.insert(allTags.end(), extraction.tags().begin(), extraction.tags().end());
+    allTags.reserve(tags.size() + extraction.tags().size());
+
+    for (const auto& stat_name_tag : tags) {
+      allTags.emplace_back(Tag{symbolTable().toString(stat_name_tag.first),
+                               symbolTable().toString(stat_name_tag.second)});
+    }
+
+    for (const auto& extracted_tag : extraction.tags()) {
+      allTags.emplace_back(extracted_tag);
+    }
 
     RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
         final_stat_name, unit, parent_, *this, extraction.tagExtractedName(), allTags));
-    central_ref = &central_cache_->histograms_[final_stat_name];
+    central_ref = &central_cache_->histograms_[stat->statName()];
     *central_ref = stat;
   }
 
   if (tls_cache != nullptr) {
-    tls_cache->insert(std::make_pair(final_stat_name, *central_ref));
+    tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
   }
   return **central_ref;
 }
