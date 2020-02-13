@@ -12,6 +12,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+// Implements declaration from 'kafka_request.h'.
 bool requestUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version) {
   switch (api_key) {
     {% for message_type in message_types %}

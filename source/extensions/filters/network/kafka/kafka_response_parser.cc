@@ -38,8 +38,7 @@ ResponseParseResponse ResponseHeaderParser::parse(absl::string_view& data) {
   }
 
   // Depending on response's api key & version, we might need to parse tagged fields element.
-  if (responseUsesTaggedFieldsInHeader(context_->api_key_, context_->api_version_) &&
-      18 != context_->api_key_) {
+  if (responseUsesTaggedFieldsInHeader(context_->api_key_, context_->api_version_)) {
     context_->remaining_response_size_ -= tagged_fields_deserializer_.feed(data);
     if (tagged_fields_deserializer_.ready()) {
       context_->tagged_fields_ = tagged_fields_deserializer_.get();

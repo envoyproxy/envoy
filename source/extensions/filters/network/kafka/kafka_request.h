@@ -11,6 +11,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+/**
+ * Decides if request with given api key & version should have tagged fields in header.
+ * This method gets implemented in generated code through 'kafka_request_resolver_cc.j2'.
+ * @param api_key Kafka request key.
+ * @param api_version Kafka request's version.
+ * @return Whether tagged fields should be used for this request.
+ */
 bool requestUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version);
 
 /**

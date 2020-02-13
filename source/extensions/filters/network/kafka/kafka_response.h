@@ -9,6 +9,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+/**
+ * Decides if response with given api key & version should have tagged fields in header.
+ * Bear in mind, that ApiVersions responses DO NOT contain tagged fields in header (despite having
+ * flexible versions) as per
+ * https://github.com/apache/kafka/blob/2.4.0/clients/src/main/resources/common/message/ApiVersionsResponse.json#L24
+ * This method gets implemented in generated code through 'kafka_response_resolver_cc.j2'.
+ *
+ * @param api_key Kafka request key.
+ * @param api_version Kafka request's version.
+ * @return Whether tagged fields should be used for this request.
+ */
 bool responseUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version);
 
 /**
@@ -27,7 +38,7 @@ struct ResponseMetadata {
   uint32_t computeSize(const EncodingContext& context) const {
     uint32_t result{0};
     result += context.computeSize(correlation_id_);
-    if (responseUsesTaggedFieldsInHeader(api_key_, api_version_) && 18 != api_key_) {
+    if (responseUsesTaggedFieldsInHeader(api_key_, api_version_)) {
       result += context.computeCompactSize(tagged_fields_);
     }
     return result;
@@ -37,7 +48,7 @@ struct ResponseMetadata {
     uint32_t written{0};
     // Encode correlation id (api key / version are not present in responses).
     written += context.encode(correlation_id_, dst);
-    if (responseUsesTaggedFieldsInHeader(api_key_, api_version_) && 18 != api_key_) {
+    if (responseUsesTaggedFieldsInHeader(api_key_, api_version_)) {
       written += context.encodeCompact(tagged_fields_, dst);
     }
     return written;

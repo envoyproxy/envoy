@@ -42,12 +42,17 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ message_type.name }}Messages) {
 
   {% for field_list in message_type.compute_field_lists() %}
   for (int i = 0; i < 100; ++i ) {
+    {# Request header cannot contain tagged fields if request does not support them. #}
+    const TaggedFields tagged_fields = requestUsesTaggedFieldsInHeader(
+      {{ message_type.get_extra('api_key') }}, {{ field_list.version }}) ?
+        TaggedFields{ { TaggedField{ 10, Bytes{1, 2, 3, 4} } } }:
+        TaggedFields({});
     const RequestHeader header = {
       {{ message_type.get_extra('api_key') }},
       {{ field_list.version }},
       correlation++,
-      "id"
-      {% if field_list.uses_compact_fields %}, TaggedFields{ {TaggedField{10, Bytes{1, 2, 3, 4} } } } {% endif %}
+      "id",
+      tagged_fields
     };
     const {{ message_type.name }} data = { {{ field_list.example_value() }} };
     const RequestUnderTest request = {header, data};
