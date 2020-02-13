@@ -766,7 +766,7 @@ static_listeners:
     EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml),
                                               "version2", true));
     // Version2 is in warming list as listener_foo2->target_ is not ready yet.
-    checkStats(/*added=*/2, 0, /*warming=*/1, /*active=*/1, 0, 0);
+    checkStats(/*added=*/2, 0, /*removed=*/1, /*warming=*/1, 0, 0);
     EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version2"));
     checkConfigDump(R"EOF(
   version_info: version2
