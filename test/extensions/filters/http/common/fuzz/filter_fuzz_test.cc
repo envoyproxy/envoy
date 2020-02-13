@@ -39,6 +39,7 @@ public:
             }));
     // Ext-authz setup
     prepareExtAuthz();
+    prepareCache();
   }
 
   void prepareExtAuthz() {
@@ -52,7 +53,13 @@ public:
     callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
   }
 
-  // This executes the methods to be fuzzed.
+  void prepareCache() {
+    // Prepare expectations for dynamic forward proxy.
+    ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
+        .WillByDefault(testing::Return(resolver_));
+  }
+
+  // This executes the decode methods to be fuzzed.
   void decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
     bool end_stream = false;
 
@@ -127,6 +134,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
+  std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   std::shared_ptr<Http::StreamDecoderFilter> filter_;
   Http::FilterFactoryCb cb_;
   NiceMock<Envoy::Network::MockConnection> connection_;
