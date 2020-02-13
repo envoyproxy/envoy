@@ -242,8 +242,10 @@ message Http2ProtocolOptions {
   // Specifies SETTINGS frame parameters to be sent to the peer.
   // Note that parameters specified through this config will override named parameters with matching
   // identifiers.
-  //   e.g., A SettingsParameter { identifier = 1, value = 1000 } will override the value specified
-  //   in :ref:`hpack_table_size`.
+  //
+  // e.g., A SettingsParameter { identifier = 1, value = 1000 } will override the value specified in
+  // :ref:`hpack_table_size <envoy_api_field_config.core.v3.Http2ProtocolOptions.hpack_table_size>`.
+  //
   // See `IANA HTTP/2 Settings
   // <https://www.iana.org/assignments/http2-parameters/http2-parameters.xhtml#settings>`_ for
   // standardized identifiers.
