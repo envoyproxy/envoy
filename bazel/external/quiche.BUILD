@@ -2879,6 +2879,7 @@ envoy_cc_library(
         "quiche/quic/core/quic_stream.h",
         "quiche/quic/core/quic_stream_id_manager.h",
         "quiche/quic/core/quic_stream_sequencer.h",
+        "quiche/quic/core/stream_delegate_interface.h",
         "quiche/quic/core/tls_client_handshaker.h",
         "quiche/quic/core/tls_handshaker.h",
         "quiche/quic/core/tls_server_handshaker.h",
