@@ -743,6 +743,30 @@ message RouteAction {
     google.protobuf.BoolValue enabled = 2;
   }
 
+  // Describe how to match the path and rewrite it using a regular expression
+  // and a substitution string.
+  message RegexRewrite {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.route.RouteAction.RegexRewrite";
+
+    // The regular expression used to find portions of the path (excluding
+    // query parameters) that should be replaced. All matches in the path are
+    // replaced by the substitution string, though anchors in the regular
+    // expression can be used to replace just one occurrence of a pattern.
+    // Capture groups can be used in the pattern to extract portions of the
+    // path, and referenced in the substitution string.
+    type.matcher.v3.RegexMatcher pattern = 1;
+
+    // The string that should be substituted into matching portions of the path.
+    // Capture groups in the pattern can be referenced in this string  Beware,
+    // however, that the syntax for referring to capture groups might vary
+    // among the regular expression engines. Google's `RE2 <https://github.com/google/re2>`_
+    // regular expression engine uses backslash followed by the capture group
+    // number to denote a numbered capture group. E.g., ``\1`` refers to capture
+    // group 1, and ``\2`` refers to capture group 2.
+    string substitution = 2;
+  }
+
   reserved 12, 18, 19, 16, 22, 21;
 
   oneof cluster_specifier {
@@ -838,28 +862,6 @@ message RouteAction {
   //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
   //   ``/aaa/yyy/bbb``.
   RegexRewrite regex_rewrite = 32;
-
-  message RegexRewrite {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.route.RouteAction.RegexRewrite";
-
-    // The regular expression used to find portions of the path (excluding
-    // query parameters) that should be replaced. All matches in the path are
-    // replaced by the substitution string, though anchors in the regular
-    // expression can be used to replace just one occurrence of a pattern.
-    // Capture groups can be used in the pattern to extract portions of the
-    // path, and referenced in the substitution string.
-    type.matcher.v3.RegexMatcher pattern = 1;
-
-    // The string that should be substituted into matching portions of the path.
-    // Capture groups in the pattern can be referenced in this string  Beware,
-    // however, that the syntax for referring to capture groups might vary
-    // among the regular expression engines. Google's `RE2 <https://github.com/google/re2>`_
-    // regular expression engine uses backslash followed by the capture group
-    // number to denote a numbered capture group. E.g., ``\1`` refers to capture
-    // group 1, and ``\2`` refers to capture group 2.
-    string substitution = 2;
-  }
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
