@@ -738,6 +738,54 @@ message RouteAction {
   //   requests to */prefix/etc* will be stripped to */etc*.
   string prefix_rewrite = 5;
 
+  // Indicates that during forwarding, portions of the path that match the
+  // pattern should be rewritten, even allowing the substitution of capture
+  // groups from the pattern into the new path as specified by the rewrite
+  // substitution string. This is useful to allow application paths to be
+  // rewritten in a way that is aware of segments with variable content like
+  // identifiers. The router filter will place the original path as it was
+  // before the rewrite into the :ref:`x-envoy-original-path
+  // <config_http_filters_router_x-envoy-original-path>` header.
+  //
+  // Examples:
+  //
+  // * The path pattern ^/service/([^/]+)(/.*)$ paired with a substitution
+  //   string of \2/instance/\1 would transform */service/foo/v1/api* into
+  //   */v1/api/instance/foo*.
+  //
+  // * The pattern *one* paired with a substitution string of *two* would
+  //   transform */xxx/one/yyy/one/zzz* into */xxx/two/yyy/two/zzz*.
+  //
+  // * The pattern ^(.*?)one(.*)$ paired with a substitution string of
+  //   \1two\2 would replace only the first occurrence of "one",
+  //   transforming path */xxx/one/yyy/one/zzz* into */xxx/two/yyy/one/zzz*.
+  //
+  // * The pattern (?i)/xxx/ paired with a substitution string of /yyy/ would
+  //   do a case-insensitive match and transform path /aaa/XxX/bbb to /aaa/yyy/bbb.
+  RegexRewrite regex_rewrite = 32;
+
+  message RegexRewrite {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.route.RouteAction.RegexRewrite";
+
+    // The regular expression used to find portions of the path (excluding
+    // query parameters) that should be replaced. All matches in the path are
+    // replaced by the substitution string, though anchors in the regular
+    // expression can be used to replace just one occurrence of a pattern.
+    // Capture groups can be used in the pattern to extract portions of the
+    // path, and referenced in the substitution string.
+    type.matcher.v3.RegexMatcher pattern = 1;
+
+    // The string that should be substituted into matching portions of the path.
+    // Capture groups in the pattern can be referenced in this string  Beware,
+    // however, that the syntax for referring to capture groups might vary
+    // among the regular expression engines. Google's `RE2 <https://github.com/google/re2>`_
+    // regular expression engine uses backslash followed by the capture group
+    // number to denote a numbered capture group. E.g., \1 refers to capture
+    // group 1, and \2 refers to capture group 2.
+    string substitution = 2;
+  }
+
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.

@@ -30,6 +30,8 @@ Version history
   restart Envoy. The behavior will not switch until the connection pools are recreated. The new
   circuit breaker behavior is described :ref:`here <arch_overview_circuit_break>`.
 * upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`.
+* router: added support for :ref:`regex_rewrite
+  <envoy_api_field_route.RouteAction.regex_rewrite>` for path rewriting using regular expressions and capture groups.
 
 1.13.0 (January 20, 2020)
 =========================
