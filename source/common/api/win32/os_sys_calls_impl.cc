@@ -54,7 +54,7 @@ static wsabufResult iovecToWSABUF(const iovec* vec, int in_vec) {
   return {num_vec, std::move(wsa_buf)};
 }
 
-static LPFN_WSARECVMSG GetWSARecvMsgFnPtr() {
+static LPFN_WSARECVMSG getFnPtrWSARecvMsg() {
   LPFN_WSARECVMSG WSARecvMsgFnPtr = NULL;
   GUID WSARecvMsg_guid = WSAID_WSARECVMSG;
   SOCKET sock = INVALID_SOCKET;
@@ -62,12 +62,11 @@ static LPFN_WSARECVMSG GetWSARecvMsgFnPtr() {
 
   sock = socket(AF_INET6, SOCK_DGRAM, 0);
 
-  if (SOCKET_ERROR == WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &WSARecvMsg_guid,
-                               sizeof(WSARecvMsg_guid), &WSARecvMsgFnPtr, sizeof(WSARecvMsgFnPtr),
-                               &bytes_received, NULL, NULL)) {
-    PANIC("WSAIoctl SIO_GET_EXTENSION_FUNCTION_POINTER for WSARecvMsg failed, not implemented?");
-    return NULL;
-  }
+  RELEASE_ASSERT(
+      WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &WSARecvMsg_guid, sizeof(WSARecvMsg_guid),
+               &WSARecvMsgFnPtr, sizeof(WSARecvMsgFnPtr), &bytes_received, NULL,
+               NULL) != SOCKET_ERROR,
+      "WSAIoctl SIO_GET_EXTENSION_FUNCTION_POINTER for WSARecvMsg failed, not implemented?");
 
   closesocket(sock);
 
@@ -146,11 +145,8 @@ SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t leng
 }
 
 SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags) {
-  LPFN_WSARECVMSG WSARecvMsgFnPtr = NULL;
   DWORD bytes_received;
-  if (NULL == (WSARecvMsgFnPtr = GetWSARecvMsgFnPtr())) {
-    PANIC("WSARecvMsg has not been implemented by this socket provider");
-  }
+  LPFN_WSARECVMSG WSARecvMsgFnPtr = getFnPtrWSARecvMsg();
   WSAMSGPtr wsa_msg = msghdrToWSAMSG(msg);
   // Windows supports only a single flag on input to WSARecvMsg
   wsa_msg->dwFlags = flags & MSG_PEEK;
