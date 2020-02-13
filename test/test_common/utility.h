@@ -625,16 +625,16 @@ namespace Http {
  */
 #define DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                      \
 public:                                                                                            \
-  const HeaderEntry* name() const override { return header_map_->name(); }                         \
+  const HeaderEntry* name() const override { return header_map_.name(); }                          \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
-    header_map_->append##name(data, delimiter);                                                    \
+    header_map_.append##name(data, delimiter);                                                     \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
-    header_map_->setReference##name(value);                                                        \
+    header_map_.setReference##name(value);                                                         \
   }                                                                                                \
-  void set##name(absl::string_view value) override { header_map_->set##name(value); }              \
-  void set##name(uint64_t value) override { header_map_->set##name(value); }                       \
-  void remove##name() override { header_map_->remove##name(); }
+  void set##name(absl::string_view value) override { header_map_.set##name(value); }               \
+  void set##name(uint64_t value) override { header_map_.set##name(value); }                        \
+  void remove##name() override { header_map_.remove##name(); }
 
 /**
  * Base class for all test header map types. This class wraps an underlying real header map
@@ -645,24 +645,21 @@ public:                                                                         
  */
 template <class Interface, class Impl> class TestHeaderMapImplBase : public Interface {
 public:
-  TestHeaderMapImplBase() : header_map_(std::make_unique<Impl>()) {}
-  TestHeaderMapImplBase(const std::initializer_list<std::pair<std::string, std::string>>& values)
-      : TestHeaderMapImplBase() {
+  TestHeaderMapImplBase() = default;
+  TestHeaderMapImplBase(const std::initializer_list<std::pair<std::string, std::string>>& values) {
     for (auto& value : values) {
       addCopy(value.first, value.second);
     }
   }
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
-      : TestHeaderMapImplBase(*rhs.header_map_) {}
-  TestHeaderMapImplBase(const HeaderMap& rhs) : TestHeaderMapImplBase() {
-    HeaderMapImpl::copyFrom(*header_map_, rhs);
-  }
+      : TestHeaderMapImplBase(rhs.header_map_) {}
+  TestHeaderMapImplBase(const HeaderMap& rhs) { HeaderMapImpl::copyFrom(header_map_, rhs); }
   TestHeaderMapImplBase& operator=(const TestHeaderMapImplBase& rhs) {
     if (this == &rhs) {
       return *this;
     }
     clear();
-    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    HeaderMapImpl::copyFrom(header_map_, rhs);
     return *this;
   }
 
@@ -684,64 +681,62 @@ public:
   void remove(const std::string& key) { remove(LowerCaseString(key)); }
 
   // HeaderMap
-  bool operator==(const HeaderMap& rhs) const override { return header_map_->operator==(rhs); }
-  bool operator!=(const HeaderMap& rhs) const override { return header_map_->operator!=(rhs); }
+  bool operator==(const HeaderMap& rhs) const override { return header_map_.operator==(rhs); }
+  bool operator!=(const HeaderMap& rhs) const override { return header_map_.operator!=(rhs); }
   void addViaMove(HeaderString&& key, HeaderString&& value) override {
-    header_map_->addViaMove(std::move(key), std::move(value));
+    header_map_.addViaMove(std::move(key), std::move(value));
   }
   void addReference(const LowerCaseString& key, absl::string_view value) override {
-    header_map_->addReference(key, value);
+    header_map_.addReference(key, value);
   }
   void addReferenceKey(const LowerCaseString& key, uint64_t value) override {
-    header_map_->addReferenceKey(key, value);
+    header_map_.addReferenceKey(key, value);
   }
   void addReferenceKey(const LowerCaseString& key, absl::string_view value) override {
-    header_map_->addReferenceKey(key, value);
+    header_map_.addReferenceKey(key, value);
   }
   void addCopy(const LowerCaseString& key, uint64_t value) override {
-    header_map_->addCopy(key, value);
+    header_map_.addCopy(key, value);
   }
   void addCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_->addCopy(key, value);
+    header_map_.addCopy(key, value);
   }
   void appendCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_->appendCopy(key, value);
+    header_map_.appendCopy(key, value);
   }
   void setReference(const LowerCaseString& key, absl::string_view value) override {
-    header_map_->setReference(key, value);
+    header_map_.setReference(key, value);
   }
   void setReferenceKey(const LowerCaseString& key, absl::string_view value) override {
-    header_map_->setReferenceKey(key, value);
+    header_map_.setReferenceKey(key, value);
   }
   void setCopy(const LowerCaseString& key, absl::string_view value) override {
-    header_map_->setCopy(key, value);
+    header_map_.setCopy(key, value);
   }
-  uint64_t byteSize() const override { return header_map_->byteSize(); }
-  const HeaderEntry* get(const LowerCaseString& key) const override {
-    return header_map_->get(key);
-  }
+  uint64_t byteSize() const override { return header_map_.byteSize(); }
+  const HeaderEntry* get(const LowerCaseString& key) const override { return header_map_.get(key); }
   void iterate(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_->iterate(cb, context);
+    header_map_.iterate(cb, context);
   }
   void iterateReverse(HeaderMap::ConstIterateCb cb, void* context) const override {
-    header_map_->iterateReverse(cb, context);
+    header_map_.iterateReverse(cb, context);
   }
   HeaderMap::Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override {
-    return header_map_->lookup(key, entry);
+    return header_map_.lookup(key, entry);
   }
-  void clear() override { header_map_->clear(); }
-  void remove(const LowerCaseString& key) override { header_map_->remove(key); }
-  void removePrefix(const LowerCaseString& key) override { header_map_->removePrefix(key); }
-  size_t size() const override { return header_map_->size(); }
-  bool empty() const override { return header_map_->empty(); }
+  void clear() override { header_map_.clear(); }
+  void remove(const LowerCaseString& key) override { header_map_.remove(key); }
+  void removePrefix(const LowerCaseString& key) override { header_map_.removePrefix(key); }
+  size_t size() const override { return header_map_.size(); }
+  bool empty() const override { return header_map_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override {
-    header_map_->dumpState(os, indent_level);
+    header_map_.dumpState(os, indent_level);
   }
-  void verifyByteSize() override { header_map_->verifyByteSizeInternalForTest(); }
+  void verifyByteSize() override { header_map_.verifyByteSizeInternalForTest(); }
 
   ALL_INLINE_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
 
-  const std::unique_ptr<Impl> header_map_;
+  Impl header_map_;
 };
 
 /**
