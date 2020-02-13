@@ -142,19 +142,19 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      init_watcher_("ListenerImpl",
-                    [this] {
-                      if (workers_started_) {
-                        parent_.onListenerWarmed(*this);
-                      } else {
-                        // Notify Server that this listener is
-                        // ready.
-                        listener_init_target_.ready();
-                      }
-                    }),
-      listener_init_target_(fmt::format("Listener Initializer {}", name),
-                            [this]() { dynamic_init_manager_.initialize(init_watcher_); }),
-      dynamic_init_manager_(fmt::format("Listener {}", name)),
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
+                          [this] {
+                            if (workers_started_) {
+                              parent_.onListenerWarmed(*this);
+                            } else {
+                              // Notify Server that this listener is
+                              // ready.
+                              listener_init_target_.ready();
+                            }
+                          }),
+      listener_init_target_(fmt::format("Listener-init-target {}", name),
+                            [this]() { dynamic_init_manager_.initialize(local_init_watcher_); }),
+      dynamic_init_manager_(fmt::format("Listener-local-init-manager {}", name)),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
@@ -406,9 +406,10 @@ void ListenerImpl::initialize() {
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // by resetting the watcher.
   if (workers_started_) {
+    ENVOY_LOG_MISC(debug, "Initialize listener {} local-init-manager.", name_);
     // If workers_started_ is true, dynamic_init_manager_ should be initialized by listener manager
     // directly.
-    dynamic_init_manager_.initialize(init_watcher_);
+    dynamic_init_manager_.initialize(local_init_watcher_);
   }
 }
 
