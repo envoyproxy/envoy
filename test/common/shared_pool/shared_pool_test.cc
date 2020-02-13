@@ -1,6 +1,6 @@
-#include "common/shared_pool/shared_pool.h"
-
 #include <thread>
+
+#include "common/shared_pool/shared_pool.h"
 
 #include "gtest/gtest.h"
 
@@ -25,9 +25,7 @@ TEST(SharedPoolTest, Basic) {
 TEST(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
   std::shared_ptr<ObjectSharedPool<int>> pool;
 
-  std::thread another_thread([&pool]{
-    pool = std::make_shared<ObjectSharedPool<int>>();
-  });
+  std::thread another_thread([&pool] { pool = std::make_shared<ObjectSharedPool<int>>(); });
   another_thread.join();
   EXPECT_DEBUG_DEATH(pool->getObject(4), ".*");
 }
@@ -35,9 +33,7 @@ TEST(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
 TEST(SharedPoolTest, NonThreadSafeForDeleteObjectDeathTest) {
   std::shared_ptr<ObjectSharedPool<int>> pool;
 
-  std::thread another_thread([&pool]{
-    pool = std::make_shared<ObjectSharedPool<int>>();
-  });
+  std::thread another_thread([&pool] { pool = std::make_shared<ObjectSharedPool<int>>(); });
   another_thread.join();
   EXPECT_DEBUG_DEATH(pool->deleteObject(std::hash<int>{}(4)), ".*");
 }
@@ -45,9 +41,7 @@ TEST(SharedPoolTest, NonThreadSafeForDeleteObjectDeathTest) {
 TEST(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
   std::shared_ptr<ObjectSharedPool<int>> pool;
 
-  std::thread another_thread([&pool]{
-    pool = std::make_shared<ObjectSharedPool<int>>();
-  });
+  std::thread another_thread([&pool] { pool = std::make_shared<ObjectSharedPool<int>>(); });
   another_thread.join();
   EXPECT_DEBUG_DEATH(pool->poolSize(), ".*");
 }
