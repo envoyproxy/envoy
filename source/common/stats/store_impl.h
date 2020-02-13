@@ -18,6 +18,7 @@ public:
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
+
 private:
   SymbolTable& symbol_table_;
 };

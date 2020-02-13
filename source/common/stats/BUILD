@@ -50,6 +50,7 @@ envoy_cc_library(
         ":null_gauge_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
+        ":tag_utility_lib",
         ":store_impl_lib",
         ":symbol_table_creator_lib",
         "//include/envoy/stats:stats_macros",
@@ -65,6 +66,17 @@ envoy_cc_library(
         ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "tag_utility_lib",
+    srcs = ["tag_utility.cc"],
+    hdrs = ["tag_utility.h"],
+    deps = [
+        ":symbol_table_lib",
+        "//include/envoy/stats:symbol_table_interface",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 
@@ -231,6 +243,7 @@ envoy_cc_library(
         ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",
+        ":tag_utility_lib",
         ":tag_producer_lib",
         "//include/envoy/thread_local:thread_local_interface",
     ],

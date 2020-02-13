@@ -13,6 +13,7 @@
 
 #include "common/common/lock_guard.h"
 #include "common/stats/stats_matcher_impl.h"
+#include "common/stats/tag_utility.h"
 #include "common/stats/tag_producer_impl.h"
 
 #include "absl/strings/str_join.h"
@@ -457,22 +458,6 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   return gauge;
 }
 
-SymbolTable::StoragePtr
-ThreadLocalStoreImpl::ScopeImpl::finalStatName(StatName name, const StatNameTagVector& tags) {
-
-  std::vector<StatName> stat_names;
-  stat_names.reserve(2 + 2 * tags.size());
-  stat_names.emplace_back(prefix_.statName());
-  stat_names.emplace_back(name);
-
-  for (const auto& tag : tags) {
-    stat_names.emplace_back(tag.first);
-    stat_names.emplace_back(tag.second);
-  }
-
-  return symbolTable().join(stat_names);
-}
-
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
                                                                   const StatNameTagVector& tags,
                                                                   Histogram::Unit unit) {
@@ -492,7 +477,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   SymbolTable::StoragePtr prefixed_stat_name_storage =
       symbolTable().join({prefix_.statName(), name});
   StatName prefixed_stat_name = StatName(prefixed_stat_name_storage.get());
-  SymbolTable::StoragePtr final_stat = finalStatName(name, tags);
+  SymbolTable::StoragePtr final_stat = TagUtility::addTagSuffix(prefixed_stat_name, tags, symbolTable());
   StatName final_stat_name = StatName(final_stat.get());
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;

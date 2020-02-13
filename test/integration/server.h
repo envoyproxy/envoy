@@ -95,6 +95,11 @@ public:
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatName(name, unit);
   }
+  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
+                                           Histogram::Unit unit) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->histogramFromStatName(name, tags, unit);
+  }
   NullGaugeImpl& nullGauge(const std::string& str) override {
     return wrapped_scope_->nullGauge(str);
   }
@@ -166,6 +171,10 @@ public:
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatName(name, unit);
+  }
+  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags, Histogram::Unit unit) override {
+    Thread::LockGuard lock(lock_);
+    return store_.histogramFromStatName(name, tags, unit);
   }
   NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {

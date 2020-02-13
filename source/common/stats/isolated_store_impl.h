@@ -13,6 +13,7 @@
 #include "common/stats/null_gauge.h"
 #include "common/stats/store_impl.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/tag_utility.h"
 #include "common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -114,9 +115,10 @@ public:
     Histogram& histogram = histograms_.get(name, unit);
     return histogram;
   }
-  Histogram& histogramFromStatName(StatName name, const StatNameTagVector&,
+  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
                                    Histogram::Unit unit) override {
-    Histogram& histogram = histograms_.get(name, unit);
+    SymbolTable::StoragePtr suffixed_storage = TagUtility::addTagSuffix(name, tags, symbolTable());
+    Histogram& histogram = histograms_.get(StatName(suffixed_storage.get()), unit);
     return histogram;
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
