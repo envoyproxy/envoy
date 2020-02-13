@@ -170,12 +170,6 @@ TEST_F(QuicPlatformTest, QuicQueue) {
   EXPECT_EQ(10, queue.back());
 }
 
-TEST_F(QuicPlatformTest, QuicDeque) {
-  QuicDeque<int> deque;
-  deque.push_back(10);
-  EXPECT_EQ(10, deque.back());
-}
-
 TEST_F(QuicPlatformTest, QuicInlinedVector) {
   QuicInlinedVector<int, 5> vec;
   vec.push_back(3);

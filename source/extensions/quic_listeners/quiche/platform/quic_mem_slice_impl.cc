@@ -12,13 +12,12 @@
 
 namespace quic {
 
-QuicMemSliceImpl::QuicMemSliceImpl(QuicBufferAllocator* /*allocator*/, size_t length) {
-  Envoy::Buffer::RawSlice iovec;
-  uint64_t num_iov = single_slice_buffer_.reserve(length, &iovec, 1);
-  ASSERT(num_iov == 1);
-  // OwnedImpl may return a slice longer than needed, trim it to requested length.
-  iovec.len_ = length;
-  single_slice_buffer_.commit(&iovec, 1);
+QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
+    : buffer_(std::move(buffer)),
+      fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
+          buffer_.get(), length,
+          [](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {})) {
+  single_slice_buffer_.addBufferFragment(*fragment_);
   ASSERT(this->length() == length);
 }
 

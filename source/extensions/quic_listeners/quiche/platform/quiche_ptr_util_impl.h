@@ -6,15 +6,12 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "absl/memory/memory.h"
 
 namespace quiche {
-namespace test {
 
-using QuicheTest = ::testing::Test;
+template <typename T> std::unique_ptr<T> QuicheWrapUniqueImpl(T* ptr) {
+  return absl::WrapUnique<T>(ptr);
+}
 
-template <class T> using QuicheTestWithParamImpl = ::testing::TestWithParam<T>;
-
-} // namespace test
 } // namespace quiche

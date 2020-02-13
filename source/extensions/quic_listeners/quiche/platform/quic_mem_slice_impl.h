@@ -23,11 +23,8 @@ public:
   // Constructs an empty QuicMemSliceImpl.
   QuicMemSliceImpl() = default;
 
-  // Constructs a QuicMemSliceImpl by letting |single_slice_buffer_| allocate |length| memory.
-  // TODO(danzh) Note that |allocator| is not used to allocate memory currently, instead,
-  // Buffer::OwnedImpl allocates memory on its own. Investigate if a customized
-  // QuicBufferAllocator can improve cache hit.
-  QuicMemSliceImpl(QuicBufferAllocator* allocator, size_t length);
+  // Constructs a QuicMemSliceImpl by taking ownernship of the memory in |buffer|.
+  QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length);
 
   // Constructs a QuicMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
   // Data will be moved from |buffer| to this mem slice.
@@ -42,6 +39,8 @@ public:
   QuicMemSliceImpl& operator=(const QuicMemSliceImpl& other) = delete;
   QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) noexcept {
     if (this != &other) {
+      buffer_ = std::move(other.buffer_);
+      fragment_ = std::move(other.fragment_);
       single_slice_buffer_.move(other.single_slice_buffer_);
     }
     return *this;
@@ -62,6 +61,8 @@ private:
   // Prerequisite: buffer has at least one slice.
   size_t firstSliceLength(Envoy::Buffer::Instance& buffer);
 
+  quic::QuicUniqueBufferPtr buffer_{nullptr, quic::QuicBufferDeleter(nullptr)};
+  std::unique_ptr<Envoy::Buffer::BufferFragmentImpl> fragment_;
   Envoy::Buffer::OwnedImpl single_slice_buffer_;
 };
 

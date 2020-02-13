@@ -71,7 +71,6 @@ envoy_cc_library(
         "http2_flags_impl.h",
         "http2_logging_impl.h",
         "http2_macros_impl.h",
-        "http2_optional_impl.h",
         "http2_string_utils_impl.h",
     ],
     external_deps = [
@@ -247,7 +246,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "@com_googlesource_quiche//:quic_platform",
+        "@com_googlesource_quiche//:quic_core_clock_lib",
     ],
 )
 
@@ -256,6 +255,9 @@ envoy_cc_library(
     hdrs = [
         "quiche_arraysize_impl.h",
         "quiche_logging_impl.h",
+        "quiche_map_util_impl.h",
+        "quiche_optional_impl.h",
+        "quiche_ptr_util_impl.h",
         "quiche_str_cat_impl.h",
         "quiche_string_piece_impl.h",
         "quiche_text_utils_impl.h",
