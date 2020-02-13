@@ -27,7 +27,7 @@ mkdir -p /tmp/debug
 vmstat -Sm -t 5 >/tmp/debug/vmstats.out &
 VMSTAT_PID=$!
 
-sysctl -w "kernel.core_pattern=/tmp/debug/%h-%e-%p.core"
+echo "/tmp/debug/%h-%e-%p.core" >/proc/sys/kernel/core_pattern
 
 function finish {
   echo "disk space at end of build:"
