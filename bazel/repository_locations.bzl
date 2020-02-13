@@ -313,8 +313,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["http://us.mirrors.quenda.co/apache/kafka/2.4.0/kafka_2.12-2.4.0.tgz"],
     ),
     kafka_python_client = dict(
-        sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",
-        strip_prefix = "kafka-python-1.4.7",
-        urls = ["https://github.com/dpkp/kafka-python/archive/1.4.7.tar.gz"],
+        sha256 = "454bf3aafef9348017192417b7f0828a347ec2eaf3efba59336f3a3b68f10094",
+        strip_prefix = "kafka-python-2.0.0",
+        urls = ["https://github.com/dpkp/kafka-python/archive/2.0.0.tar.gz"],
     ),
 )
