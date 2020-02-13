@@ -4,6 +4,7 @@ set -e
 
 # Workaround for argument too long issue in protoc
 ulimit -s 16384
+ulimit -c unlimited
 
 # bazel uses jgit internally and the default circle-ci .gitconfig says to
 # convert https://github.com to ssh://git@github.com, which jgit does not support.
@@ -22,9 +23,16 @@ export NUM_CPUS=8
 # IPv6 tests are run with Azure Pipelines.
 export BAZEL_EXTRA_TEST_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
 
+mkdir -p /tmp/debug
+vmstat -Sm -t 5 >/tmp/debug/vmstats.out &
+VMSTAT_PID=$!
+
 function finish {
   echo "disk space at end of build:"
   df -h
+
+  kill $VMSTAT_PID
+  cp core.* /tmp/debug
 }
 trap finish EXIT
 
