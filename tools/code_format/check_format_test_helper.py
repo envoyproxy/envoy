@@ -15,9 +15,10 @@ import shutil
 import sys
 import tempfile
 
-tools = os.path.dirname(os.path.realpath(__file__))
+curr_dir = os.path.dirname(os.path.realpath(__file__))
+tools = os.path.dirname(curr_dir)
 src = os.path.join(tools, 'testdata', 'check_format')
-check_format = sys.executable + " " + os.path.join(tools, 'check_format.py')
+check_format = sys.executable + " " + os.path.join(curr_dir, 'check_format.py')
 errors = 0
 
 

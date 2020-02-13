@@ -306,18 +306,18 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   echo "protoxform_test..."
   ./tools/protoxform_test.sh
   echo "fix_format..."
-  ./tools/check_format.py fix
-  ./tools/format_python_tools.sh fix
+  ./tools/code_format/check_format.py fix
+  ./tools/code_format/format_python_tools.sh fix
   ./tools/proto_format.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
   echo "check_format_test..."
-  ./tools/check_format_test_helper.py --log=WARN
+  ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
-  ./tools/check_format.py check
-  ./tools/format_python_tools.sh check
+  ./tools/code_format/check_format.py check
+  ./tools/code_format/format_python_tools.sh check
   ./tools/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
