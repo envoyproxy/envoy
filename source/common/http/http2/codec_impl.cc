@@ -846,7 +846,7 @@ void ConnectionImpl::sendSettings(
   std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals> settings;
 
   // Universally disable receiving push promise frames as we don't currently support
-  // them.  nghttp2 will fail the connection if the other side still sends them.
+  // them. nghttp2 will fail the connection if the other side still sends them.
   // TODO(mattklein123): Remove this when we correctly proxy push promise.
   // NOTE: This is a special case with respect to custom parameter overrides in that server push is
   // not supported and therefore not end user configurable.
