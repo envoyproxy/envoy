@@ -125,7 +125,6 @@ message ClusterLoadAssignment {
   Policy policy = 4;
 
   // References endpoint groups by name.
-  // Both endpoints and EGDS references will be used when present
   repeated Egds endpoint_groups = 6;
 }
 
