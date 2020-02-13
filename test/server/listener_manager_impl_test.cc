@@ -1163,7 +1163,7 @@ filter_chains:
         NiceMock<Api::MockOsSysCalls> os_sys_calls;
         TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
         ON_CALL(os_sys_calls, socket(AF_INET, _, 0))
-            .WillByDefault(Return(Api::SysCallIntResult{syscall_result.rc_, 0}));
+            .WillByDefault(Return(Api::SysCallSocketResult{syscall_result.rc_, 0}));
         return real_listener_factory.createListenSocket(address, socket_type, options, params);
       }));
   EXPECT_CALL(listener_foo->target_, initialize());
