@@ -521,9 +521,9 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
 // handles the "prefix_rewrite" and "regex_rewrite" route actions. If
 // "prefix_rewrite" is specified, it takes precedence. The "matched_path"
 // argument applies only to the prefix rewriting, and describes the portion of
-// the path (excluding query parms) that should be replaced by the rewrite. A
-// "regex_rewrite" applies to the entire path, regardless of what portion was
-// matched.
+// the path (excluding query parameters) that should be replaced by the
+// rewrite. A "regex_rewrite" applies to the entire path, regardless of what
+// portion was matched.
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
@@ -544,7 +544,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
     if (insert_envoy_original_path) {
       headers.setEnvoyOriginalPath(path);
     }
-    // Replace the entire path, but preserve the query parms
+    // Replace the entire path, but preserve the query parameters
     auto just_path(Http::PathUtil::removeQueryAndFragment(path));
     headers.setPath(path.replace(
         0, just_path.size(), regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_)));

@@ -832,7 +832,7 @@ virtual_hosts:
   }
 
   // Regular expression path rewrite after prefix match testing, replace every
-  // occurrence, excluding query parms.
+  // occurrence, excluding query parameters.
   {
     Http::TestHeaderMapImpl headers =
         genHeaders("www.lyft.com", "/newforreg2_endpoint/tee?test=me", "GET");
@@ -857,7 +857,7 @@ virtual_hosts:
   }
 
   // Regular expression path rewrite after exact path match testing,
-  // with query parms.
+  // with query parameters.
   {
     Http::TestHeaderMapImpl headers =
         genHeaders("www.lyft.com", "/exact/path/for/regex1?test=aeiou", "GET");
@@ -982,7 +982,7 @@ virtual_hosts:
     EXPECT_EQ("/xx/yy/6472", headers.get_(Http::Headers::get().EnvoyOriginalPath));
   }
 
-  // Regular expression rewrite for regular expression matching, with query parms.
+  // Regular expression rewrite for regular expression matching, with query parameters.
   {
     Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/xx/yy/6472?test=foo", "GET");
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
