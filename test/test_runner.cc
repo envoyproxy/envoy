@@ -6,7 +6,6 @@
 #include "common/common/logger_delegates.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
-#include "common/http/http2/codec_impl.h"
 #include "common/runtime/runtime_features.h"
 
 #include "exe/process_wide.h"

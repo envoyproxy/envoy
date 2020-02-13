@@ -28,6 +28,7 @@
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_subject_alt_names.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -386,10 +387,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Extract debug configuration from filter state. This is used further along to determine whether
   // we should append cluster and host headers to the response, and whether to forward the request
   // upstream.
-  const StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
   const DebugConfig* debug_config =
-      filter_state.hasData<DebugConfig>(DebugConfig::key())
-          ? &(filter_state.getDataReadOnly<DebugConfig>(DebugConfig::key()))
+      filter_state->hasData<DebugConfig>(DebugConfig::key())
+          ? &(filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key()))
           : nullptr;
 
   // TODO: Maybe add a filter API for this.
@@ -519,17 +520,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
-  if (upstream_http_protocol_options.has_value() &&
-      upstream_http_protocol_options.value().auto_sni()) {
-    const auto host_str = headers.Host()->value().getStringView();
-    const auto parsed_authority = Http::Utility::parseAuthority(host_str);
-    if (!parsed_authority.is_ip_address_) {
-      // TODO: Add SAN verification here and use it from dynamic_forward_proxy
-      // Update filter state with the host/authority to use for setting SNI in the transport
-      // socket options. This is referenced during the getConnPool() call below.
-      callbacks_->streamInfo().filterState().setData(
+  if (upstream_http_protocol_options.has_value()) {
+    const auto parsed_authority =
+        Http::Utility::parseAuthority(headers.Host()->value().getStringView());
+    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
+      callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(host_str),
+          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::StateType::Mutable);
+    }
+
+    if (upstream_http_protocol_options.value().auto_san_validation()) {
+      callbacks_->streamInfo().filterState()->setData(
+          Network::UpstreamSubjectAltNames::key(),
+          std::make_unique<Network::UpstreamSubjectAltNames>(
+              std::vector<std::string>{std::string(parsed_authority.host_)}),
           StreamInfo::FilterState::StateType::Mutable);
     }
   }
@@ -627,7 +632,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      callbacks_->streamInfo().filterState());
+      *callbacks_->streamInfo().filterState());
 
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
@@ -1123,9 +1128,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     }
   }
 
-  if (grpc_status.has_value() &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.outlier_detection_support_for_grpc_status")) {
+  if (grpc_status.has_value()) {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(grpc_to_http_status);
   } else {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
@@ -1372,13 +1375,13 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
-  StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
 
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, filter_state,
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, *filter_state,
                                                route_entry_->maxInternalRedirects(), *location,
                                                *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
@@ -1490,14 +1493,14 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+void Filter::UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
   parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
-void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void Filter::UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
@@ -1522,7 +1525,7 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
-void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+void Filter::UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   maybeEndDecode(true);
@@ -1699,7 +1702,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
+void Filter::UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host,
                                           const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
@@ -1789,7 +1792,7 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
                                 priority);
 }
 
-void Filter::UpstreamRequest::setRequestEncoder(Http::StreamEncoder& request_encoder) {
+void Filter::UpstreamRequest::setRequestEncoder(Http::RequestEncoder& request_encoder) {
   request_encoder_ = &request_encoder;
   // Now that there is an encoder, have the connection manager inform the manager when the
   // downstream buffers are overrun. This may result in immediate watermark callbacks referencing

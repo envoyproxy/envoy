@@ -182,8 +182,7 @@ public:
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   StoragePtr join(const StatNameVec& stat_names) const override;
-  void populateList(const absl::string_view* names, uint32_t num_names,
-                    StatNameList& list) override;
+  void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
   StoragePtr makeDynamicStorage(absl::string_view name) override;
   void callWithStringView(StatName stat_name,
@@ -454,6 +453,11 @@ public:
   }
 
   /**
+   * @return A pointer to the buffer, including the size bytes.
+   */
+  const uint8_t* sizeAndData() const { return size_and_data_; }
+
+  /**
    * @return whether this is empty.
    */
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
@@ -579,6 +583,11 @@ private:
  *   StatNameDynamicPool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
+ *
+ * Note; StatNameDynamicPool::add("foo") != StatNamePool::add("foo"), even
+ * though their string representations are identical. They also will not match
+ * in map lookups. Tests for StatName with dynamic components must therefore
+ * be looked up by string, via Stats::TestUtil::TestStore.
  */
 class StatNameDynamicPool {
 public:

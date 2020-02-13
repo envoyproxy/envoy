@@ -36,7 +36,6 @@ public:
   DeltaSubscriptionImpl(GrpcMuxSharedPtr context, absl::string_view type_url,
                         SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                         std::chrono::milliseconds init_fetch_timeout, bool is_aggregated);
-  ~DeltaSubscriptionImpl() override;
 
   void pause();
   void resume();
@@ -66,7 +65,7 @@ private:
   // NOTE: if another subscription of the same type_url has already been started, this value will be
   // ignored in favor of the other subscription's.
   std::chrono::milliseconds init_fetch_timeout_;
-  Watch* watch_{};
+  GrpcMuxWatchPtr watch_;
   const bool is_aggregated_;
 };
 

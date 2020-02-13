@@ -60,7 +60,7 @@ InstanceImpl::InstanceImpl(
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
-                         process_context ? OptProcessContextRef(std::ref(*process_context))
+                         process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
@@ -578,6 +578,13 @@ void InstanceImpl::terminate() {
 
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_ != nullptr) {
+    // Also shutdown the listener manager's ApiListener, if there is one, which runs on the main
+    // thread. This needs to happen ahead of calling thread_local_.shutdown() below to prevent any
+    // objects in the ApiListener destructor to reference any objects in thread local storage.
+    if (listener_manager_->apiListener().has_value()) {
+      listener_manager_->apiListener()->get().shutdown();
+    }
+
     listener_manager_->stopWorkers();
   }
 

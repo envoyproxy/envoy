@@ -86,8 +86,8 @@ public:
   void onGoAway() override;
 
   // Http::ServerConnectionCallbacks
-  StreamDecoder& newStream(StreamEncoder& response_encoder,
-                           bool is_internally_created = false) override;
+  RequestDecoder& newStream(ResponseEncoder& response_encoder,
+                            bool is_internally_created = false) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -282,8 +282,8 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       parent_.stream_info_.setResponseCodeDetails(details);
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
-                             grpc_status, details);
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
+                             parent_.state_.is_head_request_, grpc_status, details);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -438,7 +438,7 @@ private:
   struct ActiveStream : LinkedObject<ActiveStream>,
                         public Event::DeferredDeletable,
                         public StreamCallbacks,
-                        public StreamDecoder,
+                        public RequestDecoder,
                         public FilterChainFactoryCallbacks,
                         public Tracing::Config,
                         public ScopeTrackedObject {
@@ -480,13 +480,27 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
+    // As with most of the encode functions, this runs encodeHeaders on various
+    // filters before calling encodeHeadersInternal which does final header munging and passes the
+    // headers to the encoder.
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
-    // filter to start the iteration with.
+    // filter to start the iteration with, and finally calls encodeDataInternal
+    // to update stats, do end stream bookkeeping, and send the data to encoder.
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                     FilterIterationStartState filter_iteration_start_state);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
+
+    // This is a helper function for encodeHeaders and responseDataTooLarge which allows for shared
+    // code for the two headers encoding paths. It does header munging, updates timing stats, and
+    // sends the headers to the encoder.
+    void encodeHeadersInternal(HeaderMap& headers, bool end_stream);
+    // This is a helper function for encodeData and responseDataTooLarge which allows for shared
+    // code for the two data encoding paths. It does stats updates and tracks potential end of
+    // stream.
+    void encodeDataInternal(Buffer::Instance& data, bool end_stream);
+
     void maybeEndEncode(bool end_stream);
     // Returns true if new metadata is decoded. Otherwise, returns false.
     bool processNewlyAddedMetadata();
@@ -504,11 +518,12 @@ private:
     void onBelowWriteBufferLowWatermark() override;
 
     // Http::StreamDecoder
-    void decode100ContinueHeaders(HeaderMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
-    void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
-    void decodeTrailers(HeaderMapPtr&& trailers) override;
     void decodeMetadata(MetadataMapPtr&&) override;
+
+    // Http::RequestDecoder
+    void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
@@ -533,8 +548,9 @@ private:
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_)
-         << DUMP_MEMBER(has_continue_headers_) << DUMP_MEMBER(is_head_request_)
-         << DUMP_MEMBER(decoding_headers_only_) << DUMP_MEMBER(encoding_headers_only_) << "\n";
+         << DUMP_MEMBER(state_.has_continue_headers_) << DUMP_MEMBER(state_.is_head_request_)
+         << DUMP_MEMBER(state_.decoding_headers_only_) << DUMP_MEMBER(state_.encoding_headers_only_)
+         << "\n";
 
       DUMP_DETAILS(request_headers_);
       DUMP_DETAILS(request_trailers_);
@@ -589,7 +605,8 @@ private:
       State()
           : remote_complete_(false), local_complete_(false), codec_saw_local_complete_(false),
             saw_connection_close_(false), successful_upgrade_(false), created_filter_chain_(false),
-            is_internally_created_(false) {}
+            is_internally_created_(false), decorated_propagate_(true), has_continue_headers_(false),
+            is_head_request_(false), decoding_headers_only_(false), encoding_headers_only_(false) {}
 
       uint32_t filter_call_state_{0};
       // The following 3 members are booleans rather than part of the space-saving bitfield as they
@@ -611,6 +628,18 @@ private:
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
+
+      bool decorated_propagate_ : 1;
+      // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
+      // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
+      bool has_continue_headers_ : 1;
+      bool is_head_request_ : 1;
+      // Whether a filter has indicated that the request should be treated as a headers only
+      // request.
+      bool decoding_headers_only_;
+      // Whether a filter has indicated that the response should be treated as a headers only
+      // response.
+      bool encoding_headers_only_;
 
       // Used to track which filter is the latest filter that has received data.
       ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -654,12 +683,12 @@ private:
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
-    StreamEncoder* response_encoder_{};
+    ResponseEncoder* response_encoder_{};
     HeaderMapPtr continue_headers_;
     HeaderMapPtr response_headers_;
     Buffer::WatermarkBufferPtr buffered_response_data_;
     HeaderMapPtr response_trailers_{};
-    HeaderMapPtr request_headers_;
+    RequestHeaderMapPtr request_headers_;
     Buffer::WatermarkBufferPtr buffered_request_data_;
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
@@ -683,15 +712,6 @@ private:
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};
-    // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
-    // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
-    bool has_continue_headers_{};
-    bool is_head_request_{};
-    // Whether a filter has indicated that the request should be treated as a headers only request.
-    bool decoding_headers_only_{};
-    // Whether a filter has indicated that the response should be treated as a headers only
-    // response.
-    bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};

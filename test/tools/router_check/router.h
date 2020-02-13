@@ -155,7 +155,7 @@ private:
 
   void printResults();
 
-  bool runtimeMock(const std::string& key, const envoy::type::v3::FractionalPercent& default_value,
+  bool runtimeMock(absl::string_view key, const envoy::type::v3::FractionalPercent& default_value,
                    uint64_t random_value);
 
   bool headers_finalized_{false};

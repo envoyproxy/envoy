@@ -248,7 +248,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
         envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
-    access_log->set_name("envoy.file_access_log");
+    access_log->set_name("envoy.access_loggers.file");
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.set_format(

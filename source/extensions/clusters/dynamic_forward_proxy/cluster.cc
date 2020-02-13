@@ -100,13 +100,6 @@ void Cluster::addOrUpdateWorker(
 
   ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
 
-  // Create an override transport socket options that automatically provides both SNI as well as
-  // SAN verification for the resolved host if the cluster has been configured with TLS.
-  Network::TransportSocketOptionsSharedPtr transport_socket_options =
-      std::make_shared<Network::TransportSocketOptionsImpl>(
-          !host_info->isIpAddress() ? host_info->resolvedHost() : "",
-          std::vector<std::string>{host_info->resolvedHost()});
-
   if (new_host_map == nullptr) {
     new_host_map = std::make_shared<HostInfoMap>(*current_map);
   }
@@ -114,7 +107,7 @@ void Cluster::addOrUpdateWorker(
       new_host_map->try_emplace(host, host_info,
                                 std::make_shared<Upstream::LogicalHost>(
                                     info(), host, host_info->address(), dummy_locality_lb_endpoint_,
-                                    dummy_lb_endpoint_, transport_socket_options));
+                                    dummy_lb_endpoint_, nullptr));
   if (hosts_added == nullptr) {
     hosts_added = std::make_unique<Upstream::HostVector>();
   }
@@ -195,8 +188,21 @@ ClusterFactory::createClusterWithConfig(
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
       context.singletonManager(), context.dispatcher(), context.tls(), context.stats());
+  envoy::config::cluster::v3::Cluster cluster_config = cluster;
+  if (cluster_config.has_upstream_http_protocol_options()) {
+    if (!cluster_config.upstream_http_protocol_options().auto_sni() ||
+        !cluster_config.upstream_http_protocol_options().auto_san_validation()) {
+      throw EnvoyException(
+          "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true when "
+          "configured with upstream_http_protocol_options");
+    }
+  } else {
+    cluster_config.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+  }
+
   auto new_cluster = std::make_shared<Cluster>(
-      cluster, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
+      cluster_config, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
       socket_factory_context, std::move(stats_scope), context.addedViaApi());
   auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));

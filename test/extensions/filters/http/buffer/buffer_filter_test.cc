@@ -138,19 +138,6 @@ TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
   EXPECT_EQ(headers.ContentLength()->value().getStringView(), "3");
 }
 
-TEST_F(BufferFilterTest, ContentLengthPopulationRuntimeGuard) {
-  InSequence s;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.buffer_filter_populate_content_length", "false"}});
-
-  Http::TestHeaderMapImpl headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
-
-  Buffer::OwnedImpl data("foo");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
-  EXPECT_EQ(headers.ContentLength(), nullptr);
-}
-
 TEST_F(BufferFilterTest, RouteConfigOverride) {
   envoy::extensions::filters::http::buffer::v3::BufferPerRoute route_cfg;
   auto* buf = route_cfg.mutable_buffer();

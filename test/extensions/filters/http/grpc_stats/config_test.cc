@@ -66,7 +66,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
@@ -90,7 +90,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
@@ -112,7 +112,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
                      ->statsScope()
                      .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
-  EXPECT_FALSE(stream_info_.filterState().hasDataWithName(HttpFilterNames::get().GrpcStats));
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
 TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
@@ -139,8 +139,8 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                 ->statsScope()
                 .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
                 .value());
-  const auto& data =
-      stream_info_.filterState().getDataReadOnly<GrpcStatsObject>(HttpFilterNames::get().GrpcStats);
+  const auto& data = stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>(
+      HttpFilterNames::get().GrpcStats);
   EXPECT_EQ(2U, data.request_message_count);
   EXPECT_EQ(0U, data.response_message_count);
 

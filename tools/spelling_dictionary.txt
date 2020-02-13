@@ -9,6 +9,7 @@ AFAICT
 ALPN
 ALS
 AMZ
+APC
 API
 ASAN
 ASCII
@@ -17,6 +18,7 @@ AST
 AWS
 BACKTRACE
 BSON
+BPF
 CAS
 CB
 CDS
@@ -58,6 +60,7 @@ DFATAL
 DGRAM
 DLOG
 DNS
+DQUOTE
 DRYs
 DS
 DST
@@ -75,6 +78,7 @@ EDESTRUCTION
 EDF
 EINVAL
 ELB
+ENOTFOUND
 ENOTSUP
 ENV
 EOF
@@ -121,6 +125,7 @@ HCM
 HDS
 HMAC
 HPACK
+HTAB
 HTML
 HTTP
 HTTPS
@@ -160,6 +165,7 @@ LEV
 LF
 LHS
 LLVM
+LPT
 LRS
 MB
 MD
@@ -178,6 +184,7 @@ NDEBUG
 NEXTHDR
 NGHTTP
 NOAUTH
+NOCHECKRESP
 NODELAY
 NOLINT
 NOLINTNEXTLINE
@@ -212,6 +219,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Prereq
 QUIC
 QoS
 RAII
@@ -273,6 +281,7 @@ SSL
 STDSTRING
 STL
 STRLEN
+STS
 SVG
 TBD
 TCLAP
@@ -296,6 +305,7 @@ UA
 UBSAN
 UDP
 UDS
+UNC
 URI
 URL
 USEVC
@@ -304,6 +314,7 @@ UTF
 UUID
 UUIDs
 VC
+VCHAR
 VH
 VHDS
 VLOG
@@ -314,6 +325,7 @@ WIP
 WKT
 WRR
 WS
+WSA
 Welford's
 Wi
 XDS
@@ -352,6 +364,7 @@ args
 argv
 artisanal
 ary
+asctime
 async
 atoi
 atomicity
@@ -368,6 +381,7 @@ authz
 autoscale
 backend
 backends
+backgrounded
 backoff
 backpressure
 backticks
@@ -472,6 +486,8 @@ deallocated
 deallocating
 deallocation
 dec
+dechunk
+dechunked
 dechunking
 decl
 decls
@@ -559,6 +575,7 @@ filenames
 fileno
 filesystem
 firefox
+fixdate
 fixup
 fld
 fmt
@@ -651,9 +668,12 @@ istio
 istream
 istringstream
 iteratively
+ja
 javascript
 jitter
 jittered
+jlt
+jne
 kafka
 keepalive
 keepalives
@@ -665,6 +685,8 @@ kv
 kvs
 lala
 latencies
+ld
+ldb
 len
 lenenc
 lexically
@@ -693,6 +715,7 @@ lookups
 loopback
 lossy
 lowp
+lstat
 ltrim
 lua
 lyft
@@ -701,6 +724,7 @@ malloc
 matchable
 matcher
 matchers
+maxage
 maxbuffer
 megamiss
 mem
@@ -721,6 +745,7 @@ mixin
 mkdir
 mmap
 mmaping
+mod
 mongo
 moveable
 msec
@@ -815,6 +840,7 @@ preallocate
 preallocating
 preallocation
 precalculated
+precompile
 precompiled
 precompute
 precomputed
@@ -848,6 +874,7 @@ pts
 pubkey
 pwd
 py
+qdtext
 qps
 quantile
 quantiles
@@ -914,6 +941,7 @@ resync
 ret
 retriable
 retriggers
+rmdir
 rollout
 roundtrip
 rpcs
@@ -924,9 +952,12 @@ ruleset
 runfiles
 runtime
 runtimes
+rver
+rxhash
 sandboxed
 sanitization
 sanitizer
+satisfiable
 scalability
 sched
 schemas
@@ -1016,6 +1047,8 @@ syscalls
 sysctl
 sz
 tbl
+tchar
+tchars
 tcmalloc
 tcpdump
 teardown
@@ -1079,6 +1112,7 @@ unejection
 unescape
 unescaped
 unescaping
+unfreed
 unhandled
 unicast
 unicode
@@ -1104,6 +1138,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unsatisfiable
 unserializable
 unsetenv
 unsubscription

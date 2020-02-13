@@ -461,10 +461,6 @@ public:
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
-  static void renameFile(const std::string& old_name, const std::string& new_name);
-  static void createDirectory(const std::string& name);
-  static void createSymlink(const std::string& target, const std::string& link);
-
   /**
    * Return a prefix string matcher.
    * @param string prefix.
@@ -509,6 +505,11 @@ public:
   static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges);
   static bool gaugesZeroed(
       const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges);
+
+  /**
+   * Returns the members of gauges that are not zero. Uses the same regex filter as gaugesZeroed().
+   */
+  static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
@@ -616,23 +617,6 @@ private:
   bool ready_{false};
 };
 
-/**
- * A utility class for atomically updating a file using symbolic link swap.
- */
-class AtomicFileUpdater {
-public:
-  AtomicFileUpdater(const std::string& filename);
-
-  void update(const std::string& contents);
-
-private:
-  const std::string link_;
-  const std::string new_link_;
-  const std::string target1_;
-  const std::string target2_;
-  bool use_target1_;
-};
-
 namespace Http {
 
 /**
@@ -675,12 +659,43 @@ public:
   void verifyByteSize() override { ASSERT(cached_byte_size_ == byteSizeInternal()); }
 };
 
+/**
+ * Typed test implementations for all of the concrete header types.
+ */
+class TestRequestHeaderMapImpl : public TestHeaderMapImpl, public RequestHeaderMap {
+public:
+  TestRequestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values)
+      : TestHeaderMapImpl(values) {}
+  TestRequestHeaderMapImpl(const HeaderMap& rhs) : TestHeaderMapImpl(rhs) {}
+};
+class TestRequestTrailerMapImpl : public TestHeaderMapImpl, public RequestTrailerMap {
+public:
+  TestRequestTrailerMapImpl(
+      const std::initializer_list<std::pair<std::string, std::string>>& values)
+      : TestHeaderMapImpl(values) {}
+  TestRequestTrailerMapImpl(const HeaderMap& rhs) : TestHeaderMapImpl(rhs) {}
+};
+class TestResponseHeaderMapImpl : public TestHeaderMapImpl, public ResponseHeaderMap {
+public:
+  TestResponseHeaderMapImpl(
+      const std::initializer_list<std::pair<std::string, std::string>>& values)
+      : TestHeaderMapImpl(values) {}
+  TestResponseHeaderMapImpl() : TestHeaderMapImpl() {}
+};
+class TestResponseTrailerMapImpl : public TestHeaderMapImpl, public ResponseTrailerMap {
+public:
+  TestResponseTrailerMapImpl(
+      const std::initializer_list<std::pair<std::string, std::string>>& values)
+      : TestHeaderMapImpl(values) {}
+  TestResponseTrailerMapImpl() : TestHeaderMapImpl() {}
+};
+
 // Helper method to create a header map from an initializer list. Useful due to make_unique's
 // inability to infer the initializer list type.
-inline HeaderMapPtr
+template <class T>
+inline std::unique_ptr<T>
 makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& values) {
-  return std::make_unique<TestHeaderMapImpl,
-                          const std::initializer_list<std::pair<std::string, std::string>>&>(
+  return std::make_unique<T, const std::initializer_list<std::pair<std::string, std::string>>&>(
       values);
 }
 
