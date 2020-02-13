@@ -302,14 +302,14 @@ message CertificateValidationContext {
   // Subject Alternative Name of the presented certificate matches one of the specified matches.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
-  // configured with exact match type in the string matcher. For example if the certificate has
-  // "\*.example.com" as DNS service entry, to allow only "api.example.com", it should be configured
-  // as shown below.
+  // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>`. 
+  // For example if the certificate has "\*.example.com" as DNS SAN entry, to allow only "api.example.com", 
+  // it should be configured as shown below.
   //
   // .. code-block:: yaml
   //
   // match_subject_alt_names:
-  //   exact: "app.example.com"
+  //   exact: "api.example.com"
   //
   // .. attention::
   //
