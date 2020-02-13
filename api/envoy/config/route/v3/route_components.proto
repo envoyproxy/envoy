@@ -749,19 +749,20 @@ message RouteAction {
   //
   // Examples:
   //
-  // * The path pattern ^/service/([^/]+)(/.*)$ paired with a substitution
-  //   string of \2/instance/\1 would transform */service/foo/v1/api* into
-  //   */v1/api/instance/foo*.
+  // * The path pattern ``^/service/([^/]+)(/.*)$`` paired with a substitution
+  //   string of ``\2/instance/\1`` would transform ``/service/foo/v1/api``
+  //   into ``/v1/api/instance/foo``.
   //
-  // * The pattern *one* paired with a substitution string of *two* would
-  //   transform */xxx/one/yyy/one/zzz* into */xxx/two/yyy/two/zzz*.
+  // * The pattern ``one`` paired with a substitution string of ``two`` would
+  //   transform ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/two/zzz``.
   //
-  // * The pattern ^(.*?)one(.*)$ paired with a substitution string of
-  //   \1two\2 would replace only the first occurrence of "one",
-  //   transforming path */xxx/one/yyy/one/zzz* into */xxx/two/yyy/one/zzz*.
+  // * The pattern ``^(.*?)one(.*)$`` paired with a substitution string of
+  //   ``\1two\2`` would replace only the first occurrence of ``one``,
+  //   transforming path ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/one/zzz``.
   //
-  // * The pattern (?i)/xxx/ paired with a substitution string of /yyy/ would
-  //   do a case-insensitive match and transform path /aaa/XxX/bbb to /aaa/yyy/bbb.
+  // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
+  //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
+  //   ``/aaa/yyy/bbb``.
   RegexRewrite regex_rewrite = 32;
 
   message RegexRewrite {
@@ -781,8 +782,8 @@ message RouteAction {
     // however, that the syntax for referring to capture groups might vary
     // among the regular expression engines. Google's `RE2 <https://github.com/google/re2>`_
     // regular expression engine uses backslash followed by the capture group
-    // number to denote a numbered capture group. E.g., \1 refers to capture
-    // group 1, and \2 refers to capture group 2.
+    // number to denote a numbered capture group. E.g., ``\1`` refers to capture
+    // group 1, and ``\2`` refers to capture group 2.
     string substitution = 2;
   }
 
