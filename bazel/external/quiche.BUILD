@@ -751,13 +751,6 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
-    name = "spdy_platform_test",
-    hdrs = ["quiche/spdy/platform/api/spdy_test.h"],
-    repository = "@envoy",
-    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:spdy_platform_test_impl_lib"],
-)
-
-envoy_cc_test_library(
     name = "spdy_platform_test_helpers",
     hdrs = ["quiche/spdy/platform/api/spdy_test_helpers.h"],
     repository = "@envoy",
@@ -1006,7 +999,7 @@ envoy_cc_test_library(
         ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_protocol_lib",
         ":spdy_platform",
-        ":spdy_platform_test",
+        ":quiche_common_test_tools_test_utils_lib",
     ],
 )
 
@@ -3525,7 +3518,7 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         ":spdy_platform",
-        ":spdy_platform_test",
+        ":quiche_common_test_tools_test_utils_lib",
     ],
 )
 
