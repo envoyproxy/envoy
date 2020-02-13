@@ -69,12 +69,8 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
   // Creates payload using nghttp2.
   uint8_t* buf = reinterpret_cast<uint8_t*>(iovec.mem_);
   const ssize_t result = nghttp2_hd_deflate_hd(deflater_.get(), buf, buflen, nva.begin(), nvlen);
-  if (result <= 0) {
-    ENVOY_LOG(error, "Failed to deflate metadata payload, with result {}.", result);
-    iovec.len_ = 0;
-    payload_.commit(&iovec, 1);
-    return false;
-  }
+  RELEASE_ASSERT(result > 0,
+                 fmt::format("Failed to deflate metadata payload, with result {}.", result));
   iovec.len_ = result;
 
   payload_.commit(&iovec, 1);
@@ -94,11 +90,9 @@ ssize_t MetadataEncoder::packNextFramePayload(uint8_t* buf, const size_t len) {
 
   // nghttp2 guarantees len is at least 16KiB. If the check fails, please verify
   // NGHTTP2_MAX_PAYLOADLEN is consistent with METADATA_MAX_PAYLOAD_SIZE.
-  if (len < current_payload_size) {
-    ENVOY_LOG(error, "METADATA payload buffer is too small ({}, expected at least {}).", len,
-              METADATA_MAX_PAYLOAD_SIZE);
-    return -1;
-  }
+  RELEASE_ASSERT(len >= current_payload_size,
+                 fmt::format("METADATA payload buffer is too small ({}, expected at least {}).",
+                             len, METADATA_MAX_PAYLOAD_SIZE));
 
   // Copies payload to the destination memory.
   payload_.copyOut(0, current_payload_size, buf);
