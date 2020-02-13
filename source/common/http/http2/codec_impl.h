@@ -73,6 +73,18 @@ public:
                                           HeaderString& cookies);
 };
 
+struct SettingsEntryHash {
+  size_t operator()(const nghttp2_settings_entry& entry) const {
+    return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
+  }
+};
+
+struct SettingsEntryEquals {
+  bool operator()(const nghttp2_settings_entry& lhs, const nghttp2_settings_entry& rhs) const {
+    return lhs.settings_id == rhs.settings_id;
+  }
+};
+
 /**
  * Base class for HTTP/2 client and server codecs.
  */
@@ -286,6 +298,9 @@ protected:
   void sendPendingFrames();
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
+  // Callback triggered when the peer's SETTINGS frame is received.
+  // NOTE: This is only used for tests.
+  virtual void onSettings(const nghttp2_settings&) {}
 
   static Http2Callbacks http2_callbacks_;
 
@@ -356,19 +371,6 @@ protected:
   const uint32_t max_inbound_window_update_frames_per_data_frame_sent_;
 
 private:
-  friend class ConnectionImplTestPeer;
-
-  struct SettingsEntryHash {
-    size_t operator()(const nghttp2_settings_entry& entry) const {
-      return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
-    }
-  };
-  struct SettingsEntryEquals {
-    bool operator()(const nghttp2_settings_entry& lhs, const nghttp2_settings_entry& rhs) const {
-      return lhs.settings_id == rhs.settings_id;
-    }
-  };
-
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual int onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
@@ -404,7 +406,6 @@ private:
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
   bool pending_deferred_reset_ : 1;
-  std::function<void(const nghttp2_settings&)> test_only_on_settings_frame_cb_;
 };
 
 /**

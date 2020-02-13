@@ -475,11 +475,8 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     return 0;
   }
 
-  // Only for tests, issue a callback when the SETTINGS frame is received.
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    if (test_only_on_settings_frame_cb_) {
-      test_only_on_settings_frame_cb_(frame->settings);
-    }
+    onSettings(frame->settings);
   }
 
   StreamImpl* stream = getStream(frame->hd.stream_id);
@@ -845,10 +842,30 @@ void ConnectionImpl::sendPendingFrames() {
 
 void ConnectionImpl::sendSettings(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options, bool disable_push) {
+  // Custom parameters override named parameters, so they must be inserted first into this set.
   std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals> settings;
-  // Custom parameters override named parameters, so they must be inserted first into the set.
+
+  // Universally disable receiving push promise frames as we don't currently support
+  // them.  nghttp2 will fail the connection if the other side still sends them.
+  // TODO(mattklein123): Remove this when we correctly proxy push promise.
+  // NOTE: This is a special case with respect to custom parameter overrides in that server push is
+  // not supported and therefore not end user configurable.
+  if (disable_push) {
+    settings.insert({static_cast<int32_t>(NGHTTP2_SETTINGS_ENABLE_PUSH), disable_push ? 0U : 1U});
+  }
+
   for (const auto it : http2_options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
+    if (it.identifier().value() == NGHTTP2_SETTINGS_ENABLE_PUSH && it.value().value() == 1) {
+      // For simplicity, warn when server push is configured enabled on either client or server
+      // connections. It _is_ actually enabled on downstream connections although Envoy itself will
+      // never send push_promise frames, but the nuance could be confusing to end users.
+      ENVOY_CONN_LOG(
+          warn,
+          "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.",
+          connection_);
+      continue;
+    }
     auto result =
         settings.insert({static_cast<int32_t>(it.identifier().value()), it.value().value()});
     if (!result.second) {
@@ -868,11 +885,6 @@ void ConnectionImpl::sendSettings(
       {{/*nghttp2_settings_entry.settings_id=*/NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL,
         /*nghttp2_settings_entry.value=*/http2_options.allow_connect()},
        /*default_value=*/0},
-      {// Universally disable receiving push promise frames as we don't currently support
-       // them. nghttp2 will fail the connection if the other side still sends them.
-       // TODO(mattklein123): Remove this when we correctly proxy push promise.
-       {NGHTTP2_SETTINGS_ENABLE_PUSH, disable_push ? 0U : 1U},
-       1},
       {{NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_options.hpack_table_size().value()},
        NGHTTP2_DEFAULT_HEADER_TABLE_SIZE},
       {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
@@ -1028,13 +1040,14 @@ ConnectionImpl::Http2Options::Http2Options(
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
-  // calculations. This saves a tremendous amount of memory in cases where there are a large number
-  // of kept alive HTTP/2 connections.
+  // calculations. This saves a tremendous amount of memory in cases where there are a large
+  // number of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
 
   // The max send header block length is configured to an arbitrarily high number so as to never
-  // trigger the check within nghttp2, as we check request headers length in codec_impl::saveHeader.
+  // trigger the check within nghttp2, as we check request headers length in
+  // codec_impl::saveHeader.
   nghttp2_option_set_max_send_header_block_length(options_, 0x2000000);
 
   if (http2_options.hpack_table_size().value() != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
@@ -1046,11 +1059,12 @@ ConnectionImpl::Http2Options::Http2Options(
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
   }
 
-  // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames. This
-  // new limit may cause the internal nghttp2 mitigation to trigger more often (as it requires just
-  // 9K of incoming bytes for smallest 9 byte SETTINGS frame), bypassing the same mitigation and its
-  // associated behavior in the envoy HTTP/2 codec. Since envoy does not rely on this mitigation,
-  // set back to the old 10K number to avoid any changes in the HTTP/2 codec behavior.
+  // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames.
+  // This new limit may cause the internal nghttp2 mitigation to trigger more often (as it
+  // requires just 9K of incoming bytes for smallest 9 byte SETTINGS frame), bypassing the same
+  // mitigation and its associated behavior in the envoy HTTP/2 codec. Since envoy does not rely
+  // on this mitigation, set back to the old 10K number to avoid any changes in the HTTP/2 codec
+  // behavior.
   nghttp2_option_set_max_outbound_ack(options_, 10000);
 }
 
