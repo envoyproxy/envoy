@@ -359,7 +359,9 @@ TEST(PathMatcher, NoPathInHeader) {
   matcher.mutable_path()->mutable_safe_regex()->mutable_google_re2();
   matcher.mutable_path()->mutable_safe_regex()->set_regex(".*");
 
-  headers.setPath("/path");
+  Envoy::Http::LowerCaseString path(":path");
+  std::string value = "/path";
+  headers.setReference(path, value);
   checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
   headers.removePath();
   checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
@@ -370,13 +372,18 @@ TEST(PathMatcher, ValidPathInHeader) {
   envoy::type::matcher::PathMatcher matcher;
   matcher.mutable_path()->set_exact("/exact");
 
-  headers.setPath("/exact");
+  Envoy::Http::LowerCaseString path(":path");
+  std::string value = "/exact";
+  headers.setReference(path, value);
   checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
-  headers.setPath("/exact?param=val");
+  value = "/exact?param=val";
+  headers.setReference(path, value);
   checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
-  headers.setPath("/exact#fragment");
+  value = "/exact#fragment";
+  headers.setReference(path, value);
   checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
-  headers.setPath("/exacz");
+  value = "/exacz";
+  headers.setReference(path, value);
   checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
 }
 
