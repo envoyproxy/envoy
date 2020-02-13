@@ -96,7 +96,7 @@ public:
     return wrapped_scope_->histogramFromStatName(name, unit);
   }
   Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
-                                           Histogram::Unit unit) override {
+                                   Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatName(name, tags, unit);
   }
@@ -172,7 +172,8 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatName(name, unit);
   }
-  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags, Histogram::Unit unit) override {
+  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
+                                   Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatName(name, tags, unit);
   }

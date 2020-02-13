@@ -13,8 +13,8 @@
 
 #include "common/common/lock_guard.h"
 #include "common/stats/stats_matcher_impl.h"
-#include "common/stats/tag_utility.h"
 #include "common/stats/tag_producer_impl.h"
+#include "common/stats/tag_utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -477,7 +477,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   SymbolTable::StoragePtr prefixed_stat_name_storage =
       symbolTable().join({prefix_.statName(), name});
   StatName prefixed_stat_name = StatName(prefixed_stat_name_storage.get());
-  SymbolTable::StoragePtr final_stat = TagUtility::addTagSuffix(prefixed_stat_name, tags, symbolTable());
+  SymbolTable::StoragePtr final_stat =
+      TagUtility::addTagSuffix(prefixed_stat_name, tags, symbolTable());
   StatName final_stat_name = StatName(final_stat.get());
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;

@@ -6,7 +6,8 @@
 namespace Envoy {
 namespace Stats {
 namespace TagUtility {
-SymbolTable::StoragePtr addTagSuffix(StatName name, const StatNameTagVector& tags, SymbolTable& symbol_table);
+SymbolTable::StoragePtr addTagSuffix(StatName name, const StatNameTagVector& tags,
+                                     SymbolTable& symbol_table);
 } // namespace TagUtility
 } // namespace Stats
 } // namespace Envoy
