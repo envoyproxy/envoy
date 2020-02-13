@@ -32,7 +32,7 @@ The following is a YAML example of the above requirement.
           - certificate_chain: { filename: "example_com_cert.pem" }
             private_key: { filename: "example_com_key.pem" }
     filters:
-    - name: envoy.http_connection_manager
+    - name: envoy.filters.network.http_connection_manager
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         stat_prefix: ingress_http
@@ -54,7 +54,7 @@ The following is a YAML example of the above requirement.
           - certificate_chain: { filename: "api_example_com_cert.pem" }
             private_key: { filename: "api_example_com_key.pem" }
     filters:
-    - name: envoy.http_connection_manager
+    - name: envoy.filters.network.http_connection_manager
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         stat_prefix: ingress_http
