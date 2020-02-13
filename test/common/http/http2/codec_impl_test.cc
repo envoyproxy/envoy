@@ -1184,7 +1184,7 @@ TEST_P(Http2CustomSettingsTest, UserDefinedSettingsParametersOverrideNamedParame
   }
 }
 
-// Validates that server push can not be overriden via custom settings parameters.
+// Validates that server push can not be overridden via custom settings parameters.
 TEST_P(Http2CustomSettingsTest, NeverAllowServerPushEnablementOnClientConnection) {
   // Server push is always disabled only on the downstream (client) connections.
   if (!validate_client_) {
