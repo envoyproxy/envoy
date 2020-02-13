@@ -12,6 +12,9 @@ Blog posts
 - *Envoy Mobile v0.2 deep dive*
   (`Lyft Eng Blog 02/04/2020 <https://eng.lyft.com/envoy-mobile-v0-2-deep-dive-7ed262cfdf93>`_):
   deep dive into the technical aspects of the library v0.2.
+- *Observability for the Missing Hop*
+  (`Lyft Eng Blog 02/12/2020 <https://eng.lyft.com/observability-for-the-missing-hop-6688c6f3911a>`_):
+  overview of how Lyft is using time-series metrics emitted by Envoy Mobile to gain insight into mobile client networking.
 
 Recorded talks
 --------------
