@@ -23,7 +23,7 @@ public:
   // Constructs an empty QuicMemSliceImpl.
   QuicMemSliceImpl() = default;
 
-  // Constructs a QuicMemSliceImpl by taking ownernship of the memory in |buffer|.
+  // Constructs a QuicMemSliceImpl by taking ownership of the memory in |buffer|.
   QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length);
 
   // Constructs a QuicMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
