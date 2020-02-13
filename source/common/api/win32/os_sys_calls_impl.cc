@@ -219,8 +219,8 @@ SysCallIntResult OsSysCallsImpl::getpeername(os_fd_t sockfd, sockaddr* name, soc
 }
 
 SysCallIntResult OsSysCallsImpl::setsocketblocking(os_fd_t sockfd, bool blocking) {
-  u_long iMode = blocking ? 0 : 1;
-  const int rc = ::ioctlsocket(sockfd, FIONBIO, &iMode);
+  u_long io_mode = blocking ? 0 : 1;
+  const int rc = ::ioctlsocket(sockfd, FIONBIO, &io_mode);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
