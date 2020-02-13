@@ -34,6 +34,8 @@ function finish {
   df -h
 
   kill $VMSTAT_PID || true
+
+  find ./bazel-out/k8-fastbuild/bin -type f -a -name "core.*" -print0 | xargs -0 -I{} cp {} /tmp/debug/
 }
 trap finish EXIT
 
