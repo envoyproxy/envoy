@@ -249,7 +249,7 @@ private:
   uint32_t update_successes_{};
 };
 
-// Common code for tests that deliver EGDS update via the filesystem.
+// Common code for tests that deliver Egds update via the filesystem.
 class EgdsHelper {
 public:
   EgdsHelper();

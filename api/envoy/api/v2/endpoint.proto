@@ -117,12 +117,11 @@ message ClusterLoadAssignment {
   Policy policy = 4;
 
   // References endpoint groups by name.
-  // Both endpoints and EGDS references will be used when present
   repeated Egds endpoint_groups = 6;
 }
 
 // New xDS payload. The size of endpoints is fully arbitrary.
-// Also the EGDS requests to Pilot can be merged into one to boost efficiency
+// Also the Egds requests to Pilot can be merged into one to boost efficiency
 message EndpointGroup {
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -134,9 +133,9 @@ message EndpointGroup {
   map<string, endpoint.Endpoint> named_endpoints = 3;
 }
 
-// The EGDS request configuration.
+// The EndpointGroup request configuration.
 message Egds {
-  // Configuration for the source of EGDS updates for this Cluster.
+  // Configuration for the source of EndpointGroup updates for this Cluster.
   core.ConfigSource config_source = 1;
 
   // the endpoint group resource name.

@@ -19,7 +19,7 @@
 namespace Envoy {
 namespace {
 
-// Integration test for EGDS features. EGDS is consumed via filesystem
+// Integration test for Egds features. Egds is consumed via filesystem
 // subscription.
 class EgdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                             public HttpIntegrationTest {
@@ -245,7 +245,7 @@ TEST_P(EgdsIntegrationTest, Http2HcClusterRewarming) {
   fake_upstream_connection.reset();
 }
 
-// Verify that a host stabilized via active health checking which is first removed from EGDS and
+// Verify that a host stabilized via active health checking which is first removed from Egds and
 // then fails health checking is removed.
 TEST_P(EgdsIntegrationTest, RemoveAfterHcFail) {
   initializeTest(true);
@@ -330,7 +330,7 @@ TEST_P(EgdsIntegrationTest, EndpointWarmingFailedHc) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 }
 
-// Validate that health status updates are consumed from EGDS.
+// Validate that health status updates are consumed from Egds.
 TEST_P(EgdsIntegrationTest, HealthUpdate) {
   initializeTest(false);
   // Initial state, no cluster members.

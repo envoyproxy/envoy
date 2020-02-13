@@ -168,7 +168,7 @@ void EgdsClusterMapper::initializeCluster() {
         pair.second->group_.value().named_endpoints().end());
   }
 
-  ENVOY_LOG(info, "EGDS cluster {} updated, endpoint count {}",
+  ENVOY_LOG(info, "Egds cluster {} updated, endpoint count {}",
             cluster_load_assignment.cluster_name(), cluster_load_assignment.endpoints_size());
   delegate_.initializeCluster(cluster_load_assignment);
 }

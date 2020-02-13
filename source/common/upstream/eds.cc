@@ -151,7 +151,7 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
     assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
   }
 
-  // Check if EGDS resource is included.
+  // Check if Egds resource is included.
   if (!cluster_load_assignment.endpoint_groups().empty()) {
     endpoint_group_manager_ = std::make_unique<EndpointGroupsManagerImpl>();
     egds_cluster_mapper_ = std::make_unique<EgdsClusterMapper>(
