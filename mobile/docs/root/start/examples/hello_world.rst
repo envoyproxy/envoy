@@ -23,7 +23,7 @@ Next, make sure you have an Android simulator running.
 
 Run the :repo:`sample app <examples/java/hello_world>` using the following Bazel build rule:
 
-``bazel mobile-install //examples/java/hello_world:hello_envoy --fat_apk_cpu=x86``
+``bazel mobile-install //examples/java/hello_world:hello_envoy --fat_apk_cpu=<arch1,arch2>``
 
 You should see a new app installed on your simulator called ``Hello Envoy``.
 Open it up, and requests will start flowing!
@@ -38,7 +38,7 @@ Next, make sure you have an Android simulator running.
 
 Run the :repo:`sample app <examples/kotlin/hello_world>` using the following Bazel build rule:
 
-``bazel mobile-install //examples/kotlin/hello_world:hello_envoy_kt --fat_apk_cpu=x86``
+``bazel mobile-install //examples/kotlin/hello_world:hello_envoy_kt --fat_apk_cpu=<arch1,arch2>``
 
 You should see a new app installed on your simulator called ``Hello Envoy Kotlin``.
 Open it up, and requests will start flowing!

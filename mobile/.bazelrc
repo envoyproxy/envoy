@@ -27,7 +27,7 @@ build --javabase=@bazel_tools//tools/jdk:jdk
 build:ios --define=manual_stamp=manual_stamp
 
 # Default flags for builds targeting Android
-build:android --fat_apk_cpu=x86_64
+build:android --define logger=android
 
 # Common flags for release builds
 # TODO: Enable `--copt -ggdb3`. Issues were encountered previously with this:
@@ -42,4 +42,5 @@ build:release-ios --config=release-common
 build:release-ios --copt=-fembed-bitcode
 
 # Flags for release builds targeting Android or the JVM
+build:release-android --config=android
 build:release-android --config=release-common
