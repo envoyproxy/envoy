@@ -387,15 +387,15 @@ address:
     port_value: 1234
 filter_chains:
 - filters:
-  - name: envoy.tcp_proxy
+  - name: envoy.filters.network.tcp_proxy
     config: {}
   - name: unknown_but_will_not_be_processed
     config: {}
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-                          EnvoyException,
-                          "Error: envoy.tcp_proxy must be the terminal network filter.");
+  EXPECT_THROW_WITH_REGEX(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
+      "Error: envoy.filters.network.tcp_proxy must be the terminal network filter.");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
@@ -3115,7 +3115,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
     filter_chains:
     - filter_chain_match:
       filters:
-      - name: envoy.http_connection_manager
+      - name: envoy.filters.network.http_connection_manager
         config:
           stat_prefix: metadata_test
           route_config:
