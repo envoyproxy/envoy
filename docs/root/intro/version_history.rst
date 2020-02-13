@@ -3,6 +3,7 @@ Version history
 
 1.13.1 (Pending)
 ================
+* rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
 
 1.13.0 (January 20, 2020)
 =========================
