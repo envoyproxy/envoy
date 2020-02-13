@@ -17,6 +17,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/matchers.h"
 #include "common/config/metadata.h"
 #include "common/http/hash_policy.h"
 #include "common/http/header_utility.h"
@@ -717,6 +718,7 @@ public:
 
 private:
   const std::string prefix_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
 /**
@@ -742,6 +744,7 @@ public:
 
 private:
   const std::string path_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
 /**
@@ -766,8 +769,6 @@ public:
   void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
 
 private:
-  absl::string_view pathOnly(const Http::HeaderMap& headers) const;
-
   Regex::CompiledMatcherPtr regex_;
   std::string regex_str_;
 };

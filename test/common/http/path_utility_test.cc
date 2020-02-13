@@ -107,5 +107,25 @@ TEST_F(PathUtilityTest, MergeSlashes) {
   EXPECT_EQ("/a/b?", mergeSlashes("/a//b?"));             // empty query
 }
 
+TEST_F(PathUtilityTest, RemoveQueryAndFragment) {
+  EXPECT_EQ("", PathUtil::removeQueryAndFragment(""));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value1&param=value2"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc??"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc??param=value"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#fragment"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#fragment?param=value"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc##"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#?"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#?param=value"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?#"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?#fragment"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value#"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value#fragment"));
+}
+
 } // namespace Http
 } // namespace Envoy

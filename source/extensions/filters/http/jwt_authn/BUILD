@@ -81,6 +81,7 @@ envoy_cc_library(
     hdrs = ["matcher.h"],
     deps = [
         ":verifier_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/router:config_lib",
     ],

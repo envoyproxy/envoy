@@ -353,6 +353,40 @@ TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
                conn);
 }
 
+TEST(PathMatcher, NoPathInHeader) {
+  Envoy::Http::HeaderMapImpl headers;
+  envoy::type::matcher::PathMatcher matcher;
+  matcher.mutable_path()->mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_path()->mutable_safe_regex()->set_regex(".*");
+
+  Envoy::Http::LowerCaseString path(":path");
+  std::string value = "/path";
+  headers.setReference(path, value);
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.removePath();
+  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(PathMatcher, ValidPathInHeader) {
+  Envoy::Http::HeaderMapImpl headers;
+  envoy::type::matcher::PathMatcher matcher;
+  matcher.mutable_path()->set_exact("/exact");
+
+  Envoy::Http::LowerCaseString path(":path");
+  std::string value = "/exact";
+  headers.setReference(path, value);
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  value = "/exact?param=val";
+  headers.setReference(path, value);
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  value = "/exact#fragment";
+  headers.setReference(path, value);
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  value = "/exacz";
+  headers.setReference(path, value);
+  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common

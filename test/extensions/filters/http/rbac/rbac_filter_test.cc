@@ -30,6 +30,7 @@ public:
     auto policy_rules = policy.add_permissions()->mutable_or_rules();
     policy_rules->add_rules()->mutable_requested_server_name()->set_regex(".*cncf.io");
     policy_rules->add_rules()->set_destination_port(123);
+    policy_rules->add_rules()->mutable_url_path()->mutable_path()->set_suffix("suffix");
     policy.add_principals()->set_any(true);
     config.mutable_rules()->set_action(envoy::config::rbac::v2::RBAC::ALLOW);
     (*config.mutable_rules()->mutable_policies())["foo"] = policy;
@@ -111,6 +112,18 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(headers_));
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, Path) {
+  setDestinationPort(999);
+
+  auto headers = Http::TestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/suffix#seg?param=value"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Denied) {

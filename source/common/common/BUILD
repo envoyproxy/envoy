@@ -172,6 +172,7 @@ envoy_cc_library(
         "//include/envoy/common:matchers_interface",
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/http:path_utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],

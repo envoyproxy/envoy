@@ -6,6 +6,8 @@
 #include "envoy/config/rbac/v2/rbac.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/type/matcher/path.pb.h"
+#include "envoy/type/matcher/string.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/http/header_utility.h"
@@ -224,6 +226,22 @@ public:
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
+};
+
+/**
+ * Perform a match against the path header on the HTTP request. The query and fragment string are
+ * removed from the path header before matching.
+ */
+class PathMatcher : public Matcher {
+public:
+  PathMatcher(const envoy::type::matcher::PathMatcher& path_matcher)
+      : path_matcher_(path_matcher) {}
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const StreamInfo::StreamInfo&) const override;
+
+private:
+  const Matchers::PathMatcher path_matcher_;
 };
 
 } // namespace RBAC

@@ -25,6 +25,7 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -765,8 +766,8 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator),
-      prefix_(route.match().prefix()) {}
+    : RouteEntryImplBase(vhost, route, factory_context, validator), prefix_(route.match().prefix()),
+      path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
                                              bool insert_envoy_original_path) const {
@@ -777,9 +778,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      (case_sensitive_
-           ? absl::StartsWith(headers.Path()->value().getStringView(), prefix_)
-           : absl::StartsWithIgnoreCase(headers.Path()->value().getStringView(), prefix_))) {
+      path_matcher_->match(headers.Path()->value().getStringView())) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -789,7 +788,8 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::route::Route& route,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator), path_(route.match().path()) {}
+    : RouteEntryImplBase(vhost, route, factory_context, validator), path_(route.match().path()),
+      path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_)) {}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
                                            bool insert_envoy_original_path) const {
@@ -799,28 +799,9 @@ void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
-  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    const Http::HeaderString& path = headers.Path()->value();
-    absl::string_view query_string = Http::Utility::findQueryStringStart(path);
-    size_t compare_length = path.size();
-    if (query_string.length() > 0) {
-      compare_length = compare_length - query_string.length();
-    }
-
-    if (compare_length != path_.size()) {
-      return nullptr;
-    }
-
-    const absl::string_view path_section = path.getStringView().substr(0, compare_length);
-    if (case_sensitive_) {
-      if (absl::string_view(path_) == path_section) {
-        return clusterEntry(headers, random_value);
-      }
-    } else {
-      if (absl::EqualsIgnoreCase(path_, path_section)) {
-        return clusterEntry(headers, random_value);
-      }
-    }
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
+      path_matcher_->match(headers.Path()->value().getStringView())) {
+    return clusterEntry(headers, random_value);
   }
 
   return nullptr;
@@ -841,26 +822,23 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
   }
 }
 
-absl::string_view RegexRouteEntryImpl::pathOnly(const Http::HeaderMap& headers) const {
-  const Http::HeaderString& path = headers.Path()->value();
-  const absl::string_view query_string = Http::Utility::findQueryStringStart(path);
-  const size_t path_string_length = path.size() - query_string.length();
-  return path.getStringView().substr(0, path_string_length);
-}
-
 void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
                                             bool insert_envoy_original_path) const {
+  const absl::string_view path =
+      Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(regex_->match(pathOnly(headers)));
-  finalizePathHeader(headers, pathOnly(headers), insert_envoy_original_path);
+  ASSERT(regex_->match(path));
+  finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    if (regex_->match(pathOnly(headers))) {
+    const absl::string_view path =
+        Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
+    if (regex_->match(path)) {
       return clusterEntry(headers, random_value);
     }
   }

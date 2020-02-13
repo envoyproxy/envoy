@@ -6,7 +6,6 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
-#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -67,6 +66,16 @@ void PathUtil::mergeSlashes(HeaderEntry& path_header) {
   const absl::string_view suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
   path_header.value(absl::StrCat(
       prefix, absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"), query, suffix));
+}
+
+absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
+  absl::string_view ret = path;
+  // Trim query parameters and/or fragment if present.
+  size_t offset = ret.find_first_of("?#");
+  if (offset != absl::string_view::npos) {
+    ret.remove_suffix(ret.length() - offset);
+  }
+  return ret;
 }
 
 } // namespace Http
