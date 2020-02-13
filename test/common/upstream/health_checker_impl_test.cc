@@ -727,7 +727,7 @@ TEST_F(HttpHealthCheckerImplTest, PassiveFailure) {
 
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::EXCLUDE_FROM_LB));
-  EXPECT_EQ(Host::Health::Unhealthy,
+  EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
@@ -752,7 +752,7 @@ TEST_F(HttpHealthCheckerImplTest, HCSuccessAfterPassiveFailure) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, false, true, false, {}, false, true);
-  EXPECT_EQ(Host::Health::Unhealthy,
+  EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::EXCLUDE_FROM_LB));
@@ -3332,7 +3332,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailure) {
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::EXCLUDE_FROM_LB));
 
-  EXPECT_EQ(Host::Health::Unhealthy,
+  EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 
   // A single success should not bring us back to healthy.

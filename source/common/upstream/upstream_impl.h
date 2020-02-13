@@ -211,8 +211,7 @@ public:
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
         healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
-        healthFlagGet(HealthFlag::FAILED_EDS_HEALTH) ||
-        healthFlagGet(HealthFlag::EXCLUDE_FROM_LB)) {
+        healthFlagGet(HealthFlag::FAILED_EDS_HEALTH)) {
       return Host::Health::Unhealthy;
     }
 
@@ -223,7 +222,8 @@ public:
     }
 
     // The host must have no flags or be pending removal.
-    ASSERT(health_flags_ == 0 || healthFlagGet(HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    ASSERT(health_flags_ == 0 || healthFlagGet(HealthFlag::PENDING_DYNAMIC_REMOVAL) ||
+           healthFlagGet(HealthFlag::EXCLUDE_FROM_LB));
     return Host::Health::Healthy;
   }
 

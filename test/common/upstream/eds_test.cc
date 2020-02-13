@@ -753,7 +753,7 @@ TEST_F(EdsTest, EndpointRemovalEdsSuccessButExcludedState) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
 
-    EXPECT_EQ(hosts[0]->health(), Host::Health::Unhealthy);
+    EXPECT_EQ(hosts[0]->health(), Host::Health::Healthy);
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::EXCLUDE_FROM_LB));
     EXPECT_EQ(hosts[1]->health(), Host::Health::Healthy);

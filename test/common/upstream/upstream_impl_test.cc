@@ -2718,7 +2718,7 @@ TEST(HostPartitionTest, PartitionHosts) {
       HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
 
   EXPECT_EQ(5, update_hosts_params.hosts->size());
-  EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
+  EXPECT_EQ(2, update_hosts_params.healthy_hosts->get().size());
   EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
   EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
   EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
@@ -2730,7 +2730,7 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
 
   EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(2, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts_per_locality->get()[1][0]);
 
   EXPECT_EQ(1, update_hosts_params.degraded_hosts_per_locality->get()[0].size());
