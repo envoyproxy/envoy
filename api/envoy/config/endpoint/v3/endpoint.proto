@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.endpoint.v3;
 
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/endpoint/v3/endpoint_components.proto";
 import "envoy/type/v3/percent.proto";
 
