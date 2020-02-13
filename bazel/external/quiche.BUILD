@@ -995,11 +995,11 @@ envoy_cc_test_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":quiche_common_test_tools_test_utils_lib",
         ":spdy_core_header_block_lib",
         ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_protocol_lib",
         ":spdy_platform",
-        ":quiche_common_test_tools_test_utils_lib",
     ],
 )
 
@@ -3517,8 +3517,8 @@ envoy_cc_test(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":spdy_platform",
         ":quiche_common_test_tools_test_utils_lib",
+        ":spdy_platform",
     ],
 )
 
