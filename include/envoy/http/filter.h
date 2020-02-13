@@ -321,7 +321,7 @@ public:
    * @param details a string detailing why this local reply was sent.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
-                              std::function<void(HeaderMap& headers)> modify_headers,
+                              std::function<void(ResponseHeaderMap& headers)> modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 
@@ -343,7 +343,7 @@ public:
    *
    * @param headers supplies the headers to be encoded.
    */
-  virtual void encode100ContinueHeaders(HeaderMapPtr&& headers) PURE;
+  virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -354,7 +354,7 @@ public:
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
    */
-  virtual void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.
@@ -367,7 +367,7 @@ public:
    * Called with trailers to be encoded. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
    */
-  virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+  virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
 
   /**
    * Called with metadata to be encoded.
@@ -501,7 +501,7 @@ public:
    * @param end_stream supplies whether this is a header only request/response.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    */
-  virtual FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) PURE;
+  virtual FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Called with a decoded data frame.
@@ -515,7 +515,7 @@ public:
    * Called with decoded trailers, implicitly ending the stream.
    * @param trailers supplies the decoded trailers.
    */
-  virtual FilterTrailersStatus decodeTrailers(HeaderMap& trailers) PURE;
+  virtual FilterTrailersStatus decodeTrailers(RequestTrailerMap& trailers) PURE;
 
   /**
    * Called with decoded metadata. Add new metadata to metadata_map directly. Do not call
@@ -694,7 +694,7 @@ public:
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    *
    */
-  virtual FilterHeadersStatus encode100ContinueHeaders(HeaderMap& headers) PURE;
+  virtual FilterHeadersStatus encode100ContinueHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -702,7 +702,7 @@ public:
    * @param end_stream supplies whether this is a header only request/response.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    */
-  virtual FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) PURE;
+  virtual FilterHeadersStatus encodeHeaders(ResponseHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.
@@ -716,7 +716,7 @@ public:
    * Called with trailers to be encoded, implicitly ending the stream.
    * @param trailers supplies the trailers to be encoded.
    */
-  virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
+  virtual FilterTrailersStatus encodeTrailers(ResponseTrailerMap& trailers) PURE;
 
   /**
    * Called with metadata to be encoded. New metadata should be added directly to metadata_map. DO

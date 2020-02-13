@@ -274,10 +274,12 @@ protected:
     }
 
     // RequestEncoder
-    void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
+    void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
       encodeHeadersBase(headers, end_stream);
     }
-    void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+    void encodeTrailers(const RequestTrailerMap& trailers) override {
+      encodeTrailersBase(trailers);
+    }
 
     ResponseDecoder& response_decoder_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
@@ -315,13 +317,15 @@ protected:
     }
 
     // ResponseEncoder
-    void encode100ContinueHeaders(const HeaderMap& headers) override;
-    void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
+    void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+    void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override {
       // The contract is that client codecs must ensure that :status is present.
       ASSERT(headers.Status() != nullptr);
       encodeHeadersBase(headers, end_stream);
     }
-    void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+    void encodeTrailers(const ResponseTrailerMap& trailers) override {
+      encodeTrailersBase(trailers);
+    }
 
     RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;

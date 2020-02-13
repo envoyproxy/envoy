@@ -49,12 +49,12 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(quic::PendingStream* pending,
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
-void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
+void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);
 }
 
-void EnvoyQuicServerStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
+void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   // QUICHE guarantees to take all the headers. This could cause infinite data to
   // be buffered on headers stream in Google QUIC implementation because
@@ -87,7 +87,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
-void EnvoyQuicServerStream::encodeTrailers(const Http::HeaderMap& trailers) {
+void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);

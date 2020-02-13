@@ -134,7 +134,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -159,7 +159,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
 TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -195,7 +195,7 @@ TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
 TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -221,7 +221,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
   setup(1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -233,7 +233,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
   checkSimpleRequestSuccess(1024, 1024, response.get());
 
   // Send another request, this should lead to a response directly from the filter.
-  const Http::TestHeaderMapImpl request_headers2{
+  const Http::TestRequestHeaderMapImpl request_headers2{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -249,7 +249,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   upstream_tls_ = true;
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -274,7 +274,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   upstream_tls_ = true;
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -306,7 +306,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
   fake_upstreams_[0]->setReadDisableOnNewConnection(false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},

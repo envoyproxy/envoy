@@ -127,11 +127,11 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
   return response;
 }
 
-void HdsDelegate::onCreateInitialMetadata(Http::HeaderMap& metadata) {
+void HdsDelegate::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
-void HdsDelegate::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
+void HdsDelegate::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
@@ -201,7 +201,7 @@ void HdsDelegate::onReceiveMessage(
   }
 }
 
-void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
+void HdsDelegate::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 

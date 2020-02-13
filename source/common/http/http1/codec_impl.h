@@ -116,9 +116,9 @@ public:
   bool startedResponse() { return started_response_; }
 
   // Http::ResponseEncoder
-  void encode100ContinueHeaders(const HeaderMap& headers) override;
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
-  void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+  void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+  void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool started_response_{};
@@ -134,8 +134,8 @@ public:
   bool headRequest() { return head_request_; }
 
   // Http::RequestEncoder
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
-  void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+  void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool head_request_{};

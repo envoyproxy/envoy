@@ -21,7 +21,7 @@ CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
 
 // This handles the CORS preflight request as described in
 // https://www.w3.org/TR/cors/#resource-preflight-requests
-Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (decoder_callbacks_->route() == nullptr ||
       decoder_callbacks_->route()->routeEntry() == nullptr) {
     return Http::FilterHeadersStatus::Continue;
@@ -64,7 +64,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::HeaderMapPtr response_headers{Http::HeaderMapImpl::create(
+  auto response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}})};
 
   response_headers->setAccessControlAllowOrigin(origin_->value().getStringView());
@@ -93,7 +93,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
 
 // This handles simple CORS requests as described in
 // https://www.w3.org/TR/cors/#resource-requests
-Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (!is_cors_request_) {
     return Http::FilterHeadersStatus::Continue;
   }

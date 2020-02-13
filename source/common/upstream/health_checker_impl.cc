@@ -231,7 +231,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
 
-  const auto request_headers = Http::HeaderMapImpl::create(
+  const auto request_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
       {{Http::Headers::get().Method, "GET"},
        {Http::Headers::get().Host, hostname_},
        {Http::Headers::get().Path, parent_.path_},

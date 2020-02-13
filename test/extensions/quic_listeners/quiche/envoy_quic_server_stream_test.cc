@@ -141,7 +141,7 @@ protected:
   Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
   quic::QuicHeaderList request_headers_;
-  Http::TestHeaderMapImpl response_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
   quic::QuicHeaderList trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};

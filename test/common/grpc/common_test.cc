@@ -149,7 +149,7 @@ TEST(GrpcContextTest, ToGrpcTimeout) {
 
 TEST(GrpcContextTest, PrepareHeaders) {
   {
-    Http::MessagePtr message =
+    Http::RequestMessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name", absl::nullopt);
 
     EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
@@ -158,8 +158,8 @@ TEST(GrpcContextTest, PrepareHeaders) {
     EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::milliseconds>(1));
+    Http::RequestMessagePtr message = Common::prepareHeaders(
+        "cluster", "service_name", "method_name", absl::optional<std::chrono::milliseconds>(1));
 
     EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
     EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
@@ -168,8 +168,8 @@ TEST(GrpcContextTest, PrepareHeaders) {
     EXPECT_EQ("1m", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::seconds>(1));
+    Http::RequestMessagePtr message = Common::prepareHeaders(
+        "cluster", "service_name", "method_name", absl::optional<std::chrono::seconds>(1));
 
     EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
     EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
@@ -178,8 +178,8 @@ TEST(GrpcContextTest, PrepareHeaders) {
     EXPECT_EQ("1000m", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::minutes>(1));
+    Http::RequestMessagePtr message = Common::prepareHeaders(
+        "cluster", "service_name", "method_name", absl::optional<std::chrono::minutes>(1));
 
     EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
     EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
@@ -188,8 +188,8 @@ TEST(GrpcContextTest, PrepareHeaders) {
     EXPECT_EQ("60000m", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::hours>(1));
+    Http::RequestMessagePtr message = Common::prepareHeaders(
+        "cluster", "service_name", "method_name", absl::optional<std::chrono::hours>(1));
 
     EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
     EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
@@ -198,7 +198,7 @@ TEST(GrpcContextTest, PrepareHeaders) {
     EXPECT_EQ("3600000m", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
-    Http::MessagePtr message = Common::prepareHeaders(
+    Http::RequestMessagePtr message = Common::prepareHeaders(
         "cluster", "service_name", "method_name", absl::optional<std::chrono::hours>(100000000));
 
     EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
@@ -208,7 +208,7 @@ TEST(GrpcContextTest, PrepareHeaders) {
     EXPECT_EQ("99999999H", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
-    Http::MessagePtr message =
+    Http::RequestMessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name",
                                absl::optional<std::chrono::milliseconds>(100000000000));
 
@@ -301,50 +301,54 @@ TEST(GrpcContextTest, IsGrpcResponseHeader) {
 TEST(GrpcContextTest, ValidateResponse) {
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
+    response.trailers(
+        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}}});
     EXPECT_NO_THROW(Common::validateResponse(response));
   }
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
                               "non-200 response code");
   }
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "100"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
+    response.trailers(
+        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "100"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
                               "bad grpc-status trailer");
   }
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "4"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
+    response.trailers(
+        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "4"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "");
   }
   {
     Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::HeaderMapPtr{
-        new Http::TestHeaderMapImpl{{"grpc-status", "4"}, {"grpc-message", "custom error"}}});
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
+    response.trailers(Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{
+        {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
   }
   {
-    Http::ResponseMessageImpl response(Http::HeaderMapPtr{
-        new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "100"}}});
+    Http::ResponseMessageImpl response(Http::ResponseHeaderMapPtr{
+        new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "100"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
                               "bad grpc-status header");
   }
   {
-    Http::ResponseMessageImpl response(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "4"}}});
+    Http::ResponseMessageImpl response(Http::ResponseHeaderMapPtr{
+        new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "4"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "");
   }
   {
-    Http::ResponseMessageImpl response(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{
-        {":status", "200"}, {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
+    Http::ResponseMessageImpl response(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{
+            {":status", "200"}, {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
   }
 }
