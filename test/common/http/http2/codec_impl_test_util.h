@@ -23,10 +23,7 @@ protected:
   // Stores SETTINGS parameters contained in |settings_frame| to make them available via
   // getRemoteSettingsParameterValue().
   void onSettingsFrame(const nghttp2_settings& settings_frame) {
-    ENVOY_LOG_MISC(error, "callback issued");
     for (uint32_t i = 0; i < settings_frame.niv; ++i) {
-      ENVOY_LOG_MISC(error, "adding setting id {} val {}", settings_frame.iv[i].settings_id,
-                     settings_frame.iv[i].value);
       auto result = settings_.insert(settings_frame.iv[i]);
       ASSERT(result.second);
     }
