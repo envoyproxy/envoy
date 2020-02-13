@@ -217,11 +217,14 @@ message Http2ProtocolOptions {
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12;
 
-  // Specifies SETTINGS frame parameters to be sent to the peer.
+  // Specifies SETTINGS frame parameters to be sent to the peer, with one exception:
+  // SETTINGS_ENABLE_PUSH (0x2) is not configurable as HTTP/2 server push is not supported by Envoy.
   // Note that parameters specified through this config will override named parameters with matching
   // identifiers.
-  //   e.g., A SettingsParameter { identifier = 1, value = 1000 } will override the value specified
-  //   in :ref:`hpack_table_size`.
+  //
+  // e.g., A SettingsParameter { identifier = 1, value = 1000 } will override the value specified in
+  // :ref:`hpack_table_size <envoy_api_field_core.Http2ProtocolOptions.hpack_table_size>`.
+  //
   // See `IANA HTTP/2 Settings
   // <https://www.iana.org/assignments/http2-parameters/http2-parameters.xhtml#settings>`_ for
   // standardized identifiers.
