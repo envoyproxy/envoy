@@ -139,7 +139,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(Http::HeaderMapImpl(*reply_headers), false);
+    fake_stream_->encodeHeaders(Http::TestHeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {
