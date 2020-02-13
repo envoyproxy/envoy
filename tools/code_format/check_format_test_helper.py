@@ -7,6 +7,7 @@
 
 from __future__ import print_function
 
+from run_command import runCommand
 import argparse
 import logging
 import os
@@ -16,10 +17,6 @@ import tempfile
 
 curr_dir = os.path.dirname(os.path.realpath(__file__))
 tools = os.path.dirname(curr_dir)
-# due to dependency on run_command
-sys.path.append(tools)
-from run_command import runCommand
-
 src = os.path.join(tools, 'testdata', 'check_format')
 check_format = sys.executable + " " + os.path.join(curr_dir, 'check_format.py')
 errors = 0

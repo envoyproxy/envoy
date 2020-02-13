@@ -314,7 +314,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
   echo "check_format_test..."
-  ./tools/code_format/check_format_test_helper.py --log=WARN
+  ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
