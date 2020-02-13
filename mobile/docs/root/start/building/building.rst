@@ -51,7 +51,7 @@ Android AAR
 Envoy Mobile can be compiled into an ``.aar`` file for use with Android apps.
 This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
 
-``bazel build android_dist --config=android``
+``bazel build android_dist --config=android --fat_apk_cpu=<arch1,arch2>``
 
 Upon completion of the build, you'll see an ``envoy.aar`` file at :repo:`dist/envoy.aar <dist>`.
 
@@ -63,7 +63,7 @@ an example of how this artifact may be used.
 **When building the artifact for release** (usage outside of development), be sure to include the
 ``--config=release-android`` option, along with the architectures for which the artifact is being built:
 
-``bazel build android_dist --config=release-android --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a``
+``bazel build android_dist --config=release-android --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a``
 
 For a demo of a working app using this artifact, see the :ref:`hello_world` example.
 
