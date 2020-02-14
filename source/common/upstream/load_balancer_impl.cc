@@ -717,7 +717,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
     // Nuke existing scheduler if it exists, and initiate initial deadline with a float ranges
     // [0.0, 1.0)
-    auto& scheduler = scheduler_[source] = Scheduler{seed_ % 1000000 / 1000000.0};
+    auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
 
     // Check if the original host weights are equal and skip EDF creation if they are. When all
@@ -728,7 +728,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       return;
     }
 
-    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>();
+    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>(seed_ % 1000000 / 1000000.0);
 
     // Populate scheduler with host list.
     // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
