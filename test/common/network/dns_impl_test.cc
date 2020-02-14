@@ -476,7 +476,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
                          TestUtility::ipTestParamsToString);
 
 // Validate that when DnsResolverImpl is destructed with outstanding requests,
-// that we don't invoke any callbacks if the query was not cancelled. This is a regression test from
+// that we don't invoke any callbacks if the query was cancelled. This is a regression test from
 // development, where segfaults were encountered due to callback invocations on
 // destruction.
 TEST_P(DnsImplTest, DestructPending) {

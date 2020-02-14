@@ -87,7 +87,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // This destruction might have been triggered by a peer PendingResolution that received a
     // ARES_ECONNREFUSED. If the PendingResolution has not been cancelled that means that the
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
-    // can be done with this ActiveQuery and initiate a new one.
+    // can be done with this query and initiate a new one.
     if (!cancelled_) {
       callback_({});
     }
