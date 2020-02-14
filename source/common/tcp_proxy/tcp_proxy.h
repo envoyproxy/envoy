@@ -17,7 +17,6 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/stream_info/filter_state.h"
-#include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -27,6 +26,7 @@
 #include "common/network/hash_policy.h"
 #include "common/network/utility.h"
 #include "common/stream_info/stream_info_impl.h"
+#include "common/tcp_proxy/upstream.h"
 #include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
@@ -346,12 +346,14 @@ protected:
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-  Tcp::ConnectionPool::Cancellable* upstream_handle_{};
-  Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
+
+  std::shared_ptr<ConnectionHandle> upstream_handle_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
+  std::unique_ptr<GenericUpstream> upstream_;
   StreamInfo::StreamInfoImpl stream_info_;
   RouteConstSharedPtr route_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;

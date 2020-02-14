@@ -591,6 +591,22 @@ public:
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;
 
 /**
+ * Typed derived classes for all header map types.
+ * TODO(mattklein123): In future changes we will be differentiating the implementation between
+ *   these classes to both fix bugs and improve performance.
+ * TODO(mattklein123): Virtual inheritance is currently required due to a layered implementation.
+ *   Consider also removing virtual inheritance once we finish the typed header refactor.
+ */
+class RequestHeaderMap : public virtual HeaderMap {};
+using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
+class RequestTrailerMap : public virtual HeaderMap {};
+using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+class ResponseHeaderMap : public virtual HeaderMap {};
+using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
+class ResponseTrailerMap : public virtual HeaderMap {};
+using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
+
+/**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
  */
 using HeaderVector = std::vector<std::pair<LowerCaseString, std::string>>;

@@ -46,7 +46,7 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
  * Static registration for the mongo filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(MongoProxyFilterConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory);
+                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.mongo_proxy"};
 
 } // namespace MongoProxy
 } // namespace NetworkFilters
