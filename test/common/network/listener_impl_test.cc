@@ -228,9 +228,12 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   // When listener is disabled, the timer should fire before any connection is accepted.
   listener.disable();
 
-  ClientConnectionPtr client_connection =
-      dispatcher_->createClientConnection(socket->localAddress(), Address::InstanceConstSharedPtr(),
-                                          Network::Test::createRawBufferSocket(), nullptr);
+  Network::Address::InstanceConstSharedPtr remote = Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(GetParam()),
+                  socket->localAddress()->ip()->port()));
+
+  ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      remote, Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
   client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
 

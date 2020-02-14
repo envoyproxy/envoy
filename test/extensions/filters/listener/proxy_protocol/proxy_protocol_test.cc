@@ -2,9 +2,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_balancer_impl.h"
@@ -182,6 +184,7 @@ public:
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
+  Api::OsSysCallsImpl os_sys_calls_actual_;
   const Network::FilterChainSharedPtr filter_chain_;
 };
 
@@ -291,9 +294,8 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, unsigned long int request, void* argp) {
-        const int rc = ::ioctl(fd, request, argp);
-        return Api::SysCallIntResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
+        return os_sys_calls_actual_.ioctl(fd, request, argp);
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
@@ -307,6 +309,22 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+          }));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
+            return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
+          }));
+  EXPECT_CALL(os_sys_calls, shutdown(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
@@ -339,6 +357,22 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+          }));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
+            return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
+          }));
+  EXPECT_CALL(os_sys_calls, shutdown(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
@@ -525,20 +559,19 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
 
   EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, unsigned long int request, void* argp) {
-        int x = ::ioctl(fd, request, argp);
-        if (x == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
-          return Api::SysCallIntResult{-1, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
+        const Api::SysCallIntResult x = os_sys_calls_actual_.ioctl(fd, request, argp);
+        if (x.rc_ == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
+          return Api::SysCallIntResult{-1, x.errno_};
         } else {
-          return Api::SysCallIntResult{x, errno};
+          return x;
         }
       }));
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, void* buf, size_t len, int flags) {
-        const ssize_t rc = ::recv(fd, buf, len, flags);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
+        return os_sys_calls_actual_.recv(fd, buf, len, flags);
       }));
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
@@ -553,6 +586,22 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+          }));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
+            return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
+          }));
+  EXPECT_CALL(os_sys_calls, shutdown(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
@@ -659,9 +708,8 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, void* buf, size_t len, int flags) {
-        const ssize_t rc = ::recv(fd, buf, len, flags);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
+        return os_sys_calls_actual_.recv(fd, buf, len, flags);
       }));
   EXPECT_CALL(os_sys_calls, recv(_, _, 1, _))
       .Times(AnyNumber())
@@ -669,9 +717,8 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
 
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, unsigned long int request, void* argp) {
-        const int rc = ::ioctl(fd, request, argp);
-        return Api::SysCallIntResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
+        return os_sys_calls_actual_.ioctl(fd, request, argp);
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
@@ -685,6 +732,22 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+          }));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
+            return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
+          }));
+  EXPECT_CALL(os_sys_calls, shutdown(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
@@ -708,9 +771,8 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, void* buf, size_t len, int flags) {
-        const ssize_t rc = ::recv(fd, buf, len, flags);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
+        return os_sys_calls_actual_.recv(fd, buf, len, flags);
       }));
   EXPECT_CALL(os_sys_calls, recv(_, _, 4, _))
       .Times(AnyNumber())
@@ -718,9 +780,8 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
 
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, unsigned long int request, void* argp) {
-        const int rc = ::ioctl(fd, request, argp);
-        return Api::SysCallIntResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
+        return os_sys_calls_actual_.ioctl(fd, request, argp);
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
@@ -734,6 +795,22 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
+            return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen).rc_;
+          }));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
+            return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
+          }));
+  EXPECT_CALL(os_sys_calls, shutdown(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
   EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};

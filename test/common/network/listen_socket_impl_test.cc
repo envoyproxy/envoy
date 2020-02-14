@@ -1,5 +1,7 @@
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
@@ -79,7 +81,7 @@ protected:
       // TODO (conqerAtapple): This is unfortunate. We should be able to templatize this
       // instead of if block.
       if (NetworkSocketTrait<Type>::type == Address::SocketType::Stream) {
-        EXPECT_EQ(0, listen(socket1->ioHandle().fd(), 0));
+        EXPECT_EQ(0, Api::OsSysCallsSingleton::get().listen(socket1->ioHandle().fd(), 0).rc_);
       }
 
       EXPECT_EQ(addr->ip()->port(), socket1->localAddress()->ip()->port());
@@ -93,11 +95,6 @@ protected:
       options2->emplace_back(std::move(option2));
       // The address and port are bound already, should throw exception.
       EXPECT_THROW(createListenSocketPtr(addr, options2, true), SocketBindException);
-
-      // Test the case of a socket with fd and given address and port.
-      IoHandlePtr dup_handle = std::make_unique<IoSocketHandleImpl>(dup(socket1->ioHandle().fd()));
-      auto socket3 = createListenSocketPtr(std::move(dup_handle), addr, nullptr);
-      EXPECT_EQ(addr->asString(), socket3->localAddress()->asString());
 
       // Test successful.
       return;
