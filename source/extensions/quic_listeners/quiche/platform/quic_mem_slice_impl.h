@@ -39,7 +39,6 @@ public:
   QuicMemSliceImpl& operator=(const QuicMemSliceImpl& other) = delete;
   QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) noexcept {
     if (this != &other) {
-      buffer_ = std::move(other.buffer_);
       fragment_ = std::move(other.fragment_);
       single_slice_buffer_.move(other.single_slice_buffer_);
     }
@@ -61,7 +60,6 @@ private:
   // Prerequisite: buffer has at least one slice.
   size_t firstSliceLength(Envoy::Buffer::Instance& buffer);
 
-  quic::QuicUniqueBufferPtr buffer_{nullptr, quic::QuicBufferDeleter(nullptr)};
   std::unique_ptr<Envoy::Buffer::BufferFragmentImpl> fragment_;
   Envoy::Buffer::OwnedImpl single_slice_buffer_;
 };

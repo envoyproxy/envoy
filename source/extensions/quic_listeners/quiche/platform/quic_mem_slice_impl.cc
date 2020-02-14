@@ -13,10 +13,11 @@
 namespace quic {
 
 QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
-    : buffer_(std::move(buffer)),
-      fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
-          buffer_.get(), length,
-          [](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {})) {
+    : fragment_(std::make_unique<Envoy::Buffer::BufferFragmentImpl>(
+          buffer.release(), length,
+          [](const void* p, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
+            delete static_cast<char*>(const_cast<void*>(p));
+          })) {
   single_slice_buffer_.addBufferFragment(*fragment_);
   ASSERT(this->length() == length);
 }
