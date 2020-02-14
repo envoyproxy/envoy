@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace Config {
 
+SINGLETON_MANAGER_REGISTRATION(const_metadata_shared_pool);
+
 MetadataKey::MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key)
     : key_(metadata_key.key()) {
   for (const auto& seg : metadata_key.path()) {
@@ -101,6 +103,17 @@ bool Metadata::metadataLabelMatch(const LabelSet& label_set,
     }
   }
   return true;
+}
+
+ConstMetadataSharedPoolSharedPtr
+Metadata::getConstMetadataSharedPool(Singleton::Manager& manager, Event::Dispatcher& dispatcher) {
+  return manager
+      .getTyped<SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, MessageUtil>>(
+          SINGLETON_MANAGER_REGISTERED_NAME(const_metadata_shared_pool), [&dispatcher] {
+            return std::make_shared<
+                SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, MessageUtil>>(
+                dispatcher);
+          });
 }
 
 } // namespace Config

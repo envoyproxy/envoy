@@ -13,5 +13,6 @@ envoy_cc_test(
     srcs = ["shared_pool_test.cc"],
     deps = [
         "//source/common/shared_pool:shared_pool_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )

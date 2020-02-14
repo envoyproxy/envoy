@@ -6,13 +6,19 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/registry/registry.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/shared_pool/shared_pool.h"
 
 namespace Envoy {
 namespace Config {
+
+using ConstMetadataSharedPoolSharedPtr = std::shared_ptr<
+    SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, MessageUtil>>;
 
 /**
  * MetadataKey presents the key name and path to retrieve value from metadata.
@@ -82,6 +88,14 @@ public:
   static bool metadataLabelMatch(const LabelSet& label_set,
                                  const envoy::config::core::v3::Metadata* host_metadata,
                                  const std::string& filter_key, bool list_as_any);
+  /**
+   * Returns an ObjectSharedPool to store const Metadata
+   * @param manager used to create singleton
+   * @param dispatcher the dispatcher object reference to the thread that created the
+   * ObjectSharedPool
+   */
+  static ConstMetadataSharedPoolSharedPtr getConstMetadataSharedPool(Singleton::Manager& manager,
+                                                                     Event::Dispatcher& dispatcher);
 };
 
 template <typename factoryClass> class TypedMetadataImpl : public TypedMetadata {

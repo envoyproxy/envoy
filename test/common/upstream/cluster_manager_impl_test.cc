@@ -102,8 +102,7 @@ public:
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
-  std::shared_ptr<const envoy::config::core::v3::Metadata>
-  buildMetadata(const std::string& version) const {
+  MetadataConstSharedPtr buildMetadata(const std::string& version) const {
     envoy::config::core::v3::Metadata metadata;
 
     if (!version.empty()) {

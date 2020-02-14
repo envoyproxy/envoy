@@ -76,12 +76,8 @@ public:
   // Upstream:HostDescription
   bool canary() const override { return logical_host_->canary(); }
   void canary(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  std::shared_ptr<const envoy::config::core::v3::Metadata> metadata() const override {
-    return logical_host_->metadata();
-  }
-  void metadata(std::shared_ptr<const envoy::config::core::v3::Metadata>) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
+  void metadata(MetadataConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return logical_host_->transportSocketFactory();

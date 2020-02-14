@@ -701,7 +701,9 @@ public:
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
   Stats::SymbolTable& symbolTable() { return symbol_table_; }
-  ConstMetadataSharedPoolSharedPtr constMetadataSharedPool() { return const_metadata_shared_pool_; }
+  Config::ConstMetadataSharedPoolSharedPtr constMetadataSharedPool() {
+    return const_metadata_shared_pool_;
+  }
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
@@ -767,7 +769,7 @@ private:
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
   Stats::SymbolTable& symbol_table_;
-  ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
+  Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
 };
 
 using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;

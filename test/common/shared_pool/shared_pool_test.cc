@@ -2,12 +2,16 @@
 
 #include "common/shared_pool/shared_pool.h"
 
+#include "test/mocks/event/mocks.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace SharedPool {
 
 TEST(SharedPoolTest, Basic) {
-  auto pool = std::make_shared<ObjectSharedPool<int>>();
+  Event::MockDispatcher dispatcher;
+  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
   {
     auto o = pool->getObject(4);
     auto o1 = pool->getObject(4);
@@ -23,27 +27,44 @@ TEST(SharedPoolTest, Basic) {
 }
 
 TEST(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
+  Event::MockDispatcher dispatcher;
   std::shared_ptr<ObjectSharedPool<int>> pool;
 
-  std::thread another_thread([&pool] { pool = std::make_shared<ObjectSharedPool<int>>(); });
+  std::thread another_thread(
+      [&pool, &dispatcher] { pool = std::make_shared<ObjectSharedPool<int>>(dispatcher); });
   another_thread.join();
   EXPECT_DEBUG_DEATH(pool->getObject(4), ".*");
 }
 
-TEST(SharedPoolTest, NonThreadSafeForDeleteObjectDeathTest) {
+TEST(SharedPoolTest, ThreadSafeForDeleteObject) {
+  Event::MockDispatcher dispatcher;
   std::shared_ptr<ObjectSharedPool<int>> pool;
+  {
+    // same thread
+    pool.reset(new ObjectSharedPool<int>(dispatcher));
+    EXPECT_CALL(dispatcher, post(_)).Times(0);
+    pool->deleteObject(std::hash<int>{}(4));
+  }
 
-  std::thread another_thread([&pool] { pool = std::make_shared<ObjectSharedPool<int>>(); });
+  // different threads
+
+  std::thread another_thread(
+      [&pool, &dispatcher] { pool.reset(new ObjectSharedPool<int>(dispatcher)); });
   another_thread.join();
-  EXPECT_DEBUG_DEATH(pool->deleteObject(std::hash<int>{}(4)), ".*");
+  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([](auto) {
+    // Overrides the default behavior, do nothing
+  }));
+  pool->deleteObject(std::hash<int>{}(4));
 }
 
 TEST(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
+  Event::MockDispatcher dispatcher;
   std::shared_ptr<ObjectSharedPool<int>> pool;
-
-  std::thread another_thread([&pool] { pool = std::make_shared<ObjectSharedPool<int>>(); });
+  std::thread another_thread(
+      [&pool, &dispatcher] { pool = std::make_shared<ObjectSharedPool<int>>(dispatcher); });
   another_thread.join();
   EXPECT_DEBUG_DEATH(pool->poolSize(), ".*");
 }
 
+} // namespace SharedPool
 } // namespace Envoy

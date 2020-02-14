@@ -17,6 +17,8 @@
 namespace Envoy {
 namespace Upstream {
 
+using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Metadata>;
+
 /**
  * All per host stats. @see stats_macros.h
  *
@@ -73,12 +75,12 @@ public:
   /**
    * @return the metadata associated with this host
    */
-  virtual std::shared_ptr<const envoy::config::core::v3::Metadata> metadata() const PURE;
+  virtual MetadataConstSharedPtr metadata() const PURE;
 
   /**
    * Set the current metadata.
    */
-  virtual void metadata(std::shared_ptr<const envoy::config::core::v3::Metadata> new_metadata) PURE;
+  virtual void metadata(MetadataConstSharedPtr new_metadata) PURE;
 
   /**
    * @return the cluster the host is a member of.

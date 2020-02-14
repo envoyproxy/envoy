@@ -5,22 +5,22 @@
 #include <thread>
 #include <type_traits>
 
-#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/singleton/instance.h"
-#include "envoy/singleton/manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"
-#include "common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
+namespace SharedPool {
 
 /**
  * Used to share objects that have the same content.
  * control the life cycle of shared objects by reference counting
- * Note: this class is not thread-safe
+ * Note: this class has only deleteObject for thread safety, and the other member methods are
+ * non-thread safe
  */
 template <typename T, typename HashFunc = std::hash<T>,
           class = typename std::enable_if<std::is_copy_constructible<T>::value>::type>
@@ -28,12 +28,17 @@ class ObjectSharedPool : public Singleton::Instance,
                          public std::enable_shared_from_this<ObjectSharedPool<T, HashFunc>>,
                          NonCopyable {
 public:
-  ObjectSharedPool() : thread_id_(std::this_thread::get_id()) {}
+  ObjectSharedPool(Event::Dispatcher& dispatcher)
+      : thread_id_(std::this_thread::get_id()), dispatcher_(dispatcher) {}
   ~ObjectSharedPool() = default;
 
   void deleteObject(const size_t hash_key) {
-    ASSERT(std::this_thread::get_id() == thread_id_);
-    object_pool_.erase(hash_key);
+    if (std::this_thread::get_id() == thread_id_) {
+      object_pool_.erase(hash_key);
+    } else {
+      auto this_shared_ptr = this->shared_from_this();
+      dispatcher_.post([hash_key, this_shared_ptr] { this_shared_ptr->deleteObject(hash_key); });
+    }
   }
 
   std::shared_ptr<T> getObject(const T& obj) {
@@ -64,13 +69,8 @@ public:
 private:
   std::thread::id thread_id_;
   absl::flat_hash_map<size_t, std::weak_ptr<T>> object_pool_;
+  Event::Dispatcher& dispatcher_;
 };
 
-using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Metadata>;
-
-using ConstMetadataSharedPoolSharedPtr =
-    std::shared_ptr<ObjectSharedPool<const envoy::config::core::v3::Metadata, MessageUtil>>;
-
-ConstMetadataSharedPoolSharedPtr getConstMetadataSharedPool(Singleton::Manager& manager);
-
+} // namespace SharedPool
 } // namespace Envoy

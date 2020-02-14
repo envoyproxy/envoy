@@ -147,6 +147,7 @@ private:
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool master)
         : Upstream::HostImpl(
               cluster, hostname, address,
+              // TODO(zyfjeff): Created through metadata shared pool
               std::make_shared<envoy::config::core::v3::Metadata>(parent.lbEndpoint().metadata()),
               parent.lbEndpoint().load_balancing_weight().value(),
               parent.localityLbEndpoint().locality(),

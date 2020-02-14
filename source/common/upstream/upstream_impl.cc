@@ -847,7 +847,8 @@ ClusterImplBase::ClusterImplBase(
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       symbol_table_(stats_scope->symbolTable()),
-      const_metadata_shared_pool_(getConstMetadataSharedPool(factory_context.singletonManager())) {
+      const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
+          factory_context.singletonManager(), factory_context.dispatcher())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
@@ -1342,10 +1343,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
           updateHealthFlag(*host, *existing_host->second, Host::HealthFlag::DEGRADED_EDS_HEALTH);
 
       // Did metadata change?
-      bool metadata_changed = false;
+      bool metadata_changed = true;
       if (host->metadata() && existing_host->second->metadata()) {
         metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
             *host->metadata(), *existing_host->second->metadata());
+      }
+
+      if (!host->metadata() && !existing_host->second->metadata()) {
+        metadata_changed = false;
       }
 
       if (metadata_changed) {
