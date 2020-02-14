@@ -231,6 +231,10 @@ public:
   void weight(uint32_t new_weight) override;
   bool used() const override { return used_; }
   void used(bool new_used) override { used_ = new_used; }
+  bool isExcluded() const override {
+    return healthFlagGet(HealthFlag::PENDING_ACTIVE_HC) ||
+           healthFlagGet(HealthFlag::EXCLUDE_FROM_LB);
+  }
 
 protected:
   static Network::ClientConnectionPtr

@@ -204,6 +204,11 @@ public:
    * @param new_used supplies the new value of host being in use to be stored.
    */
   virtual void used(bool new_used) PURE;
+
+  /**
+   * @return if the host should be excluded from load balancing.
+   */
+  virtual bool isExcluded() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;

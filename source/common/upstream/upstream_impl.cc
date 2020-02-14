@@ -894,8 +894,7 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
     if (host->health() == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
-    if (host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-        host->healthFlagGet(Host::HealthFlag::EXCLUDE_FROM_LB)) {
+    if (host->isExcluded()) {
       excluded_list->get().emplace_back(host);
     }
   }
@@ -909,10 +908,7 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
   auto filtered_clones =
       hosts.filter({[](const Host& host) { return host.health() == Host::Health::Healthy; },
                     [](const Host& host) { return host.health() == Host::Health::Degraded; },
-                    [](const Host& host) {
-                      return host.healthFlagGet(Host::HealthFlag::EXCLUDE_FROM_LB) ||
-                             host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC);
-                    }});
+                    [](const Host& host) { return host.isExcluded(); }});
 
   return std::make_tuple(std::move(filtered_clones[0]), std::move(filtered_clones[1]),
                          std::move(filtered_clones[2]));

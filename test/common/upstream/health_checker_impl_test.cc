@@ -747,7 +747,7 @@ TEST_F(HttpHealthCheckerImplTest, HCSuccessAfterPassiveFailure) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
       .WillRepeatedly(Return(45000));
 
-  // We start off as healthy, and should go degraded after receiving the degraded health response.
+  // We start off as health and set immediate hc failure
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, false, true, false, {}, false, true);
