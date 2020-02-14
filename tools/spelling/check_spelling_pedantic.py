@@ -26,6 +26,7 @@ except NameError:
   def cmp(x, y):
     return (x > y) - (x < y)
 
+
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 TOOLS_DIR = os.path.dirname(CURR_DIR)
 
@@ -589,8 +590,9 @@ if __name__ == "__main__":
 
   if args.operation_type == 'check':
     if not rv:
-      print("ERROR: spell check failed. Run 'tools/spelling/check_spelling_pedantic.py fix and/or add new "
-            "words to tools/spelling/spelling_dictionary.txt'")
+      print(
+          "ERROR: spell check failed. Run 'tools/spelling/check_spelling_pedantic.py fix and/or add new "
+          "words to tools/spelling/spelling_dictionary.txt'")
       sys.exit(1)
 
     print("PASS")
