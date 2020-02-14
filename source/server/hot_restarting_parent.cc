@@ -84,17 +84,20 @@ void HotRestartingParent::onSocketEvent() {
 
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
-static Stats::Gauge& makeGenerationStat(Stats::Store& store) {
-  Stats::StatNameDynamicPool pool(store.symbolTable());
-  Stats::Gauge& gauge = store.gaugeFromStatName(pool.add("hotrestart.generation"),
-                                                Stats::Gauge::ImportMode::Accumulate);
-  gauge.inc();
-  return gauge;
-}
-
 HotRestartingParent::Internal::Internal(Server::Instance* server)
-    : server_(server),
-      generation_(makeGenerationStat(server_->stats())) {}
+    : server_(server) {
+
+  // Track the hot-restart generation. Using gauge's accumulate semantics,
+  // the increments will be combined across hot-restart. This may be useful
+  // at some point, though the main motivation for this stat is to enable
+  // an integration test showing that dynamic stat-names can be coalesced
+  // across hot-restarts. There's no other reason this particular stat-name
+  // needs to be created dynamically.
+  Stats::StatNameDynamicPool pool(server_->stats().symbolTable());
+  Stats::Gauge& gauge = server_->stats().gaugeFromStatName(
+      pool.add("hotrestart.generation"), Stats::Gauge::ImportMode::Accumulate);
+  gauge.inc();
+}
 
 HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
   server_->shutdownAdmin();

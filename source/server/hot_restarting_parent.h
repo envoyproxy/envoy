@@ -36,7 +36,6 @@ public:
 
   private:
     Server::Instance* const server_{};
-    Stats::Gauge& generation_;   // incremented for each hot-restart genera
   };
 
 private:
