@@ -125,6 +125,16 @@ TEST(ConfigTest, ConfigTest) {
   cb(connection);
 }
 
+// Test that the deprecated extension name still functions.
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.tcp_proxy";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace TcpProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -188,7 +188,7 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([](const Http::HeaderMapPtr& decoded_headers, bool) {
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->Status()->value().getStringView());
       }));
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);

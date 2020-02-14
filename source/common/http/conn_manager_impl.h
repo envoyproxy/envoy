@@ -522,8 +522,8 @@ private:
     void decodeMetadata(MetadataMapPtr&&) override;
 
     // Http::RequestDecoder
-    void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeTrailers(HeaderMapPtr&& trailers) override;
+    void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
 
     // Http::FilterChainFactoryCallbacks
     void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
@@ -688,7 +688,7 @@ private:
     HeaderMapPtr response_headers_;
     Buffer::WatermarkBufferPtr buffered_response_data_;
     HeaderMapPtr response_trailers_{};
-    HeaderMapPtr request_headers_;
+    RequestHeaderMapPtr request_headers_;
     Buffer::WatermarkBufferPtr buffered_request_data_;
     HeaderMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;

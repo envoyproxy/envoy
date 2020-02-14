@@ -156,8 +156,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
 
   // Http::RequestDecoder
-  void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-  void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
+  void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,

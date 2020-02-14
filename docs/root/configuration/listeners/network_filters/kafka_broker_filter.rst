@@ -40,7 +40,7 @@ in the configuration snippet below:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.kafka_broker.v2alpha1.KafkaBroker
           stat_prefix: exampleprefix
-      - name: envoy.tcp_proxy
+      - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp
