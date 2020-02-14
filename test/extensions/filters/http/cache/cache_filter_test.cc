@@ -16,7 +16,8 @@ namespace {
 class CacheFilterTest : public ::testing::Test {
 protected:
   CacheFilter makeFilter() {
-    CacheFilter filter(config_, /*stats_prefix=*/"", context_.scope(), context_.timeSource(), cache_);
+    CacheFilter filter(config_, /*stats_prefix=*/"", context_.scope(), context_.timeSource(),
+                       cache_);
     filter.setDecoderFilterCallbacks(decoder_callbacks_);
     filter.setEncoderFilterCallbacks(encoder_callbacks_);
     return filter;
@@ -103,8 +104,9 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
                                               HeaderHasValueRef("age", "0")),
                                false));
-    EXPECT_CALL(decoder_callbacks_,
-                encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopIteration);
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
