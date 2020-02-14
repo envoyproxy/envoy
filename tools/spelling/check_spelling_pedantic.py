@@ -28,7 +28,6 @@ except NameError:
 
 
 CURR_DIR = os.path.dirname(os.path.realpath(__file__))
-TOOLS_DIR = os.path.dirname(CURR_DIR)
 
 # Single line comments: // comment OR /* comment */
 # Limit the characters that may precede // to help filter out some code
@@ -107,7 +106,7 @@ class SpellChecker:
     words = self.load_dictionary()
 
     # Generate aspell personal dictionary.
-    pws = os.path.join(TOOLS_DIR, '.aspell.en.pws')
+    pws = os.path.join(CURR_DIR, '.aspell.en.pws')
     with open(pws, 'w') as f:
       f.write("personal_ws-1.1 en %d\n" % (len(words)))
       f.writelines(words)
