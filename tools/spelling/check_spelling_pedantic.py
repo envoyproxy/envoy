@@ -26,8 +26,8 @@ except NameError:
   def cmp(x, y):
     return (x > y) - (x < y)
 
-
-TOOLS_DIR = os.path.dirname(os.path.realpath(__file__))
+CURR_DIR = os.path.dirname(os.path.realpath(__file__))
+TOOLS_DIR = os.path.dirname(CURR_DIR)
 
 # Single line comments: // comment OR /* comment */
 # Limit the characters that may precede // to help filter out some code
@@ -542,7 +542,7 @@ if __name__ == "__main__":
   except:
     locale.setlocale(locale.LC_ALL, 'C.UTF-8')
 
-  default_dictionary = os.path.join(TOOLS_DIR, 'spelling_dictionary.txt')
+  default_dictionary = os.path.join(CURR_DIR, 'spelling_dictionary.txt')
 
   parser = argparse.ArgumentParser(description="Check comment spelling.")
   parser.add_argument('operation_type',
@@ -589,8 +589,8 @@ if __name__ == "__main__":
 
   if args.operation_type == 'check':
     if not rv:
-      print("ERROR: spell check failed. Run 'tools/check_spelling_pedantic.py fix and/or add new "
-            "words to tools/spelling_dictionary.txt'")
+      print("ERROR: spell check failed. Run 'tools/spelling/check_spelling_pedantic.py fix and/or add new "
+            "words to tools/spelling/spelling_dictionary.txt'")
       sys.exit(1)
 
     print("PASS")
