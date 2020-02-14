@@ -33,7 +33,7 @@
               route:
                 cluster: local_service
         http_filters:
-        - name: envoy.health_check
+        - name: envoy.filters.http.health_check
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
             pass_through_mode: true
@@ -41,11 +41,11 @@
               - name: ":path"
                 exact_match: "/healthcheck"
             cache_time: 2.5s
-        - name: envoy.buffer
+        - name: envoy.filters.http.buffer
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
             max_request_bytes: 5242880
-        - name: envoy.router
+        - name: envoy.filters.http.router
           typed_config: {}
         access_log:
         - name: envoy.access_loggers.file
@@ -154,7 +154,7 @@ static_resources:
               {{ access_log_helper.egress_error_log()|indent(10) }}
           use_remote_address: true
           http_filters:
-          - name: envoy.rate_limit
+          - name: envoy.filters.http.ratelimit
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
               domain: envoy_service_to_service
@@ -162,9 +162,9 @@ static_resources:
                  grpc_service:
                     envoy_grpc:
                        cluster_name: ratelimit
-          - name: envoy.grpc_http1_bridge
+          - name: envoy.filters.http.grpc_http1_bridge
             typed_config: {}
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
 
   - address:
@@ -215,7 +215,7 @@ static_resources:
               {{ access_log_helper.egress_error_log()|indent(10) }}
           use_remote_address: true
           http_filters:
-          - name: envoy.rate_limit
+          - name: envoy.filters.http.ratelimit
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
               domain: envoy_service_to_service
@@ -223,9 +223,9 @@ static_resources:
                  grpc_service:
                     envoy_grpc:
                        cluster_name: ratelimit
-          - name: envoy.grpc_http1_bridge
+          - name: envoy.filters.http.grpc_http1_bridge
             typed_config: {}
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
   {% if external_virtual_hosts|length > 0 or mongos_servers|length > 0 %}{% endif -%}
   {% for mapping in external_virtual_hosts -%}
@@ -264,10 +264,10 @@ static_resources:
             {% endfor %}
           http_filters:
           {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
-          - name: envoy.http_dynamo_filter
+          - name: envoy.filters.http.dynamo
             typed_config: {}
           {% endif -%}
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
           access_log:
           - name: envoy.access_loggers.file

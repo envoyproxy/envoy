@@ -94,7 +94,7 @@ message BuildVersion {
 // [#next-free-field: 6]
 message Extension {
   // This is the name of the Envoy filter as specified in the Envoy
-  // configuration, e.g. envoy.router, com.acme.widget.
+  // configuration, e.g. envoy.filters.http.router, com.acme.widget.
   string name = 1;
 
   // Category of the extension.

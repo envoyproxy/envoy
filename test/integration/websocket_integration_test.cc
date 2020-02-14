@@ -352,7 +352,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         auto* filter_list_back = foo_upgrade->add_filters();
-        TestUtility::loadFromYaml("name: envoy.router", *filter_list_back);
+        TestUtility::loadFromYaml("name: envoy.filters.http.router", *filter_list_back);
       });
   initialize();
 
