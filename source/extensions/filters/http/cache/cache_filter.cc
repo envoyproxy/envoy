@@ -1,8 +1,5 @@
 #include "extensions/filters/http/cache/cache_filter.h"
 
-#include "envoy/registry/registry.h"
-
-#include "common/config/utility.h"
 #include "common/http/headers.h"
 
 #include "absl/strings/string_view.h"
@@ -35,22 +32,10 @@ bool CacheFilter::isCacheableResponse(Http::HeaderMap& headers) {
   return false;
 }
 
-HttpCache&
-CacheFilter::getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) {
-  const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
-  HttpCacheFactory* const factory =
-      Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type);
-  if (factory == nullptr) {
-    throw EnvoyException(
-        fmt::format("Didn't find a registered implementation for type: '{}'", type));
-  }
-  return factory->getCache(config);
-}
-
-CacheFilter::CacheFilter(
-    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config, const std::string&,
-    Stats::Scope&, TimeSource& time_source)
-    : time_source_(time_source), cache_(getCache(config)) {}
+CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig&,
+                         const std::string&, Stats::Scope&, TimeSource& time_source,
+                         HttpCache& http_cache)
+    : time_source_(time_source), cache_(http_cache) {}
 
 void CacheFilter::onDestroy() {
   // Clear decoder_callbacks_ so any pending callbacks will see that this filter is no longer

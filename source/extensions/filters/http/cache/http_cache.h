@@ -168,7 +168,7 @@ public:
   Key& key() { return key_; }
 
   // Returns the subset of this request's headers that are listed in
-  // envoy::config::filter::http::cache::v3::CacheConfig::allowed_vary_headers. If a cache
+  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
   // storage implementation forwards lookup requests to a remote cache server that supports *vary*
   // headers, that server may need to see these headers. For local implementations, it may be
   // simpler to instead call makeLookupResult with each potential response.

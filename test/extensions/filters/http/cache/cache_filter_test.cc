@@ -1,6 +1,5 @@
-#include "source/extensions/filters/http/cache/simple_http_cache/config.pb.h"
-
 #include "extensions/filters/http/cache/cache_filter.h"
+#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
@@ -16,20 +15,14 @@ namespace {
 
 class CacheFilterTest : public ::testing::Test {
 protected:
-  CacheFilterTest() {
-    config_.mutable_typed_config()->PackFrom(
-        envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig());
-    ASSERT(config_.typed_config()
-               .Is<envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig>());
-  }
-
   CacheFilter makeFilter() {
-    CacheFilter filter(config_, /*stats_prefix=*/"", context_.scope(), context_.timeSource());
+    CacheFilter filter(config_, /*stats_prefix=*/"", context_.scope(), context_.timeSource(), cache_);
     filter.setDecoderFilterCallbacks(decoder_callbacks_);
     filter.setEncoderFilterCallbacks(encoder_callbacks_);
     return filter;
   }
 
+  SimpleHttpCache cache_;
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;

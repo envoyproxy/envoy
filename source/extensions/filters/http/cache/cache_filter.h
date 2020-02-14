@@ -23,9 +23,9 @@ namespace Cache {
 class CacheFilter : public Http::PassThroughFilter,
                     public Logger::Loggable<Logger::Id::cache_filter> {
 public:
-  // Throws EnvoyException if no registered HttpCacheFactory for config.typed_config.
   CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
-              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source);
+              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
+              HttpCache& http_cache);
   // Http::StreamFilterBase
   void onDestroy() override;
   // Http::StreamDecoderFilter
@@ -49,8 +49,6 @@ private:
   // These don't require private access, but are members per envoy convention.
   static bool isCacheableRequest(Http::HeaderMap& headers);
   static bool isCacheableResponse(Http::HeaderMap& headers);
-  static HttpCache&
-  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config);
 
   TimeSource& time_source_;
   HttpCache& cache_;
