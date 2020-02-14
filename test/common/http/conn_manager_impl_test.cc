@@ -5104,7 +5104,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
       // 3. then refreshCachedRoute triggered by decoder_filters_[1]->callbacks_->route().
       .Times(3)
       .WillRepeatedly(Invoke([&](const HeaderMap& headers) -> Router::ConfigConstSharedPtr {
-        auto& test_headers = dynamic_cast<const TestHeaderMapImpl&>(headers);
+        auto& test_headers = dynamic_cast<const TestRequestHeaderMapImpl&>(headers);
         if (test_headers.get_("scope_key") == "foo") {
           return route_config1;
         }
@@ -5121,7 +5121,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        auto& test_headers = dynamic_cast<TestHeaderMapImpl&>(headers);
+        auto& test_headers = dynamic_cast<TestRequestHeaderMapImpl&>(headers);
         // Clear cached route and change scope key to "bar".
         decoder_filters_[0]->callbacks_->clearRouteCache();
         test_headers.remove("scope_key");
@@ -5130,7 +5130,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> FilterHeadersStatus {
-        auto& test_headers = dynamic_cast<TestHeaderMapImpl&>(headers);
+        auto& test_headers = dynamic_cast<TestRequestHeaderMapImpl&>(headers);
         EXPECT_EQ(test_headers.get_("scope_key"), "bar");
         // Route now switched to route2 as header "scope_key" has changed.
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());

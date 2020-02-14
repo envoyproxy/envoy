@@ -99,7 +99,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
   // needed until submitHeaders has been called.
   Http::HeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
-    modified_headers = std::make_unique<Http::HeaderMapImpl>(headers);
+    modified_headers = Http::HeaderMapImpl::create(headers);
     transformUpgradeFromH1toH2(*modified_headers);
     buildHeaders(final_headers, *modified_headers);
   } else {
@@ -128,7 +128,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     ASSERT(!pending_trailers_to_encode_);
-    pending_trailers_to_encode_ = std::make_unique<HeaderMapImpl>(trailers);
+    pending_trailers_to_encode_ = HeaderMapImpl::create(trailers);
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
@@ -185,7 +185,7 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
-  auto& headers = absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_);
+  auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   if (!upgrade_type_.empty() && headers->Status()) {
     Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
@@ -200,11 +200,11 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
 
 void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
   response_decoder_.decodeTrailers(
-      std::move(absl::get<ResponseTrailerMapImplPtr>(headers_or_trailers_)));
+      std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
-  auto& headers = absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_);
+  auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
@@ -213,7 +213,7 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
   request_decoder_->decodeTrailers(
-      std::move(absl::get<RequestTrailerMapImplPtr>(headers_or_trailers_)));
+      std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
