@@ -84,6 +84,18 @@ void HotRestartingParent::onSocketEvent() {
 
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
+static Stats::Gauge& makeGenerationStat(Stats::Store& store) {
+  Stats::StatNameDynamicPool pool(store.symbolTable());
+  Stats::Gauge& gauge = store.gaugeFromStatName(pool.add("hotrestart.generation"),
+                                                Stats::Gauge::ImportMode::Accumulate);
+  gauge.inc();
+  return gauge;
+}
+
+HotRestartingParent::Internal::Internal(Server::Instance* server)
+    : server_(server),
+      generation_(makeGenerationStat(server_->stats())) {}
+
 HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
   server_->shutdownAdmin();
   HotRestartMessage wrapped_reply;

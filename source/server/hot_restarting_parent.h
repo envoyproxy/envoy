@@ -22,7 +22,7 @@ public:
   // request from the child for that action.
   class Internal {
   public:
-    explicit Internal(Server::Instance* server) : server_(server) {}
+    explicit Internal(Server::Instance* server);
     // Return value is the response to return to the child.
     envoy::HotRestartMessage shutdownAdmin();
     // Return value is the response to return to the child.
@@ -36,6 +36,7 @@ public:
 
   private:
     Server::Instance* const server_{};
+    Stats::Gauge& generation_;   // incremented for each hot-restart genera
   };
 
 private:
