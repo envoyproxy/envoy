@@ -135,7 +135,10 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
   is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
-    Utility::appendXff(headers, *parent_.config_.local_info_.address());
+    const Network::Address::InstanceConstSharedPtr address = parent_.config_.local_info_.address();
+    if (address) {
+      Utility::appendXff(headers, *address);
+    }
   }
   router_.decodeHeaders(headers, end_stream);
   closeLocal(end_stream);
