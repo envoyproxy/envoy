@@ -104,6 +104,7 @@ void EnvoyQuicServerSession::OnCanWrite() {
 void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
   quic::QuicServerSessionBase::SetDefaultEncryptionLevel(level);
   if (level == quic::ENCRYPTION_FORWARD_SECURE) {
+    // This is only reached once, when handshake is done.
     raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }

@@ -58,6 +58,7 @@ void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
 void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
   quic::QuicSpdyClientSession::SetDefaultEncryptionLevel(level);
   if (level == quic::ENCRYPTION_FORWARD_SECURE) {
+    // This is only reached once, when handshake is done.
     raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }
