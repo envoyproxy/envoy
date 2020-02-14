@@ -166,7 +166,7 @@ IoHandlePtr InstanceBase::socketFromSocketType(SocketType socket_type) const {
     domain = AF_UNIX;
   }
 
-  const Api::SysCallSocketResult result = os_sys_calls_.socket(domain, flags, 0);
+  const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
   RELEASE_ASSERT(SOCKET_VALID(result.rc_),
                  fmt::format("socket(2) failed, got error: {}", strerror(result.errno_)));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_);
@@ -225,8 +225,8 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
 }
 
 Api::SysCallIntResult Ipv4Instance::bind(os_fd_t fd) const {
-  return os_sys_calls_.bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                            sizeof(ip_.ipv4_.address_));
+  return Api::OsSysCallsSingleton::get().bind(
+      fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_), sizeof(ip_.ipv4_.address_));
 }
 
 Api::SysCallIntResult Ipv4Instance::connect(os_fd_t fd) const {
@@ -314,8 +314,8 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
 }
 
 Api::SysCallIntResult Ipv6Instance::bind(os_fd_t fd) const {
-  return os_sys_calls_.bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
-                            sizeof(ip_.ipv6_.address_));
+  return Api::OsSysCallsSingleton::get().bind(
+      fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_), sizeof(ip_.ipv6_.address_));
 }
 
 Api::SysCallIntResult Ipv6Instance::connect(os_fd_t fd) const {

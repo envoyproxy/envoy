@@ -10,8 +10,6 @@
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
 
-#include "common/api/os_sys_calls_impl.h"
-
 namespace Envoy {
 namespace Network {
 namespace Address {
@@ -65,11 +63,10 @@ public:
   virtual socklen_t sockAddrLen() const PURE;
 
 protected:
-  InstanceBase(Type type) : os_sys_calls_(Api::OsSysCallsSingleton::get()), type_(type) {}
+  InstanceBase(Type type) : type_(type) {}
   IoHandlePtr socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
-  Api::OsSysCallsImpl& os_sys_calls_;
 
 private:
   const Type type_;
