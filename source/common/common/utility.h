@@ -268,20 +268,6 @@ public:
                             absl::string_view key_token, bool trim_whitespace = true);
 
   /**
-   * Compare one string view with another string view ignoring case sensitivity.
-   * @param lhs supplies the first string view.
-   * @param rhs supplies the second string view.
-   * @return true if strings are semantically the same and false otherwise.
-   *
-   * E.g.,
-   *
-   * caseCompare("hello", "hello")   . true
-   * caseCompare("hello", "HELLO")   . true
-   * caseCompare("hello", "HellO")   . true
-   */
-  static bool caseCompare(absl::string_view lhs, absl::string_view rhs);
-
-  /**
    * Crop characters from a string view starting at the first character of the matched
    * delimiter string view until the end of the source string view.
    * @param source supplies the string view to be processed.
