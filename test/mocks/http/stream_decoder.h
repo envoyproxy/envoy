@@ -23,14 +23,14 @@ public:
   MockRequestDecoder();
   ~MockRequestDecoder();
 
-  void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
+  void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override {
     decodeHeaders_(headers, end_stream);
   }
-  void decodeTrailers(HeaderMapPtr&& trailers) override { decodeTrailers_(trailers); }
+  void decodeTrailers(RequestTrailerMapPtr&& trailers) override { decodeTrailers_(trailers); }
 
   // Http::RequestDecoder
-  MOCK_METHOD(void, decodeHeaders_, (HeaderMapPtr & headers, bool end_stream));
-  MOCK_METHOD(void, decodeTrailers_, (HeaderMapPtr & trailers));
+  MOCK_METHOD(void, decodeHeaders_, (RequestHeaderMapPtr & headers, bool end_stream));
+  MOCK_METHOD(void, decodeTrailers_, (RequestTrailerMapPtr & trailers));
 };
 
 class MockResponseDecoder : public MockStreamDecoder, public ResponseDecoder {
@@ -38,18 +38,18 @@ public:
   MockResponseDecoder();
   ~MockResponseDecoder();
 
-  void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
+  void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     decode100ContinueHeaders_(headers);
   }
-  void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
+  void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
     decodeHeaders_(headers, end_stream);
   }
-  void decodeTrailers(HeaderMapPtr&& trailers) override { decodeTrailers_(trailers); }
+  void decodeTrailers(ResponseTrailerMapPtr&& trailers) override { decodeTrailers_(trailers); }
 
   // Http::ResponseDecoder
-  MOCK_METHOD(void, decode100ContinueHeaders_, (HeaderMapPtr & headers));
-  MOCK_METHOD(void, decodeHeaders_, (HeaderMapPtr & headers, bool end_stream));
-  MOCK_METHOD(void, decodeTrailers_, (HeaderMapPtr & trailers));
+  MOCK_METHOD(void, decode100ContinueHeaders_, (ResponseHeaderMapPtr & headers));
+  MOCK_METHOD(void, decodeHeaders_, (ResponseHeaderMapPtr & headers, bool end_stream));
+  MOCK_METHOD(void, decodeTrailers_, (ResponseTrailerMapPtr & trailers));
 };
 
 } // namespace Http

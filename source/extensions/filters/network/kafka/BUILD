@@ -81,6 +81,7 @@ envoy_cc_library(
     deps = [
         ":kafka_request_lib",
         ":parser_lib",
+        ":tagged_fields_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -143,6 +144,7 @@ envoy_cc_library(
     deps = [
         ":kafka_response_lib",
         ":parser_lib",
+        ":tagged_fields_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],

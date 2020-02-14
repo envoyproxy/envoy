@@ -1017,10 +1017,8 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
             max_request_headers_count_);
       });
 
-  Http::HeaderMapImpl big_headers{{Http::Headers::get().Method, "GET"},
-                                  {Http::Headers::get().Path, "/test/long/url"},
-                                  {Http::Headers::get().Scheme, "http"},
-                                  {Http::Headers::get().Host, "host"}};
+  Http::TestHeaderMapImpl big_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
   for (int i = 0; i < 20000; i++) {
     big_headers.addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));

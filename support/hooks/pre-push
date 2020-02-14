@@ -59,7 +59,7 @@ do
     # either of these things aren't true, the check fails.
     for i in $(git diff --name-only $RANGE --diff-filter=ACMR --ignore-submodules=all 2>&1); do
       echo -ne "  Checking format for $i - "
-      "$SCRIPT_DIR"/check_format.py check $i
+      "$SCRIPT_DIR"/code_format/check_format.py check $i
       if [[ $? -ne 0 ]]; then
         exit 1
       fi
@@ -77,7 +77,7 @@ do
       exit 1
     fi
 
-    "$SCRIPT_DIR"/format_python_tools.sh check
+    "$SCRIPT_DIR"/code_format/format_python_tools.sh check
     if [[ $? -ne 0 ]]; then
       exit 1
     fi

@@ -192,7 +192,8 @@ void Http2ConnPoolImplTest::completeRequest(ActiveTestRequest& r) {
   r.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                              true);
   EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
-  r.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 }
 
 void Http2ConnPoolImplTest::completeRequestCloseUpstream(size_t index, ActiveTestRequest& r) {
@@ -238,7 +239,8 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionReadyWithRequest) {
 
   EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
   EXPECT_CALL(*this, onClientDestroy());
-  r.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 }
 
 /**
@@ -260,7 +262,8 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionBusy) {
 
   EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
   EXPECT_CALL(*this, onClientDestroy());
-  r.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 }
 
 /**
@@ -613,7 +616,8 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   r1.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
@@ -638,7 +642,8 @@ TEST_F(Http2ConnPoolImplTest, VerifyBufferLimits) {
   r1.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -659,14 +664,16 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
                                               true);
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_active_.value());
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   ActiveTestRequest r2(*this, 0, true);
   EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
   r2.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -768,7 +775,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
@@ -807,14 +815,16 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(drained, ready());
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
@@ -834,7 +844,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
                                               true);
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);
@@ -846,7 +857,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
                                               true);
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
@@ -878,7 +890,8 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   r2.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -927,7 +940,8 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   r1.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[0].codec_client_->raiseGoAway();
 
@@ -938,7 +952,8 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   r2.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);

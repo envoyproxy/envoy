@@ -370,6 +370,20 @@ public:
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER)
 
   /**
+   * For testing. This is an exact match comparison (order matters).
+   */
+  virtual bool operator==(const HeaderMap& rhs) const PURE;
+  virtual bool operator!=(const HeaderMap& rhs) const PURE;
+
+  /**
+   * Add a header via full move. This is the expected high performance paths for codecs populating
+   * a map when receiving.
+   * @param key supplies the header key.
+   * @param value supplies the header value.
+   */
+  virtual void addViaMove(HeaderString&& key, HeaderString&& value) PURE;
+
+  /**
    * Add a reference header to the map. Both key and value MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). The key will not be copied and a best effort will be made not to
@@ -586,9 +600,33 @@ public:
     headers.dumpState(os);
     return os;
   }
+
+protected:
+  // In TestHeaderMapImpl and VerifiedHeaderMapImpl, this method is overridden to perform a
+  // time-consuming manual byte size count on each operation to verify the byte size. For prod
+  // HeaderMaps, this verification is skipped.
+  // TODO(asraa): Move this verification out of prod code and wrap virtual HeaderMap methods
+  // in both VerifiedHeaderMapImpl and TestHeaderMapImpl with the verification.
+  virtual void verifyByteSize() {}
 };
 
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;
+
+/**
+ * Typed derived classes for all header map types.
+ * TODO(mattklein123): In future changes we will be differentiating the implementation between
+ *   these classes to both fix bugs and improve performance.
+ * TODO(mattklein123): Virtual inheritance is currently required due to a layered implementation.
+ *   Consider also removing virtual inheritance once we finish the typed header refactor.
+ */
+class RequestHeaderMap : public virtual HeaderMap {};
+using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
+class RequestTrailerMap : public virtual HeaderMap {};
+using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+class ResponseHeaderMap : public virtual HeaderMap {};
+using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
+class ResponseTrailerMap : public virtual HeaderMap {};
+using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
