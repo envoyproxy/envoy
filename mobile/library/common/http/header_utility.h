@@ -17,12 +17,20 @@ namespace Utility {
 std::string convertToString(envoy_data s);
 
 /**
- * Transform envoy_headers to HeaderMap.
+ * Transform envoy_headers to RequestHeaderMap.
  * This function copies the content.
  * @param headers, the envoy_headers to transform.
- * @return HeaderMapPtr, the HeaderMap 1:1 transformation of the headers param.
+ * @return RequestHeaderMapPtr, the RequestHeaderMap 1:1 transformation of the headers param.
  */
-HeaderMapPtr toInternalHeaders(envoy_headers headers);
+RequestHeaderMapPtr toRequestHeaders(envoy_headers headers);
+
+/**
+ * Transform envoy_headers to RequestHeaderMap.
+ * This function copies the content.
+ * @param trailers, the envoy_headers (trailers) to transform.
+ * @return RequestTrailerMapPtr, the RequestTrailerMap 1:1 transformation of the headers param.
+ */
+RequestTrailerMapPtr toRequestTrailers(envoy_headers trailers);
 
 /**
  * Transform envoy_headers to HeaderMap.

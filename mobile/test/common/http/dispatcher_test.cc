@@ -28,6 +28,18 @@ using testing::WithArg;
 namespace Envoy {
 namespace Http {
 
+// Based on Http::Utility::toRequestHeaders() but only used for these tests.
+ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
+  ResponseHeaderMapPtr transformed_headers = std::make_unique<ResponseHeaderMapImpl>();
+  for (envoy_header_size_t i = 0; i < headers.length; i++) {
+    transformed_headers->addCopy(LowerCaseString(Utility::convertToString(headers.headers[i].key)),
+                                 Utility::convertToString(headers.headers[i].value));
+  }
+  // The C envoy_headers struct can be released now because the headers have been copied.
+  release_envoy_headers(headers);
+  return transformed_headers;
+}
+
 class DispatcherTest : public testing::Test {
 public:
   DispatcherTest() { http_dispatcher_.ready(event_dispatcher_, api_listener_); }
@@ -58,7 +70,7 @@ TEST_F(DispatcherTest, PreferredNetwork) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -166,7 +178,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -226,7 +238,7 @@ TEST_F(DispatcherTest, BasicStream) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_FALSE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -309,7 +321,7 @@ TEST_F(DispatcherTest, MultipleDataStream) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_FALSE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -408,7 +420,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -456,7 +468,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   bridge_callbacks2.on_headers = [](envoy_headers c_headers, bool end_stream,
                                     void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     bool* on_headers_called2 = static_cast<bool*>(context);
     *on_headers_called2 = true;
@@ -574,7 +586,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_FALSE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -644,7 +656,7 @@ TEST_F(DispatcherTest, StreamResetAfterOnComplete) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -706,7 +718,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRaceLocalWins) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -795,7 +807,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWinsDeletesStream) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -883,7 +895,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWins) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -973,7 +985,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRaceLocalWins) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -1059,7 +1071,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWinsDeletesStream) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -1144,7 +1156,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWins) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -1230,7 +1242,7 @@ TEST_F(DispatcherTest, ResetWhenRemoteClosesBeforeLocal) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_TRUE(end_stream);
-    HeaderMapPtr response_headers = Utility::toInternalHeaders(c_headers);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
