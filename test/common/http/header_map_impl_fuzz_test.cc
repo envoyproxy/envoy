@@ -100,7 +100,18 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       const auto& mutate_and_move = action.mutate_and_move();
       lower_case_strings.emplace_back(
           std::make_unique<Http::LowerCaseString>(replaceInvalidCharacters(mutate_and_move.key())));
-      Http::HeaderString header_field(*lower_case_strings.back());
+      // Randomly (using fuzzer data) set the header_field to either be of type Reference or Inline
+      const auto& str = lower_case_strings.back();
+      Http::HeaderString header_field; // By default it's Inline
+      if ((str->get().size() > 0) && (str->get().at(0) & 0x1)) {
+        // Keeping header_field as Inline
+        header_field.setCopy(str->get());
+        // inlineTransform can only be applied to Inline type!
+        header_field.inlineTransform(absl::ascii_tolower);
+      } else {
+        // Changing header_field to Reference
+        header_field.setReference(str->get());
+      }
       Http::HeaderString header_value;
       // Do some mutation or parameterized action.
       switch (mutate_and_move.mutate_selector_case()) {
@@ -125,7 +136,6 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       }
       // Can't addViaMove on an empty header value.
       if (!header_value.empty()) {
-        header_field.inlineTransform([](char c) { return absl::ascii_tolower(c); });
         header_map->addViaMove(std::move(header_field), std::move(header_value));
       }
       break;

@@ -46,7 +46,7 @@ the only one which needs to be amended is the listener
           portValue: 0
       filterChains:
         filters:
-          name: envoy.http_connection_manager
+          name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             http2_protocol_options:

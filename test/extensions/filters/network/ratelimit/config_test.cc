@@ -83,6 +83,16 @@ ip_white_list: '12'
                           "ip_white_list: Cannot find field");
 }
 
+// Test that the deprecated extension name still functions.
+TEST(RateLimitFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.ratelimit";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace RateLimitFilter
 } // namespace NetworkFilters
 } // namespace Extensions
