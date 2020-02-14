@@ -87,6 +87,17 @@ using LowerCaseStrPairVector =
     std::vector<std::pair<const Http::LowerCaseString, const std::string>>;
 
 /**
+ * Convenient type for an inline vector that will be used by HeaderString.
+ */
+using InlineHeaderVector = absl::InlinedVector<char, 128>;
+
+/**
+ * Convenient type for the underlying type of HeaderString that allows a variant
+ * between string_view and the InlinedVector.
+ */
+using VariantHeader = absl::variant<absl::string_view, InlineHeaderVector>;
+
+/**
  * This is a string implementation for use in header processing. It is heavily optimized for
  * performance. It supports 2 different types of storage and can switch between them:
  * 1) A reference.
@@ -115,7 +126,7 @@ public:
   explicit HeaderString(absl::string_view ref_value);
 
   HeaderString(HeaderString&& move_value) noexcept;
-  ~HeaderString();
+  ~HeaderString() = default;
 
   /**
    * Append data to an existing string. If the string is a reference string the reference data is
@@ -130,9 +141,9 @@ public:
    */
   template <typename UnaryOperation> void inlineTransform(UnaryOperation&& unary_op) {
     ASSERT(type() == Type::Inline);
-    std::transform(absl::get<absl::InlinedVector<char, 128>>(buffer_).begin(),
-                   absl::get<absl::InlinedVector<char, 128>>(buffer_).end(),
-                   absl::get<absl::InlinedVector<char, 128>>(buffer_).begin(), unary_op);
+    std::transform(absl::get<InlineHeaderVector>(buffer_).begin(),
+                   absl::get<InlineHeaderVector>(buffer_).end(),
+                   absl::get<InlineHeaderVector>(buffer_).begin(), unary_op);
   }
 
   /**
@@ -199,14 +210,14 @@ public:
 private:
   enum class Type { Reference, Inline };
 
-  absl::variant<absl::string_view, absl::InlinedVector<char, 128>> buffer_;
+  VariantHeader buffer_;
 
   bool valid() const;
 
   /**
    * @return the type of backing storage for the string.
    */
-  Type type() const { return Type(buffer_.index()); }
+  Type type() const;
 };
 
 /**

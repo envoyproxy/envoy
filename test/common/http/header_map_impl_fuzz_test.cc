@@ -8,6 +8,8 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 
+#include "absl/strings/ascii.h"
+
 using Envoy::Fuzz::replaceInvalidCharacters;
 
 namespace Envoy {
@@ -123,6 +125,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       }
       // Can't addViaMove on an empty header value.
       if (!header_value.empty()) {
+        header_field.inlineTransform([](char c) { return absl::ascii_tolower(c); });
         header_map->addViaMove(std::move(header_field), std::move(header_value));
       }
       break;

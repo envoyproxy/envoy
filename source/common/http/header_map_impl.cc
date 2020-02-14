@@ -27,24 +27,21 @@ void validateCapacity(uint64_t new_capacity) {
                  "Trying to allocate overly large headers.");
 }
 
-absl::string_view
-get_str_view(const absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
+absl::string_view get_str_view(const VariantHeader& buffer) {
   return absl::get<absl::string_view>(buffer);
 }
 
-absl::InlinedVector<char, 128>&
-get_in_vec(absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
-  return absl::get<absl::InlinedVector<char, 128>>(buffer);
+InlineHeaderVector& get_in_vec(VariantHeader& buffer) {
+  return absl::get<InlineHeaderVector>(buffer);
 }
 
-const absl::InlinedVector<char, 128>&
-get_in_vec(const absl::variant<absl::string_view, absl::InlinedVector<char, 128>>& buffer) {
-  return absl::get<absl::InlinedVector<char, 128>>(buffer);
+const InlineHeaderVector& get_in_vec(const VariantHeader& buffer) {
+  return absl::get<InlineHeaderVector>(buffer);
 }
 } // namespace
 
 // Initialize as a Type::Inline
-HeaderString::HeaderString() : buffer_(absl::InlinedVector<char, 128>()) {
+HeaderString::HeaderString() : buffer_(InlineHeaderVector()) {
   ASSERT((get_in_vec(buffer_).capacity()) >= MaxIntegerLength);
   ASSERT(valid());
 }
@@ -64,8 +61,6 @@ HeaderString::HeaderString(HeaderString&& move_value) noexcept
   ASSERT(valid());
 }
 
-HeaderString::~HeaderString() {}
-
 bool HeaderString::valid() const { return validHeaderString(getStringView()); }
 
 void HeaderString::append(const char* data, uint32_t data_size) {
@@ -78,11 +73,11 @@ void HeaderString::append(const char* data, uint32_t data_size) {
   case Type::Reference: {
     // Rather than be too clever and optimize this uncommon case, we switch to
     // Inline mode and copy.
-    absl::string_view prev = get_str_view(buffer_);
-    buffer_ = absl::InlinedVector<char, 128>();
+    const absl::string_view prev = get_str_view(buffer_);
+    buffer_ = InlineHeaderVector();
     // Assigning new_capacity to avoid resizing when appending the new data
     get_in_vec(buffer_).reserve(new_capacity);
-    get_in_vec(buffer_).assign(prev.data(), prev.data() + prev.size());
+    get_in_vec(buffer_).assign(prev.begin(), prev.end());
     break;
   }
   case Type::Inline: {
@@ -110,9 +105,9 @@ void HeaderString::clear() {
 void HeaderString::setCopy(const char* data, uint32_t size) {
   ASSERT(validHeaderString(absl::string_view(data, size)));
 
-  if (!absl::holds_alternative<absl::InlinedVector<char, 128>>(buffer_)) {
+  if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
     // Switching from Type::Reference to Type::Inline
-    buffer_ = absl::InlinedVector<char, 128>();
+    buffer_ = InlineHeaderVector();
   }
 
   get_in_vec(buffer_).reserve(size);
@@ -127,12 +122,16 @@ void HeaderString::setCopy(absl::string_view view) {
 void HeaderString::setInteger(uint64_t value) {
   // Initialize the size to the max length, copy the actual data, and then
   // reduce the size (but not the capacity) as needed
+  // Note: instead of using the inner_buffer, attempted the following:
+  // resize buffer_ to MaxIntegerLength, apply StringUtil::itoa to the buffer_.data(), and then
+  // resize buffer_ to int_length (the number of digits in value).
+  // However it was slower than the following approach.
   char inner_buffer[MaxIntegerLength];
   const uint32_t int_length = StringUtil::itoa(inner_buffer, MaxIntegerLength, value);
 
   if (type() == Type::Reference) {
     // Switching from Type::Reference to Type::Inline
-    buffer_ = absl::InlinedVector<char, 128>();
+    buffer_ = InlineHeaderVector();
   }
   ASSERT((get_in_vec(buffer_).capacity()) > MaxIntegerLength);
   get_in_vec(buffer_).assign(inner_buffer, inner_buffer + int_length);
@@ -149,6 +148,17 @@ uint32_t HeaderString::size() const {
   }
   ASSERT(type() == Type::Inline);
   return get_in_vec(buffer_).size();
+}
+
+HeaderString::Type HeaderString::type() const {
+  // buffer_.index() is correlated with the order of Reference and Inline in the
+  // enum.
+  ASSERT(buffer_.index() == 0 || buffer_.index() == 1);
+  ASSERT((buffer_.index() == 0 && absl::holds_alternative<absl::string_view>(buffer_)) ||
+         (buffer_.index() != 0));
+  ASSERT((buffer_.index() == 1 && absl::holds_alternative<InlineHeaderVector>(buffer_)) ||
+         (buffer_.index() != 1));
+  return Type(buffer_.index());
 }
 
 // Specialization needed for HeaderMapImpl::HeaderList::insert() when key is LowerCaseString.
