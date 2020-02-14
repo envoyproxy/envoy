@@ -754,7 +754,7 @@ static_listeners:
   manager_->startWorkers(guard_dog_);
 
   // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
-  // initialized, as no target will be aded to it.
+  // initialized, as no target will be added to it.
   time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
   EXPECT_CALL(server_, initManager()).Times(0); // No target added to server init manager.
   server_init_watcher.expectReady().Times(0);
