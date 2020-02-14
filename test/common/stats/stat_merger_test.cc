@@ -213,8 +213,6 @@ class StatMergerDynamicTest : public testing::Test {
 public:
   void init(SymbolTablePtr&& symbol_table) {
     symbol_table_ = std::move(symbol_table);
-    //store_ = std::make_unique<IsolatedStoreImpl>(*symbol_table_);
-    //stat_merger_ = std::make_unique<StatMerger>(*store_);
   }
 
   /**
