@@ -3986,7 +3986,7 @@ protected:
     EXPECT_CALL(*client_write_buffer, move(_))
         .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                               Invoke(client_write_buffer, &MockWatermarkBuffer::baseMove)));
-    EXPECT_CALL(*client_write_buffer, drain(_)).WillOnce(Invoke([&](uint64_t n) -> void {
+    EXPECT_CALL(*client_write_buffer, drain(_)).Times(2).WillOnce(Invoke([&](uint64_t n) -> void {
       client_write_buffer->baseDrain(n);
       dispatcher_->exit();
     }));
