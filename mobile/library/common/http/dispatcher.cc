@@ -318,7 +318,7 @@ envoy_status_t Dispatcher::sendHeaders(envoy_stream_t stream, envoy_headers head
     // from the caller.
     // https://github.com/lyft/envoy-mobile/issues/301
     if (direct_stream) {
-      HeaderMapPtr internal_headers = Utility::toInternalHeaders(headers);
+      RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
       ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
                 *internal_headers);
       attachPreferredNetwork(*internal_headers);
@@ -370,7 +370,7 @@ envoy_status_t Dispatcher::sendTrailers(envoy_stream_t stream, envoy_headers tra
     // from the caller.
     // https://github.com/lyft/envoy-mobile/issues/301
     if (direct_stream) {
-      HeaderMapPtr internal_trailers = Utility::toInternalHeaders(trailers);
+      RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);
       ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
       direct_stream->request_decoder_->decodeTrailers(std::move(internal_trailers));
       direct_stream->closeLocal(true);

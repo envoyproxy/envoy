@@ -16,6 +16,19 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace {
 
+// Based on Http::Utility::toRequestHeaders() but only used for these tests.
+Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
+  Http::ResponseHeaderMapPtr transformed_headers = std::make_unique<Http::ResponseHeaderMapImpl>();
+  for (envoy_header_size_t i = 0; i < headers.length; i++) {
+    transformed_headers->addCopy(
+        Http::LowerCaseString(Http::Utility::convertToString(headers.headers[i].key)),
+        Http::Utility::convertToString(headers.headers[i].value));
+  }
+  // The C envoy_headers struct can be released now because the headers have been copied.
+  release_envoy_headers(headers);
+  return transformed_headers;
+}
+
 typedef struct {
   uint32_t on_headers_calls;
   uint32_t on_data_calls;
@@ -115,7 +128,7 @@ TEST_P(DispatcherIntegrationTest, Basic) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_FALSE(end_stream);
-    Http::HeaderMapPtr response_headers = Http::Utility::toInternalHeaders(c_headers);
+    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
@@ -172,7 +185,7 @@ TEST_P(DispatcherIntegrationTest, RaceDoesNotCauseDoubleDeletion) {
   bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
                                    void* context) -> void {
     ASSERT_FALSE(end_stream);
-    Http::HeaderMapPtr response_headers = Http::Utility::toInternalHeaders(c_headers);
+    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
     EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
