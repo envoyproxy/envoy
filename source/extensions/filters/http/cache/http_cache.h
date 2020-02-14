@@ -231,6 +231,15 @@ public:
   // Inserts trailers into the cache.
   virtual void insertTrailers(const Http::HeaderMap& trailers) PURE;
 
+  /**
+   * This routine is called prior to an InsertContext being destroyed. InsertContext is responsible
+   * for making sure that any async events are cleaned up in the context of this routine. This
+   * includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing this
+   * type of cleanup in the destructor is due to the deferred deletion model that Envoy uses to
+   * avoid stack unwind complications. InsertContext must not invoke any callbacks after having
+   * onDestroy() invoked.
+   */
+  virtual void onDestroy() PURE;
   virtual ~InsertContext() = default;
 };
 using InsertContextPtr = std::unique_ptr<InsertContext>;
@@ -240,8 +249,6 @@ using InsertContextPtr = std::unique_ptr<InsertContext>;
 // an in-progress lookup by simply dropping the LookupContextPtr.
 class LookupContext {
 public:
-  virtual ~LookupContext() = default;
-
   // Get the headers from the cache. It is a programming error to call this
   // twice.
   virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
@@ -267,6 +274,17 @@ public:
   // Get the trailers from the cache. Only called if LookupResult::has_trailers
   // == true.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
+
+  /**
+   * This routine is called prior to an LookupContext being destroyed. LookupContext is responsible
+   * for making sure that any async events are cleaned up in the context of this routine. This
+   * includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing this
+   * type of cleanup in the destructor is due to the deferred deletion model that Envoy uses to
+   * avoid stack unwind complications. LookupContext must not invoke any callbacks after having
+   * onDestroy() invoked.
+   */
+  virtual void onDestroy() PURE;
+  virtual ~LookupContext() = default;
 };
 using LookupContextPtr = std::unique_ptr<LookupContext>;
 

@@ -19,22 +19,13 @@ namespace Cache {
 
 /**
  * A filter that caches responses and attempts to satisfy requests from cache.
- * It also inherits from std::enable_shared_from_this so it can pass shared_ptrs to async methods,
- * to ensure that it doesn't get destroyed before they complete.
  */
-class CacheFilter;
-using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
 class CacheFilter : public Http::PassThroughFilter,
-                    public Logger::Loggable<Logger::Id::cache_filter>,
-                    public std::enable_shared_from_this<CacheFilter> {
+                    public Logger::Loggable<Logger::Id::cache_filter> {
 public:
   // Throws EnvoyException if no registered HttpCacheFactory for config.typed_config.
-  static CacheFilterSharedPtr
-  make(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
-       const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source) {
-    // Can't use make_shared due to private constructor.
-    return std::shared_ptr<CacheFilter>(new CacheFilter(config, stats_prefix, scope, time_source));
-  }
+  CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
+              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source);
   // Http::StreamFilterBase
   void onDestroy() override;
   // Http::StreamDecoderFilter
@@ -44,22 +35,16 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
 
 private:
-  // Throws EnvoyException if no registered HttpCacheFactory for config.typed_config.
-  // Constructor is private to enforce enable_shared_from_this's requirement that this must be owned
-  // by a shared_ptr.
-  CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
-              const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source);
-
   void getBody();
-  void onOkHeaders(Http::HeaderMapPtr&& headers, std::vector<AdjustedByteRange>&& response_ranges,
-                   uint64_t content_length, bool has_trailers);
-  void onUnusableHeaders();
-  void onBody(Buffer::InstancePtr&& body);
-  void onTrailers(Http::HeaderMapPtr&& trailers);
-  static void onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&& result);
-  static void onBodyAsync(const CacheFilterSharedPtr& self, Buffer::InstancePtr&& body);
-  static void onTrailersAsync(const CacheFilterSharedPtr& self, Http::HeaderMapPtr&& trailers);
   void post(std::function<void()> f) const;
+  bool active() const { return decoder_callbacks_; }
+
+  void onHeaders(LookupResult&& result);
+  void onHeadersAsync(LookupResult&& result);
+  void onBody(Buffer::InstancePtr&& body);
+  void onBodyAsync(Buffer::InstancePtr&& body);
+  void onTrailers(Http::HeaderMapPtr&& trailers);
+  void onTrailersAsync(Http::HeaderMapPtr&& trailers);
 
   // These don't require private access, but are members per envoy convention.
   static bool isCacheableRequest(Http::HeaderMap& headers);
@@ -81,6 +66,7 @@ private:
   // TODO(toddmgreer): cache trailers.
   bool response_has_trailers_;
 };
+using CacheFilterPtr = std::unique_ptr<CacheFilter>;
 
 } // namespace Cache
 } // namespace HttpFilters

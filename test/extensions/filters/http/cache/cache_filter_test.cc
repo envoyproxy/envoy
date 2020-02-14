@@ -23,13 +23,10 @@ protected:
                .Is<envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig>());
   }
 
-  CacheFilterSharedPtr makeFilter() {
-    CacheFilterSharedPtr filter =
-        CacheFilter::make(config_, /*stats_prefix=*/"", context_.scope(), context_.timeSource());
-    if (filter) {
-      filter->setDecoderFilterCallbacks(decoder_callbacks_);
-      filter->setEncoderFilterCallbacks(encoder_callbacks_);
-    }
+  CacheFilter makeFilter() {
+    CacheFilter filter(config_, /*stats_prefix=*/"", context_.scope(), context_.timeSource());
+    filter.setDecoderFilterCallbacks(decoder_callbacks_);
+    filter.setEncoderFilterCallbacks(encoder_callbacks_);
     return filter;
   }
 
@@ -51,73 +48,75 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
-  // Create filter for request 1
-  CacheFilterSharedPtr filter = makeFilter();
-  ASSERT_TRUE(filter);
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter();
 
-  // Decode request 1 header
-  EXPECT_CALL(decoder_callbacks_, continueDecoding);
-  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
-            Http::FilterHeadersStatus::StopIteration);
-  ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    // Decode request 1 header
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopIteration);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
 
-  // Encode response header
-  EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
-  filter->onDestroy();
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter();
 
-  // Create filter for request 2
-  filter = makeFilter();
-  ASSERT_TRUE(filter);
-
-  // Decode request 2 header
-  EXPECT_CALL(decoder_callbacks_,
-              encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                            HeaderHasValueRef("age", "0")),
-                             true));
-  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
-            Http::FilterHeadersStatus::StopIteration);
-  ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
-  filter->onDestroy();
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               true));
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopIteration);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
 }
 
 TEST_F(CacheFilterTest, ImmediateHitBody) {
   request_headers_.setHost("ImmediateHitBody");
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
-
-  // Create filter for request 1
-  CacheFilterSharedPtr filter = makeFilter();
-  ASSERT_TRUE(filter);
-
-  // Decode request 1 header
-  EXPECT_CALL(decoder_callbacks_, continueDecoding);
-  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
-            Http::FilterHeadersStatus::StopIteration);
-  ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
-
-  // Encode response header
   const std::string body = "abc";
-  Buffer::OwnedImpl buffer(body);
-  response_headers_.setContentLength(body.size());
-  EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
-  EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
-  filter->onDestroy();
 
-  // Create filter for request 2
-  filter = makeFilter();
-  ASSERT_TRUE(filter);
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter();
 
-  // Decode request 2 header
-  EXPECT_CALL(decoder_callbacks_,
-              encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                            HeaderHasValueRef("age", "0")),
-                             false));
-  EXPECT_CALL(decoder_callbacks_,
-              encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
-  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
-            Http::FilterHeadersStatus::StopIteration);
-  ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
-  filter->onDestroy();
+    // Decode request 1 header
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopIteration);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    Buffer::OwnedImpl buffer(body);
+    response_headers_.setContentLength(body.size());
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.encodeData(buffer, true), Http::FilterDataStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter();
+
+    // Decode request 2 header
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               false));
+    EXPECT_CALL(decoder_callbacks_,
+                encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopIteration);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
 }
 
 } // namespace
