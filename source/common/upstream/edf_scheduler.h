@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <queue>
 
@@ -25,6 +26,8 @@ namespace Upstream {
 // weights and an O(log n) pick time.
 template <class C> class EdfScheduler {
 public:
+  EdfScheduler() {}
+  EdfScheduler(double current_time) : current_time_(current_time) {}
   /**
    * Pick queue entry with closest deadline.
    * @return std::shared_ptr<C> to the queue entry if a valid entry exists in the queue, nullptr
@@ -68,6 +71,21 @@ public:
   }
 
   /**
+   * Insert entry into queue with a given weight. The deadline will be multiples of (1 / weight) that 
+   * just larger than initial current time
+   * @param weight floating point weight.
+   * @param entry shared pointer to entry, only a weak reference will be retained.
+   */
+  void initial_add(double weight, std::shared_ptr<C> entry) {
+    ASSERT(weight > 0);
+    double deadline = std::ceil((current_time_ - deadline) * weight) / weight;
+    EDF_TRACE("Insertion {} in queue with deadline {} and weight {} and current_time {}.",
+              static_cast<const void*>(entry.get()), deadline, weight, current_time_);
+    queue_.push({deadline, order_offset_++, entry});
+    ASSERT(queue_.top().deadline_ >= current_time_);
+  }
+
+  /**
    * Implements empty() on the internal queue. Does not attempt to discard expired elements.
    * @return bool whether or not the internal queue is empty.
    */
@@ -89,7 +107,8 @@ private:
     }
   };
 
-  // Current time in EDF scheduler.
+  // Current time in EDF scheduler. It could be initiated as a float ranges [0.0, 1.0) to avoid
+  // biasing towards earlier hosts in the schedule across refreshes for the weighted case.
   // TODO(htuch): Is it worth the small extra complexity to use integer time for performance
   // reasons?
   double current_time_{};

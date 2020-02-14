@@ -715,8 +715,9 @@ void EdfLoadBalancerBase::initialize() {
 
 void EdfLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
-    // Nuke existing scheduler if it exists.
-    auto& scheduler = scheduler_[source] = Scheduler{};
+    // Nuke existing scheduler if it exists, and initiate initial deadline with a float ranges
+    // [0.0, 1.0)
+    auto& scheduler = scheduler_[source] = Scheduler{seed_ % 1000000 / 1000000.0};
     refreshHostSource(source);
 
     // Check if the original host weights are equal and skip EDF creation if they are. When all
@@ -739,12 +740,11 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
-      scheduler.edf_->add(hostWeight(*host), host);
+      scheduler.edf_->initial_add(hostWeight(*host), host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
-    // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the schedule across
-    // refreshes for the weighted case.
+    // This random pick could avoid biasing towards earlier hosts for non-weighted case.
     if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
         auto host = scheduler.edf_->pick();
