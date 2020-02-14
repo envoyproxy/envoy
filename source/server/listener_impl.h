@@ -229,7 +229,7 @@ private:
   // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
   // listener initialization is complete.
   Init::WatcherImpl local_init_watcher_;
-  // A target is afdded to Server's InitManager if workers_started_ is false.
+  // A target is added to Server's InitManager if workers_started_ is false.
   Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
