@@ -78,7 +78,7 @@ public:
    */
   void initial_add(double weight, std::shared_ptr<C> entry) {
     ASSERT(weight > 0);
-    double deadline = std::ceil(current_time_ * weight) / weight;
+    double deadline = (std::floor(current_time_ * weight) + 1.0) / weight;
     EDF_TRACE("Insertion {} in queue with deadline {} and weight {} and current_time {}.",
               static_cast<const void*>(entry.get()), deadline, weight, current_time_);
     queue_.push({deadline, order_offset_++, entry});
