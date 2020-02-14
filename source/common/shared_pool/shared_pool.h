@@ -12,6 +12,7 @@
 #include "common/common/non_copyable.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "gtest/gtest_prod.h"
 
 namespace Envoy {
 namespace SharedPool {
@@ -70,6 +71,9 @@ private:
   std::thread::id thread_id_;
   absl::flat_hash_map<size_t, std::weak_ptr<T>> object_pool_;
   Event::Dispatcher& dispatcher_;
+  FRIEND_TEST(SharedPoolTest, NonThreadSafeForGetObjectDeathTest);
+  FRIEND_TEST(SharedPoolTest, ThreadSafeForDeleteObject);
+  FRIEND_TEST(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest);
 };
 
 } // namespace SharedPool

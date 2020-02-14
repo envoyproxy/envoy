@@ -28,11 +28,16 @@ TEST(SharedPoolTest, Basic) {
 
 TEST(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
   Event::MockDispatcher dispatcher;
-  std::shared_ptr<ObjectSharedPool<int>> pool;
-
-  std::thread another_thread(
-      [&pool, &dispatcher] { pool = std::make_shared<ObjectSharedPool<int>>(dispatcher); });
-  another_thread.join();
+  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
+  pool->thread_id_ = std::thread::id();
+#ifdef NDEBUG
+  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([&pool](auto callback) {
+    // Overrides the default behavior
+    // Restore thread ids so that objects can be destructed, avoiding memory leaks
+    pool->thread_id_ = std::this_thread::get_id();
+    callback();
+  }));
+#endif
   EXPECT_DEBUG_DEATH(pool->getObject(4), ".*");
 }
 
@@ -46,23 +51,21 @@ TEST(SharedPoolTest, ThreadSafeForDeleteObject) {
     pool->deleteObject(std::hash<int>{}(4));
   }
 
-  // different threads
-
-  std::thread another_thread(
-      [&pool, &dispatcher] { pool.reset(new ObjectSharedPool<int>(dispatcher)); });
-  another_thread.join();
-  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([](auto) {
-    // Overrides the default behavior, do nothing
-  }));
-  pool->deleteObject(std::hash<int>{}(4));
+  {
+    // different threads
+    pool.reset(new ObjectSharedPool<int>(dispatcher));
+    pool->thread_id_ = std::thread::id();
+    EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([](auto) {
+      // Overrides the default behavior, do nothing
+    }));
+    pool->deleteObject(std::hash<int>{}(4));
+  }
 }
 
 TEST(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
   Event::MockDispatcher dispatcher;
-  std::shared_ptr<ObjectSharedPool<int>> pool;
-  std::thread another_thread(
-      [&pool, &dispatcher] { pool = std::make_shared<ObjectSharedPool<int>>(dispatcher); });
-  another_thread.join();
+  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
+  pool->thread_id_ = std::thread::id();
   EXPECT_DEBUG_DEATH(pool->poolSize(), ".*");
 }
 

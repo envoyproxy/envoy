@@ -13,6 +13,9 @@ envoy_cc_library(
     hdrs = [
         "shared_pool.h",
     ],
+    external_deps = [
+        "googletest",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:instance_interface",
