@@ -213,6 +213,11 @@ void OwnedImpl::drain(uint64_t size) {
       }
     }
   }
+  // Make sure to drain any zero byte fragments that might have been added as
+  // sentinels for flushed data.
+  while (!slices_.empty() && slices_.front()->dataSize() == 0) {
+    slices_.pop_front();
+  }
 }
 
 uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
