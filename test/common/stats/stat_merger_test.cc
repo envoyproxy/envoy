@@ -211,9 +211,7 @@ TEST_F(StatMergerTest, gaugeMergeImportMode) {
 
 class StatMergerDynamicTest : public testing::Test {
 public:
-  void init(SymbolTablePtr&& symbol_table) {
-    symbol_table_ = std::move(symbol_table);
-  }
+  void init(SymbolTablePtr&& symbol_table) { symbol_table_ = std::move(symbol_table); }
 
   /**
    * Test helper function takes an input_descriptor. And input_descriptor is
