@@ -29,12 +29,12 @@ TEST(SharedPoolTest, Basic) {
 TEST(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
   Event::MockDispatcher dispatcher;
   auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
-  pool->thread_id_ = std::thread::id();
+  pool->setThreadIdForTest(std::thread::id());
 #ifdef NDEBUG
   EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([&pool](auto callback) {
     // Overrides the default behavior
     // Restore thread ids so that objects can be destructed, avoiding memory leaks
-    pool->thread_id_ = std::this_thread::get_id();
+    pool->setThreadIdForTest(std::this_thread::get_id());
     callback();
   }));
 #endif
@@ -54,7 +54,7 @@ TEST(SharedPoolTest, ThreadSafeForDeleteObject) {
   {
     // different threads
     pool.reset(new ObjectSharedPool<int>(dispatcher));
-    pool->thread_id_ = std::thread::id();
+    pool->setThreadIdForTest(std::thread::id());
     EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([](auto) {
       // Overrides the default behavior, do nothing
     }));
@@ -65,7 +65,7 @@ TEST(SharedPoolTest, ThreadSafeForDeleteObject) {
 TEST(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
   Event::MockDispatcher dispatcher;
   auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
-  pool->thread_id_ = std::thread::id();
+  pool->setThreadIdForTest(std::thread::id());
   EXPECT_DEBUG_DEATH(pool->poolSize(), ".*");
 }
 
