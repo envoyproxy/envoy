@@ -1347,9 +1347,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       if (host->metadata() && existing_host->second->metadata()) {
         metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
             *host->metadata(), *existing_host->second->metadata());
-      }
-
-      if (!host->metadata() && !existing_host->second->metadata()) {
+      } else if (!host->metadata() && !existing_host->second->metadata()) {
         metadata_changed = false;
       }
 
