@@ -191,7 +191,8 @@ void Http2ConnPoolImplLegacyTest::completeRequest(ActiveTestRequest& r) {
   r.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                              true);
   EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
-  r.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 }
 
 void Http2ConnPoolImplLegacyTest::completeRequestCloseUpstream(size_t index, ActiveTestRequest& r) {
@@ -400,7 +401,8 @@ TEST_F(Http2ConnPoolImplLegacyTest, VerifyConnectionTimingStats) {
   r1.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -425,7 +427,8 @@ TEST_F(Http2ConnPoolImplLegacyTest, VerifyBufferLimits) {
   r1.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -445,14 +448,16 @@ TEST_F(Http2ConnPoolImplLegacyTest, RequestAndResponse) {
   r1.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   ActiveTestRequest r2(*this, 0, true);
   EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
   r2.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -549,7 +554,8 @@ TEST_F(Http2ConnPoolImplLegacyTest, DrainDisconnectDrainingWithActiveRequest) {
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
@@ -586,14 +592,16 @@ TEST_F(Http2ConnPoolImplLegacyTest, DrainPrimary) {
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(drained, ready());
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
@@ -610,7 +618,8 @@ TEST_F(Http2ConnPoolImplLegacyTest, DrainPrimaryNoActiveRequest) {
   r1.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   expectClientCreate();
@@ -622,7 +631,8 @@ TEST_F(Http2ConnPoolImplLegacyTest, DrainPrimaryNoActiveRequest) {
   r2.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   ReadyWatcher drained;
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
@@ -655,7 +665,8 @@ TEST_F(Http2ConnPoolImplLegacyTest, ConnectTimeout) {
   r2.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -704,7 +715,8 @@ TEST_F(Http2ConnPoolImplLegacyTest, GoAway) {
   r1.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
-  r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r1.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[0].codec_client_->raiseGoAway();
 
@@ -715,7 +727,8 @@ TEST_F(Http2ConnPoolImplLegacyTest, GoAway) {
   r2.callbacks_.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                               true);
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
-  r2.inner_decoder_->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
+  r2.inner_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);

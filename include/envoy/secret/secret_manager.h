@@ -11,7 +11,6 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 class TransportSocketFactoryContext;
-class FactoryContext;
 } // namespace Configuration
 } // namespace Server
 

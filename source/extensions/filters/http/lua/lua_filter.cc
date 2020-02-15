@@ -265,8 +265,8 @@ void StreamHandleWrapper::onFailure(Http::AsyncClient::FailureReason) {
 
   // Just fake a basic 503 response.
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(Http::HeaderMapPtr{
-      new Http::HeaderMapImpl{{Http::Headers::get().Status,
-                               std::to_string(enumToInt(Http::Code::ServiceUnavailable))}}}));
+      Http::HeaderMapImpl::create({{Http::Headers::get().Status,
+                                    std::to_string(enumToInt(Http::Code::ServiceUnavailable))}})}));
   response_message->body() = std::make_unique<Buffer::OwnedImpl>("upstream failure");
   onSuccess(std::move(response_message));
 }

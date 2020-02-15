@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/common/platform.h"
 #include "envoy/http/codec.h"
 
@@ -34,9 +36,27 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
     const Network::Address::InstanceConstSharedPtr& envoy_address);
 
 // The returned header map has all keys in lower case.
-Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list);
+template <class T>
+std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
+  auto headers = std::make_unique<T>();
+  for (const auto& entry : header_list) {
+    // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
+    headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
+  }
+  return headers;
+}
 
-Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block);
+template <class T>
+std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
+  auto headers = std::make_unique<T>();
+  for (auto entry : header_block) {
+    // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
+    std::string key(entry.first);
+    std::string value(entry.second);
+    headers->addCopy(Http::LowerCaseString(key), value);
+  }
+  return headers;
+}
 
 spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers);
 

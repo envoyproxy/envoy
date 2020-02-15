@@ -28,6 +28,7 @@
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_subject_alt_names.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -369,9 +370,9 @@ void Filter::chargeUpstreamCode(Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
   const uint64_t response_status_code = enumToInt(code);
-  Http::HeaderMapImpl fake_response_headers{
-      {Http::Headers::get().Status, std::to_string(response_status_code)}};
-  chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
+  const auto fake_response_headers = Http::HeaderMapImpl::create(
+      {{Http::Headers::get().Status, std::to_string(response_status_code)}});
+  chargeUpstreamCode(response_status_code, *fake_response_headers, upstream_host, dropped);
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
@@ -519,17 +520,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
-  if (upstream_http_protocol_options.has_value() &&
-      upstream_http_protocol_options.value().auto_sni()) {
+  if (upstream_http_protocol_options.has_value()) {
     const auto parsed_authority =
         Http::Utility::parseAuthority(headers.Host()->value().getStringView());
-    if (!parsed_authority.is_ip_address_) {
-      // TODO: Add SAN verification here and use it from dynamic_forward_proxy
-      // Update filter state with the host/authority to use for setting SNI in the transport
-      // socket options. This is referenced during the getConnPool() call below.
+    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
       callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
           std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::StateType::Mutable);
+    }
+
+    if (upstream_http_protocol_options.value().auto_san_validation()) {
+      callbacks_->streamInfo().filterState()->setData(
+          Network::UpstreamSubjectAltNames::key(),
+          std::make_unique<Network::UpstreamSubjectAltNames>(
+              std::vector<std::string>{std::string(parsed_authority.host_)}),
           StreamInfo::FilterState::StateType::Mutable);
     }
   }
@@ -734,13 +739,13 @@ void Filter::maybeDoShadowing() {
     const auto& shadow_policy = shadow_policy_wrapper.get();
 
     ASSERT(!shadow_policy.cluster().empty());
-    Http::MessagePtr request(new Http::RequestMessageImpl(
-        Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
+    Http::MessagePtr request(
+        new Http::RequestMessageImpl(Http::HeaderMapImpl::create(*downstream_headers_)));
     if (callbacks_->decodingBuffer()) {
       request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
     }
     if (downstream_trailers_) {
-      request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
+      request->trailers(Http::HeaderMapImpl::create(*downstream_trailers_));
     }
 
     config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request),
@@ -1488,14 +1493,14 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+void Filter::UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
   parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
-void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void Filter::UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
@@ -1505,7 +1510,7 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
 
   awaiting_headers_ = false;
   if (!parent_.config_.upstream_logs_.empty()) {
-    upstream_headers_ = std::make_unique<Http::HeaderMapImpl>(*headers);
+    upstream_headers_ = Http::HeaderMapImpl::create(*headers);
   }
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
@@ -1520,12 +1525,12 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
-void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+void Filter::UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   maybeEndDecode(true);
   if (!parent_.config_.upstream_logs_.empty()) {
-    upstream_trailers_ = std::make_unique<Http::HeaderMapImpl>(*trailers);
+    upstream_trailers_ = Http::HeaderMapImpl::create(*trailers);
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }

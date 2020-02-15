@@ -1257,10 +1257,10 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 // maybeNormalizePath() does nothing by default.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/../a");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(original_headers, header_map);
 }
@@ -1268,10 +1268,10 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
 // maybeNormalizePath() leaves already normal paths alone.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(original_headers, header_map);
 }
@@ -1279,10 +1279,10 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
 // maybeNormalizePath() normalizes relative paths.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/../abc");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
@@ -1291,10 +1291,10 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
 TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(false));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz///abc");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz///abc");
 }
@@ -1303,10 +1303,10 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
 TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz///abc");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/abc");
 }
@@ -1315,10 +1315,10 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
 TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/..//abc");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/../abc");
 }

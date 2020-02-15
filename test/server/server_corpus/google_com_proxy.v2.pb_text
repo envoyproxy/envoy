@@ -9,7 +9,7 @@ static_resources {
     }
     filter_chains {
       filters {
-        name: "envoy.http_connection_manager"
+        name: "envoy.filters.network.http_connection_manager"
         config {
           fields {
             key: "http_filters"

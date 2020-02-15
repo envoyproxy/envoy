@@ -816,6 +816,13 @@ public:
    * @return the operation name
    */
   virtual const std::string& getOperation() const PURE;
+
+  /**
+   * This method returns whether the decorator information
+   * should be propagated to other services.
+   * @return whether to propagate
+   */
+  virtual bool propagate() const PURE;
 };
 
 using DecoratorConstPtr = std::unique_ptr<const Decorator>;

@@ -397,9 +397,9 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
     // Http::ResponseDecoder
-    void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
-    void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
+    void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+    void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,

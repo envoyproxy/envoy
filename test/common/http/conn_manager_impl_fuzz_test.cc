@@ -205,7 +205,7 @@ public:
     EXPECT_CALL(*config_.codec_, dispatch(_))
         .WillOnce(InvokeWithoutArgs([this, &request_headers, end_stream] {
           decoder_ = &conn_manager_.newStream(encoder_);
-          auto headers = std::make_unique<TestHeaderMapImpl>(request_headers);
+          auto headers = std::make_unique<TestRequestHeaderMapImpl>(request_headers);
           if (headers->Method() == nullptr) {
             headers->setReferenceKey(Headers::get().Method, "GET");
           }
@@ -312,7 +312,7 @@ public:
                 }));
         EXPECT_CALL(*config_.codec_, dispatch(_))
             .WillOnce(InvokeWithoutArgs([this, &trailers_action] {
-              decoder_->decodeTrailers(std::make_unique<TestHeaderMapImpl>(
+              decoder_->decodeTrailers(std::make_unique<TestRequestTrailerMapImpl>(
                   Fuzz::fromHeaders(trailers_action.headers())));
             }));
         fakeOnData();

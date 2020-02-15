@@ -45,7 +45,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
                                TransportSocketPtr&& transport_socket, bool connected)
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      filter_manager_(*this), stream_info_(dispatcher.timeSource()),
+      stream_info_(dispatcher.timeSource()), filter_manager_(*this),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
@@ -353,9 +353,8 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   // where no check of the write buffer is made. Provide an opportunity to flush
   // here. If connection write is not ready, this is harmless. We should only do
   // this if we're still open (the above callbacks may have closed).
-  if (state() == State::Open && event == ConnectionEvent::Connected &&
-      write_buffer_->length() > 0) {
-    onWriteReady();
+  if (event == ConnectionEvent::Connected) {
+    flushWriteBuffer();
   }
 }
 
@@ -650,6 +649,12 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 
 absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
+}
+
+void ConnectionImpl::flushWriteBuffer() {
+  if (state() == State::Open && write_buffer_->length() > 0) {
+    onWriteReady();
+  }
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
