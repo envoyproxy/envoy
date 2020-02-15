@@ -728,8 +728,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     }
 
     // Current time is initialized as a float ranges [0.0, 1.0).
-    // Accuracy 1e-5 is enough because (1 / 128) ^ 2 > 1e-5.
-    // 128 is the largest host weight (see envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
+    // Accuracy 1e-5 is enough because (1 / 128) ^ 2 > 1e-5. 128 is the largest weight for hosts
+    // (see envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
     scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>(seed_ % 100000 / 100000.0);
 
     // Populate scheduler with host list.
