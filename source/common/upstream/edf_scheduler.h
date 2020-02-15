@@ -71,8 +71,8 @@ public:
   }
 
   /**
-   * Insert entry into queue with a given weight. The deadline will be multiples of (1 / weight)
-   *  that just larger than initial current time
+   * Insert entry into queue with a given weight only in refreshing stage. The deadline will be
+   *  multiples of (1 / weight) that just larger than initial current time
    * @param weight floating point weight.
    * @param entry shared pointer to entry, only a weak reference will be retained.
    */

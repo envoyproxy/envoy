@@ -715,8 +715,7 @@ void EdfLoadBalancerBase::initialize() {
 
 void EdfLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
-    // Nuke existing scheduler if it exists, and initiate initial deadline with a float ranges
-    // [0.0, 1.0)
+    // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
 
@@ -728,7 +727,10 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       return;
     }
 
-    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>(seed_ % 1000000 / 1000000.0);
+    // Current time is initialized as a float ranges [0.0, 1.0). 
+    // Accuracy 1e-5 is enough because (1 / 128) ^ 2 > 1e-5.
+    // 128 is the largest host weight (see envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
+    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>(seed_ % 100000 / 100000.0);
 
     // Populate scheduler with host list.
     // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
@@ -743,8 +745,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       scheduler.edf_->initial_add(hostWeight(*host), host);
     }
 
-    // Cycle through hosts to achieve the intended offset behavior.
-    // This random pick could avoid biasing towards earlier hosts for non-weighted case.
+    // Cycle through hosts to achieve the intended offset for hosts that have the same weight.
     if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
         auto host = scheduler.edf_->pick();
