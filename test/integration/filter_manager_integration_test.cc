@@ -42,7 +42,8 @@ const std::regex invalid_param_name_regex() { return std::regex{"[^a-zA-Z0-9_]"}
  * Integration test with one of auxiliary filters (listed above)
  * added to the head of the filter chain.
  *
- * Shared by tests for "envoy.echo", "envoy.tcp_proxy" and "envoy.http_connection_manager".
+ * Shared by tests for "envoy.filters.network.echo", "envoy.filters.network.tcp_proxy" and
+ * "envoy.filters.network.http_connection_manager".
  */
 class TestWithAuxiliaryFilter {
 public:
@@ -55,8 +56,9 @@ protected:
   /**
    * Returns configuration for a given auxiliary filter.
    *
-   * Assuming that representative configurations differ in the context of "envoy.echo",
-   * "envoy.tcp_proxy" and "envoy.http_connection_manager".
+   * Assuming that representative configurations differ in the context of
+   * "envoy.filters.network.echo", "envoy.filters.network.tcp_proxy" and
+   * "envoy.filters.network.http_connection_manager".
    */
   virtual std::string filterConfig(const std::string& auxiliary_filter_name) PURE;
 
@@ -125,7 +127,7 @@ private:
 };
 
 /**
- * Base class for "envoy.echo" and "envoy.tcp_proxy" tests.
+ * Base class for "envoy.filters.network.echo" and "envoy.filters.network.tcp_proxy" tests.
  *
  * Inherits from BaseIntegrationTest; parameterized with IP version and auxiliary filter.
  */
@@ -170,7 +172,7 @@ protected:
 };
 
 /**
- * Integration test with an auxiliary filter in front of "envoy.echo".
+ * Integration test with an auxiliary filter in front of "envoy.filters.network.echo".
  */
 class InjectDataWithEchoFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
@@ -178,7 +180,7 @@ public:
     return ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-      - name: envoy.echo
+      - name: envoy.filters.network.echo
       )EOF";
   }
 
@@ -203,7 +205,7 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, UsageOfInjectDataMethodsShouldBe
 }
 
 /**
- * Integration test with an auxiliary filter in front of "envoy.tcp_proxy".
+ * Integration test with an auxiliary filter in front of "envoy.filters.network.tcp_proxy".
  */
 class InjectDataWithTcpProxyFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
@@ -248,7 +250,8 @@ TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShou
 }
 
 /**
- * Integration test with an auxiliary filter in front of "envoy.http_connection_manager".
+ * Integration test with an auxiliary filter in front of
+ * "envoy.filters.network.http_connection_manager".
  *
  * Inherits from HttpIntegrationTest;
  * parameterized with IP version, downstream HTTP version and auxiliary filter.

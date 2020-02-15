@@ -51,7 +51,7 @@ host when forwarding. See the example below within the configured routes.
           port_value: 10000
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http

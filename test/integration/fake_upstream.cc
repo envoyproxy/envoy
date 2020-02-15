@@ -73,16 +73,14 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   }
 }
 
-void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
-  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
-      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
+void FakeStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
+  std::shared_ptr<Http::HeaderMapImpl> headers_copy(Http::HeaderMapImpl::create(headers));
   parent_.connection().dispatcher().post(
       [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
 }
 
-void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream) {
-  std::shared_ptr<Http::HeaderMapImpl> headers_copy(
-      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(headers)));
+void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
+  std::shared_ptr<Http::HeaderMapImpl> headers_copy(Http::HeaderMapImpl::create(headers));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().localAddress()->asString());
@@ -112,9 +110,8 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
       [this, data_copy, end_stream]() -> void { encoder_.encodeData(*data_copy, end_stream); });
 }
 
-void FakeStream::encodeTrailers(const Http::HeaderMapImpl& trailers) {
-  std::shared_ptr<Http::HeaderMapImpl> trailers_copy(
-      new Http::HeaderMapImpl(static_cast<const Http::HeaderMap&>(trailers)));
+void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
+  std::shared_ptr<Http::HeaderMapImpl> trailers_copy(Http::HeaderMapImpl::create(trailers));
   parent_.connection().dispatcher().post(
       [this, trailers_copy]() -> void { encoder_.encodeTrailers(*trailers_copy); });
 }

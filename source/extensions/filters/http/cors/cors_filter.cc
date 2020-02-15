@@ -64,8 +64,8 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
-      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}}};
+  Http::HeaderMapPtr response_headers{Http::HeaderMapImpl::create(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}})};
 
   response_headers->setAccessControlAllowOrigin(origin_->value().getStringView());
 
