@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Helper script to run tests under valgrind.  Usage:
-#    bazel test --run_under=`pwd`/tools/run-valgrind.sh ...
+#    bazel test --run_under=`pwd`/tools/debugging/run-valgrind.sh ...
 #
 
 dir=$(dirname "$0")
