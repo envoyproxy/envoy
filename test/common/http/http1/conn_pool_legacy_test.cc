@@ -187,8 +187,8 @@ struct ActiveTestRequest {
 
   void completeResponse(bool with_body) {
     // Test additional metric writes also.
-    Http::HeaderMapPtr response_headers(
-        new TestHeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "true"}});
+    Http::ResponseHeaderMapPtr response_headers(
+        new TestResponseHeaderMapImpl{{":status", "200"}, {"x-envoy-upstream-canary", "true"}});
 
     inner_decoder_->decodeHeaders(std::move(response_headers), !with_body);
     if (with_body) {
@@ -581,14 +581,14 @@ TEST_F(Http1ConnPoolImplLegacyTest, MaxConnections) {
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                           true);
-  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   conn_pool_.expectAndRunUpstreamReady();
   callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                            true);
   // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
-  response_headers = std::make_unique<TestHeaderMapImpl>(
+  response_headers = std::make_unique<TestResponseHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
@@ -635,7 +635,7 @@ TEST_F(Http1ConnPoolImplLegacyTest, ConnectionCloseWithoutHeader) {
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                           true);
-  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   // Cause the connection to go away.
@@ -654,7 +654,7 @@ TEST_F(Http1ConnPoolImplLegacyTest, ConnectionCloseWithoutHeader) {
   callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                            true);
   // N.B. clang_tidy insists that we use std::make_unique which can not infer std::initialize_list.
-  response_headers = std::make_unique<TestHeaderMapImpl>(
+  response_headers = std::make_unique<TestResponseHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
@@ -689,8 +689,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, ConnectionCloseHeader) {
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::HeaderMapPtr response_headers(
-      new TestHeaderMapImpl{{":status", "200"}, {"Connection", "Close"}});
+  Http::ResponseHeaderMapPtr response_headers(
+      new TestResponseHeaderMapImpl{{":status", "200"}, {"Connection", "Close"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
@@ -723,8 +723,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, ProxyConnectionCloseHeader) {
 
   // Response with 'proxy-connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::HeaderMapPtr response_headers(
-      new TestHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close"}});
+  Http::ResponseHeaderMapPtr response_headers(
+      new TestResponseHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
@@ -757,8 +757,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, Http10NoConnectionKeepAlive) {
 
   // Response without 'connection: keep-alive' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::HeaderMapPtr response_headers(
-      new TestHeaderMapImpl{{":protocol", "HTTP/1.0"}, {":status", "200"}});
+  Http::ResponseHeaderMapPtr response_headers(
+      new TestResponseHeaderMapImpl{{":protocol", "HTTP/1.0"}, {":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
@@ -793,7 +793,7 @@ TEST_F(Http1ConnPoolImplLegacyTest, MaxRequestsPerConnection) {
 
   // Response with 'connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  Http::ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
   dispatcher_.clearDeferredDeleteList();
 
@@ -897,7 +897,8 @@ TEST_F(Http1ConnPoolImplLegacyTest, RemoteCloseToCompleteResponse) {
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}},
                                           true);
 
-  inner_decoder->decodeHeaders(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
+  inner_decoder->decodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, false);
   Buffer::OwnedImpl dummy_data("12345");
   inner_decoder->decodeData(dummy_data, false);
 

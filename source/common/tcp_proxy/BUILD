@@ -10,8 +10,14 @@ envoy_package()
 
 envoy_cc_library(
     name = "tcp_proxy",
-    srcs = ["tcp_proxy.cc"],
-    hdrs = ["tcp_proxy.h"],
+    srcs = [
+        "tcp_proxy.cc",
+        "upstream.cc",
+    ],
+    hdrs = [
+        "tcp_proxy.h",
+        "upstream.h",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",

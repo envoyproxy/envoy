@@ -30,7 +30,8 @@ Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the dynamic opentracing tracer. @see RegisterFactory.
  */
-REGISTER_FACTORY(DynamicOpenTracingTracerFactory, Server::Configuration::TracerFactory);
+REGISTER_FACTORY(DynamicOpenTracingTracerFactory,
+                 Server::Configuration::TracerFactory){"envoy.dynamic.ot"};
 
 } // namespace DynamicOt
 } // namespace Tracers

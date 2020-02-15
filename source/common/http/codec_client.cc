@@ -132,8 +132,7 @@ void CodecClient::onData(Buffer::Instance& data) {
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
-    if (!active_requests_.empty() ||
-        Utility::getResponseStatus(e.headers()) != enumToInt(Code::RequestTimeout)) {
+    if (!active_requests_.empty() || e.responseCode() != Code::RequestTimeout) {
       protocol_error = true;
     }
   }

@@ -381,6 +381,7 @@ authz
 autoscale
 backend
 backends
+backgrounded
 backoff
 backpressure
 backticks
@@ -837,6 +838,7 @@ preallocate
 preallocating
 preallocation
 precalculated
+precompile
 precompiled
 precompute
 precomputed

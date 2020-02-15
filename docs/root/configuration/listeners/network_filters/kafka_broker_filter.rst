@@ -5,7 +5,7 @@ Kafka Broker filter
 
 The Apache Kafka broker filter decodes the client protocol for
 `Apache Kafka <https://kafka.apache.org/>`_, both the requests and responses in the payload.
-The message versions in `Kafka 2.3.1 <http://kafka.apache.org/231/protocol.html#protocol_api_keys>`_
+The message versions in `Kafka 2.4.0 <http://kafka.apache.org/24/protocol.html#protocol_api_keys>`_
 are supported.
 The filter attempts not to influence the communication between client and brokers, so the messages
 that could not be decoded (due to Kafka client or broker running a newer version than supported by
@@ -40,7 +40,7 @@ in the configuration snippet below:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.kafka_broker.v2alpha1.KafkaBroker
           stat_prefix: exampleprefix
-      - name: envoy.tcp_proxy
+      - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp

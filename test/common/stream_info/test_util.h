@@ -6,7 +6,7 @@
 #include "common/common/assert.h"
 #include "common/stream_info/filter_state_impl.h"
 
-#include "test/test_common/test_time.h"
+#include "test/test_common/simulated_time_system.h"
 
 namespace Envoy {
 
@@ -242,7 +242,7 @@ public:
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
   const Http::HeaderMap* request_headers_{};
-  DangerousDeprecatedTestTime test_time_;
+  Envoy::Event::SimulatedTimeSystem test_time_;
 };
 
 } // namespace Envoy
