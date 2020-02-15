@@ -20,7 +20,7 @@ using HotRestartMessage = envoy::HotRestartMessage;
 
 class HotRestartingParentTest : public testing::Test {
 public:
-  MockInstance server_;
+  NiceMock<MockInstance> server_;
   HotRestartingParent::Internal hot_restarting_parent_{&server_};
 };
 
