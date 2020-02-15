@@ -121,7 +121,9 @@ organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
 1. If this is still WiP and subject to breaking changes, use `vNalpha` instead of `vN` in steps
-   below.
+   below. Refer to the [Cache filter config](envoy/config/filter/http/cache/v2alpha/cache.proto)
+   as an example of `v2alpha`, and the
+   [Buffer filter config](envoy/config/filter/http/buffer/v2/buffer.proto) as an example of `v2`.
 1. Place the v2 extension configuration `.proto` in `api/envoy/config`, e.g.
    `api/envoy/config/filter/http/foobar/v2/foobar.proto` together with an initial BUILD file:
    ```
