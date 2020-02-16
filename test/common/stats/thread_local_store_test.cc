@@ -328,16 +328,34 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   ASSERT_TRUE(found_histogram2.has_value());
   EXPECT_EQ(&h2, &found_histogram2->get());
 
-  StatNameManagedStorage storage("h3", *symbol_table_);
   StatNameManagedStorage tag_key("a", *symbol_table_);
   StatNameManagedStorage tag_value("b", *symbol_table_);
   StatNameTagVector tags{{StatName(tag_key.statName()), StatName(tag_value.statName())}};
-  Histogram& h3 = scope1->histogramFromStatName(StatName(storage.statName()), tags,
-                                                Stats::Histogram::Unit::Unspecified);
+
   const std::vector<Tag> expectedTags = {Tag{"a", "b"}};
-  EXPECT_EQ(expectedTags, h3.tags());
-  EXPECT_EQ(&h3, &scope1->histogramFromStatName(StatName(storage.statName()), tags,
-                                                Stats::Histogram::Unit::Unspecified));
+
+  {
+    StatNameManagedStorage storage("c3", *symbol_table_);
+    Counter& counter = scope1->counterFromStatName(StatName(storage.statName()), tags);
+    EXPECT_EQ(expectedTags, counter.tags());
+    EXPECT_EQ(&counter, &scope1->counterFromStatName(StatName(storage.statName()), tags));
+  }
+  {
+    StatNameManagedStorage storage("g3", *symbol_table_);
+    Gauge& gauge = scope1->gaugeFromStatName(StatName(storage.statName()), tags,
+                                             Gauge::ImportMode::Accumulate);
+    EXPECT_EQ(expectedTags, gauge.tags());
+    EXPECT_EQ(&gauge, &scope1->gaugeFromStatName(StatName(storage.statName()), tags,
+                                                 Gauge::ImportMode::Accumulate));
+  }
+  {
+    StatNameManagedStorage storage("h3", *symbol_table_);
+    Histogram& histogram = scope1->histogramFromStatName(StatName(storage.statName()), tags,
+                                                         Stats::Histogram::Unit::Unspecified);
+    EXPECT_EQ(expectedTags, histogram.tags());
+    EXPECT_EQ(&histogram, &scope1->histogramFromStatName(StatName(storage.statName()), tags,
+                                                         Stats::Histogram::Unit::Unspecified));
+  }
 
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);
