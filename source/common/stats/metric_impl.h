@@ -22,7 +22,7 @@ namespace Stats {
 class MetricHelper {
 public:
   MetricHelper(StatName name, absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-               SymbolTable& symbol_table);
+               const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
   ~MetricHelper();
 
   StatName statName() const;
@@ -57,13 +57,13 @@ template <class BaseClass> class MetricImpl : public BaseClass {
 public:
   // TODO(jmarantz): Use StatName for tag_extracted_name.
   MetricImpl(StatName name, absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
-             SymbolTable& symbol_table)
-      : helper_(name, tag_extracted_name, tags, symbol_table) {}
+             const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table)
+      : helper_(name, tag_extracted_name, tags, stat_name_tags, symbol_table) {}
 
   // Empty construction of a MetricImpl; used for null stats.
   explicit MetricImpl(SymbolTable& symbol_table)
       : MetricImpl(StatNameManagedStorage("", symbol_table).statName(), "", std::vector<Tag>(),
-                   symbol_table) {}
+                   StatNameTagVector{}, symbol_table) {}
   std::vector<Tag> tags() const override { return helper_.tags(constSymbolTable()); }
   StatName statName() const override { return helper_.statName(); }
   StatName tagExtractedStatName() const override { return helper_.tagExtractedStatName(); }

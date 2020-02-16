@@ -51,7 +51,9 @@ template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> 
 public:
   StatsSharedImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
                   const std::vector<Tag>& tags)
-      : MetricImpl<BaseClass>(name, tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc) {}
+      : MetricImpl<BaseClass>(name, tag_extracted_name, tags, StatNameTagVector{},
+                              alloc.symbolTable()),
+        alloc_(alloc) {}
 
   ~StatsSharedImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it

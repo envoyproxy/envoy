@@ -506,21 +506,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   } else {
     TagExtraction extraction(parent_, prefixed_stat_name);
 
-    // Combine the provided tags with the extracted tags.
-    std::vector<Tag> allTags;
-    allTags.reserve(tags.size() + extraction.tags().size());
-
-    for (const auto& stat_name_tag : tags) {
-      allTags.emplace_back(Tag{symbolTable().toString(stat_name_tag.first),
-                               symbolTable().toString(stat_name_tag.second)});
-    }
-
-    for (const auto& extracted_tag : extraction.tags()) {
-      allTags.emplace_back(extracted_tag);
-    }
-
-    RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
-        final_stat_name, unit, parent_, *this, extraction.tagExtractedName(), allTags));
+    RefcountPtr<ParentHistogramImpl> stat(
+        new ParentHistogramImpl(final_stat_name, unit, parent_, *this,
+                                extraction.tagExtractedName(), extraction.tags(), tags));
     central_ref = &central_cache_->histograms_[stat->statName()];
     *central_ref = stat;
   }
@@ -569,8 +557,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   std::vector<Tag> tags;
   std::string tag_extracted_name =
       parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
-  TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(name, parent.unit(), tag_extracted_name, tags, symbolTable()));
+  TlsHistogramSharedPtr hist_tls_ptr(new ThreadLocalHistogramImpl(
+      name, parent.unit(), tag_extracted_name, tags, StatNameTagVector{}, symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -583,9 +571,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
                                                    const std::string& tag_extracted_name,
                                                    const std::vector<Tag>& tags,
+                                                   const StatNameTagVector& stat_name_tags,
                                                    SymbolTable& symbol_table)
-    : HistogramImplHelper(name, tag_extracted_name, tags, symbol_table), unit_(unit),
-      current_active_(0), used_(false), created_thread_id_(std::this_thread::get_id()),
+    : HistogramImplHelper(name, tag_extracted_name, tags, stat_name_tags, symbol_table),
+      unit_(unit), current_active_(0), used_(false), created_thread_id_(std::this_thread::get_id()),
       symbol_table_(symbol_table) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
@@ -611,8 +600,9 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent,
                                          TlsScope& tls_scope, absl::string_view tag_extracted_name,
-                                         const std::vector<Tag>& tags)
-    : MetricImpl(name, tag_extracted_name, tags, parent.symbolTable()), unit_(unit),
+                                         const std::vector<Tag>& tags,
+                                         const StatNameTagVector& stat_name_tags)
+    : MetricImpl(name, tag_extracted_name, tags, stat_name_tags, parent.symbolTable()), unit_(unit),
       parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()), interval_statistics_(interval_histogram_),
       cumulative_statistics_(cumulative_histogram_), merged_(false) {}

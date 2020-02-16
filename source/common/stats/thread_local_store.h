@@ -33,7 +33,7 @@ class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
                            const std::string& tag_extracted_name, const std::vector<Tag>& tags,
-                           SymbolTable& symbol_table);
+                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -80,7 +80,8 @@ class TlsScope;
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent, TlsScope& tls_scope,
-                      absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
+                      absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+                      const StatNameTagVector& stat_name_tags);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
