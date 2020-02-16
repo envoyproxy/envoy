@@ -102,10 +102,22 @@ public:
 
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override { return counters_.get(name); }
+  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+    SymbolTable::StoragePtr suffixed_storage = TagUtility::addTagSuffix(name, tags, symbolTable());
+    Counter& counter = counters_.get(StatName(suffixed_storage.get()));
+    return counter;
+  }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     Gauge& gauge = gauges_.get(name, import_mode);
+    gauge.mergeImportMode(import_mode);
+    return gauge;
+  }
+  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                           Gauge::ImportMode import_mode) override {
+    SymbolTable::StoragePtr suffixed_storage = TagUtility::addTagSuffix(name, tags, symbolTable());
+    Gauge& gauge = gauges_.get(StatName(suffixed_storage.get()));
     gauge.mergeImportMode(import_mode);
     return gauge;
   }

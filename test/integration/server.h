@@ -86,9 +86,20 @@ public:
     return wrapped_scope_->counterFromStatName(name);
   }
 
+  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->counterFromStatName(name, tags);
+  }
+
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->gaugeFromStatName(name, import_mode);
+  }
+
+  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                           Gauge::ImportMode import_mode) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->gaugeFromStatName(name, tags, import_mode);
   }
 
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
@@ -151,6 +162,10 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatName(name);
   }
+  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+    Thread::LockGuard lock(lock_);
+    return store_.counterFromStatName(name, tags);
+  }
   Counter& counter(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counter(name);
@@ -163,6 +178,11 @@ public:
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
     return store_.gaugeFromStatName(name, import_mode);
+  }
+  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                           Gauge::ImportMode import_mode) override {
+    Thread::LockGuard lock(lock_);
+    return store_.gaugeFromStatName(name, tags, import_mode);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);

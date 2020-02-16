@@ -297,8 +297,17 @@ public:
   Counter& counterFromStatName(StatName name) override {
     return counter(symbol_table_->toString(name));
   }
+  Counter& counterFromStatName(StatName name, const StatNameTagVector&) override {
+    // We always just respond with the mocked counter, so the tags don't matter.
+    return counterFromStatName(name);
+  }
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     return gauge(symbol_table_->toString(name), import_mode);
+  }
+  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector&,
+                           Gauge::ImportMode import_mode) override {
+    // We always just respond with the mocked gauge, so the tags don't matter.
+    return gaugeFromStatName(name, import_mode);
   }
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     return histogram(symbol_table_->toString(name), unit);

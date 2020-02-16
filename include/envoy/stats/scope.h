@@ -54,6 +54,12 @@ public:
   virtual Counter& counterFromStatName(StatName name) PURE;
 
   /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) PURE;
+
+  /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
@@ -66,6 +72,15 @@ public:
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) PURE;
+
+  /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags The tags to associate with this gauge.
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                                   Gauge::ImportMode import_mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.

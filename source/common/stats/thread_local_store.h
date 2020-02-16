@@ -163,6 +163,9 @@ public:
   Counter& counterFromStatName(StatName name) override {
     return default_scope_->counterFromStatName(name);
   }
+  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+    return default_scope_->counterFromStatName(name, tags);
+  }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
@@ -170,6 +173,10 @@ public:
   }
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
     return default_scope_->gaugeFromStatName(name, import_mode);
+  }
+  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                           Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromStatName(name, tags, import_mode);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gauge(name, import_mode);
@@ -284,9 +291,14 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatName(StatName name) override;
+    Counter& counterFromStatName(StatName name) override { return counterFromStatName(name, {}); }
+    Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
+    Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
+      return gaugeFromStatName(name, {}, import_mode);
+    }
+    Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                             Gauge::ImportMode import_mode) override;
     Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
       return histogramFromStatName(name, {}, unit);
     }

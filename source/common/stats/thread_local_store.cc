@@ -370,7 +370,9 @@ ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
   return std::cref(*iter->second);
 }
 
-Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
+Counter&
+ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name,
+                                                     const StatNameTagVector& stat_name_tags) {
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -384,8 +386,12 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
   // after we construct the stat we can insert it into the required maps. This
   // strategy costs an extra hash lookup for each miss, but saves time
   // re-copying the string and significant memory overhead.
-  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
-  StatName final_stat_name(final_name.get());
+  SymbolTable::StoragePtr prefixed_stat_name_storage =
+      symbolTable().join({prefix_.statName(), name});
+  StatName prefixed_stat_name = StatName(prefixed_stat_name_storage.get());
+  SymbolTable::StoragePtr final_stat =
+      TagUtility::addTagSuffix(prefixed_stat_name, stat_name_tags, symbolTable());
+  StatName final_stat_name = StatName(final_stat.get());
 
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
@@ -399,9 +405,9 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
 
   return safeMakeStat<Counter>(
       final_stat_name, central_cache_->counters_, central_cache_->rejected_stats_,
-      [](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
-         const std::vector<Tag>& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, tag_extracted_name, tags);
+      [&stat_name_tags](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
+                        const std::vector<Tag>& tags) -> CounterSharedPtr {
+        return allocator.makeCounter(name, tag_extracted_name, tags, stat_name_tags);
       },
       tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
@@ -423,6 +429,7 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 }
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
+                                                          const StatNameTagVector& stat_name_tags,
                                                           Gauge::ImportMode import_mode) {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
@@ -436,8 +443,12 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   // a temporary, and address sanitization errors would follow. Instead we must
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
-  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
-  StatName final_stat_name(final_name.get());
+  SymbolTable::StoragePtr prefixed_stat_name_storage =
+      symbolTable().join({prefix_.statName(), name});
+  StatName prefixed_stat_name = StatName(prefixed_stat_name_storage.get());
+  SymbolTable::StoragePtr final_stat =
+      TagUtility::addTagSuffix(prefixed_stat_name, stat_name_tags, symbolTable());
+  StatName final_stat_name = StatName(final_stat.get());
 
   StatRefMap<Gauge>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
@@ -449,9 +460,10 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
 
   Gauge& gauge = safeMakeStat<Gauge>(
       final_stat_name, central_cache_->gauges_, central_cache_->rejected_stats_,
-      [import_mode](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
-                    const std::vector<Tag>& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
+      [import_mode, &stat_name_tags](Allocator& allocator, StatName name,
+                                     absl::string_view tag_extracted_name,
+                                     const std::vector<Tag>& tags) -> GaugeSharedPtr {
+        return allocator.makeGauge(name, tag_extracted_name, tags, stat_name_tags, import_mode);
       },
       tls_cache, tls_rejected_stats, parent_.null_gauge_);
   gauge.mergeImportMode(import_mode);

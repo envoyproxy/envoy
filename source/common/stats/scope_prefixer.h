@@ -18,7 +18,10 @@ public:
   // Scope
   ScopePtr createScope(const std::string& name) override;
   Counter& counterFromStatName(StatName name) override;
+  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override;
   Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
+  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                           Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
   Histogram& histogramFromStatName(StatName name, const StatNameTagVector&,
                                    Histogram::Unit unit) override;

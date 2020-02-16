@@ -32,6 +32,19 @@ Counter& ScopePrefixer::counterFromStatName(StatName name) {
   return scope_.counterFromStatName(StatName(stat_name_storage.get()));
 }
 
+Counter& ScopePrefixer::counterFromStatName(StatName name, const StatNameTagVector& tags) {
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_.symbolTable().join({prefix_.statName(), name});
+  return scope_.counterFromStatName(StatName(stat_name_storage.get()), tags);
+}
+
+Gauge& ScopePrefixer::gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                                        Gauge::ImportMode import_mode) {
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_.symbolTable().join({prefix_.statName(), name});
+  return scope_.gaugeFromStatName(StatName(stat_name_storage.get()), tags, import_mode);
+}
+
 Gauge& ScopePrefixer::gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
