@@ -956,6 +956,16 @@ access_log:
                           "bad_type: Cannot find field");
 }
 
+// Test that the deprecated extension name still functions.
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.http_connection_manager";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 class FilterChainTest : public HttpConnectionManagerConfigTest {
 public:
   const std::string basic_config_ = R"EOF(

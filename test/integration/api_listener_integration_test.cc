@@ -104,7 +104,7 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
 
     // Send a headers-only request
     stream_decoder.decodeHeaders(
-        Http::HeaderMapPtr(new Http::TestHeaderMapImpl{
+        Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         true);
   });
@@ -128,7 +128,7 @@ TEST_P(ApiListenerIntegrationTest, DestroyWithActiveStreams) {
 
     // Send a headers-only request
     stream_decoder.decodeHeaders(
-        Http::HeaderMapPtr(new Http::TestHeaderMapImpl{
+        Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         false);
 

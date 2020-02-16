@@ -93,9 +93,9 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::ResponseDecoder
-    void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
-    void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeTrailers(Http::HeaderMapPtr&&) override { onResponseComplete(); }
+    void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
+    void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override { onResponseComplete(); }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -312,9 +312,9 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::ResponseDecoder
-    void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
-    void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
-    void decodeTrailers(Http::HeaderMapPtr&&) override;
+    void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
+    void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override;
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,

@@ -27,7 +27,7 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
-void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void BufferingStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
   headers_ = std::move(headers);
@@ -45,7 +45,7 @@ void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream)
   }
 }
 
-void BufferingStreamDecoder::decodeTrailers(Http::HeaderMapPtr&&) {
+void BufferingStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 

@@ -122,8 +122,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       time_source_(time_source) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
-  CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
-                         {Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))});
+  static const auto headers = HeaderMapImpl::create(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))}});
+  return *headers;
 }
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -705,7 +706,8 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 //
 // TODO(alyssawilk) all the calls here should be audited for order priority,
 // e.g. many early returns do not currently handle connection: close properly.
-void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& headers,
+                                                        bool end_stream) {
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
@@ -1193,7 +1195,7 @@ MetadataMapVector& ConnectionManagerImpl::ActiveStream::addDecodedMetadata() {
   return *getRequestMetadataMapVector();
 }
 
-void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers) {
+void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& trailers) {
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   resetIdleTimer();
@@ -2308,7 +2310,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   // n.b. we do not currently change the codecs to point at the new stream
   // decoder because the decoder callbacks are complete. It would be good to
   // null out that pointer but should not be necessary.
-  HeaderMapPtr request_headers(std::move(parent_.request_headers_));
+  RequestHeaderMapPtr request_headers(std::move(parent_.request_headers_));
   ResponseEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
   response_encoder->getStream().removeCallbacks(parent_);

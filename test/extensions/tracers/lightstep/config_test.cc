@@ -27,7 +27,7 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.lightstep
+    name: envoy.tracers.lightstep
     config:
       collector_cluster: fake_cluster
       access_token_file: fake_file
@@ -40,6 +40,14 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, lightstep_tracer);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(LightstepTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.lightstep";
+
+  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
+                         deprecated_name));
 }
 
 } // namespace

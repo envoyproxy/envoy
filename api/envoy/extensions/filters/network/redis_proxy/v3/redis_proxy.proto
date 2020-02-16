@@ -237,7 +237,7 @@ message RedisProxy {
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
 // :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
-// keyed by the name `envoy.redis_proxy`.
+// keyed by the name `envoy.filters.network.redis_proxy`.
 message RedisProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions";

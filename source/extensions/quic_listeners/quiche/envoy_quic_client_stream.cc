@@ -105,7 +105,8 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   ASSERT(headers_decompressed());
-  response_decoder_->decodeHeaders(quicHeadersToEnvoyHeaders(header_list), /*end_stream=*/fin);
+  response_decoder_->decodeHeaders(
+      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list), /*end_stream=*/fin);
   if (fin) {
     end_stream_decoded_ = true;
   }
@@ -164,7 +165,8 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
     // For Google QUIC implementation, trailers may arrived earlier and wait to
     // be consumed after reading all the body. Consume it here.
     // IETF QUIC shouldn't reach here because trailers are sent on same stream.
-    response_decoder_->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
+    response_decoder_->decodeTrailers(
+        spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
   }
   OnFinRead();
@@ -180,7 +182,8 @@ void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
       !FinishedReadingTrailers()) {
     // Before QPack, trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
-    response_decoder_->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
+    response_decoder_->decodeTrailers(
+        spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
   }
 }
