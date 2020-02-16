@@ -36,7 +36,8 @@ public:
    *     tag_extracted_name and tags are not moved.
    */
   virtual CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
-                                       const std::vector<Tag>& tags, const StatNameTagVector& stat_name_tags) PURE;
+                                       const std::vector<Tag>& tags,
+                                       const StatNameTagVector& stat_name_tags) PURE;
 
   /**
    * @param name the full name of the stat.
