@@ -33,13 +33,13 @@ protected:
 
 // No truncation occurs in the implementation of HeapStatData.
 TEST_F(MetricImplTest, NoTags) {
-  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter"), "", {});
+  CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter"), "", {}, {});
   EXPECT_EQ(0, counter->tags().size());
 }
 
 TEST_F(MetricImplTest, OneTag) {
   CounterSharedPtr counter =
-      alloc_.makeCounter(makeStat("counter.name.value"), "counter", {{"name", "value"}});
+      alloc_.makeCounter(makeStat("counter.name.value"), "counter", {{"name", "value"}}, {});
   std::vector<Tag> tags = counter->tags();
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("name", tags[0].name_);
@@ -51,7 +51,7 @@ TEST_F(MetricImplTest, OneTag) {
 
 TEST_F(MetricImplTest, TwoTagsIterOnce) {
   CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter.name.value"), "counter",
-                                                {{"name1", "value1"}, {"name2", "value2"}});
+                                                {{"name1", "value1"}, {"name2", "value2"}}, {});
   StatName name1 = makeStat("name1");
   StatName value1 = makeStat("value1");
   int count = 0;
@@ -66,7 +66,7 @@ TEST_F(MetricImplTest, TwoTagsIterOnce) {
 
 TEST_F(MetricImplTest, FindTag) {
   CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter.name.value"), "counter",
-                                                {{"name1", "value1"}, {"name2", "value2"}});
+                                                {{"name1", "value1"}, {"name2", "value2"}}, {});
   EXPECT_EQ(makeStat("value1"), Utility::findTag(*counter, makeStat("name1")));
   EXPECT_EQ(makeStat("value2"), Utility::findTag(*counter, makeStat("name2")));
   EXPECT_FALSE(Utility::findTag(*counter, makeStat("name3")));
