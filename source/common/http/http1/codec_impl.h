@@ -14,7 +14,6 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
-#include "common/common/to_lower_table.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -314,7 +313,6 @@ private:
   virtual void onBelowLowWatermark() PURE;
 
   static http_parser_settings settings_;
-  static const ToLowerTable& toLowerTable();
 
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;

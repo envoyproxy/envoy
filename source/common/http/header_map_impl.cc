@@ -16,195 +16,101 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-constexpr size_t MinDynamicCapacity{32};
 // This includes the NULL (StringUtil::itoa technically only needs 21).
 constexpr size_t MaxIntegerLength{32};
-
-uint64_t newCapacity(uint32_t existing_capacity, uint32_t size_to_append) {
-  return (static_cast<uint64_t>(existing_capacity) + size_to_append) * 2;
-}
 
 void validateCapacity(uint64_t new_capacity) {
   // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
   // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
   RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(),
                  "Trying to allocate overly large headers.");
-  ASSERT(new_capacity >= MinDynamicCapacity);
 }
 
+absl::string_view get_str_view(const VariantHeader& buffer) {
+  return absl::get<absl::string_view>(buffer);
+}
+
+InlineHeaderVector& get_in_vec(VariantHeader& buffer) {
+  return absl::get<InlineHeaderVector>(buffer);
+}
+
+const InlineHeaderVector& get_in_vec(const VariantHeader& buffer) {
+  return absl::get<InlineHeaderVector>(buffer);
+}
 } // namespace
 
-HeaderString::HeaderString() : type_(Type::Inline) {
-  buffer_.dynamic_ = inline_buffer_;
-  clear();
-  static_assert(sizeof(inline_buffer_) >= MaxIntegerLength, "");
-  static_assert(MinDynamicCapacity >= MaxIntegerLength, "");
+// Initialize as a Type::Inline
+HeaderString::HeaderString() : buffer_(InlineHeaderVector()) {
+  ASSERT((get_in_vec(buffer_).capacity()) >= MaxIntegerLength);
   ASSERT(valid());
 }
 
-HeaderString::HeaderString(const LowerCaseString& ref_value) : type_(Type::Reference) {
-  buffer_.ref_ = ref_value.get().c_str();
-  string_length_ = ref_value.get().size();
+// Initialize as a Type::Reference
+HeaderString::HeaderString(const LowerCaseString& ref_value)
+    : buffer_(absl::string_view(ref_value.get().c_str(), ref_value.get().size())) {
   ASSERT(valid());
 }
 
-HeaderString::HeaderString(absl::string_view ref_value) : type_(Type::Reference) {
-  buffer_.ref_ = ref_value.data();
-  string_length_ = ref_value.size();
+// Initialize as a Type::Reference
+HeaderString::HeaderString(absl::string_view ref_value) : buffer_(ref_value) { ASSERT(valid()); }
+
+HeaderString::HeaderString(HeaderString&& move_value) noexcept
+    : buffer_(std::move(move_value.buffer_)) {
+  move_value.clear();
   ASSERT(valid());
-}
-
-HeaderString::HeaderString(HeaderString&& move_value) noexcept {
-  type_ = move_value.type_;
-  string_length_ = move_value.string_length_;
-  switch (move_value.type_) {
-  case Type::Reference: {
-    buffer_.ref_ = move_value.buffer_.ref_;
-    break;
-  }
-  case Type::Dynamic: {
-    // When we move a dynamic header, we switch the moved header back to its default state (inline).
-    buffer_.dynamic_ = move_value.buffer_.dynamic_;
-    dynamic_capacity_ = move_value.dynamic_capacity_;
-    move_value.type_ = Type::Inline;
-    move_value.buffer_.dynamic_ = move_value.inline_buffer_;
-    move_value.clear();
-    break;
-  }
-  case Type::Inline: {
-    buffer_.dynamic_ = inline_buffer_;
-    memcpy(inline_buffer_, move_value.inline_buffer_, string_length_);
-    move_value.string_length_ = 0;
-    break;
-  }
-  }
-  ASSERT(valid());
-}
-
-HeaderString::~HeaderString() { freeDynamic(); }
-
-void HeaderString::freeDynamic() {
-  if (type_ == Type::Dynamic) {
-    free(buffer_.dynamic_);
-  }
 }
 
 bool HeaderString::valid() const { return validHeaderString(getStringView()); }
 
-void HeaderString::append(const char* data, uint32_t size) {
-  switch (type_) {
+void HeaderString::append(const char* data, uint32_t data_size) {
+  // Make sure the requested memory allocation is below uint32_t::max
+  const uint64_t new_capacity = static_cast<uint64_t>(data_size) + size();
+  validateCapacity(new_capacity);
+  ASSERT(validHeaderString(absl::string_view(data, data_size)));
+
+  switch (type()) {
   case Type::Reference: {
-    // Rather than be too clever and optimize this uncommon case, we dynamically
-    // allocate and copy.
-    type_ = Type::Dynamic;
-    const uint64_t new_capacity = newCapacity(string_length_, size);
-    if (new_capacity > MinDynamicCapacity) {
-      validateCapacity(new_capacity);
-      dynamic_capacity_ = new_capacity;
-    } else {
-      dynamic_capacity_ = MinDynamicCapacity;
-    }
-    char* buf = static_cast<char*>(malloc(dynamic_capacity_));
-    RELEASE_ASSERT(buf != nullptr, "");
-    memcpy(buf, buffer_.ref_, string_length_);
-    buffer_.dynamic_ = buf;
+    // Rather than be too clever and optimize this uncommon case, we switch to
+    // Inline mode and copy.
+    const absl::string_view prev = get_str_view(buffer_);
+    buffer_ = InlineHeaderVector();
+    // Assigning new_capacity to avoid resizing when appending the new data
+    get_in_vec(buffer_).reserve(new_capacity);
+    get_in_vec(buffer_).assign(prev.begin(), prev.end());
     break;
   }
-
   case Type::Inline: {
-    const uint64_t new_capacity = static_cast<uint64_t>(size) + string_length_;
-    if (new_capacity <= sizeof(inline_buffer_)) {
-      // Already inline and the new value fits in inline storage.
-      break;
-    }
-
-    FALLTHRU;
-  }
-
-  case Type::Dynamic: {
-    // We can get here either because we didn't fit in inline or we are already dynamic.
-    if (type_ == Type::Inline) {
-      const uint64_t new_capacity = newCapacity(string_length_, size);
-      validateCapacity(new_capacity);
-      buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
-      RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
-      memcpy(buffer_.dynamic_, inline_buffer_, string_length_);
-      dynamic_capacity_ = new_capacity;
-      type_ = Type::Dynamic;
-    } else {
-      if (size + string_length_ > dynamic_capacity_) {
-        const uint64_t new_capacity = newCapacity(string_length_, size);
-        validateCapacity(new_capacity);
-
-        // Need to reallocate.
-        dynamic_capacity_ = new_capacity;
-        buffer_.dynamic_ = static_cast<char*>(realloc(buffer_.dynamic_, dynamic_capacity_));
-        RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
-      }
-    }
+    get_in_vec(buffer_).reserve(new_capacity);
+    break;
   }
   }
-  ASSERT(validHeaderString(absl::string_view(data, size)));
-  memcpy(buffer_.dynamic_ + string_length_, data, size);
-  string_length_ += size;
+  get_in_vec(buffer_).insert(get_in_vec(buffer_).end(), data, data + data_size);
+}
+
+absl::string_view HeaderString::getStringView() const {
+  if (type() == Type::Reference) {
+    return get_str_view(buffer_);
+  }
+  ASSERT(type() == Type::Inline);
+  return {get_in_vec(buffer_).data(), get_in_vec(buffer_).size()};
 }
 
 void HeaderString::clear() {
-  switch (type_) {
-  case Type::Reference: {
-    break;
-  }
-  case Type::Inline: {
-    FALLTHRU;
-  }
-  case Type::Dynamic: {
-    string_length_ = 0;
-  }
+  if (type() == Type::Inline) {
+    get_in_vec(buffer_).clear();
   }
 }
 
 void HeaderString::setCopy(const char* data, uint32_t size) {
-  switch (type_) {
-  case Type::Reference: {
-    // Switch back to inline and fall through.
-    type_ = Type::Inline;
-    buffer_.dynamic_ = inline_buffer_;
+  ASSERT(validHeaderString(absl::string_view(data, size)));
 
-    FALLTHRU;
+  if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
+    // Switching from Type::Reference to Type::Inline
+    buffer_ = InlineHeaderVector();
   }
 
-  case Type::Inline: {
-    if (size <= sizeof(inline_buffer_)) {
-      // Already inline and the new value fits in inline storage.
-      break;
-    }
-
-    FALLTHRU;
-  }
-
-  case Type::Dynamic: {
-    // We can get here either because we didn't fit in inline or we are already dynamic.
-    if (type_ == Type::Inline) {
-      dynamic_capacity_ = size * 2;
-      validateCapacity(dynamic_capacity_);
-      buffer_.dynamic_ = static_cast<char*>(malloc(dynamic_capacity_));
-      RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
-      type_ = Type::Dynamic;
-    } else {
-      if (size > dynamic_capacity_) {
-        // Need to reallocate. Use free/malloc to avoid the copy since we are about to overwrite.
-        dynamic_capacity_ = size * 2;
-        validateCapacity(dynamic_capacity_);
-        free(buffer_.dynamic_);
-        buffer_.dynamic_ = static_cast<char*>(malloc(dynamic_capacity_));
-        RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
-      }
-    }
-  }
-  }
-
-  memcpy(buffer_.dynamic_, data, size);
-  string_length_ = size;
+  get_in_vec(buffer_).reserve(size);
+  get_in_vec(buffer_).assign(data, data + size);
   ASSERT(valid());
 }
 
@@ -213,36 +119,45 @@ void HeaderString::setCopy(absl::string_view view) {
 }
 
 void HeaderString::setInteger(uint64_t value) {
-  switch (type_) {
-  case Type::Reference: {
-    // Switch back to inline and fall through.
-    type_ = Type::Inline;
-    buffer_.dynamic_ = inline_buffer_;
+  // Initialize the size to the max length, copy the actual data, and then
+  // reduce the size (but not the capacity) as needed
+  // Note: instead of using the inner_buffer, attempted the following:
+  // resize buffer_ to MaxIntegerLength, apply StringUtil::itoa to the buffer_.data(), and then
+  // resize buffer_ to int_length (the number of digits in value).
+  // However it was slower than the following approach.
+  char inner_buffer[MaxIntegerLength];
+  const uint32_t int_length = StringUtil::itoa(inner_buffer, MaxIntegerLength, value);
 
-    FALLTHRU;
+  if (type() == Type::Reference) {
+    // Switching from Type::Reference to Type::Inline
+    buffer_ = InlineHeaderVector();
   }
-
-  case Type::Inline:
-    // buffer_.dynamic_ should always point at inline_buffer_ for Type::Inline.
-    ASSERT(buffer_.dynamic_ == inline_buffer_);
-    FALLTHRU;
-  case Type::Dynamic: {
-    // Whether dynamic or inline the buffer is guaranteed to be large enough.
-    ASSERT(type_ == Type::Inline || dynamic_capacity_ >= MaxIntegerLength);
-    // It's safe to use buffer.dynamic_, since buffer.ref_ is union aliased.
-    // This better not change without verifying assumptions across this file.
-    static_assert(offsetof(Buffer, dynamic_) == offsetof(Buffer, ref_), "");
-    string_length_ = StringUtil::itoa(buffer_.dynamic_, 32, value);
-  }
-  }
+  ASSERT((get_in_vec(buffer_).capacity()) > MaxIntegerLength);
+  get_in_vec(buffer_).assign(inner_buffer, inner_buffer + int_length);
 }
 
 void HeaderString::setReference(absl::string_view ref_value) {
-  freeDynamic();
-  type_ = Type::Reference;
-  buffer_.ref_ = ref_value.data();
-  string_length_ = ref_value.size();
+  buffer_ = ref_value;
   ASSERT(valid());
+}
+
+uint32_t HeaderString::size() const {
+  if (type() == Type::Reference) {
+    return get_str_view(buffer_).size();
+  }
+  ASSERT(type() == Type::Inline);
+  return get_in_vec(buffer_).size();
+}
+
+HeaderString::Type HeaderString::type() const {
+  // buffer_.index() is correlated with the order of Reference and Inline in the
+  // enum.
+  ASSERT(buffer_.index() == 0 || buffer_.index() == 1);
+  ASSERT((buffer_.index() == 0 && absl::holds_alternative<absl::string_view>(buffer_)) ||
+         (buffer_.index() != 0));
+  ASSERT((buffer_.index() == 1 && absl::holds_alternative<InlineHeaderVector>(buffer_)) ||
+         (buffer_.index() != 1));
+  return Type(buffer_.index());
 }
 
 // Specialization needed for HeaderMapImpl::HeaderList::insert() when key is LowerCaseString.

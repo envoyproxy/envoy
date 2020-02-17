@@ -70,11 +70,11 @@ TEST(HeaderStringTest, All) {
   {
     HeaderString string;
     string.setCopy("hello");
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    EXPECT_FALSE(string.isReference());
     HeaderString string2(std::move(string));
     EXPECT_TRUE(string.empty()); // NOLINT(bugprone-use-after-move)
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
-    EXPECT_EQ(HeaderString::Type::Inline, string2.type());
+    EXPECT_FALSE(string.isReference());
+    EXPECT_FALSE(string2.isReference());
     string.append("world", 5);
     EXPECT_EQ("world", string.getStringView());
     EXPECT_EQ(5UL, string.size());
@@ -82,16 +82,16 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(5UL, string2.size());
   }
 
-  // Dynamic move constructor
+  // Inline move large constructor
   {
     std::string large(4096, 'a');
     HeaderString string;
     string.setCopy(large);
-    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+    EXPECT_FALSE(string.isReference());
     HeaderString string2(std::move(string));
     EXPECT_TRUE(string.empty()); // NOLINT(bugprone-use-after-move)
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
-    EXPECT_EQ(HeaderString::Type::Dynamic, string2.type());
+    EXPECT_FALSE(string.isReference());
+    EXPECT_FALSE(string2.isReference());
     string.append("b", 1);
     EXPECT_EQ("b", string.getStringView());
     EXPECT_EQ(1UL, string.size());
@@ -104,7 +104,7 @@ TEST(HeaderStringTest, All) {
     std::string static_string("HELLO");
     HeaderString string(static_string);
     string.setInteger(5);
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    EXPECT_FALSE(string.isReference());
     EXPECT_EQ("5", string.getStringView());
   }
 
@@ -113,7 +113,7 @@ TEST(HeaderStringTest, All) {
     std::string static_string("HELLO");
     HeaderString string(static_string);
     string.setCopy(static_string);
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    EXPECT_FALSE(string.isReference());
     EXPECT_EQ("HELLO", string.getStringView());
   }
 
@@ -121,9 +121,9 @@ TEST(HeaderStringTest, All) {
   {
     std::string static_string("HELLO");
     HeaderString string(static_string);
-    EXPECT_EQ(HeaderString::Type::Reference, string.type());
+    EXPECT_TRUE(string.isReference());
     string.clear();
-    EXPECT_EQ(HeaderString::Type::Reference, string.type());
+    EXPECT_TRUE(string.isReference());
     EXPECT_EQ("HELLO", string.getStringView());
   }
 
@@ -131,7 +131,7 @@ TEST(HeaderStringTest, All) {
   {
     std::string static_string("HELLO");
     HeaderString string(static_string);
-    EXPECT_EQ(HeaderString::Type::Reference, string.type());
+    EXPECT_TRUE(string.isReference());
     string.append("a", 1);
     EXPECT_EQ("HELLOa", string.getStringView());
   }
@@ -200,58 +200,36 @@ TEST(HeaderStringTest, All) {
     HeaderString string;
     std::string large(128, 'z');
     string.setCopy(large);
-    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
+    EXPECT_FALSE(string.isReference());
     EXPECT_EQ(string.getStringView(), large);
-  }
-
-  // Ensure setCopy does not add NUL.
-  {
-    HeaderString string;
-    std::string large(128, 'z');
-    string.setCopy(large);
-    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
-    EXPECT_EQ(string.getStringView(), large);
-    std::string small(1, 'a');
-    string.setCopy(small);
-    EXPECT_EQ(string.type(), HeaderString::Type::Inline);
-    EXPECT_EQ(string.getStringView(), small);
-    // If we peek past the valid first character of the
-    // header string_view it should still be 'z' and not '\0'.
-    // We know this peek is OK since the memory is much larger
-    // than two bytes.
-    EXPECT_EQ(string.getStringView().data()[1], 'z');
   }
 
   // Copy, exactly filling dynamic capacity
   //
-  // ASAN should catch a write one past the end of the dynamic buffer. This test
+  // ASAN should catch a write one past the end of the inline buffer. This test
   // forces a dynamic buffer with one copy and then fills it with the next.
   {
     HeaderString string;
-    // Force Dynamic with setCopy of inline buffer size + 1.
+    // Force dynamic vector allocation with setCopy of inline buffer size + 1.
     std::string large1(129, 'z');
     string.setCopy(large1);
-    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
-    const void* dynamic_buffer_address = string.getStringView().data();
+    EXPECT_FALSE(string.isReference());
     // Dynamic capacity in setCopy is 2x required by the size.
-    // So to fill it exactly setCopy with a total of 258 chars.
-    std::string large2(258, 'z');
+    // So to fill it exactly setCopy with a total of 256 chars.
+    std::string large2(256, 'z');
     string.setCopy(large2);
-    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
-    // The actual buffer address should be the same as it was after
-    // setCopy(large1), ensuring no reallocation occurred.
-    EXPECT_EQ(string.getStringView().data(), dynamic_buffer_address);
+    EXPECT_FALSE(string.isReference());
     EXPECT_EQ(string.getStringView(), large2);
   }
 
-  // Append, small buffer to dynamic
+  // Append, small buffer to inline
   {
     HeaderString string;
     std::string test(128, 'a');
     string.append(test.c_str(), test.size());
-    EXPECT_EQ(HeaderString::Type::Inline, string.type());
+    EXPECT_FALSE(string.isReference());
     string.append("a", 1);
-    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+    EXPECT_FALSE(string.isReference());
     test += 'a';
     EXPECT_EQ(test, string.getStringView());
   }
@@ -272,25 +250,12 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(4106U, string.size());
   }
 
-  // Append, realloc dynamic.
-  {
-    HeaderString string;
-    std::string large(129, 'a');
-    string.append(large.c_str(), large.size());
-    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
-    std::string large2 = large + large;
-    string.append(large2.c_str(), large2.size());
-    large += large2;
-    EXPECT_EQ(large, string.getStringView());
-    EXPECT_EQ(387U, string.size());
-  }
-
   // Append, realloc close to limit with small buffer.
   {
     HeaderString string;
     std::string large(129, 'a');
     string.append(large.c_str(), large.size());
-    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+    EXPECT_FALSE(string.isReference());
     std::string large2(120, 'b');
     string.append(large2.c_str(), large2.size());
     std::string large3(32, 'c');
@@ -305,19 +270,15 @@ TEST(HeaderStringTest, All) {
   // forces a dynamic buffer with one copy and then fills it with the next.
   {
     HeaderString string;
-    // Force Dynamic with setCopy of inline buffer size + 1.
+    // Force dynamic allocation with setCopy of inline buffer size + 1.
     std::string large1(129, 'z');
     string.setCopy(large1);
-    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
-    const void* dynamic_buffer_address = string.getStringView().data();
+    EXPECT_FALSE(string.isReference());
     // Dynamic capacity in setCopy is 2x required by the size.
-    // So to fill it exactly append 129 chars for a total of 258 chars.
-    std::string large2(129, 'z');
+    // So to fill it exactly append 127 chars for a total of 256 chars.
+    std::string large2(127, 'z');
     string.append(large2.c_str(), large2.size());
-    EXPECT_EQ(string.type(), HeaderString::Type::Dynamic);
-    // The actual buffer address should be the same as it was after
-    // setCopy(large1), ensuring no reallocation occurred.
-    EXPECT_EQ(string.getStringView().data(), dynamic_buffer_address);
+    EXPECT_FALSE(string.isReference());
     EXPECT_EQ(string.getStringView(), large1 + large2);
   }
 
@@ -337,27 +298,27 @@ TEST(HeaderStringTest, All) {
     string.setInteger(123456789);
     EXPECT_EQ("123456789", string.getStringView());
     EXPECT_EQ(9U, string.size());
-    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+    EXPECT_FALSE(string.isReference());
   }
 
-  // Set static, switch to dynamic, back to static.
+  // Set static, switch to inline, back to static.
   {
     const std::string static_string = "hello world";
     HeaderString string;
     string.setReference(static_string);
     EXPECT_EQ(string.getStringView(), static_string);
     EXPECT_EQ(11U, string.size());
-    EXPECT_EQ(HeaderString::Type::Reference, string.type());
+    EXPECT_TRUE(string.isReference());
 
     const std::string large(129, 'a');
     string.setCopy(large);
     EXPECT_NE(string.getStringView().data(), large.c_str());
-    EXPECT_EQ(HeaderString::Type::Dynamic, string.type());
+    EXPECT_FALSE(string.isReference());
 
     string.setReference(static_string);
     EXPECT_EQ(string.getStringView(), static_string);
     EXPECT_EQ(11U, string.size());
-    EXPECT_EQ(HeaderString::Type::Reference, string.type());
+    EXPECT_TRUE(string.isReference());
   }
 
   // getString
@@ -371,6 +332,21 @@ TEST(HeaderStringTest, All) {
     HeaderString headerString2;
     absl::string_view retString2 = headerString2.getStringView();
     EXPECT_EQ(0U, retString2.size());
+  }
+
+  // inlineTransform
+  {
+    const std::string static_string = "HELLO";
+    HeaderString string;
+    string.setCopy(static_string);
+    string.inlineTransform([](char c) { return static_cast<uint8_t>(tolower(c)); });
+    EXPECT_FALSE(string.isReference());
+    EXPECT_EQ(5U, string.size());
+    EXPECT_EQ(string.getStringView(), "hello");
+    string.inlineTransform(toupper);
+    EXPECT_EQ(string.getStringView(), static_string);
+    EXPECT_EQ(5U, string.size());
+    EXPECT_FALSE(string.isReference());
   }
 }
 
@@ -460,7 +436,7 @@ TEST(HeaderMapImplTest, Remove) {
   std::string ref_value("value");
   headers.addReference(static_key, ref_value);
   EXPECT_EQ("value", headers.get(static_key)->value().getStringView());
-  EXPECT_EQ(HeaderString::Type::Reference, headers.get(static_key)->value().type());
+  EXPECT_TRUE(headers.get(static_key)->value().isReference());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
   headers.remove(static_key);
@@ -1226,7 +1202,7 @@ TEST(HeaderMapImplTest, ClearHeaderMap) {
   // Add random header and then clear.
   headers.addReference(static_key, ref_value);
   EXPECT_EQ("value", headers.get(static_key)->value().getStringView());
-  EXPECT_EQ(HeaderString::Type::Reference, headers.get(static_key)->value().type());
+  EXPECT_TRUE(headers.get(static_key)->value().isReference());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
   headers.clear();
