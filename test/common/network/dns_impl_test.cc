@@ -476,18 +476,39 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
                          TestUtility::ipTestParamsToString);
 
 // Validate that when DnsResolverImpl is destructed with outstanding requests,
-// that we don't invoke any callbacks. This is a regression test from
+// that we don't invoke any callbacks if the query was cancelled. This is a regression test from
 // development, where segfaults were encountered due to callback invocations on
 // destruction.
 TEST_P(DnsImplTest, DestructPending) {
-  EXPECT_NE(nullptr, resolver_->resolve("", DnsLookupFamily::V4Only,
-                                        [&](std::list<DnsResponse>&& results) -> void {
-                                          FAIL();
-                                          UNREFERENCED_PARAMETER(results);
-                                        }));
+  ActiveDnsQuery* query = resolver_->resolve("", DnsLookupFamily::V4Only,
+                                             [&](std::list<DnsResponse>&& results) -> void {
+                                               FAIL();
+                                               UNREFERENCED_PARAMETER(results);
+                                             });
+  ASSERT_NE(nullptr, query);
+  query->cancel();
   // Also validate that pending events are around to exercise the resource
   // reclamation path.
   EXPECT_GT(peer_->events().size(), 0U);
+}
+
+TEST_P(DnsImplTest, DestructCallback) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+
+  ActiveDnsQuery* query = resolver_->resolve("some.domain", DnsLookupFamily::Auto,
+                                             [&](std::list<DnsResponse> &&) -> void {
+                                               query = nullptr;
+                                               dispatcher_->exit();
+                                             });
+
+  // This simulates destruction thanks to another query setting the dirty_channel_ bit, thus causing
+  // a subsequent result to call ares_destroy.
+  peer_->resetChannelTcpOnly(zero_timeout());
+  ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  ASSERT_EQ(nullptr, query);
 }
 
 // Validate basic success/fail lookup behavior. The empty request will connect
@@ -946,16 +967,12 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForTcpTest,
 TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
-  std::list<Address::InstanceConstSharedPtr> address_list;
   ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   EXPECT_TRUE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
   EXPECT_NE(nullptr, resolver_->resolve("root.cnam.domain", DnsLookupFamily::Auto,
-                                        [&](std::list<DnsResponse>&& results) -> void {
-                                          address_list = getAddressList(results);
-                                          dispatcher_->exit();
-                                        }));
+                                        [&](std::list<DnsResponse> &&) -> void {}));
   ares_destroy_options(&opts);
 }
 
@@ -974,16 +991,12 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForUdpTest,
 TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
-  std::list<Address::InstanceConstSharedPtr> address_list;
   ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   EXPECT_FALSE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
   EXPECT_NE(nullptr, resolver_->resolve("root.cnam.domain", DnsLookupFamily::Auto,
-                                        [&](std::list<DnsResponse>&& results) -> void {
-                                          address_list = getAddressList(results);
-                                          dispatcher_->exit();
-                                        }));
+                                        [&](std::list<DnsResponse> &&) -> void {}));
   ares_destroy_options(&opts);
 }
 
