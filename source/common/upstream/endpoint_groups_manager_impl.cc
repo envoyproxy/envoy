@@ -27,6 +27,28 @@ bool EndpointGroupsManagerImpl::removeEndpointGroup(absl::string_view name) {
   return active_groups_.erase(name);
 }
 
+bool EndpointGroupsManagerImpl::batchUpdateEndpointGroup(
+    const std::vector<envoy::config::endpoint::v3::EndpointGroup>& added,
+    const std::vector<std::string> removed, absl::string_view version_info) {
+  std::vector<envoy::config::endpoint::v3::EndpointGroup> total(added);
+  for (auto& name : removed) {
+    envoy::config::endpoint::v3::EndpointGroup empty_group;
+    empty_group.set_name(name.data());
+    total.emplace_back(empty_group);
+  }
+
+  for (size_t i = 0; i < total.size(); i++) {
+    const auto& group = total[i];
+    if (active_groups_.find(group.name()) == active_groups_.end()) {
+      active_groups_.emplace(group.name(), std::make_shared<ActiveEndpointGroup>());
+    }
+
+    active_groups_[group.name()]->batchUpdate(group, version_info, i == total.size() - 1);
+  }
+
+  return true;
+}
+
 void EndpointGroupsManagerImpl::addMonitor(EndpointGroupMonitorSharedPtr monitor,
                                            absl::string_view group_name) {
   if (active_groups_.find(group_name) == active_groups_.end()) {

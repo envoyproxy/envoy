@@ -585,9 +585,13 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
     uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor) {
-  // We assume that each call updates a different priority.
-  ASSERT(priorities_.find(priority) == priorities_.end());
-  priorities_.insert(priority);
+  // The updateHosts function is called for each EGDS update, and multiple EGDS may contain the same
+  // priority, so the ASSERT check here does not apply.
+  // ASSERT(priorities_.find(priority) == priorities_.end());
+
+  if (!priorities_.count(priority)) {
+    priorities_.insert(priority);
+  }
 
   for (const auto& host : hosts_added) {
     all_hosts_added_.insert(host);

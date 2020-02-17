@@ -66,7 +66,6 @@ private:
                    const HostVector& hosts_removed, PriorityStateManager& priority_state_manager,
                    LocalityWeightsMap& new_locality_weights_map,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
-  void batchHostUpdateForEndpointGroup(PrioritySet::BatchUpdateCb& callback) override;
 
   // ClusterImplBase
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;

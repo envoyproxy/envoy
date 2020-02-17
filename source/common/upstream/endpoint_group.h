@@ -16,6 +16,9 @@ public:
   bool update(const envoy::config::endpoint::v3::EndpointGroup& group,
               absl::string_view version_info);
 
+  bool batchUpdate(const envoy::config::endpoint::v3::EndpointGroup& group,
+                   absl::string_view version_info, bool all_endpoint_groups_updated);
+
   void addMonitor(EndpointGroupMonitorSharedPtr monitor) {
     if (!monitors_.count(monitor)) {
       monitors_.insert(monitor);

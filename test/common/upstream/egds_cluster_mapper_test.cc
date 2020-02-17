@@ -186,23 +186,23 @@ TEST_F(EgdsClusterMapperTest, Basic) {
   {
     // The onUpdate interface is called because the dependent resources has been
     // retrieved.
-    PrioritySet::BatchUpdateCb* batch_update_callback;
-    EXPECT_CALL(mock_delegate, batchHostUpdateForEndpointGroup(_))
-        .WillOnce(Invoke([&](PrioritySet::BatchUpdateCb& callback) -> void {
-          batch_update_callback = &callback;
-        }));
-    EXPECT_CALL(mock_delegate, initializeCluster(_)).Times(0);
-    const std::string version("1.0");
-    envoy::config::endpoint::v3::EndpointGroup group_data;
-    group_data.set_name("test_data_1");
-    auto* endpoints = group_data.add_endpoints();
-    auto* socket_address = endpoints->add_lb_endpoints()
-                               ->mutable_endpoint()
-                               ->mutable_address()
-                               ->mutable_socket_address();
-    socket_address->set_address("4.5.6.7");
-    socket_address->set_port_value(4567);
-    active_monitor_test1->update(group_data, version);
+    // PrioritySet::BatchUpdateCb* batch_update_callback;
+    // EXPECT_CALL(mock_delegate, batchHostUpdateForEndpointGroup(_))
+    //     .WillOnce(Invoke([&](PrioritySet::BatchUpdateCb& callback) -> void {
+    //       batch_update_callback = &callback;
+    //     }));
+    // EXPECT_CALL(mock_delegate, initializeCluster(_)).Times(0);
+    // const std::string version("1.0");
+    // envoy::config::endpoint::v3::EndpointGroup group_data;
+    // group_data.set_name("test_data_1");
+    // auto* endpoints = group_data.add_endpoints();
+    // auto* socket_address = endpoints->add_lb_endpoints()
+    //                            ->mutable_endpoint()
+    //                            ->mutable_address()
+    //                            ->mutable_socket_address();
+    // socket_address->set_address("4.5.6.7");
+    // socket_address->set_port_value(4567);
+    // active_monitor_test1->update(group_data, version);
   }
 
   EXPECT_CALL(mock_manager, removeMonitor(_, _)).Times(1);

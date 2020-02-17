@@ -81,6 +81,8 @@ void EgdsApiImpl::onConfigUpdate(
   std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> endpoint_group_names;
   bool any_applied = false;
+  std::vector<envoy::config::endpoint::v3::EndpointGroup> added;
+  std::vector<std::string> removed;
   for (const auto& resource : added_resources) {
     envoy::config::endpoint::v3::EndpointGroup endpoint_group;
     try {
@@ -92,24 +94,17 @@ void EgdsApiImpl::onConfigUpdate(
             fmt::format("duplicate endpoint group {} found", endpoint_group.name()));
       }
 
-      if (endpoint_group_mananger_.addOrUpdateEndpointGroup(endpoint_group, resource.version())) {
-        any_applied = true;
-        ENVOY_LOG(info, "egds: update endpoint group '{}'", endpoint_group.name());
-      } else {
-        ENVOY_LOG(debug, "egds: update endpoint group '{}' skipped", endpoint_group.name());
-      }
+      ENVOY_LOG(debug, "egds: added endpoint group '{}'", endpoint_group.name());
+      added.emplace_back(endpoint_group);
     } catch (const EnvoyException& e) {
       exception_msgs.push_back(fmt::format("{}: {}", endpoint_group.name(), e.what()));
     }
   }
 
-  for (const auto& resource_name : removed_resources) {
-    if (endpoint_group_mananger_.clearEndpointGroup(resource_name, version_info)) {
-      any_applied = true;
-      ENVOY_LOG(info, "egds: remove endpoint group '{}'", resource_name);
-    }
-  }
+  ENVOY_LOG(debug, "egds: removed endpoint group '{}'", removed_resources.size());
+  removed.insert(removed.end(), removed_resources.begin(), removed_resources.end());
 
+  any_applied = endpoint_group_mananger_.batchUpdateEndpointGroup(added, removed, version_info);
   if (any_applied) {
     system_version_info_ = version_info;
   }

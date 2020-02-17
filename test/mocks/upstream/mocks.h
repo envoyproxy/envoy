@@ -438,6 +438,8 @@ public:
   ~MockEndpointGroupMonitor() override;
 
   MOCK_METHOD2(update, void(const envoy::config::endpoint::v3::EndpointGroup&, absl::string_view));
+  MOCK_METHOD3(batchUpdate,
+               void(const envoy::config::endpoint::v3::EndpointGroup&, absl::string_view, bool));
 };
 
 class MockEndpointGroupsManager : public EndpointGroupsManager {
@@ -456,7 +458,6 @@ public:
   ~MockEgdsClusterMapperDelegate() override = default;
 
   MOCK_METHOD1(initializeCluster, void(const envoy::config::endpoint::v3::ClusterLoadAssignment&));
-  MOCK_METHOD1(batchHostUpdateForEndpointGroup, void(PrioritySet::BatchUpdateCb&));
   MOCK_METHOD6(updateHosts,
                void(uint32_t priority, const HostVector&, const HostVector&, PriorityStateManager&,
                     LocalityWeightsMap&, absl::optional<uint32_t>));

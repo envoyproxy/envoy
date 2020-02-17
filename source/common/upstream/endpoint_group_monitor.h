@@ -17,6 +17,8 @@ public:
 
   virtual void update(const envoy::config::endpoint::v3::EndpointGroup& group,
                       absl::string_view version_info) PURE;
+  virtual void batchUpdate(const envoy::config::endpoint::v3::EndpointGroup& group,
+                           absl::string_view version_info, bool all_endpoint_groups_updated) PURE;
 };
 
 using EndpointGroupMonitorSharedPtr = std::shared_ptr<EndpointGroupMonitor>;

@@ -20,6 +20,10 @@ public:
                                 absl::string_view version_info) override;
   bool removeEndpointGroup(absl::string_view name) override;
   bool clearEndpointGroup(absl::string_view name, absl::string_view version_info) override;
+  bool
+  batchUpdateEndpointGroup(const std::vector<envoy::config::endpoint::v3::EndpointGroup>& added,
+                           const std::vector<std::string> removed,
+                           absl::string_view version_info) override;
 
   // Upstream::EndpointGroupMonitorManager
   void addMonitor(EndpointGroupMonitorSharedPtr monitor, absl::string_view group_name) override;

@@ -244,10 +244,6 @@ void EdsClusterImpl::updateHosts(uint32_t priority, const HostVector& hosts_adde
                                                   overprovisioning_factor);
 }
 
-void EdsClusterImpl::batchHostUpdateForEndpointGroup(PrioritySet::BatchUpdateCb& callback) {
-  priority_set_.batchHostUpdate(callback);
-}
-
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);

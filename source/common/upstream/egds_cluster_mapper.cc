@@ -48,6 +48,12 @@ void EgdsClusterMapper::removeResource(absl::string_view name) {
 
 void EgdsClusterMapper::ActiveEndpointGroupMonitor::update(
     const envoy::config::endpoint::v3::EndpointGroup& group, absl::string_view version_info) {
+  batchUpdate(group, version_info, true);
+}
+
+void EgdsClusterMapper::ActiveEndpointGroupMonitor::batchUpdate(
+    const envoy::config::endpoint::v3::EndpointGroup& group, absl::string_view version_info,
+    bool all_endpoint_groups_updated) {
   if (group_.has_value() && Protobuf::util::MessageDifferencer::Equivalent(group_.value(), group)) {
     ENVOY_LOG(info, "Resources {} are unchanged and do not need to be updated, version: {} ",
               group.name(), version_info);
@@ -60,59 +66,38 @@ void EgdsClusterMapper::ActiveEndpointGroupMonitor::update(
   // When the complete data of the cluster is initialized, subsequent updates to each EG are
   // incrementally calculated.
   if (parent_.cluster_initialized_) {
-    BatchUpdateHelper helper(*this);
-    parent_.delegate_.batchHostUpdateForEndpointGroup(helper);
+    parent_.addUpdatedActiveMonitor(shared_from_this());
+    if (all_endpoint_groups_updated) {
+      // This is the last updated endpoint group, trigger a batch update.
+      parent_.batchHostUpdate();
+      return;
+    }
+
     return;
   }
+
+  // Initialize the Endpoint Group, using the initial data as the baseline for subsequent
+  // calculations. Initialization does not trigger "updateHosts" notification.
+  initializeEndpointGroup();
 
   if (parent_.clusterDataIsReady()) {
     // Initialize the cluster after all EG data is complete and the initialization is performed only
     // once.
     parent_.initializeCluster();
   }
-
-  // Initialize the Endpoint Group, using the initial data as the baseline for subsequent
-  // calculations. Initialization does not trigger "updateHosts" notification.
-  initializeEndpointGroup();
 }
 
 void EgdsClusterMapper::ActiveEndpointGroupMonitor::initializeEndpointGroup() {
-  BatchUpdateHelper helper(*this, false);
   EmptyBatchUpdateScope empty_update;
-  helper.batchUpdate(empty_update);
+  doBatchUpdate(empty_update);
 }
 
-bool EgdsClusterMapper::ActiveEndpointGroupMonitor::BatchUpdateHelper::
-    calculateUpdatedHostsPerLocality(const uint32_t priority, const HostVector& new_hosts,
-                                     std::unordered_map<std::string, HostSharedPtr>& updated_hosts,
-                                     PriorityStateManager& priority_state_manager,
-                                     LocalityWeightsMap& new_locality_weights_map,
-                                     absl::optional<uint32_t> overprovisioning_factor) {
-  auto& host_set = parent_.priority_set_.getOrCreateMutableHostSet(priority);
-  ENVOY_LOG(debug,
-            "compute the updated host in the '{}' endpoint-group, added hosts count '{}', existed "
-            "hosts count '{}'",
-            parent_.group_.value().name(), new_hosts.size(), host_set.mutableHosts().size());
-  HostVector hosts_added;
-  HostVector hosts_removed;
-  const bool hosts_updated = parent_.parent_.cluster_.updateDynamicHostList(
-      new_hosts, host_set.mutableHosts(), hosts_added, hosts_removed, updated_hosts,
-      parent_.all_hosts_);
-  if (hosts_updated && notify_hosts_updated_) {
-    parent_.parent_.delegate_.updateHosts(priority, hosts_added, hosts_removed,
-                                          priority_state_manager, new_locality_weights_map,
-                                          overprovisioning_factor);
-  }
-
-  return hosts_updated;
-}
-
-void EgdsClusterMapper::ActiveEndpointGroupMonitor::BatchUpdateHelper::batchUpdate(
+void EgdsClusterMapper::ActiveEndpointGroupMonitor::doBatchUpdate(
     PrioritySet::HostUpdateCb& host_update_cb) {
   std::unordered_map<std::string, HostSharedPtr> updated_hosts;
-  PriorityStateManager priority_state_manager(parent_.parent_.cluster_, parent_.parent_.local_info_,
+  PriorityStateManager priority_state_manager(parent_.cluster_, parent_.local_info_,
                                               &host_update_cb);
-  for (const auto& locality_lb_endpoint : parent_.group_.value().endpoints()) {
+  for (const auto& locality_lb_endpoint : group_.value().endpoints()) {
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -126,7 +111,7 @@ void EgdsClusterMapper::ActiveEndpointGroupMonitor::BatchUpdateHelper::batchUpda
   bool endpoint_group_rebuilt = false;
 
   const uint32_t overprovisioning_factor =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(parent_.parent_.origin_cluster_load_assignment_.policy(),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(parent_.origin_cluster_load_assignment_.policy(),
                                       overprovisioning_factor, kDefaultOverProvisioningFactor);
 
   // Loop over all priorities that exist in the new configuration.
@@ -139,13 +124,35 @@ void EgdsClusterMapper::ActiveEndpointGroupMonitor::BatchUpdateHelper::batchUpda
     }
   }
 
-  parent_.all_hosts_ = std::move(updated_hosts);
+  all_hosts_ = std::move(updated_hosts);
 
   if (endpoint_group_rebuilt) {
     // TODO(leilei.gll) Add stats.
   }
 
-  ENVOY_LOG(debug, "EG resource '{}' completes batch updates", parent_.group_.value().name());
+  ENVOY_LOG(debug, "Edgs resource '{}' completes batch updates", group_.value().name());
+}
+
+bool EgdsClusterMapper::ActiveEndpointGroupMonitor::calculateUpdatedHostsPerLocality(
+    const uint32_t priority, const HostVector& new_hosts,
+    std::unordered_map<std::string, HostSharedPtr>& updated_hosts,
+    PriorityStateManager& priority_state_manager, LocalityWeightsMap& new_locality_weights_map,
+    absl::optional<uint32_t> overprovisioning_factor) {
+  auto& host_set = priority_set_.getOrCreateMutableHostSet(priority);
+  ENVOY_LOG(debug,
+            "compute the updated host in the '{}' endpoint-group, added hosts count '{}', existed "
+            "hosts count '{}'",
+            group_.value().name(), new_hosts.size(), host_set.mutableHosts().size());
+  HostVector hosts_added;
+  HostVector hosts_removed;
+  const bool hosts_updated = parent_.cluster_.updateDynamicHostList(
+      new_hosts, host_set.mutableHosts(), hosts_added, hosts_removed, updated_hosts, all_hosts_);
+  if (hosts_updated && parent_.cluster_initialized_) {
+    parent_.delegate_.updateHosts(priority, hosts_added, hosts_removed, priority_state_manager,
+                                  new_locality_weights_map, overprovisioning_factor);
+  }
+
+  return hosts_updated;
 }
 
 bool EgdsClusterMapper::clusterDataIsReady() {
@@ -168,9 +175,24 @@ void EgdsClusterMapper::initializeCluster() {
         pair.second->group_.value().named_endpoints().end());
   }
 
-  ENVOY_LOG(info, "Egds cluster {} updated, endpoint count {}",
+  ENVOY_LOG(debug, "Egds cluster {} updated, endpoint count {}",
             cluster_load_assignment.cluster_name(), cluster_load_assignment.endpoints_size());
   delegate_.initializeCluster(cluster_load_assignment);
+}
+
+void EgdsClusterMapper::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
+  for (auto& monitor : updated_monitor_) {
+    monitor->doBatchUpdate(host_update_cb);
+  }
+}
+
+void EgdsClusterMapper::batchHostUpdate() {
+  cluster_.prioritySet().batchHostUpdate(batch_update_helper_);
+  batch_update_helper_.clear();
+}
+
+void EgdsClusterMapper::addUpdatedActiveMonitor(ActiveEndpointGroupMonitorSharedPtr monitor) {
+  batch_update_helper_.addUpdatedMonitor(monitor);
 }
 
 } // namespace Upstream
