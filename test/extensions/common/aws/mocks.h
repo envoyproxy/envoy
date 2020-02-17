@@ -12,19 +12,14 @@ namespace Aws {
 
 class MockCredentialsProvider : public CredentialsProvider {
 public:
-  MockCredentialsProvider();
-  ~MockCredentialsProvider() override;
-
   MOCK_METHOD(Credentials, getCredentials, ());
 };
 
 class MockSigner : public Signer {
 public:
-  MockSigner();
-  ~MockSigner() override;
-
   MOCK_METHOD(void, sign, (Http::RequestMessage&, bool));
   MOCK_METHOD(void, sign, (Http::RequestHeaderMap&));
+  MOCK_METHOD(void, sign, (Http::RequestHeaderMap&, const std::string&));
 };
 
 class MockMetadataFetcher {

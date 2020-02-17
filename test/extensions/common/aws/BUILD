@@ -11,7 +11,7 @@ envoy_package()
 
 envoy_cc_mock(
     name = "aws_mocks",
-    srcs = ["mocks.cc"],
+    srcs = [],
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/common/aws:credentials_provider_interface",

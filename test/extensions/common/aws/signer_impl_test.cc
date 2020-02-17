@@ -80,12 +80,12 @@ TEST_F(SignerImplTest, SignDateHeader) {
   addMethod("GET");
   addPath("/");
   signer_.sign(*message_);
-  EXPECT_EQ(nullptr, message_->headers().get(SignatureHeaders::get().ContentSha256));
+  EXPECT_NE(nullptr, message_->headers().get(SignatureHeaders::get().ContentSha256));
   EXPECT_EQ("20180102T030400Z",
             message_->headers().get(SignatureHeaders::get().Date)->value().getStringView());
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-            "SignedHeaders=x-amz-date, "
-            "Signature=1310784f67248cab70d98b9404d601f30d8fe20bd1820560cce224f4131dc1cc",
+            "SignedHeaders=x-amz-content-sha256;x-amz-date, "
+            "Signature=4ee6aa9355259c18133f150b139ea9aeb7969c9408ad361b2151f50a516afe42",
             message_->headers().Authorization()->value().getStringView());
 }
 
@@ -99,8 +99,8 @@ TEST_F(SignerImplTest, SignSecurityTokenHeader) {
       "token",
       message_->headers().get(SignatureHeaders::get().SecurityToken)->value().getStringView());
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-            "SignedHeaders=x-amz-date;x-amz-security-token, "
-            "Signature=ff1d9fa7e54a72677b5336df047bb1f1493f86b92099973bf62da3af852d1679",
+            "SignedHeaders=x-amz-content-sha256;x-amz-date;x-amz-security-token, "
+            "Signature=1d42526aabf7d8b6d7d33d9db43b03537300cc7e6bb2817e349749e0a08f5b5e",
             message_->headers().Authorization()->value().getStringView());
 }
 
@@ -145,8 +145,8 @@ TEST_F(SignerImplTest, SignExtraHeaders) {
   addHeader("c", "c_value");
   signer_.sign(*message_);
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-            "SignedHeaders=a;b;c;x-amz-date, "
-            "Signature=d5e025e1cf0d5af0d83110bc2ef1cafd2d9dca1dea9d7767f58308da64aa6558",
+            "SignedHeaders=a;b;c;x-amz-content-sha256;x-amz-date, "
+            "Signature=0940025fcecfef5d7ee30e0a26a0957e116560e374878cd86ef4316c53ae9e81",
             message_->headers().Authorization()->value().getStringView());
 }
 
@@ -158,8 +158,8 @@ TEST_F(SignerImplTest, SignHostHeader) {
   addHeader("host", "www.example.com");
   signer_.sign(*message_);
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-            "SignedHeaders=host;x-amz-date, "
-            "Signature=60216ee44dd651322ea10cc6747308dd30e582aaa773f6c1b1354e486385c021",
+            "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
+            "Signature=d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
             message_->headers().Authorization()->value().getStringView());
 }
 
