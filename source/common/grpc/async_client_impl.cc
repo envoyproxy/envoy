@@ -106,7 +106,7 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
     if (end_stream && grpc_status) {
-      // Do to headers/trailers type differences we need to copy here. This is an uncommon case but
+      // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
       // we can potentially optimize in the future.
       onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
       return;
@@ -119,7 +119,7 @@ void AsyncStreamImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_s
     return;
   }
   if (end_stream) {
-    // Do to headers/trailers type differences we need to copy here. This is an uncommon case but
+    // Due to headers/trailers type differences we need to copy here. This is an uncommon case but
     // we can potentially optimize in the future.
     onTrailers(Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*headers));
   }
