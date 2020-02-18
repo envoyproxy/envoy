@@ -209,6 +209,13 @@ public:
           if (headers->Method() == nullptr) {
             headers->setReferenceKey(Headers::get().Method, "GET");
           }
+          if (headers->Host() != nullptr &&
+              !HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+            // Sanitize host header so we don't fail at ASSERTs that verify header sanity checks
+            // which should have been performed by the codec.
+            headers->setHost(
+                Fuzz::replaceInvalidHostCharacters(headers->Host()->value().getStringView()));
+          }
           decoder_->decodeHeaders(std::move(headers), end_stream);
         }));
     fakeOnData();
