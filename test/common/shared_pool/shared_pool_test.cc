@@ -30,6 +30,9 @@ TEST(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
   Event::MockDispatcher dispatcher;
   auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
   pool->setThreadIdForTest(std::thread::id());
+  // This section of code is executed only when release build, because getObject will trigger ASSERT
+  // call at debug build causing the entire program to end, and getObject can run normally and
+  // trigger object destruct to cause the deleteObject method to be executed at release build.
 #ifdef NDEBUG
   EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([&pool](auto callback) {
     // Overrides the default behavior
