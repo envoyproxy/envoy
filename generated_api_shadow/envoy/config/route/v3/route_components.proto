@@ -813,6 +813,10 @@ message RouteAction {
   // place the original path before rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
+  // Only one of *prefix_rewrite* or
+  // :ref:`regex_rewrite <envoy_api_field_config.route.v3.RouteAction.regex_rewrite>`
+  // should be specified.  If both are specified, *prefix_rewrite* take precedence.
+  //
   // .. attention::
   //
   //   Pay careful attention to the use of trailing slashes in the
@@ -844,6 +848,10 @@ message RouteAction {
   // identifiers. The router filter will place the original path as it was
   // before the rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
+  //
+  // Only one of :ref:`prefix_rewrite <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`
+  // or *regex_rewrite* should be specified.  If both are specified,
+  // *prefix_rewrite* take precedence.
   //
   // Examples:
   //
