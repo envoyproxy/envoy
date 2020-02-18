@@ -313,13 +313,13 @@ void Utility::sendLocalReply(
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (is_grpc) {
-    HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
-        {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
-        {Headers::get().GrpcStatus,
-         std::to_string(
-             enumToInt(grpc_status ? grpc_status.value()
-                                   : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
+    HeaderMapPtr response_headers{HeaderMapImpl::create(
+        {{Headers::get().Status, std::to_string(enumToInt(Code::OK))},
+         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
+         {Headers::get().GrpcStatus,
+          std::to_string(enumToInt(
+              grpc_status ? grpc_status.value()
+                          : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}})};
     if (!body_text.empty() && !is_head_request) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
@@ -330,7 +330,7 @@ void Utility::sendLocalReply(
   }
 
   HeaderMapPtr response_headers{
-      new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
+      HeaderMapImpl::create({{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Text);

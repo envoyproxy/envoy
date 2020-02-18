@@ -51,7 +51,7 @@ public:
 
   void insertHeaders(const Http::HeaderMap& response_headers, bool end_stream) override {
     ASSERT(!committed_);
-    response_headers_ = std::make_unique<Http::HeaderMapImpl>(response_headers);
+    response_headers_ = Http::HeaderMapImpl::create(response_headers);
     if (end_stream) {
       commit();
     }
@@ -107,8 +107,8 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
     return Entry{};
   }
   ASSERT(iter->second.response_headers_);
-  return SimpleHttpCache::Entry{
-      std::make_unique<Http::HeaderMapImpl>(*iter->second.response_headers_), iter->second.body_};
+  return SimpleHttpCache::Entry{Http::HeaderMapImpl::create(*iter->second.response_headers_),
+                                iter->second.body_};
 }
 
 void SimpleHttpCache::insert(const Key& key, Http::HeaderMapPtr&& response_headers,

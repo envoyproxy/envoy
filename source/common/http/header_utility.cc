@@ -160,7 +160,7 @@ void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_a
         k.setCopy(header.key().getStringView());
         HeaderString v;
         v.setCopy(header.value().getStringView());
-        static_cast<HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
+        static_cast<HeaderMap*>(context)->addViaMove(std::move(k), std::move(v));
         return HeaderMap::Iterate::Continue;
       },
       &headers);

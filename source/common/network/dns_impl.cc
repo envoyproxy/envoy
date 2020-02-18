@@ -84,6 +84,13 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
+    // This destruction might have been triggered by a peer PendingResolution that received a
+    // ARES_ECONNREFUSED. If the PendingResolution has not been cancelled that means that the
+    // callback_ target _should_ still be around. In that case, raise the callback_ so the target
+    // can be done with this query and initiate a new one.
+    if (!cancelled_) {
+      callback_({});
+    }
     delete this;
     return;
   }
@@ -251,8 +258,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     // Enable timer to wake us up if the request times out.
     updateAresTimer();
 
-    // The PendingResolution will self-delete when the request completes
-    // (including if cancelled or if ~DnsResolverImpl() happens).
+    // The PendingResolution will self-delete when the request completes (including if cancelled or
+    // if ~DnsResolverImpl() happens via ares_destroy() and subsequent handling of ARES_EDESTRUCTION
+    // in DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback()).
     pending_resolution->owned_ = true;
     return pending_resolution.release();
   }

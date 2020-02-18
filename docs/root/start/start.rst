@@ -68,7 +68,7 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
           socket_address: { address: 0.0.0.0, port_value: 10000 }
         filter_chains:
         - filters:
-          - name: envoy.http_connection_manager
+          - name: envoy.filters.network.http_connection_manager
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
               stat_prefix: ingress_http

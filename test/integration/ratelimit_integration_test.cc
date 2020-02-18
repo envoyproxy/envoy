@@ -128,8 +128,8 @@ public:
   }
 
   void sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::Code code,
-                             const Http::HeaderMapImpl& response_headers_to_add,
-                             const Http::HeaderMapImpl& request_headers_to_add) {
+                             const Http::HeaderMap& response_headers_to_add,
+                             const Http::HeaderMap& request_headers_to_add) {
     ratelimit_request_->startGrpcStream();
     envoy::service::ratelimit::v3::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);

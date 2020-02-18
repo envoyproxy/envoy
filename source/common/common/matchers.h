@@ -83,6 +83,8 @@ public:
   bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
+  const envoy::type::matcher::v3::StringMatcher& matcher() const { return matcher_; }
+
 private:
   const envoy::type::matcher::v3::StringMatcher matcher_;
   Regex::CompiledMatcherPtr regex_;

@@ -23,6 +23,10 @@ MockRequestDecoder::MockRequestDecoder() {
 MockRequestDecoder::~MockRequestDecoder() = default;
 
 MockResponseDecoder::MockResponseDecoder() {
+  ON_CALL(*this, decode100ContinueHeaders_(_))
+      .WillByDefault(
+          Invoke([](ResponseHeaderMapPtr& headers) { auto moved_headers = std::move(headers); }));
+
   ON_CALL(*this, decodeHeaders_(_, _))
       .WillByDefault(Invoke([](ResponseHeaderMapPtr& headers, bool) {
         // Check for passing request headers as response headers in a test.

@@ -173,6 +173,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
@@ -182,7 +183,6 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
-  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.
@@ -1006,6 +1006,7 @@ public:
   Network::MockListenSocketFactory socket_factory_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
@@ -1015,7 +1016,6 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
-  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.

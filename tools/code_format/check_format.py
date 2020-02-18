@@ -968,7 +968,7 @@ if __name__ == "__main__":
     error_messages += sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
-    print("ERROR: check format failed. run 'tools/check_format.py fix'")
+    print("ERROR: check format failed. run 'tools/code_format/check_format.py fix'")
     sys.exit(1)
 
   if operation_type == "check":
