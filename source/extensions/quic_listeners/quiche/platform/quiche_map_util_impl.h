@@ -6,5 +6,11 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#define SPDY_EXPORT
-#define SPDY_EXPORT_PRIVATE
+namespace quiche {
+
+template <class Collection, class Key>
+bool QuicheContainsKeyImpl(const Collection& collection, const Key& key) {
+  return collection.find(key) != collection.end();
+}
+
+} // namespace quiche

@@ -52,13 +52,13 @@ public:
   void SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) override;
   void OnCanWrite() override;
   // quic::QuicSpdySession
-  void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
+  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
   using quic::QuicSession::stream_map;
 
 protected:
   // quic::QuicServerSessionBase
-  quic::QuicCryptoServerStreamBase*
+  std::unique_ptr<quic::QuicCryptoServerStreamBase>
   CreateQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                quic::QuicCompressedCertsCache* compressed_certs_cache) override;
 

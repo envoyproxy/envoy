@@ -268,9 +268,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz
-        sha256 = "63ca7aa58511beb8cd6e6b93dbb25154bd14c8c8a316a1b20430e830060fa7db",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/372452f3cea7ef3888eb1bedb19a041a037fd7a7.tar.gz
+        sha256 = "4993b776fe596f141366d62f09c1f8e91be9f968631477a8e8e1432f0569391c",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/372452f3cea7ef3888eb1bedb19a041a037fd7a7.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "b4eaf871d4910c599bb70eaef2eec852747989f15f26885353b7c5188a940ca8",
