@@ -102,6 +102,8 @@ public:
       stream->runLowWatermarkCallbacks();
     }
   }
+  // nghttp2 error callback.
+  void onError(int lib_error_code, const char* msg, size_t len);
 
 protected:
   /**

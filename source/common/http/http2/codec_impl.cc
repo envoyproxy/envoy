@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
@@ -20,6 +21,7 @@
 #include "common/http/headers.h"
 
 #include "absl/container/fixed_array.h"
+#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http {
@@ -1020,6 +1022,14 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
         ASSERT(frame->hd.length <= len);
         return static_cast<ConnectionImpl*>(user_data)->packMetadata(frame->hd.stream_id, buf, len);
       });
+
+  nghttp2_session_callbacks_set_error_callback2(
+      callbacks_,
+      [](nghttp2_session*, int lib_error_code, const char* msg, size_t len,
+         void* user_data) -> int {
+        static_cast<ConnectionImpl*>(user_data)->onError(lib_error_code, msg, len);
+        return 0;
+      });
 }
 
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
@@ -1063,6 +1073,11 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(const Http2Settings& http
   // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
   nghttp2_option_set_peer_max_concurrent_streams(options_,
                                                  Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+}
+
+void ConnectionImpl::onError(int lib_error_code, const char* msg, size_t len) {
+  ENVOY_CONN_LOG(trace, "nghttp2 error: lib_error_code: {}, message: {}", connection_,
+                 lib_error_code, absl::string_view(msg, len));
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
