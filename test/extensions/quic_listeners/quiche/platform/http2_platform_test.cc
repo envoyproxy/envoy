@@ -18,8 +18,6 @@
 #include "quiche/http2/platform/api/http2_flags.h"
 #include "quiche/http2/platform/api/http2_logging.h"
 #include "quiche/http2/platform/api/http2_macros.h"
-#include "quiche/http2/platform/api/http2_optional.h"
-#include "quiche/http2/platform/api/http2_reconstruct_object.h"
 #include "quiche/http2/test_tools/http2_random.h"
 
 // Basic tests to validate functioning of the QUICHE http2 platform
@@ -72,27 +70,6 @@ TEST(Http2PlatformTest, Http2Log) {
   HTTP2_DVLOG_IF(4, false) << "DVLOG_IF(4, false)";
 
   HTTP2_DLOG_EVERY_N(ERROR, 2) << "DLOG_EVERY_N(ERROR, 2)";
-}
-
-TEST(Http2PlatformTest, Http2Optional) {
-  http2::Http2Optional<int> opt;
-  EXPECT_FALSE(opt.has_value());
-  opt = 3;
-  EXPECT_TRUE(opt.has_value());
-}
-
-TEST(Http2PlatformTest, Http2ReconstructObject) {
-  http2::test::Http2Random rng;
-  std::string s;
-
-  http2::test::Http2ReconstructObject(&s, &rng, "123");
-  EXPECT_EQ("123", s);
-
-  http2::test::Http2ReconstructObject(&s, &rng, "456");
-  EXPECT_EQ("456", s);
-
-  http2::test::Http2DefaultReconstructObject(&s, &rng);
-  EXPECT_EQ("", s);
 }
 
 TEST(Http2PlatformTest, Http2StringPiece) {

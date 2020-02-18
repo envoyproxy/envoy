@@ -62,10 +62,10 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
   uint8_t flags = 0;
-  if (header.key().type() == HeaderString::Type::Reference) {
+  if (header.key().isReference()) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_NAME;
   }
-  if (header.value().type() == HeaderString::Type::Reference) {
+  if (header.value().isReference()) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
   }
   const absl::string_view header_key = header.key().getStringView();

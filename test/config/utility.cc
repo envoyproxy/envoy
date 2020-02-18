@@ -117,7 +117,7 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
             name: envoy.router
           codec_type: HTTP1
           access_log:
-            name: envoy.access_loggers.file
+            name: accesslog
             filter:
               not_health_check_filter:  {}
             typed_config:

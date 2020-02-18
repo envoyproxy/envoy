@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/common/macros.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -86,16 +87,25 @@ using LowerCaseStrPairVector =
     std::vector<std::pair<const Http::LowerCaseString, const std::string>>;
 
 /**
+ * Convenient type for an inline vector that will be used by HeaderString.
+ */
+using InlineHeaderVector = absl::InlinedVector<char, 128>;
+
+/**
+ * Convenient type for the underlying type of HeaderString that allows a variant
+ * between string_view and the InlinedVector.
+ */
+using VariantHeader = absl::variant<absl::string_view, InlineHeaderVector>;
+
+/**
  * This is a string implementation for use in header processing. It is heavily optimized for
- * performance. It supports 3 different types of storage and can switch between them:
+ * performance. It supports 2 different types of storage and can switch between them:
  * 1) A reference.
- * 2) Interned string.
- * 3) Heap allocated storage.
+ * 2) An InlinedVector (an optimized interned string for small strings, but allows heap
+ * allocation if needed).
  */
 class HeaderString {
 public:
-  enum class Type { Inline, Reference, Dynamic };
-
   /**
    * Default constructor. Sets up for inline storage.
    */
@@ -116,7 +126,7 @@ public:
   explicit HeaderString(absl::string_view ref_value);
 
   HeaderString(HeaderString&& move_value) noexcept;
-  ~HeaderString();
+  ~HeaderString() = default;
 
   /**
    * Append data to an existing string. If the string is a reference string the reference data is
@@ -125,16 +135,23 @@ public:
   void append(const char* data, uint32_t size);
 
   /**
-   * @return the modifiable backing buffer (either inline or heap allocated).
+   * Transforms the inlined vector data using the given UnaryOperation (conforms
+   * to std::transform).
+   * @param unary_op the operations to be performed on each of the elements.
    */
-  char* buffer() { return buffer_.dynamic_; }
+  template <typename UnaryOperation> void inlineTransform(UnaryOperation&& unary_op) {
+    ASSERT(type() == Type::Inline);
+    std::transform(absl::get<InlineHeaderVector>(buffer_).begin(),
+                   absl::get<InlineHeaderVector>(buffer_).end(),
+                   absl::get<InlineHeaderVector>(buffer_).begin(), unary_op);
+  }
 
   /**
    * Get an absl::string_view. It will NOT be NUL terminated!
    *
    * @return an absl::string_view.
    */
-  absl::string_view getStringView() const { return {buffer_.ref_, string_length_}; }
+  absl::string_view getStringView() const;
 
   /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
@@ -145,7 +162,7 @@ public:
   /**
    * @return whether the string is empty or not.
    */
-  bool empty() const { return string_length_ == 0; }
+  bool empty() const { return size() == 0; }
 
   // Looking for find? Use getStringView().find()
 
@@ -172,14 +189,14 @@ public:
   void setReference(absl::string_view ref_value);
 
   /**
-   * @return the size of the string, not including the null terminator.
+   * @return whether the string is a reference or an InlinedVector.
    */
-  uint32_t size() const { return string_length_; }
+  bool isReference() const { return type() == Type::Reference; }
 
   /**
-   * @return the type of backing storage for the string.
+   * @return the size of the string, not including the null terminator.
    */
-  Type type() const { return type_; }
+  uint32_t size() const;
 
   bool operator==(const char* rhs) const {
     return getStringView() == absl::NullSafeStringView(rhs);
@@ -191,25 +208,16 @@ public:
   bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
 private:
-  union Buffer {
-    // This should reference inline_buffer_ for Type::Inline.
-    char* dynamic_;
-    const char* ref_;
-  } buffer_;
+  enum class Type { Reference, Inline };
 
-  // Capacity in both Type::Inline and Type::Dynamic cases must be at least MinDynamicCapacity in
-  // header_map_impl.cc.
-  union {
-    char inline_buffer_[128];
-    // Since this is a union, this is only valid for type_ == Type::Dynamic.
-    uint32_t dynamic_capacity_;
-  };
+  VariantHeader buffer_;
 
-  void freeDynamic();
   bool valid() const;
 
-  uint32_t string_length_;
-  Type type_;
+  /**
+   * @return the type of backing storage for the string.
+   */
+  Type type() const;
 };
 
 /**

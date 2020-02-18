@@ -145,7 +145,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
   // TODO(danzh): check Envoy per stream buffer limit.
   // Currently read out all the data.
   while (HasBytesToRead()) {
-    struct iovec iov;
+    iovec iov;
     int num_regions = GetReadableRegions(&iov, 1);
     ASSERT(num_regions > 0);
     size_t bytes_read = iov.iov_len;

@@ -19,6 +19,7 @@
 #include "common/runtime/runtime_impl.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Http {
@@ -361,11 +362,6 @@ http_parser_settings ConnectionImpl::settings_{
     nullptr  // on_chunk_complete
 };
 
-const ToLowerTable& ConnectionImpl::toLowerTable() {
-  static auto* table = new ToLowerTable();
-  return *table;
-}
-
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
@@ -391,7 +387,7 @@ void ConnectionImpl::completeLastHeader() {
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
   if (!current_header_field_.empty()) {
-    toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
+    current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
     headers().addViaMove(std::move(current_header_field_), std::move(current_header_value_));
   }
 

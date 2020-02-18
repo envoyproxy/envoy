@@ -32,6 +32,7 @@ public:
   SysCallSizeResult sendmsg(os_fd_t fd, const msghdr* message, int flags) override;
   SysCallIntResult getsockname(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) override;
   SysCallIntResult gethostname(char* name, size_t length) override;
+
   SysCallIntResult getpeername(os_fd_t sockfd, sockaddr* name, socklen_t* namelen) override;
   SysCallIntResult setsocketblocking(os_fd_t sockfd, bool blocking) override;
   SysCallIntResult connect(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) override;

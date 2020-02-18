@@ -22,7 +22,7 @@ Version history
 * thrift_proxy: add router filter stats to docs.
 * tracers: tracer extensions use the "envoy.tracers" name space. A mapping of extension names is
   available in the :ref:`deprecated <deprecated>` documentation.
-* tracing: added gRPC service configuration to the OpenCensus Stackdriver tracer.
+* tracing: added gRPC service configuration to the OpenCensus Stackdriver and OpenCensus Agent tracers.
 * upstream: combined HTTP/1 and HTTP/2 connection pool code. This means that circuit breaker
   limits for both requests and connections apply to both pool types. Also, HTTP/2 now has
   the option to limit concurrent requests on a connection, and allow multiple draining

@@ -5,6 +5,8 @@ package envoy.config.transport_socket.tap.v2alpha;
 import "envoy/api/v2/core/base.proto";
 import "envoy/config/common/tap/v2alpha/common.proto";
 
+import "udpa/annotations/status.proto";
+
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -13,6 +15,7 @@ option java_outer_classname = "TapProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.transport_sockets.tap.v3";
+option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: Tap]
 // [#extension: envoy.transport_sockets.tap]

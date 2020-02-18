@@ -134,9 +134,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "052fd37cd698e24ab73ee18fc3fa55acd1d43153c12a0e65b0fba0447de1117e",
-        strip_prefix = "dd-opentracing-cpp-1.1.1",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.1.tar.gz"],
+        sha256 = "6dc1088ab7f788b6c849fbaa6300517c8fdf88991a70b778be79c284c36857bf",
+        strip_prefix = "dd-opentracing-cpp-1.1.3",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.3.tar.gz"],
     ),
     com_github_google_benchmark = dict(
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
@@ -268,9 +268,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz
-        sha256 = "63ca7aa58511beb8cd6e6b93dbb25154bd14c8c8a316a1b20430e830060fa7db",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/372452f3cea7ef3888eb1bedb19a041a037fd7a7.tar.gz
+        sha256 = "4993b776fe596f141366d62f09c1f8e91be9f968631477a8e8e1432f0569391c",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/372452f3cea7ef3888eb1bedb19a041a037fd7a7.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "b4eaf871d4910c599bb70eaef2eec852747989f15f26885353b7c5188a940ca8",
