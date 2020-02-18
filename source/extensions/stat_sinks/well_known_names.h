@@ -15,11 +15,11 @@ namespace StatSinks {
 class StatsSinkNameValues {
 public:
   // Statsd sink
-  const std::string Statsd = "envoy.statsd";
+  const std::string Statsd = "envoy.stat_sinks.statsd";
   // DogStatsD compatible statsd sink
-  const std::string DogStatsd = "envoy.dog_statsd";
+  const std::string DogStatsd = "envoy.stat_sinks.dog_statsd";
   // MetricsService sink
-  const std::string MetricsService = "envoy.metrics_service";
+  const std::string MetricsService = "envoy.stat_sinks.metrics_service";
   // Hystrix sink
   const std::string Hystrix = "envoy.stat_sinks.hystrix";
 };

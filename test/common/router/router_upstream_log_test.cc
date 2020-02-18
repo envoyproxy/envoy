@@ -38,7 +38,7 @@ namespace {
 absl::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string yaml = R"EOF(
-name: envoy.file_access_log
+name: envoy.access_loggers.file
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
@@ -125,12 +125,12 @@ public:
       const std::initializer_list<std::pair<std::string, std::string>>& request_headers_init,
       const std::initializer_list<std::pair<std::string, std::string>>& response_headers_init,
       const std::initializer_list<std::pair<std::string, std::string>>& response_trailers_init) {
-    NiceMock<Http::MockStreamEncoder> encoder;
-    Http::StreamDecoder* response_decoder = nullptr;
+    NiceMock<Http::MockRequestEncoder> encoder;
+    Http::ResponseDecoder* response_decoder = nullptr;
 
     EXPECT_CALL(context_.cluster_manager_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
-            [&](Http::StreamDecoder& decoder,
+            [&](Http::ResponseDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
               EXPECT_CALL(encoder.stream_, connectionLocalAddress())
@@ -147,26 +147,28 @@ public:
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
 
-    Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl(response_headers_init));
+    Http::ResponseHeaderMapPtr response_headers(
+        new Http::TestResponseHeaderMapImpl(response_headers_init));
     response_headers->setStatus(response_code);
 
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(response_code));
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
-    Http::HeaderMapPtr response_trailers(new Http::TestHeaderMapImpl(response_trailers_init));
+    Http::ResponseTrailerMapPtr response_trailers(
+        new Http::TestResponseTrailerMapImpl(response_trailers_init));
     response_decoder->decodeTrailers(std::move(response_trailers));
   }
 
   void run() { run(200, {}, {}, {}); }
 
   void runWithRetry() {
-    NiceMock<Http::MockStreamEncoder> encoder1;
-    Http::StreamDecoder* response_decoder = nullptr;
+    NiceMock<Http::MockRequestEncoder> encoder1;
+    Http::ResponseDecoder* response_decoder = nullptr;
 
     EXPECT_CALL(context_.cluster_manager_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
-            [&](Http::StreamDecoder& decoder,
+            [&](Http::ResponseDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
               EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
@@ -190,10 +192,10 @@ public:
     per_try_timeout_->invokeCallback();
 
     // We expect this reset to kick off a new request.
-    NiceMock<Http::MockStreamEncoder> encoder2;
+    NiceMock<Http::MockRequestEncoder> encoder2;
     EXPECT_CALL(context_.cluster_manager_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
-            [&](Http::StreamDecoder& decoder,
+            [&](Http::ResponseDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
               EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
@@ -209,7 +211,8 @@ public:
 
     // Normal response.
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-    Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+    Http::ResponseHeaderMapPtr response_headers(
+        new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(200));
     response_decoder->decodeHeaders(std::move(response_headers), true);
@@ -280,7 +283,7 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
 // Test timestamps and durations are emitted.
 TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
   const std::string yaml = R"EOF(
-name: envoy.file_access_log
+name: envoy.access_loggers.file
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%

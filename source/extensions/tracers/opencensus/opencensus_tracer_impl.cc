@@ -6,6 +6,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"
+#include "common/grpc/google_grpc_utils.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -27,6 +28,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
+
+constexpr char GoogleStackdriverTraceAddress[] = "cloudtrace.googleapis.com";
 
 namespace {
 
@@ -236,7 +239,7 @@ void Span::setSampled(bool sampled) { span_.AddAnnotation("setSampled", {{"sampl
 } // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-               const LocalInfo::LocalInfo& localinfo)
+               const LocalInfo::LocalInfo& localinfo, Api::Api& api)
     : oc_config_(oc_config), local_info_(localinfo) {
   if (oc_config.has_trace_config()) {
     applyTraceConfig(oc_config.trace_config());
@@ -251,6 +254,19 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
       auto channel =
           grpc::CreateChannel(oc_config.stackdriver_address(), grpc::InsecureChannelCredentials());
       opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
+    } else if (oc_config.has_stackdriver_grpc_service()) {
+      if (!oc_config.stackdriver_grpc_service().has_google_grpc()) {
+        throw EnvoyException("Opencensus stackdriver tracer only support GoogleGrpc.");
+      }
+      envoy::config::core::v3::GrpcService stackdriver_service =
+          oc_config.stackdriver_grpc_service();
+      if (stackdriver_service.google_grpc().target_uri().empty()) {
+        // If stackdriver server address is not provided, the default production stackdriver
+        // address will be used.
+        stackdriver_service.mutable_google_grpc()->set_target_uri(GoogleStackdriverTraceAddress);
+      }
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(stackdriver_service, api);
+      opts.trace_service_stub = ::google::devtools::cloudtrace::v2::TraceService::NewStub(channel);
     }
     ::opencensus::exporters::trace::StackdriverExporter::Register(std::move(opts));
   }
@@ -261,7 +277,17 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
   }
   if (oc_config.ocagent_exporter_enabled()) {
     ::opencensus::exporters::trace::OcAgentOptions opts;
-    opts.address = oc_config.ocagent_address();
+    if (!oc_config.ocagent_address().empty()) {
+      opts.address = oc_config.ocagent_address();
+    } else if (oc_config.has_ocagent_grpc_service()) {
+      if (!oc_config.ocagent_grpc_service().has_google_grpc()) {
+        throw EnvoyException("Opencensus ocagent tracer only supports GoogleGrpc.");
+      }
+      envoy::config::core::v3::GrpcService ocagent_service = oc_config.ocagent_grpc_service();
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
+      opts.trace_service_stub =
+          ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);
+    }
     opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::OcAgentExporter::Register(std::move(opts));
   }

@@ -97,7 +97,11 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   ConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  NiceMock<Network::MockReadFilterCallbacks> readFilterCallback;
+  EXPECT_CALL(connection, addReadFilter(_))
+      .WillRepeatedly(Invoke([&readFilterCallback](Network::ReadFilterSharedPtr filter) {
+        filter->initializeReadFilterCallbacks(readFilterCallback);
+      }));
   cb(connection);
 }
 
@@ -119,10 +123,25 @@ TEST(ConfigTest, ConfigTest) {
   config.set_cluster("cluster");
 
   EXPECT_TRUE(factory.isTerminalFilter());
+
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  NiceMock<Network::MockReadFilterCallbacks> readFilterCallback;
+  EXPECT_CALL(connection, addReadFilter(_))
+      .WillRepeatedly(Invoke([&readFilterCallback](Network::ReadFilterSharedPtr filter) {
+        filter->initializeReadFilterCallbacks(readFilterCallback);
+      }));
   cb(connection);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.tcp_proxy";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace TcpProxy

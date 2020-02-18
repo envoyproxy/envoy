@@ -138,14 +138,14 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Runtime::MockRandomGenerator> random_;
 
   NiceMock<Tracing::MockConfig> config_;
-  DangerousDeprecatedTestTime test_time_;
+  Event::SimulatedTimeSystem test_time_;
   TimeSource& time_source_;
 };
 

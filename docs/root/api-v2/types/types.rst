@@ -15,6 +15,7 @@ Types
   ../type/matcher/metadata.proto
   ../type/matcher/node.proto
   ../type/matcher/number.proto
+  ../type/matcher/path.proto
   ../type/matcher/regex.proto
   ../type/matcher/string.proto
   ../type/matcher/struct.proto

@@ -117,8 +117,8 @@ public:
     Http::MockClientConnection* codec_{};
     Stats::IsolatedStoreImpl stats_store_;
     Network::MockClientConnection* client_connection_{};
-    NiceMock<Http::MockStreamEncoder> request_encoder_;
-    Http::StreamDecoder* stream_response_callbacks_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
   };
 
   using TestSessionPtr = std::unique_ptr<TestSession>;
@@ -613,8 +613,8 @@ public:
                bool body = false, bool trailers = false,
                const absl::optional<std::string>& service_cluster = absl::optional<std::string>(),
                bool degraded = false) {
-    std::unique_ptr<Http::TestHeaderMapImpl> response_headers(
-        new Http::TestHeaderMapImpl{{":status", code}});
+    std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
+        new Http::TestResponseHeaderMapImpl{{":status", code}});
 
     if (degraded) {
       response_headers->setEnvoyDegraded(1);
@@ -640,7 +640,7 @@ public:
 
     if (trailers) {
       test_sessions_[index]->stream_response_callbacks_->decodeTrailers(
-          Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"some", "trailer"}}});
+          Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"some", "trailer"}}});
     }
   }
 
@@ -904,8 +904,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
 
-  std::unique_ptr<Http::TestHeaderMapImpl> continue_headers(
-      new Http::TestHeaderMapImpl{{":status", "100"}});
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> continue_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "100"}});
   test_sessions_[0]->stream_response_callbacks_->decode100ContinueHeaders(
       std::move(continue_headers));
 
@@ -1322,7 +1322,6 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
             key: value
       )EOF");
 
-  std::string current_start_time;
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", metadata)};
   cluster_->info_->stats().upstream_cx_total_.inc();
@@ -1348,8 +1347,10 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
         EXPECT_EQ(headers.get(downstream_local_address_without_port)->value().getStringView(),
                   value_downstream_local_address_without_port);
 
-        EXPECT_NE(headers.get(start_time)->value().getStringView(), current_start_time);
-        current_start_time = std::string(headers.get(start_time)->value().getStringView());
+        Envoy::DateFormatter date_formatter("%s.%9f");
+        std::string current_start_time =
+            date_formatter.fromTime(dispatcher_.timeSource().systemTime());
+        EXPECT_EQ(headers.get(start_time)->value().getStringView(), current_start_time);
       }));
   health_checker_->start();
 
@@ -1834,8 +1835,8 @@ TEST_F(HttpHealthCheckerImplTest, TimeoutThenSuccess) {
   health_checker_->start();
 
   // Do a response that is not complete but includes headers.
-  std::unique_ptr<Http::TestHeaderMapImpl> response_headers(
-      new Http::TestHeaderMapImpl{{":status", "200"}});
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), false);
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
@@ -3375,8 +3376,8 @@ public:
     Http::MockClientConnection* codec_{};
     Stats::IsolatedStoreImpl stats_store_;
     Network::MockClientConnection* client_connection_{};
-    NiceMock<Http::MockStreamEncoder> request_encoder_;
-    Http::StreamDecoder* stream_response_callbacks_{};
+    NiceMock<Http::MockRequestEncoder> request_encoder_;
+    Http::ResponseDecoder* stream_response_callbacks_{};
     CodecClientForTest* codec_client_{};
   };
 
@@ -3629,7 +3630,7 @@ public:
   void respondResponseSpec(size_t index, ResponseSpec&& spec) {
     const bool trailers_empty = spec.trailers.empty();
     const bool end_stream_on_headers = spec.body_chunks.empty() && trailers_empty;
-    auto response_headers = std::make_unique<Http::TestHeaderMapImpl>();
+    auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>();
     for (const auto& header : spec.response_headers) {
       response_headers->addCopy(header.first, header.second);
     }
@@ -3647,7 +3648,7 @@ public:
       }
     }
     if (!trailers_empty) {
-      auto trailers = std::make_unique<Http::TestHeaderMapImpl>();
+      auto trailers = std::make_unique<Http::TestResponseTrailerMapImpl>();
       for (const auto& header : spec.trailers) {
         trailers->addCopy(header.first, header.second);
       }
@@ -3738,7 +3739,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
   setupServiceNameHC(absl::nullopt);
   expectSingleHealthcheck(HealthTransition::Unchanged);
 
-  auto response_headers = std::make_unique<Http::TestHeaderMapImpl>(
+  auto response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{
           {":status", "200"},
           {"content-type", "application/grpc"},
@@ -3757,7 +3758,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
     test_sessions_[0]->stream_response_callbacks_->decodeData(*chunk, false);
   }
 
-  auto trailers = std::make_unique<Http::TestHeaderMapImpl>(
+  auto trailers = std::make_unique<Http::TestResponseTrailerMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{{"grpc-status", "0"}});
   test_sessions_[0]->stream_response_callbacks_->decodeTrailers(std::move(trailers));
 

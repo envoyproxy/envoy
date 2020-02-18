@@ -13,8 +13,6 @@ envoy_cc_library(
     srcs = ["api_type_oracle.cc"],
     hdrs = ["api_type_oracle.h"],
     deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
         "//source/common/protobuf",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
     ],
@@ -87,6 +85,7 @@ envoy_cc_library(
     deps = [
         ":api_version_lib",
         ":pausable_ack_queue_lib",
+        ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
@@ -146,6 +145,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/memory:utils_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -176,6 +176,7 @@ envoy_cc_library(
         ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
+        "//source/common/memory:utils_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -351,6 +352,7 @@ envoy_cc_library(
     hdrs = ["version_converter.h"],
     deps = [
         ":api_type_oracle_lib",
+        "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:well_known_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

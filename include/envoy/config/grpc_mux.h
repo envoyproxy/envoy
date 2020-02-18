@@ -26,16 +26,20 @@ struct ControlPlaneStats {
 };
 
 /**
- * Handle on an muxed gRPC subscription. The subscription is canceled on destruction.
+ * Handle on a muxed gRPC subscription. The subscription is canceled on destruction.
  */
 class GrpcMuxWatch {
 public:
   virtual ~GrpcMuxWatch() = default;
+
+  /**
+   * Updates the set of resources that the watch is interested in.
+   * @param resources set of resource names to watch for
+   */
+  virtual void update(const std::set<std::string>& resources) PURE;
 };
 
 using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
-
-struct Watch;
 
 /**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
@@ -49,21 +53,6 @@ public:
    * Initiate stream with management server.
    */
   virtual void start() PURE;
-
-  /**
-   * Start a configuration subscription asynchronously for some API type and resources.
-   * @param type_url type URL corresponding to xDS API, e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster.
-   * @param resources set of resource names to watch for. If this is empty, then all
-   *                  resources for type_url will result in callbacks.
-   * @param callbacks the callbacks to be notified of configuration updates. These must be valid
-   *                  until GrpcMuxWatch is destroyed.
-   * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
-   * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
-   */
-  virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
-                                    const std::set<std::string>& resources,
-                                    SubscriptionCallbacks& callbacks) PURE;
 
   /**
    * Pause discovery requests for a given API type. This is useful when we're processing an update
@@ -88,12 +77,21 @@ public:
    */
   virtual bool isDelta() const PURE;
 
-  // For delta
-  virtual Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
-                                  const std::set<std::string>& resources,
-                                  SubscriptionCallbacks& callbacks,
-                                  std::chrono::milliseconds init_fetch_timeout) PURE;
-  virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
+  /**
+   * Start a configuration subscription asynchronously for some API type and resources.
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster.
+   * @param resources set of resource names to watch for. If this is empty, then all
+   *                  resources for type_url will result in callbacks.
+   * @param callbacks the callbacks to be notified of configuration updates. These must be valid
+   *                  until GrpcMuxWatch is destroyed.
+   * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
+   * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
+   */
+  virtual GrpcMuxWatchPtr addWatch(const std::string& type_url,
+                                   const std::set<std::string>& resources,
+                                   SubscriptionCallbacks& callbacks,
+                                   std::chrono::milliseconds init_fetch_timeout) PURE;
 
   /**
    * Retrieves the current pause state as set by pause()/resume().

@@ -249,13 +249,6 @@ TEST(StringUtil, StringViewCaseFindToken) {
   EXPECT_TRUE(StringUtil::caseFindToken("A=5", ".", "A=5"));
 }
 
-TEST(StringUtil, StringViewCaseCompare) {
-  EXPECT_TRUE(StringUtil::caseCompare("HELLO world", "hello world"));
-  EXPECT_TRUE(StringUtil::caseCompare("hello world", "HELLO world"));
-  EXPECT_FALSE(StringUtil::caseCompare("hello world", "hello"));
-  EXPECT_FALSE(StringUtil::caseCompare("hello", "hello world"));
-}
-
 TEST(StringUtil, StringViewCropRight) {
   EXPECT_EQ("hello", StringUtil::cropRight("hello; world\t\f\v\n\r", ";"));
   EXPECT_EQ("foo ", StringUtil::cropRight("foo ; ; ; ; ; ; ", ";"));

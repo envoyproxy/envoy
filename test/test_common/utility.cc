@@ -21,7 +21,6 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "common/api/api_impl.h"
-#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread_impl.h"
@@ -272,16 +271,22 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
 }
 
 // static
-bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
-  // Returns true if all gauges are 0 except the circuit_breaker remaining resource
+std::string TestUtility::nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges) {
+  // Returns all gauges that are 0 except the circuit_breaker remaining resource
   // gauges which default to the resource max.
   std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+  std::string non_zero;
   for (const Stats::GaugeSharedPtr& gauge : gauges) {
     if (!std::regex_match(gauge->name(), omitted) && gauge->value() != 0) {
-      return false;
+      non_zero.append(fmt::format("{}: {}; ", gauge->name(), gauge->value()));
     }
   }
-  return true;
+  return non_zero;
+}
+
+// static
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr>& gauges) {
+  return nonZeroedGauges(gauges).empty();
 }
 
 // static
@@ -325,60 +330,6 @@ void ConditionalInitializer::wait() {
 }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
-
-namespace Http {
-
-TestHeaderMapImpl::TestHeaderMapImpl() = default;
-
-TestHeaderMapImpl::TestHeaderMapImpl(
-    const std::initializer_list<std::pair<std::string, std::string>>& values) {
-  for (auto& value : values) {
-    addCopy(value.first, value.second);
-  }
-}
-
-TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
-
-TestHeaderMapImpl::TestHeaderMapImpl(const TestHeaderMapImpl& rhs)
-    : TestHeaderMapImpl(static_cast<const HeaderMap&>(rhs)) {}
-
-TestHeaderMapImpl& TestHeaderMapImpl::operator=(const TestHeaderMapImpl& rhs) {
-  if (&rhs == this) {
-    return *this;
-  }
-
-  clear();
-  copyFrom(rhs);
-
-  return *this;
-}
-
-void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value) {
-  addCopy(LowerCaseString(key), value);
-}
-
-void TestHeaderMapImpl::remove(const std::string& key) { remove(LowerCaseString(key)); }
-
-std::string TestHeaderMapImpl::get_(const std::string& key) const {
-  return get_(LowerCaseString(key));
-}
-
-std::string TestHeaderMapImpl::get_(const LowerCaseString& key) const {
-  const HeaderEntry* header = get(key);
-  if (!header) {
-    return EMPTY_STRING;
-  } else {
-    return std::string(header->value().getStringView());
-  }
-}
-
-bool TestHeaderMapImpl::has(const std::string& key) const {
-  return get(LowerCaseString(key)) != nullptr;
-}
-
-bool TestHeaderMapImpl::has(const LowerCaseString& key) const { return get(key) != nullptr; }
-
-} // namespace Http
 
 namespace Api {
 

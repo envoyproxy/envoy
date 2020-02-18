@@ -65,7 +65,7 @@ public:
                                Http::ConnectionCallbacks& callbacks);
 
   // Http::ClientConnection
-  Http::StreamEncoder& newStream(Http::StreamDecoder& response_decoder) override;
+  Http::RequestEncoder& newStream(Http::ResponseDecoder& response_decoder) override;
 
   // Http::Connection
   void goAway() override { NOT_REACHED_GCOVR_EXCL_LINE; }

@@ -85,6 +85,7 @@ public:
   void expectLogRequestMethod(const std::string& request_method) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
 
     Http::TestHeaderMapImpl request_headers{
         {":method", request_method},
@@ -104,7 +105,8 @@ common_properties:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
-  start_time: {{}}
+  start_time:
+    seconds: 3600
 request:
   request_method: {}
   request_headers_bytes: {}
@@ -145,13 +147,13 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
     stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
-    stream_info.filter_state_.setData("string_accessor",
-                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
-    stream_info.filter_state_.setData("serialized", std::make_unique<TestSerializedFilterState>(),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("string_accessor",
+                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:

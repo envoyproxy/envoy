@@ -25,38 +25,40 @@ struct {{ complex_type.name }} {
   {{ constructor['full_declaration'] }}{% endfor %}
 
   {# For every field that's used in version, just compute its size using an encoder. #}
-  {% if complex_type.fields|length > 0 %}
   uint32_t computeSize(const EncodingContext& encoder) const {
     const int16_t api_version = encoder.apiVersion();
-    uint32_t written{0};{% for field in complex_type.fields %}
-    if (api_version >= {{ field.version_usage[0] }}
-      && api_version < {{ field.version_usage[-1] + 1 }}) {
-      written += encoder.computeSize({{ field.name }}_);
-    }{% endfor %}
+    uint32_t written{0};
+
+    {% for spec in complex_type.compute_serialization_specs() %}
+    if (api_version >= {{ spec.versions[0] }} && api_version < {{ spec.versions[-1] + 1 }}) {
+      written += encoder.{{ spec.compute_size_method_name }}({{ spec.field.name }}_);
+    }
+    {% endfor %}
+
     return written;
   }
-  {% else %}
-  uint32_t computeSize(const EncodingContext&) const {
-    return 0;
+
+  uint32_t computeCompactSize(const EncodingContext& encoder) const {
+    return computeSize(encoder);
   }
-  {% endif %}
 
   {# For every field that's used in version, just serialize it. #}
-  {% if complex_type.fields|length > 0 %}
   uint32_t encode(Buffer::Instance& dst, EncodingContext& encoder) const {
     const int16_t api_version = encoder.apiVersion();
-    uint32_t written{0};{% for field in complex_type.fields %}
-    if (api_version >= {{ field.version_usage[0] }}
-      && api_version < {{ field.version_usage[-1] + 1 }}) {
-      written += encoder.encode({{ field.name }}_, dst);
-    }{% endfor %}
+    uint32_t written{0};
+
+    {% for spec in complex_type.compute_serialization_specs() %}
+    if (api_version >= {{ spec.versions[0] }} && api_version < {{ spec.versions[-1] + 1 }}) {
+      written += encoder.{{ spec.encode_method_name }}({{ spec.field.name }}_, dst);
+    }
+    {% endfor %}
+
     return written;
   }
-  {% else %}
-  uint32_t encode(Buffer::Instance&, EncodingContext&) const {
-    return 0;
+
+  uint32_t encodeCompact(Buffer::Instance& dst, EncodingContext& encoder) const {
+    return encode(dst, encoder);
   }
-  {% endif %}
 
   {% if complex_type.fields|length > 0 %}
   bool operator==(const {{ complex_type.name }}& rhs) const {
@@ -77,7 +79,7 @@ class {{ complex_type.name }}V{{ field_list.version }}Deserializer:
   public CompositeDeserializerWith{{ field_list.field_count() }}Delegates<
     {{ complex_type.name }}
     {% for field in field_list.used_fields() %},
-      {{ field.deserializer_name_in_version(field_list.version) }}
+      {{ field.deserializer_name_in_version(field_list.version, field_list.uses_compact_fields) }}
     {% endfor %}>{};
 {% endfor %}
 

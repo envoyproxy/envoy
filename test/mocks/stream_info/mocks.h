@@ -6,6 +6,7 @@
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 
@@ -78,8 +79,10 @@ public:
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD(void, setDynamicMetadata,
               (const std::string&, const std::string&, const std::string&));
-  MOCK_METHOD(FilterState&, filterState, ());
+  MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
+  MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
+  MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
   MOCK_METHOD(void, setRequestedServerName, (const absl::string_view));
   MOCK_METHOD(const std::string&, requestedServerName, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view));
@@ -89,6 +92,7 @@ public:
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
+  Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
   absl::optional<std::chrono::nanoseconds> last_downstream_rx_byte_received_;
@@ -102,8 +106,10 @@ public:
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
+  uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
-  FilterStateImpl filter_state_;
+  FilterStateSharedPtr upstream_filter_state_;
+  FilterStateSharedPtr filter_state_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;

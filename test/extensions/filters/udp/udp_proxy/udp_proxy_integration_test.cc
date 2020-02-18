@@ -1,39 +1,10 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "test/integration/integration.h"
+#include "test/test_common/network_utility.h"
 
 namespace Envoy {
 namespace {
-
-/**
- * A synchronous UDP client used for testing.
- */
-class UdpSyncClient {
-public:
-  UdpSyncClient(Network::Address::IpVersion version)
-      : socket_(std::make_unique<Network::UdpListenSocket>(
-            Network::Test::getCanonicalLoopbackAddress(version), nullptr, true)) {
-    // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
-    // modification black to the abstraction layer so it will work for multiple platforms.
-    RELEASE_ASSERT(fcntl(socket_->ioHandle().fd(), F_SETFL, 0) != -1, "");
-  }
-
-  void write(const std::string& buffer, const Network::Address::Instance& peer) {
-    const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
-                                                    nullptr, peer);
-    ASSERT_EQ(rc.rc_, buffer.length());
-  }
-
-  void recv(Network::UdpRecvData& datagram) {
-    datagram = Network::UdpRecvData();
-    const auto rc =
-        Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(), datagram);
-    ASSERT_TRUE(rc.ok());
-  }
-
-private:
-  const Network::SocketPtr socket_;
-};
 
 class UdpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
@@ -83,7 +54,7 @@ public:
 
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address) {
     // Send datagram to be proxied.
-    UdpSyncClient client(version_);
+    Network::Test::UdpSyncPeer client(version_);
     client.write("hello", listener_address);
 
     // Wait for the upstream datagram.
@@ -162,10 +133,10 @@ TEST_P(UdpProxyIntegrationTest, MultipleClients) {
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
-  UdpSyncClient client1(version_);
+  Network::Test::UdpSyncPeer client1(version_);
   client1.write("client1_hello", *listener_address);
 
-  UdpSyncClient client2(version_);
+  Network::Test::UdpSyncPeer client2(version_);
   client2.write("client2_hello", *listener_address);
   client2.write("client2_hello_2", *listener_address);
 
@@ -205,7 +176,7 @@ TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
-  UdpSyncClient client(version_);
+  Network::Test::UdpSyncPeer client(version_);
   client.write("hello1", *listener_address);
   client.write("hello2", *listener_address);
   Network::UdpRecvData request_datagram;

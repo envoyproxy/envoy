@@ -141,6 +141,11 @@ protected:
   }
 
   void disconnect(bool wait_for_remote_close) {
+    if (client_write_buffer_) {
+      EXPECT_CALL(*client_write_buffer_, drain(_))
+          .Times(AnyNumber())
+          .WillOnce(Invoke([&](uint64_t size) -> void { client_write_buffer_->baseDrain(size); }));
+    }
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
     client_connection_->close(ConnectionCloseType::NoFlush);
     if (wait_for_remote_close) {
@@ -845,8 +850,6 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   // call to write() will succeed, bringing the connection back under the low watermark.
   EXPECT_CALL(*client_write_buffer_, write(_))
       .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackWrites));
-  EXPECT_CALL(*client_write_buffer_, drain(_))
-      .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
   EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(1);
 
   disconnect(true);
@@ -924,6 +927,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
   disconnect(true);
 }
 
@@ -1776,6 +1780,30 @@ TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
   // in the write buffer, we should see a doWrite with this data.
   EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
     transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    return IoResult{PostIoAction::KeepOpen, 0, false};
+  }));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  file_ready_cb_(Event::FileReadyType::Read);
+  EXPECT_CALL(*transport_socket_, doWrite(_, true))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
+}
+
+// Test the interface used by external consumers.
+TEST_F(MockTransportConnectionImplTest, FlushWriteBuffer) {
+  InSequence s;
+
+  // Queue up some data in write buffer.
+  const std::string val("some data");
+  Buffer::OwnedImpl buffer(val);
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
+  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
+      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
+  connection_->write(buffer, false);
+
+  // A read event triggers underlying socket to ask for more data.
+  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
+    transport_socket_callbacks_->flushWriteBuffer();
     return IoResult{PostIoAction::KeepOpen, 0, false};
   }));
   EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))

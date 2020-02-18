@@ -100,5 +100,25 @@ TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
   EXPECT_STREQ(NULL, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
 }
 
+TEST_P(AutoSniIntegrationTest, PassingHostWithoutPort) {
+  setup();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ =
+      sendRequestAndWaitForResponse(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                            {":path", "/"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "example.com:8080"}},
+                                    0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("example.com",
+               SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+}
+
 } // namespace
 } // namespace Envoy

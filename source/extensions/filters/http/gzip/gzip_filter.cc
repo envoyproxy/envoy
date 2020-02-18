@@ -178,7 +178,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
       // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        const bool is_gzip = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        const bool is_gzip = !absl::EqualsIgnoreCase(q_value, ZeroQvalueString);
         if (is_gzip) {
           config_->stats().header_gzip_.inc();
           return true;
@@ -198,7 +198,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
       // identity is weighted higher. Note that this filter disregards
       // order/priority at this time.
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-        is_wildcard = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        is_wildcard = !absl::EqualsIgnoreCase(q_value, ZeroQvalueString);
       }
     }
     // If neither identity nor gzip codings are present, return the result of the wildcard.
@@ -260,10 +260,9 @@ bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
          // computed twice. Find all other sites where this can be improved.
          StringUtil::splitToken(transfer_encoding->value().getStringView(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
-      if (StringUtil::caseCompare(trimmed_value,
-                                  Http::Headers::get().TransferEncodingValues.Gzip) ||
-          StringUtil::caseCompare(trimmed_value,
-                                  Http::Headers::get().TransferEncodingValues.Deflate)) {
+      if (absl::EqualsIgnoreCase(trimmed_value, Http::Headers::get().TransferEncodingValues.Gzip) ||
+          absl::EqualsIgnoreCase(trimmed_value,
+                                 Http::Headers::get().TransferEncodingValues.Deflate)) {
         return false;
       }
     }

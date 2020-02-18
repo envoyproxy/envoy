@@ -85,6 +85,12 @@ public:
 
 class TestQuicCryptoServerStream : public quic::QuicCryptoServerStream {
 public:
+  explicit TestQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
+                                      quic::QuicCompressedCertsCache* compressed_certs_cache,
+                                      quic::QuicSession* session,
+                                      quic::QuicCryptoServerStream::Helper* helper)
+      : quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
+
   using quic::QuicCryptoServerStream::QuicCryptoServerStream;
 
   bool encryption_established() const override { return true; }
@@ -96,7 +102,7 @@ public:
       : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_q099, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_t099, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -155,11 +161,11 @@ public:
     return envoy_quic_session_.initializeReadFilters();
   }
 
-  quic::QuicStream* createNewStream(Http::MockStreamDecoder& request_decoder,
+  quic::QuicStream* createNewStream(Http::MockRequestDecoder& request_decoder,
                                     Http::MockStreamCallbacks& stream_callbacks) {
     EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-        .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::StreamEncoder& encoder,
-                                                               bool) -> Http::StreamDecoder& {
+        .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
+                                                               bool) -> Http::RequestDecoder& {
           encoder.getStream().addCallbacks(stream_callbacks);
           return request_decoder;
         }));
@@ -212,7 +218,7 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerSessionTests, EnvoyQuicServerSessionTest
 TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
 
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));
   quic::QuicStreamId stream_id =
@@ -229,7 +235,7 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
+      .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
         EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
@@ -241,7 +247,7 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
 TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
   quic::SetVerbosityLogThreshold(1);
   installReadFilter();
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   // IETF stream 5 and G-Quic stream 2 are server initiated.
   quic::QuicStreamId stream_id =
@@ -258,7 +264,7 @@ TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
 
 TEST_P(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
   installReadFilter();
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   // IETF stream 5 and G-Quic stream 2 are server initiated.
   quic::QuicStreamId stream_id =
@@ -274,7 +280,7 @@ TEST_P(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
 
 TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   installReadFilter();
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   quic::QuicStream* stream1 = createNewStream(request_decoder, stream_callbacks);
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream1->id(),
@@ -291,8 +297,8 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   stream1->OnStreamReset(rst1);
 
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::StreamEncoder& encoder,
-                                                             bool) -> Http::StreamDecoder& {
+      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
+                                                             bool) -> Http::RequestDecoder& {
         encoder.getStream().addCallbacks(stream_callbacks);
         return request_decoder;
       }));
@@ -321,7 +327,7 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
 TEST_P(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
   installReadFilter();
 
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
   EXPECT_CALL(*quic_connection_,
@@ -336,7 +342,7 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionCloseWithActiveStream) {
 TEST_P(EnvoyQuicServerSessionTest, NoFlushWithDataToWrite) {
   installReadFilter();
 
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
   envoy_quic_session_.MarkConnectionLevelWriteBlocked(stream->id());
@@ -353,7 +359,7 @@ TEST_P(EnvoyQuicServerSessionTest, NoFlushWithDataToWrite) {
 
 TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithDataToWrite) {
   installReadFilter();
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
 
@@ -403,7 +409,7 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
       10 * quic::kDefaultFlowControlSendWindow);
 
   envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   // Create a stream and write enough data to make it blocked.
   auto stream =
@@ -419,7 +425,7 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
+      .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
         EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
@@ -498,7 +504,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   envoy_quic_session_.flow_controller()->UpdateSendWindowOffset(
       10 * quic::kDefaultFlowControlSendWindow);
 
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   // Create a stream and write enough data to make it blocked.
   auto stream =
@@ -514,7 +520,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
+      .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
         EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
@@ -562,7 +568,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
 TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
   installReadFilter();
   envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
 
@@ -592,7 +598,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {
 TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   installReadFilter();
   envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
 
@@ -624,7 +630,7 @@ TEST_P(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
 TEST_P(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   installReadFilter();
   envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   quic::QuicStream* stream = createNewStream(request_decoder, stream_callbacks);
 
@@ -788,11 +794,11 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   envoy_quic_session_.flow_controller()->UpdateSendWindowOffset(
       10 * quic::kDefaultFlowControlSendWindow);
   installReadFilter();
-  Http::MockStreamDecoder request_decoder;
+  Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::StreamEncoder& encoder,
-                                                             bool) -> Http::StreamDecoder& {
+      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
+                                                             bool) -> Http::RequestDecoder& {
         encoder.getStream().addCallbacks(stream_callbacks);
         return request_decoder;
       }));
@@ -811,7 +817,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Request headers should be propagated to decoder.
   EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
+      .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
         EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
@@ -833,18 +839,18 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
 
   // Receive another request and send back response to trigger connection level
   // send buffer watermark.
-  Http::MockStreamDecoder request_decoder2;
+  Http::MockRequestDecoder request_decoder2;
   Http::MockStreamCallbacks stream_callbacks2;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-      .WillOnce(Invoke([&request_decoder2, &stream_callbacks2](Http::StreamEncoder& encoder,
-                                                               bool) -> Http::StreamDecoder& {
+      .WillOnce(Invoke([&request_decoder2, &stream_callbacks2](Http::ResponseEncoder& encoder,
+                                                               bool) -> Http::RequestDecoder& {
         encoder.getStream().addCallbacks(stream_callbacks2);
         return request_decoder2;
       }));
   auto stream2 =
       dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id + 4));
   EXPECT_CALL(request_decoder2, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
+      .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
         EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,
@@ -864,11 +870,11 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
 
   // Receive another request, the new stream should be notified about connection
   // high watermark reached upon creation.
-  Http::MockStreamDecoder request_decoder3;
+  Http::MockRequestDecoder request_decoder3;
   Http::MockStreamCallbacks stream_callbacks3;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
-      .WillOnce(Invoke([&request_decoder3, &stream_callbacks3](Http::StreamEncoder& encoder,
-                                                               bool) -> Http::StreamDecoder& {
+      .WillOnce(Invoke([&request_decoder3, &stream_callbacks3](Http::ResponseEncoder& encoder,
+                                                               bool) -> Http::RequestDecoder& {
         encoder.getStream().addCallbacks(stream_callbacks3);
         return request_decoder3;
       }));
@@ -876,7 +882,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   auto stream3 =
       dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id + 8));
   EXPECT_CALL(request_decoder3, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
+      .WillOnce(Invoke([&host](const Http::RequestHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
         EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get,

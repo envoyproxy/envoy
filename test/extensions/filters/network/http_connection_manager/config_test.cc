@@ -877,7 +877,7 @@ http_filters:
 - name: envoy.http_dynamo_filter
   config: {}
 access_log:
-- name: envoy.file_access_log
+- name: envoy.access_loggers.file
   typed_config:
     "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
     path: "/dev/null"
@@ -906,7 +906,7 @@ http_filters:
 - name: envoy.http_dynamo_filter
   typed_config: {}
 access_log:
-- name: envoy.file_access_log
+- name: envoy.access_loggers.file
   typed_config:
     "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
     path: "/dev/null"
@@ -936,7 +936,7 @@ http_filters:
 - name: envoy.http_dynamo_filter
   typed_config: {}
 access_log:
-- name: envoy.file_access_log
+- name: envoy.access_loggers.file
   typed_config:
     "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
     path: "/dev/null"
@@ -954,6 +954,16 @@ access_log:
 
   EXPECT_THROW_WITH_REGEX(parseHttpConnectionManagerFromV2Yaml(yaml_string), EnvoyException,
                           "bad_type: Cannot find field");
+}
+
+// Test that the deprecated extension name still functions.
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.http_connection_manager";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {

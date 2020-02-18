@@ -77,7 +77,7 @@ void IntegrationCodecClient::flushWrite() {
 IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeHeaderOnlyRequest(const Http::HeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
-  Http::StreamEncoder& encoder = newStream(*response);
+  Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, true);
   flushWrite();
@@ -93,7 +93,7 @@ IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
                                             const std::string& body) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
-  Http::StreamEncoder& encoder = newStream(*response);
+  Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, false);
   Buffer::OwnedImpl data(body);
@@ -102,37 +102,37 @@ IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers,
   return response;
 }
 
-void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, absl::string_view data,
+void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, absl::string_view data,
                                       bool end_stream) {
   Buffer::OwnedImpl buffer_data(data.data(), data.size());
   encoder.encodeData(buffer_data, end_stream);
   flushWrite();
 }
 
-void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, Buffer::Instance& data,
+void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, Buffer::Instance& data,
                                       bool end_stream) {
   encoder.encodeData(data, end_stream);
   flushWrite();
 }
 
-void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, uint64_t size,
+void IntegrationCodecClient::sendData(Http::RequestEncoder& encoder, uint64_t size,
                                       bool end_stream) {
   Buffer::OwnedImpl data(std::string(size, 'a'));
   sendData(encoder, data, end_stream);
 }
 
-void IntegrationCodecClient::sendTrailers(Http::StreamEncoder& encoder,
+void IntegrationCodecClient::sendTrailers(Http::RequestEncoder& encoder,
                                           const Http::HeaderMap& trailers) {
   encoder.encodeTrailers(trailers);
   flushWrite();
 }
 
-void IntegrationCodecClient::sendReset(Http::StreamEncoder& encoder) {
+void IntegrationCodecClient::sendReset(Http::RequestEncoder& encoder) {
   encoder.getStream().resetStream(Http::StreamResetReason::LocalReset);
   flushWrite();
 }
 
-void IntegrationCodecClient::sendMetadata(Http::StreamEncoder& encoder,
+void IntegrationCodecClient::sendMetadata(Http::RequestEncoder& encoder,
                                           Http::MetadataMap metadata_map) {
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
   Http::MetadataMapVector metadata_map_vector;
@@ -141,10 +141,10 @@ void IntegrationCodecClient::sendMetadata(Http::StreamEncoder& encoder,
   flushWrite();
 }
 
-std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
+std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
 IntegrationCodecClient::startRequest(const Http::HeaderMap& headers) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
-  Http::StreamEncoder& encoder = newStream(*response);
+  Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, false);
   flushWrite();
@@ -1017,10 +1017,8 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
             max_request_headers_count_);
       });
 
-  Http::HeaderMapImpl big_headers{{Http::Headers::get().Method, "GET"},
-                                  {Http::Headers::get().Path, "/test/long/url"},
-                                  {Http::Headers::get().Scheme, "http"},
-                                  {Http::Headers::get().Host, "host"}};
+  Http::TestHeaderMapImpl big_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
   for (int i = 0; i < 20000; i++) {
     big_headers.addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
