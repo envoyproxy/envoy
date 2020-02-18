@@ -73,6 +73,7 @@ message VirtualHost {
   //   The longest wildcards match first.
   //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
   //   must be unique across all virtual hosts or the config will fail to load.
+  //
   // Domains cannot contain control characters. This is validated by the well_known_regex HTTP_HEADER_VALUE.
   repeated string domains = 2 [(validate.rules).repeated = {
     min_items: 1
