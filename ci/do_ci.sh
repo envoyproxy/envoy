@@ -304,7 +304,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
   echo "protoxform_test..."
-  ./tools/protoxform_test.sh
+  ./tools/protoxform/protoxform_test.sh
   echo "fix_format..."
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
