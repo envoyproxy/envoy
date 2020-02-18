@@ -1558,7 +1558,7 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   setup(SCRIPT);
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
-  DangerousDeprecatedTestTime test_time;
+  Event::SimulatedTimeSystem test_time;
   StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time.timeSystem());
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));

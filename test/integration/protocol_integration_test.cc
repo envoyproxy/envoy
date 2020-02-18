@@ -240,6 +240,25 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   test_server_->drainManager().draining_ = false;
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/9873
+TEST_P(ProtocolIntegrationTest, ResponseWithHostHeader) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"host", "host"}}, true);
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("host",
+            response->headers().get(Http::LowerCaseString("host"))->value().getStringView());
+}
+
 TEST_P(ProtocolIntegrationTest, Retry) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

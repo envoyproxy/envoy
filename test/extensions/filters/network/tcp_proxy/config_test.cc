@@ -97,7 +97,11 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   ConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  NiceMock<Network::MockReadFilterCallbacks> readFilterCallback;
+  EXPECT_CALL(connection, addReadFilter(_))
+      .WillRepeatedly(Invoke([&readFilterCallback](Network::ReadFilterSharedPtr filter) {
+        filter->initializeReadFilterCallbacks(readFilterCallback);
+      }));
   cb(connection);
 }
 
@@ -119,9 +123,14 @@ TEST(ConfigTest, ConfigTest) {
   config.set_cluster("cluster");
 
   EXPECT_TRUE(factory.isTerminalFilter());
+
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
+  NiceMock<Network::MockReadFilterCallbacks> readFilterCallback;
+  EXPECT_CALL(connection, addReadFilter(_))
+      .WillRepeatedly(Invoke([&readFilterCallback](Network::ReadFilterSharedPtr filter) {
+        filter->initializeReadFilterCallbacks(readFilterCallback);
+      }));
   cb(connection);
 }
 

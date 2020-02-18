@@ -145,7 +145,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
 
   NiceMock<Tracing::MockConfig> config_;
-  DangerousDeprecatedTestTime test_time_;
+  Event::SimulatedTimeSystem test_time_;
   TimeSource& time_source_;
 };
 

@@ -326,19 +326,19 @@ elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling" ]]; then
   echo "check_spelling..."
-  ./tools/check_spelling.sh check
+  ./tools/spelling/check_spelling.sh check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling" ]];then
   echo "fix_spell..."
-  ./tools/check_spelling.sh fix
+  ./tools/spelling/check_spelling.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
   echo "check_spelling_pedantic..."
-  ./tools/check_spelling_pedantic.py --mark check
+  ./tools/spelling/check_spelling_pedantic.py --mark check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."
-  ./tools/check_spelling_pedantic.py fix
+  ./tools/spelling/check_spelling_pedantic.py fix
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."

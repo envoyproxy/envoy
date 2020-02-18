@@ -56,7 +56,7 @@ public:
   void OnCanWrite() override;
   void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
-  void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
+  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
   using quic::QuicSpdyClientSession::stream_map;
 
