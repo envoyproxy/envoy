@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace Network {
 
-Address::InstanceConstSharedPtr BaseListenerImpl::getLocalAddress(int fd) {
+Address::InstanceConstSharedPtr BaseListenerImpl::getLocalAddress(os_fd_t fd) {
   return Address::addressFromFd(fd);
 }
 

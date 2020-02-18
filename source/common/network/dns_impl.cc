@@ -72,7 +72,7 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
 }
 
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
-  options->sock_state_cb = [](void* arg, int fd, int read, int write) {
+  options->sock_state_cb = [](void* arg, os_fd_t fd, int read, int write) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
@@ -196,14 +196,14 @@ void DnsResolverImpl::updateAresTimer() {
   }
 }
 
-void DnsResolverImpl::onEventCallback(int fd, uint32_t events) {
+void DnsResolverImpl::onEventCallback(os_fd_t fd, uint32_t events) {
   const ares_socket_t read_fd = events & Event::FileReadyType::Read ? fd : ARES_SOCKET_BAD;
   const ares_socket_t write_fd = events & Event::FileReadyType::Write ? fd : ARES_SOCKET_BAD;
   ares_process_fd(channel_, read_fd, write_fd);
   updateAresTimer();
 }
 
-void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
+void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
   updateAresTimer();
   auto it = events_.find(fd);
   // Stop tracking events for fd if no more state change events.
