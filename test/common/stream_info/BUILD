@@ -46,7 +46,7 @@ envoy_cc_test_library(
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/stream_info:filter_state_lib",
-        "//test/test_common:test_time_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

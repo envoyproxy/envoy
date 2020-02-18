@@ -79,7 +79,7 @@ public:
       ready_ = true;
     }
 
-    return consumed;
+    return consumed + data_consumed;
   };
 
   bool ready() const override { return ready_; };
@@ -100,7 +100,7 @@ private:
  */
 struct TaggedFields {
 
-  const std::vector<TaggedField> fields_;
+  std::vector<TaggedField> fields_;
 
   uint32_t computeCompactSize(const EncodingContext& encoder) const {
     uint32_t result{0};

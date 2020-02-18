@@ -17,7 +17,7 @@ namespace quic {
 // QuicMemSliceStorageImpl wraps a MemSlice vector.
 class QuicMemSliceStorageImpl {
 public:
-  QuicMemSliceStorageImpl(const struct iovec* iov, int iov_count, QuicBufferAllocator* allocator,
+  QuicMemSliceStorageImpl(const iovec* iov, int iov_count, QuicBufferAllocator* allocator,
                           const QuicByteCount max_slice_len);
 
   QuicMemSliceStorageImpl(const QuicMemSliceStorageImpl& other) { buffer_.add(other.buffer_); }

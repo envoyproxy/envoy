@@ -19,6 +19,7 @@
 #include "common/runtime/runtime_impl.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Http {
@@ -361,11 +362,6 @@ http_parser_settings ConnectionImpl::settings_{
     nullptr  // on_chunk_complete
 };
 
-const ToLowerTable& ConnectionImpl::toLowerTable() {
-  static auto* table = new ToLowerTable();
-  return *table;
-}
-
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
@@ -391,7 +387,7 @@ void ConnectionImpl::completeLastHeader() {
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
   if (!current_header_field_.empty()) {
-    toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
+    current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
     headers().addViaMove(std::move(current_header_field_), std::move(current_header_value_));
   }
 
@@ -656,7 +652,7 @@ void ServerConnectionImpl::onEncodeComplete() {
   }
 }
 
-void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int method) {
+void ServerConnectionImpl::handlePath(HeaderMap& headers, unsigned int method) {
   HeaderString path(Headers::get().Path);
 
   bool is_connect = (method == HTTP_CONNECT);
@@ -704,7 +700,7 @@ int ServerConnectionImpl::onHeadersComplete() {
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_) {
-    auto& headers = absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_);
+    auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
 
@@ -778,18 +774,18 @@ void ServerConnectionImpl::onMessageComplete() {
     active_request_->remote_complete_ = true;
     if (deferred_end_stream_headers_) {
       active_request_->request_decoder_->decodeHeaders(
-          std::move(absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_)), true);
+          std::move(absl::get<RequestHeaderMapPtr>(headers_or_trailers_)), true);
       deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
       active_request_->request_decoder_->decodeTrailers(
-          std::move(absl::get<RequestTrailerMapImplPtr>(headers_or_trailers_)));
+          std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
     } else {
       Buffer::OwnedImpl buffer;
       active_request_->request_decoder_->decodeData(buffer, true);
     }
 
-    // Reset for assertion purposes.
-    headers_or_trailers_.emplace<RequestHeaderMapImplPtr>(nullptr);
+    // Reset to ensure no information from one requests persists to the next.
+    headers_or_trailers_.emplace<RequestHeaderMapPtr>(nullptr);
   }
 
   // Always pause the parser so that the calling code can process 1 request at a time and apply
@@ -875,7 +871,7 @@ int ClientConnectionImpl::onHeadersComplete() {
   if (pending_responses_.empty() && !resetStreamCalled()) {
     throw PrematureResponseException(static_cast<Http::Code>(parser_.status_code));
   } else if (!pending_responses_.empty()) {
-    auto& headers = absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_);
+    auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
     headers->setStatus(parser_.status_code);
 
@@ -930,18 +926,18 @@ void ClientConnectionImpl::onMessageComplete() {
 
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(
-          std::move(absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_)), true);
+          std::move(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_)), true);
       deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
       response.decoder_->decodeTrailers(
-          std::move(absl::get<ResponseTrailerMapImplPtr>(headers_or_trailers_)));
+          std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
     } else {
       Buffer::OwnedImpl buffer;
       response.decoder_->decodeData(buffer, true);
     }
 
-    // Reset for assertion purposes.
-    headers_or_trailers_.emplace<ResponseHeaderMapImplPtr>(nullptr);
+    // Reset to ensure no information from one requests persists to the next.
+    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
   }
 }
 

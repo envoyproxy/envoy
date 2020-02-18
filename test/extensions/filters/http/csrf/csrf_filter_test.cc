@@ -92,11 +92,11 @@ public:
   CsrfFilterConfigSharedPtr config_;
 
   CsrfFilter filter_;
-  Http::TestHeaderMapImpl request_headers_;
+  Http::TestRequestHeaderMapImpl request_headers_;
 };
 
 TEST_F(CsrfFilterTest, RequestWithNonMutableMethod) {
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -110,7 +110,7 @@ TEST_F(CsrfFilterTest, RequestWithNonMutableMethod) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithoutOrigin) {
-  Http::TestHeaderMapImpl request_headers{{":method", "PUT"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
@@ -123,7 +123,7 @@ TEST_F(CsrfFilterTest, RequestWithoutOrigin) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithoutDestination) {
-  Http::TestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "localhost"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "localhost"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
@@ -136,7 +136,7 @@ TEST_F(CsrfFilterTest, RequestWithoutDestination) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOrigin) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {":authority", "localhost"}};
 
   Http::TestHeaderMapImpl response_headers{
@@ -158,7 +158,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOrigin) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithValidOrigin) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "localhost"}, {"host", "localhost"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
@@ -171,7 +171,7 @@ TEST_F(CsrfFilterTest, RequestWithValidOrigin) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowDisabled) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {"host", "localhost"}};
 
   setFilterEnabled(false);
@@ -187,7 +187,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowDisabled) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowEnabled) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {"host", "localhost"}};
 
   setFilterEnabled(false);
@@ -203,7 +203,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowEnabled) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithValidOriginCsrfDisabledShadowEnabled) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "localhost"}, {"host", "localhost"}};
 
   setFilterEnabled(false);
@@ -219,7 +219,7 @@ TEST_F(CsrfFilterTest, RequestWithValidOriginCsrfDisabledShadowEnabled) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfEnabledShadowEnabled) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {"host", "localhost"}};
 
   setShadowEnabled(true);
@@ -242,7 +242,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfEnabledShadowEnabled) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithValidOriginCsrfEnabledShadowEnabled) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "localhost"}, {"host", "localhost"}};
 
   setShadowEnabled(true);
@@ -294,7 +294,7 @@ TEST_F(CsrfFilterTest, EmptyRouteEntry) {
 }
 
 TEST_F(CsrfFilterTest, NoCsrfEntry) {
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {"host", "localhost"}};
 
   setRoutePolicy(nullptr);
@@ -310,7 +310,7 @@ TEST_F(CsrfFilterTest, NoCsrfEntry) {
 }
 
 TEST_F(CsrfFilterTest, NoRouteCsrfEntry) {
-  Http::TestHeaderMapImpl request_headers{{":method", "POST"}, {"origin", "localhost"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"}, {"origin", "localhost"}};
 
   setRoutePolicy(nullptr);
 
@@ -325,7 +325,7 @@ TEST_F(CsrfFilterTest, NoRouteCsrfEntry) {
 }
 
 TEST_F(CsrfFilterTest, NoVHostCsrfEntry) {
-  Http::TestHeaderMapImpl request_headers{{":method", "DELETE"}, {"origin", "localhost"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "DELETE"}, {"origin", "localhost"}};
 
   setVirtualHostPolicy(nullptr);
 
@@ -340,7 +340,7 @@ TEST_F(CsrfFilterTest, NoVHostCsrfEntry) {
 }
 
 TEST_F(CsrfFilterTest, RequestFromAdditionalExactOrigin) {
-  Http::TestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "additionalhost"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "additionalhost"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -352,7 +352,7 @@ TEST_F(CsrfFilterTest, RequestFromAdditionalExactOrigin) {
 }
 
 TEST_F(CsrfFilterTest, RequestFromAdditionalRegexOrigin) {
-  Http::TestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "www-1.allow.com"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "www-1.allow.com"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -364,7 +364,7 @@ TEST_F(CsrfFilterTest, RequestFromAdditionalRegexOrigin) {
 }
 
 TEST_F(CsrfFilterTest, RequestFromInvalidAdditionalRegexOrigin) {
-  Http::TestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "www.allow.com"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"}, {"origin", "www.allow.com"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));

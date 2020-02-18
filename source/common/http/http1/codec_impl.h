@@ -14,7 +14,6 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
-#include "common/common/to_lower_table.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -225,7 +224,7 @@ protected:
 private:
   enum class HeaderParsingState { Field, Value, Done };
 
-  virtual HeaderMapImpl& headers() PURE;
+  virtual HeaderMap& headers() PURE;
   virtual void allocHeaders() PURE;
   virtual void maybeAllocTrailers() PURE;
 
@@ -314,7 +313,6 @@ private:
   virtual void onBelowLowWatermark() PURE;
 
   static http_parser_settings settings_;
-  static const ToLowerTable& toLowerTable();
 
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
@@ -358,7 +356,7 @@ private:
    * @param headers the request's headers
    * @throws CodecProtocolException on an invalid url in the request line
    */
-  void handlePath(HeaderMapImpl& headers, unsigned int method);
+  void handlePath(HeaderMap& headers, unsigned int method);
 
   // ConnectionImpl
   void onEncodeComplete() override;
@@ -372,22 +370,21 @@ private:
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
-  HeaderMapImpl& headers() override {
-    if (absl::holds_alternative<RequestHeaderMapImplPtr>(headers_or_trailers_)) {
-      return *absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_);
+  HeaderMap& headers() override {
+    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
+      return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
     } else {
-      return *absl::get<RequestTrailerMapImplPtr>(headers_or_trailers_);
+      return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
     }
   }
   void allocHeaders() override {
-    ASSERT(nullptr == absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_));
-    headers_or_trailers_.emplace<RequestHeaderMapImplPtr>(std::make_unique<RequestHeaderMapImpl>());
+    ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+    headers_or_trailers_.emplace<RequestHeaderMapPtr>(std::make_unique<RequestHeaderMapImpl>());
   }
   void maybeAllocTrailers() override {
     ASSERT(processing_trailers_);
-    if (!absl::holds_alternative<RequestTrailerMapImplPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<RequestTrailerMapImplPtr>(
-          std::make_unique<RequestTrailerMapImpl>());
+    if (!absl::holds_alternative<RequestTrailerMapPtr>(headers_or_trailers_)) {
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::make_unique<RequestTrailerMapImpl>());
     }
   }
 
@@ -399,7 +396,7 @@ private:
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
   // trailers are enabled). The variant is reset to null headers on message complete for assertion
   // purposes.
-  absl::variant<RequestHeaderMapImplPtr, RequestTrailerMapImplPtr> headers_or_trailers_;
+  absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
 };
 
 /**
@@ -436,22 +433,21 @@ private:
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
-  HeaderMapImpl& headers() override {
-    if (absl::holds_alternative<ResponseHeaderMapImplPtr>(headers_or_trailers_)) {
-      return *absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_);
+  HeaderMap& headers() override {
+    if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
+      return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     } else {
-      return *absl::get<ResponseTrailerMapImplPtr>(headers_or_trailers_);
+      return *absl::get<ResponseTrailerMapPtr>(headers_or_trailers_);
     }
   }
   void allocHeaders() override {
-    ASSERT(nullptr == absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_));
-    headers_or_trailers_.emplace<ResponseHeaderMapImplPtr>(
-        std::make_unique<ResponseHeaderMapImpl>());
+    ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
+    headers_or_trailers_.emplace<ResponseHeaderMapPtr>(std::make_unique<ResponseHeaderMapImpl>());
   }
   void maybeAllocTrailers() override {
     ASSERT(processing_trailers_);
-    if (!absl::holds_alternative<ResponseTrailerMapImplPtr>(headers_or_trailers_)) {
-      headers_or_trailers_.emplace<ResponseTrailerMapImplPtr>(
+    if (!absl::holds_alternative<ResponseTrailerMapPtr>(headers_or_trailers_)) {
+      headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
           std::make_unique<ResponseTrailerMapImpl>());
     }
   }
@@ -465,7 +461,7 @@ private:
   // populated on message begin. Trailers are populated on the first parsed trailer field (if
   // trailers are enabled). The variant is reset to null headers on message complete for assertion
   // purposes.
-  absl::variant<ResponseHeaderMapImplPtr, ResponseTrailerMapImplPtr> headers_or_trailers_;
+  absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;

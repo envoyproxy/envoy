@@ -22,8 +22,9 @@ namespace {
 
 // Static header map used for creating authorization requests.
 const Http::HeaderMap& lengthZeroHeader() {
-  CONSTRUCT_ON_FIRST_USE(Http::HeaderMapImpl,
-                         {Http::Headers::get().ContentLength, std::to_string(0)});
+  static const auto headers =
+      Http::HeaderMapImpl::create({{Http::Headers::get().ContentLength, std::to_string(0)}});
+  return *headers;
 }
 
 // Static response used for creating authorization ERROR responses.
@@ -190,12 +191,10 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   Http::HeaderMapPtr headers;
   const uint64_t request_length = request.attributes().request().http().body().size();
   if (request_length > 0) {
-    headers =
-        std::make_unique<Http::HeaderMapImpl,
-                         std::initializer_list<std::pair<Http::LowerCaseString, std::string>>>(
-            {{Http::Headers::get().ContentLength, std::to_string(request_length)}});
+    headers = Http::HeaderMapImpl::create(
+        {{Http::Headers::get().ContentLength, std::to_string(request_length)}});
   } else {
-    headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
+    headers = Http::HeaderMapImpl::create(lengthZeroHeader());
   }
 
   for (const auto& header : request.attributes().request().http().headers()) {
