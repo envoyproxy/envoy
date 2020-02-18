@@ -4213,7 +4213,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(10);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
-    Http::TestHeaderMapImpl headers{};
+    Http::TestHeaderMapImpl headers;
     FilterUtility::TimeoutData timeout =
         FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
