@@ -109,6 +109,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
+        # TODO(JimmyCYJ): Bump to release 1.27
+        # This sha is specifically chosen to fix gRPC STS call credential options.
         sha256 = "bbc8f020f4e85ec029b047fab939b8c81f3d67254b5c724e1003a2bc49ddd123",
         strip_prefix = "grpc-d8f4928fa779f6005a7fe55a176bdb373b0f910f",
         urls = ["https://github.com/grpc/grpc/archive/d8f4928fa779f6005a7fe55a176bdb373b0f910f.tar.gz"],
