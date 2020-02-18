@@ -21,7 +21,7 @@ struct wsabufResult {
   WSABUFPtr wsabuf_;
 };
 
-static wsabufResult iovecToWSABUF(const iovec* vec, int in_vec) {
+wsabufResult iovecToWSABUF(const iovec* vec, int in_vec) {
   DWORD num_vec = 0;
   for (int i = 0; i < in_vec; i++) {
     size_t cur_len = vec[i].iov_len;
@@ -54,28 +54,28 @@ static wsabufResult iovecToWSABUF(const iovec* vec, int in_vec) {
   return {num_vec, std::move(wsa_buf)};
 }
 
-static LPFN_WSARECVMSG getFnPtrWSARecvMsg() {
-  LPFN_WSARECVMSG WSARecvMsgFnPtr = NULL;
-  GUID WSARecvMsg_guid = WSAID_WSARECVMSG;
+LPFN_WSARECVMSG getFnPtrWSARecvMsg() {
+  LPFN_WSARECVMSG recvmsg_fn_ptr = NULL;
+  GUID recvmsg_guid = WSAID_WSARECVMSG;
   SOCKET sock = INVALID_SOCKET;
   DWORD bytes_received = 0;
 
   sock = socket(AF_INET6, SOCK_DGRAM, 0);
 
   RELEASE_ASSERT(
-      WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &WSARecvMsg_guid, sizeof(WSARecvMsg_guid),
-               &WSARecvMsgFnPtr, sizeof(WSARecvMsgFnPtr), &bytes_received, NULL,
+      WSAIoctl(sock, SIO_GET_EXTENSION_FUNCTION_POINTER, &recvmsg_guid, sizeof(recvmsg_guid),
+               &recvmsg_fn_ptr, sizeof(recvmsg_fn_ptr), &bytes_received, NULL,
                NULL) != SOCKET_ERROR,
       "WSAIoctl SIO_GET_EXTENSION_FUNCTION_POINTER for WSARecvMsg failed, not implemented?");
 
   closesocket(sock);
 
-  return WSARecvMsgFnPtr;
+  return recvmsg_fn_ptr;
 }
 
 using WSAMSGPtr = std::unique_ptr<WSAMSG>;
 
-static WSAMSGPtr msghdrToWSAMSG(const msghdr* msg) {
+WSAMSGPtr msghdrToWSAMSG(const msghdr* msg) {
   WSAMSGPtr wsa_msg(new WSAMSG);
 
   wsa_msg->name = reinterpret_cast<SOCKADDR*>(msg->msg_name);
@@ -89,7 +89,7 @@ static WSAMSGPtr msghdrToWSAMSG(const msghdr* msg) {
   wsa_msg->Control = control;
   wsa_msg->dwFlags = msg->msg_flags;
 
-  return std::move(wsa_msg);
+  return wsa_msg;
 }
 
 } // namespace
@@ -146,11 +146,11 @@ SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t leng
 
 SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags) {
   DWORD bytes_received;
-  LPFN_WSARECVMSG WSARecvMsgFnPtr = getFnPtrWSARecvMsg();
+  LPFN_WSARECVMSG recvmsg_fn_ptr = getFnPtrWSARecvMsg();
   WSAMSGPtr wsa_msg = msghdrToWSAMSG(msg);
   // Windows supports only a single flag on input to WSARecvMsg
   wsa_msg->dwFlags = flags & MSG_PEEK;
-  const int rc = WSARecvMsgFnPtr(sockfd, wsa_msg.get(), &bytes_received, nullptr, nullptr);
+  const int rc = recvmsg_fn_ptr(sockfd, wsa_msg.get(), &bytes_received, nullptr, nullptr);
   if (rc == SOCKET_ERROR) {
     return {-1, ::WSAGetLastError()};
   }
