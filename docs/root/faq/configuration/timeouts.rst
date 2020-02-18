@@ -77,6 +77,8 @@ stream timeouts already introduced above.
   configured when using retries so that individual tries using a shorter timeout than the overall
   request timeout described above. This timeout only applies before any part of the response
   is sent to the downstream, which normally happens after the upstream has sent response headers.
+  This timeout can be used with streaming endpoints to retry if the upstream fails to begin a
+  response within the timeout.
 
 TCP
 ---
