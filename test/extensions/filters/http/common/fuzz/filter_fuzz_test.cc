@@ -63,7 +63,7 @@ public:
   void decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
     bool end_stream = false;
 
-    Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(data.headers());
+    auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(data.headers());
     if (headers.Path() == nullptr) {
       headers.setPath("/foo");
     }
@@ -97,7 +97,7 @@ public:
 
     if (data.has_trailers()) {
       ENVOY_LOG_MISC(debug, "Decoding trailers: {} ", data.trailers().DebugString());
-      Http::TestHeaderMapImpl trailers = Fuzz::fromHeaders(data.trailers());
+      auto trailers = Fuzz::fromHeaders<Http::TestRequestTrailerMapImpl>(data.trailers());
       filter->decodeTrailers(trailers);
     }
   }
