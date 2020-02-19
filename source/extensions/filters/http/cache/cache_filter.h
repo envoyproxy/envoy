@@ -66,7 +66,6 @@ private:
   // TODO(toddmgreer): cache trailers.
   bool response_has_trailers_;
 };
-using CacheFilterPtr = std::unique_ptr<CacheFilter>;
 
 } // namespace Cache
 } // namespace HttpFilters
