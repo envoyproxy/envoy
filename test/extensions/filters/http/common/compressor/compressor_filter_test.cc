@@ -49,7 +49,9 @@ protected:
   void SetUp() override { setUpFilter("{}"); }
 
   // CompressorFilter private member functions
-  void sanitizeEtagHeader(Http::ResponseHeaderMap& headers) { filter_->sanitizeEtagHeader(headers); }
+  void sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
+    filter_->sanitizeEtagHeader(headers);
+  }
 
   void insertVaryHeader(Http::ResponseHeaderMap& headers) { filter_->insertVaryHeader(headers); }
 

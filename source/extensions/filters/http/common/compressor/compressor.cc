@@ -150,7 +150,8 @@ CompressorFilter::chooseEncoding(const Http::HeaderMap& headers) const {
 
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
-    content_type_value = StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
+    content_type_value =
+        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
   }
 
   // There could be many compressors registered for the same content encoding, e.g. consider a case
@@ -363,10 +364,9 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::ResponseHeaderMap& header
       const auto trimmed_value = StringUtil::trim(header_value);
       if (absl::EqualsIgnoreCase(trimmed_value, config_->contentEncoding()) ||
           // or any other compression type known to Envoy
+          absl::EqualsIgnoreCase(trimmed_value, Http::Headers::get().TransferEncodingValues.Gzip) ||
           absl::EqualsIgnoreCase(trimmed_value,
-                                  Http::Headers::get().TransferEncodingValues.Gzip) ||
-          absl::EqualsIgnoreCase(trimmed_value,
-                                  Http::Headers::get().TransferEncodingValues.Deflate)) {
+                                 Http::Headers::get().TransferEncodingValues.Deflate)) {
         return false;
       }
     }
