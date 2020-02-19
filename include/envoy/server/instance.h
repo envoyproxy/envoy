@@ -220,7 +220,7 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
-   * Flush the server stats
+   * Flush the stats sinks outside of a flushing interval.
    */
   virtual void flushStats() PURE;
 
