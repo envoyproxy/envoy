@@ -246,6 +246,7 @@ public:
   uint32_t retryOn() const override { return retry_on_; }
   std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
   Upstream::RetryPrioritySharedPtr retryPriority() const override;
+  Upstream::RetryHeaderSharedPtr retryHeader() const override;
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
@@ -274,6 +275,7 @@ private:
   // Name and config proto to use to create the RetryPriority to use with this policy. Default
   // initialized when no RetryPriority should be used.
   std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
+  std::pair<Upstream::RetryHeaderFactory*, ProtobufTypes::MessagePtr> retry_header_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;

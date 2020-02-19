@@ -74,6 +74,19 @@ public:
 using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
 
 /**
+ * Used to decide whether to retry based on the response header and request header.
+ */
+class RetryHeader {
+public:
+  virtual ~RetryHeader() = default;
+
+  virtual bool shouldRetryHeader(const Http::HeaderMap& request_header,
+                                 const Http::HeaderMap& response_header) PURE;
+};
+
+using RetryHeaderSharedPtr = std::shared_ptr<RetryHeader>;
+
+/**
  * Factory for RetryPriority.
  */
 class RetryPriorityFactory : public Config::TypedFactory {
@@ -99,6 +112,21 @@ public:
                                                           uint32_t retry_count) PURE;
 
   std::string category() const override { return "envoy.retry_host_predicates"; }
+};
+
+/**
+ * Factory for RetryHeader.
+ */
+class RetryHeaderFactory : public Config::TypedFactory {
+public:
+  virtual ~RetryHeaderFactory() = default;
+  virtual RetryHeaderSharedPtr
+  createRetryHeader(const Protobuf::Message& config,
+                    ProtobufMessage::ValidationVisitor& validation_visitor, const uint32_t retry_on,
+                    const std::vector<uint32_t>& retriable_status_codes,
+                    const std::vector<Http::HeaderMatcherSharedPtr>& retriable_headers) PURE;
+
+  std::string category() const override { return "envoy.retry_headers"; }
 };
 
 } // namespace Upstream

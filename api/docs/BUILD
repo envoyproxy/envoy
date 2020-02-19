@@ -98,6 +98,7 @@ proto_library(
         "//envoy/config/retry/omit_host_metadata/v2:pkg",
         "//envoy/config/retry/previous_hosts/v2:pkg",
         "//envoy/config/retry/previous_priorities:pkg",
+        "//envoy/config/retry/response_headers/v2:pkg",
         "//envoy/config/trace/v2:pkg",
         "//envoy/config/trace/v2alpha:pkg",
         "//envoy/config/transport_socket/alts/v2alpha:pkg",

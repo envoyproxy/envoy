@@ -196,6 +196,11 @@ public:
   virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
 
   /**
+   * Initializes a RetryHeader to be used when retrying with this retry policy.
+   */
+  virtual Upstream::RetryHeaderSharedPtr retryHeader() const PURE;
+
+  /**
    * Number of times host selection should be reattempted when selecting a host
    * for a retry attempt.
    */

@@ -135,6 +135,7 @@ private:
       return {};
     }
     Upstream::RetryPrioritySharedPtr retryPriority() const override { return {}; }
+    Upstream::RetryHeaderSharedPtr retryHeader() const override { return {}; }
 
     uint32_t hostSelectionMaxAttempts() const override { return 1; }
     uint32_t numRetries() const override { return 1; }

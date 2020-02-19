@@ -56,10 +56,10 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
-    : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+    : request_headers_(request_headers), cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
       retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
-      retry_priority_(route_policy.retryPriority()),
+      retry_priority_(route_policy.retryPriority()), retry_header_(route_policy.retryHeader()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()) {
 
@@ -274,63 +274,7 @@ bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_heade
     return false;
   }
 
-  if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
-    if (Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(response_headers))) {
-      return true;
-    }
-  }
-
-  if (retry_on_ & RetryPolicy::RETRY_ON_GATEWAY_ERROR) {
-    if (Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(response_headers))) {
-      return true;
-    }
-  }
-
-  if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX)) {
-    Http::Code code = static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers));
-    if (code == Http::Code::Conflict) {
-      return true;
-    }
-  }
-
-  if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
-    for (auto code : retriable_status_codes_) {
-      if (Http::Utility::getResponseStatus(response_headers) == code) {
-        return true;
-      }
-    }
-  }
-
-  if (retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_HEADERS) {
-    for (const auto& retriable_header : retriable_headers_) {
-      if (retriable_header->matchesHeaders(response_headers)) {
-        return true;
-      }
-    }
-  }
-
-  if (retry_on_ &
-      (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
-       RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED | RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE |
-       RetryPolicy::RETRY_ON_GRPC_INTERNAL)) {
-    absl::optional<Grpc::Status::GrpcStatus> status = Grpc::Common::getGrpcStatus(response_headers);
-    if (status) {
-      if ((status.value() == Grpc::Status::Canceled &&
-           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_CANCELLED)) ||
-          (status.value() == Grpc::Status::DeadlineExceeded &&
-           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED)) ||
-          (status.value() == Grpc::Status::ResourceExhausted &&
-           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED)) ||
-          (status.value() == Grpc::Status::Unavailable &&
-           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE)) ||
-          (status.value() == Grpc::Status::Internal &&
-           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_INTERNAL))) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return retry_header_->shouldRetryHeader(request_headers_, response_headers);
 }
 
 bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason) {

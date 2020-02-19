@@ -162,6 +162,12 @@ EXTENSIONS = {
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 
     #
+    # Retry header
+    #
+
+    "envoy.retry_header.response_headers":              "//source/extensions/retry/header/response_headers:config",
+
+    #
     # CacheFilter plugins
     #
 
