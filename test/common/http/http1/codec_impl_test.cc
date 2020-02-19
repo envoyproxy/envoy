@@ -427,6 +427,92 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
 
+TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Buffer::OwnedImpl local_buffer;
+  // Read a request and send a response, without draining the response from the
+  // connection buffer. The first two should not cause problems.
+  for (int i = 0; i < 2; ++i) {
+    Http::StreamEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+    codec_->dispatch(buffer);
+    EXPECT_EQ(0U, buffer.length());
+
+    // In most tests the write output is serialized to a buffer here it is
+    // ignored to build up queued "end connection" sentinels.
+    EXPECT_CALL(connection_, write(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
+          // Move the response out of data while preserving the buffer fragment sentinels.
+          local_buffer.move(data);
+        }));
+
+    TestHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+  }
+
+  // Trying to shove a third response in the queue should trigger flood protection.
+  {
+    Http::StreamEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+    codec_->dispatch(buffer);
+
+    TestHeaderMapImpl headers{{":status", "200"}};
+    EXPECT_THROW_WITH_MESSAGE(response_encoder->encodeHeaders(headers, true), FrameFloodException,
+                              "Too many responses queued.");
+    EXPECT_EQ(1, store_.counter("http1.response_flood").value());
+  }
+}
+
+TEST_F(Http1ServerConnectionImplTest, FloodProtectionOff) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http1_flood_protection", "false"}});
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Buffer::OwnedImpl local_buffer;
+  // With flood protection off, many responses can be queued up.
+  for (int i = 0; i < 4; ++i) {
+    Http::StreamEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+    codec_->dispatch(buffer);
+    EXPECT_EQ(0U, buffer.length());
+
+    // In most tests the write output is serialized to a buffer here it is
+    // ignored to build up queued "end connection" sentinels.
+    EXPECT_CALL(connection_, write(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
+          // Move the response out of data while preserving the buffer fragment sentinels.
+          local_buffer.move(data);
+        }));
+
+    TestHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+  }
+}
+
 TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   initialize();
 

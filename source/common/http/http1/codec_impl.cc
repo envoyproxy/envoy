@@ -198,17 +198,49 @@ void StreamEncoderImpl::endEncode() {
     connection_.buffer().add(LAST_CHUNK);
   }
 
-  connection_.flushOutput();
+  connection_.flushOutput(true);
   connection_.onEncodeComplete();
 }
 
-void ConnectionImpl::flushOutput() {
+void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) {
+  if (!flood_protection_) {
+    return;
+  }
+  // It's messy and complicated to try to tag the final write of an HTTP response for response
+  // tracking for flood protection. Instead, write an empty buffer fragment after the response,
+  // to allow for tracking.
+  // When the response is written out, the fragment will be deleted and the counter will be updated
+  // by ServerConnectionImpl::releaseOutboundResponse()
+  auto fragment =
+      Buffer::OwnedBufferFragmentImpl::create(absl::string_view("", 0), response_buffer_releasor_);
+  output_buffer.addBufferFragment(*fragment.release());
+  ASSERT(outbound_responses_ < max_outbound_responses_);
+  outbound_responses_++;
+}
+
+void ServerConnectionImpl::doFloodProtectionChecks() const {
+  if (!flood_protection_) {
+    return;
+  }
+  // Before sending another response, make sure it won't exceed flood protection thresholds.
+  if (outbound_responses_ >= max_outbound_responses_) {
+    ENVOY_CONN_LOG(trace, "error sending response: Too many pending responses queued", connection_);
+    stats_.response_flood_.inc();
+    throw FrameFloodException("Too many responses queued.");
+  }
+}
+
+void ConnectionImpl::flushOutput(bool end_encode) {
   if (reserved_current_) {
     reserved_iovec_.len_ = reserved_current_ - static_cast<char*>(reserved_iovec_.mem_);
     output_buffer_.commit(&reserved_iovec_, 1);
     reserved_current_ = nullptr;
   }
-
+  if (end_encode) {
+    // If this is an HTTP response in ServerConnectionImpl, track outbound responses for flood
+    // protection
+    maybeAddSentinelBufferFragment(output_buffer_);
+  }
   connection().write(output_buffer_, false);
   ASSERT(0UL == output_buffer_.length());
 }
@@ -260,6 +292,9 @@ static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+  // Do flood checks before attempting to write any responses.
+  flood_checks_();
+
   started_response_ = true;
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
@@ -581,7 +616,18 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
                                            const uint32_t max_request_headers_count)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
                      max_request_headers_count, formatter(settings)),
-      callbacks_(callbacks), codec_settings_(settings) {}
+      callbacks_(callbacks), codec_settings_(settings),
+      response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
+        releaseOutboundResponse(fragment);
+      }),
+      // Pipelining is generally not well supported on the internet and has a series of dangerous
+      // overflow bugs. As such we are disabling it for now, and removing this temporary override if
+      // no one objects. If you use this integer to restore prior behavior, contact the
+      // maintainer team as it will otherwise be removed entirely soon.
+      max_outbound_responses_(
+          Runtime::getInteger("envoy.do_not_use_going_away_max_http2_outbound_responses", 2)),
+      flood_protection_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -681,7 +727,8 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_);
-    active_request_ = std::make_unique<ActiveRequest>(*this, header_key_formatter_.get());
+    active_request_ =
+        std::make_unique<ActiveRequest>(*this, header_key_formatter_.get(), flood_checks_);
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
   }
 }
@@ -750,6 +797,13 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   if (active_request_) {
     active_request_->response_encoder_.runLowWatermarkCallbacks();
   }
+}
+
+void ServerConnectionImpl::releaseOutboundResponse(
+    const Buffer::OwnedBufferFragmentImpl* fragment) {
+  ASSERT(outbound_responses_ >= 1);
+  --outbound_responses_;
+  delete fragment;
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
