@@ -107,12 +107,12 @@ private:
     void closeRemote(bool end_stream);
 
     // ResponseEncoder
-    void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
+    void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
-    void encodeTrailers(const HeaderMap& trailers) override;
+    void encodeTrailers(const ResponseTrailerMap& trailers) override;
     Stream& getStream() override;
     // TODO: implement
-    void encode100ContinueHeaders(const HeaderMap&) override {}
+    void encode100ContinueHeaders(const ResponseHeaderMap&) override {}
     void encodeMetadata(const MetadataMapVector&) override {}
 
   private:
