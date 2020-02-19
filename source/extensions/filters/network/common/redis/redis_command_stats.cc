@@ -72,7 +72,7 @@ Stats::StatName RedisCommandStats::getCommandFromRequest(const RespValue& reques
   case RespType::Null:
     return null_metric_;
   default:
-    std::string to_lower_command = Absl::AsciiStrToLower(request.asString());
+    std::string to_lower_command = absl::AsciiStrToLower(request.asString());
     return stat_name_set_->getBuiltin(to_lower_command, unknown_metric_);
   }
 }
