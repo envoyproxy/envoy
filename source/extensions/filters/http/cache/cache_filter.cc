@@ -37,19 +37,7 @@ CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha:
                          HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache) {}
 
-void CacheFilter::onDestroy() {
-  if (lookup_) {
-    lookup_->onDestroy();
-  }
-  if (insert_) {
-    insert_->onDestroy();
-  }
-  // There should be no more calls to our async callbacks, so they won't be posting any more
-  // callbacks to our dispatcher. However, there may be already posted callbacks in the queue; we
-  // clear decoder_callbacks_ so they'll see that this filter is no longer active(), and will just
-  // return.
-  decoder_callbacks_ = nullptr;
-}
+void CacheFilter::onDestroy() {}
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
@@ -63,7 +51,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   ASSERT(lookup_);
 
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
-  lookup_->getHeaders([this](LookupResult&& result) { onHeadersAsync(std::move(result)); });
+  lookup_->getHeaders([this](LookupResult&& result) { onHeaders(std::move(result)); });
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -113,28 +101,15 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       getBody();
     } else {
       lookup_->getTrailers(
-          [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailersAsync(std::move(trailers)); });
+          [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailers(std::move(trailers)); });
     }
   }
-}
-
-void CacheFilter::onHeadersAsync(LookupResult&& result) {
-  post([this, status = result.cache_entry_status_, headers = result.headers_.release(),
-        response_ranges = std::move(result.response_ranges_),
-        content_length = result.content_length_, has_trailers = result.has_trailers_] {
-    onHeaders(LookupResult{status, absl::WrapUnique(headers), content_length, response_ranges,
-                           has_trailers});
-  });
 }
 
 void CacheFilter::getBody() {
   ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
   lookup_->getBody(remaining_body_[0],
-                   [this](Buffer::InstancePtr&& body) { onBodyAsync(std::move(body)); });
-}
-
-void CacheFilter::onBodyAsync(Buffer::InstancePtr&& body) {
-  post([this, body = body.release()] { onBody(absl::WrapUnique(body)); });
+                   [this](Buffer::InstancePtr&& body) { onBody(std::move(body)); });
 }
 
 // TODO(toddmgreer): Handle downstream backpressure.
@@ -164,7 +139,7 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
     getBody();
   } else if (response_has_trailers_) {
     lookup_->getTrailers(
-        [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailersAsync(std::move(trailers)); });
+        [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailers(std::move(trailers)); });
   }
 }
 
@@ -172,14 +147,6 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (active()) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   }
-}
-
-void CacheFilter::onTrailersAsync(Http::ResponseTrailerMapPtr&& trailers) {
-  post([this, trailers = trailers.release()] { onTrailers(absl::WrapUnique(trailers)); });
-}
-
-void CacheFilter::post(std::function<void()> f) const {
-  decoder_callbacks_->dispatcher().post(std::move(f));
 }
 } // namespace Cache
 } // namespace HttpFilters

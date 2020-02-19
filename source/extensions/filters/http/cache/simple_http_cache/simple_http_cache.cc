@@ -37,7 +37,6 @@ public:
   }
 
   const LookupRequest& request() const { return request_; }
-  void onDestroy() override {}
 
 private:
   SimpleHttpCache& cache_;

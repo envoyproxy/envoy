@@ -38,15 +38,11 @@ public:
 
 private:
   void getBody();
-  void post(std::function<void()> f) const;
   bool active() const { return decoder_callbacks_; }
 
   void onHeaders(LookupResult&& result);
-  void onHeadersAsync(LookupResult&& result);
   void onBody(Buffer::InstancePtr&& body);
-  void onBodyAsync(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
-  void onTrailersAsync(Http::ResponseTrailerMapPtr&& trailers);
 
   // These don't require private access, but are members per envoy convention.
   static bool isCacheableRequest(Http::RequestHeaderMap& headers);
