@@ -220,6 +220,11 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
+   * Flush the server stats
+   */
+  virtual void flushStats() PURE;
+
+  /**
    * @return ProtobufMessage::ValidationContext& validation context for configuration
    *         messages.
    */
