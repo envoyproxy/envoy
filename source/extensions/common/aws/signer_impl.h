@@ -50,11 +50,11 @@ public:
         time_source_(time_source), long_date_formatter_(SignatureConstants::get().LongDateFormat),
         short_date_formatter_(SignatureConstants::get().ShortDateFormat) {}
 
-  void sign(Http::Message& message, bool sign_body = false) override;
-  void sign(Http::HeaderMap& headers) override;
+  void sign(Http::RequestMessage& message, bool sign_body = false) override;
+  void sign(Http::RequestHeaderMap& headers) override;
 
 private:
-  std::string createContentHash(Http::Message& message, bool sign_body) const;
+  std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
 
   std::string createCredentialScope(absl::string_view short_date) const;
 
@@ -69,7 +69,7 @@ private:
                                         const std::map<std::string, std::string>& canonical_headers,
                                         absl::string_view signature) const;
 
-  void sign(Http::HeaderMap& headers, const std::string& content_hash);
+  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash);
 
   const std::string service_name_;
   const std::string region_;

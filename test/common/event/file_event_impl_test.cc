@@ -33,7 +33,7 @@ public:
   }
 
 protected:
-  int fds_[2];
+  os_fd_t fds_[2];
   Api::ApiPtr api_;
   DispatcherPtr dispatcher_;
 };
@@ -45,7 +45,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, FileEventImplActivateTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(FileEventImplActivateTest, Activate) {
-  int fd;
+  os_fd_t fd;
   if (GetParam() == Network::Address::IpVersion::v4) {
     fd = socket(AF_INET, SOCK_STREAM, 0);
   } else {

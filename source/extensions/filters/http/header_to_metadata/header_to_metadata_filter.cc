@@ -54,7 +54,8 @@ HeaderToMetadataFilter::HeaderToMetadataFilter(const ConfigSharedPtr config) : c
 
 HeaderToMetadataFilter::~HeaderToMetadataFilter() = default;
 
-Http::FilterHeadersStatus HeaderToMetadataFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus HeaderToMetadataFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                                bool) {
   if (config_->doRequest()) {
     writeHeaderToMetadata(headers, config_->requestRules(), *decoder_callbacks_);
   }
@@ -67,7 +68,8 @@ void HeaderToMetadataFilter::setDecoderFilterCallbacks(
   decoder_callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus HeaderToMetadataFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus HeaderToMetadataFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                                bool) {
   if (config_->doResponse()) {
     writeHeaderToMetadata(headers, config_->responseRules(), *encoder_callbacks_);
   }

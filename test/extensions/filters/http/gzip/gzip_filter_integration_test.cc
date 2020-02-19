@@ -96,14 +96,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GzipIntegrationTest,
  */
 TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
   initializeFilter(default_config);
-  doRequestAndCompression(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                  {":path", "/test/long/url"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"accept-encoding", "deflate, gzip"}},
-                          Http::TestHeaderMapImpl{{":status", "200"},
-                                                  {"content-length", "4400"},
-                                                  {"content-type", "text/xml"}});
+  doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                         {":path", "/test/long/url"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"accept-encoding", "deflate, gzip"}},
+                          Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                          {"content-length", "4400"},
+                                                          {"content-type", "text/xml"}});
 }
 
 /**
@@ -111,14 +111,14 @@ TEST_P(GzipIntegrationTest, AcceptanceDefaultConfigTest) {
  */
 TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
   initializeFilter(full_config);
-  doRequestAndCompression(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                  {":path", "/test/long/url"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"accept-encoding", "deflate, gzip"}},
-                          Http::TestHeaderMapImpl{{":status", "200"},
-                                                  {"content-length", "4400"},
-                                                  {"content-type", "application/json"}});
+  doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                         {":path", "/test/long/url"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"accept-encoding", "deflate, gzip"}},
+                          Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                          {"content-length", "4400"},
+                                                          {"content-type", "application/json"}});
 }
 
 /**
@@ -126,14 +126,14 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
  */
 TEST_P(GzipIntegrationTest, IdentityAcceptEncoding) {
   initializeFilter(default_config);
-  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                    {":path", "/test/long/url"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"accept-encoding", "identity"}},
-                            Http::TestHeaderMapImpl{{":status", "200"},
-                                                    {"content-length", "128"},
-                                                    {"content-type", "text/plain"}});
+  doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"accept-encoding", "identity"}},
+                            Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                            {"content-length", "128"},
+                                                            {"content-type", "text/plain"}});
 }
 
 /**
@@ -141,14 +141,14 @@ TEST_P(GzipIntegrationTest, IdentityAcceptEncoding) {
  */
 TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
   initializeFilter(default_config);
-  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                    {":path", "/test/long/url"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"accept-encoding", "deflate, br"}},
-                            Http::TestHeaderMapImpl{{":status", "200"},
-                                                    {"content-length", "128"},
-                                                    {"content-type", "text/plain"}});
+  doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"accept-encoding", "deflate, br"}},
+                            Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                            {"content-length", "128"},
+                                                            {"content-type", "text/plain"}});
 }
 
 /**
@@ -156,16 +156,16 @@ TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
  */
 TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
   initializeFilter(default_config);
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"accept-encoding", "deflate, gzip"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {"content-encoding", "br"},
-                                           {"content-length", "128"},
-                                           {"content-type", "application/json"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-encoding", "br"},
+                                                   {"content-length", "128"},
+                                                   {"content-type", "application/json"}};
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 128);
 
@@ -182,13 +182,13 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
  */
 TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
   initializeFilter(default_config);
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"accept-encoding", "deflate, gzip"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
 
-  Http::TestHeaderMapImpl response_headers{
+  Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"}, {"content-length", "10"}, {"content-type", "application/json"}};
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 10);
@@ -206,13 +206,13 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
  */
 TEST_P(GzipIntegrationTest, EmptyResponse) {
   initializeFilter(default_config);
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"accept-encoding", "deflate, gzip"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
 
-  Http::TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "0"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "0"}};
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
 
@@ -229,14 +229,14 @@ TEST_P(GzipIntegrationTest, EmptyResponse) {
  */
 TEST_P(GzipIntegrationTest, SkipOnContentType) {
   initializeFilter(full_config);
-  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                    {":path", "/test/long/url"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"accept-encoding", "deflate, gzip"}},
-                            Http::TestHeaderMapImpl{{":status", "200"},
-                                                    {"content-length", "128"},
-                                                    {"content-type", "application/xml"}});
+  doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"accept-encoding", "deflate, gzip"}},
+                            Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                            {"content-length", "128"},
+                                                            {"content-type", "application/xml"}});
 }
 
 /**
@@ -244,15 +244,15 @@ TEST_P(GzipIntegrationTest, SkipOnContentType) {
  */
 TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
   initializeFilter(full_config);
-  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                    {":path", "/test/long/url"},
-                                                    {":scheme", "http"},
-                                                    {":authority", "host"},
-                                                    {"accept-encoding", "deflate, gzip"}},
-                            Http::TestHeaderMapImpl{{":status", "200"},
-                                                    {"content-length", "128"},
-                                                    {"cache-control", "no-transform"},
-                                                    {"content-type", "application/json"}});
+  doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/test/long/url"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"accept-encoding", "deflate, gzip"}},
+                            Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                            {"content-length", "128"},
+                                                            {"cache-control", "no-transform"},
+                                                            {"content-type", "application/json"}});
 }
 
 /**
@@ -260,14 +260,14 @@ TEST_P(GzipIntegrationTest, SkipOnCacheControl) {
  */
 TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
   initializeFilter(full_config);
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"accept-encoding", "deflate, gzip"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {"content-type", "application/json"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/json"}};
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
 
@@ -284,13 +284,13 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
  */
 TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
   initializeFilter(default_config);
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"accept-encoding", "deflate, gzip"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
 
-  Http::TestHeaderMapImpl response_headers{
+  Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"}, {"content-type", "application/json"}, {"vary", "Cookie"}};
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);

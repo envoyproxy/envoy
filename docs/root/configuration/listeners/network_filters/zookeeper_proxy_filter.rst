@@ -31,7 +31,7 @@ in the configuration snippet below:
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.network.zookeeper_proxy.v1alpha1.ZooKeeperProxy
         stat_prefix: zookeeper
-    - name: envoy.tcp_proxy
+    - name: envoy.filters.network.tcp_proxy
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
         stat_prefix: tcp

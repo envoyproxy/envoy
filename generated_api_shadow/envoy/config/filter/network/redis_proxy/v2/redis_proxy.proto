@@ -236,7 +236,7 @@ message RedisProxy {
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
 // :ref:`typed_extension_protocol_options<envoy_api_field_Cluster.typed_extension_protocol_options>`,
-// keyed by the name `envoy.redis_proxy`.
+// keyed by the name `envoy.filters.network.redis_proxy`.
 message RedisProtocolOptions {
   // Upstream server password as defined by the `requirepass` directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.

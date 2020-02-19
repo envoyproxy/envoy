@@ -139,7 +139,7 @@ TEST_F(RequestCodecUnitTest, shouldPassParsedMessageToCallbackAndInitializeNextP
   putGarbageIntoBuffer();
 
   const AbstractRequestSharedPtr parsed_message =
-      std::make_shared<Request<int32_t>>(RequestHeader(), 0);
+      std::make_shared<Request<int32_t>>(RequestHeader{0, 0, 0, absl::nullopt}, 0);
 
   MockParserSharedPtr parser1 = std::make_shared<MockParser>();
   EXPECT_CALL(*parser1, parse(_))
@@ -170,7 +170,7 @@ TEST_F(RequestCodecUnitTest, shouldPassParseFailureDataToCallback) {
   putGarbageIntoBuffer();
 
   const RequestParseFailureSharedPtr failure_data =
-      std::make_shared<RequestParseFailure>(RequestHeader());
+      std::make_shared<RequestParseFailure>(RequestHeader{0, 0, 0, absl::nullopt});
 
   MockParserSharedPtr parser = std::make_shared<MockParser>();
   auto consume_and_return = [&failure_data](absl::string_view& data) -> RequestParseResponse {

@@ -86,7 +86,7 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     TestUtility::validate(input.config());
     ConfigImpl config(cleanRouteConfig(input.config()), factory_context,
                       ProtobufMessage::getNullValidationVisitor(), true);
-    Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(input.headers());
+    auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
     auto route = config.route(headers, stream_info, input.random_value());
     if (route != nullptr && route->routeEntry() != nullptr) {
       route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);

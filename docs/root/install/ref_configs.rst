@@ -34,7 +34,7 @@ To generate the example configurations run the following from the root of the re
 
   mkdir -p generated/configs
   bazel build //configs:example_configs
-  tar xvf $PWD/bazel-genfiles/configs/example_configs.tar -C generated/configs
+  tar xvf $PWD/bazel-out/k8-fastbuild/bin/configs/example_configs.tar -C generated/configs
 
 The previous command will produce three fully expanded configurations using some variables
 defined inside of `configgen.py`. See the comments inside of `configgen.py` for detailed
