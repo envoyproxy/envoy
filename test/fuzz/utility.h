@@ -78,8 +78,8 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
   return processed;
 }
 
-// Convert from test proto Headers to a variant of TestHeaderMapImpl. Validate proto if you intend to sanitize
-// for invalid header characters.
+// Convert from test proto Headers to a variant of TestHeaderMapImpl. Validate proto if you intend
+// to sanitize for invalid header characters.
 template <class T>
 inline T fromHeaders(
     const test::fuzz::Headers& headers,
