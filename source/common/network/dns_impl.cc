@@ -72,7 +72,7 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
 }
 
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
-  options->sock_state_cb = [](void* arg, int fd, int read, int write) {
+  options->sock_state_cb = [](void* arg, os_fd_t fd, int read, int write) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
@@ -84,6 +84,13 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
+    // This destruction might have been triggered by a peer PendingResolution that received a
+    // ARES_ECONNREFUSED. If the PendingResolution has not been cancelled that means that the
+    // callback_ target _should_ still be around. In that case, raise the callback_ so the target
+    // can be done with this query and initiate a new one.
+    if (!cancelled_) {
+      callback_({});
+    }
     delete this;
     return;
   }
@@ -189,14 +196,14 @@ void DnsResolverImpl::updateAresTimer() {
   }
 }
 
-void DnsResolverImpl::onEventCallback(int fd, uint32_t events) {
+void DnsResolverImpl::onEventCallback(os_fd_t fd, uint32_t events) {
   const ares_socket_t read_fd = events & Event::FileReadyType::Read ? fd : ARES_SOCKET_BAD;
   const ares_socket_t write_fd = events & Event::FileReadyType::Write ? fd : ARES_SOCKET_BAD;
   ares_process_fd(channel_, read_fd, write_fd);
   updateAresTimer();
 }
 
-void DnsResolverImpl::onAresSocketStateChange(int fd, int read, int write) {
+void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
   updateAresTimer();
   auto it = events_.find(fd);
   // Stop tracking events for fd if no more state change events.
@@ -251,8 +258,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     // Enable timer to wake us up if the request times out.
     updateAresTimer();
 
-    // The PendingResolution will self-delete when the request completes
-    // (including if cancelled or if ~DnsResolverImpl() happens).
+    // The PendingResolution will self-delete when the request completes (including if cancelled or
+    // if ~DnsResolverImpl() happens via ares_destroy() and subsequent handling of ARES_EDESTRUCTION
+    // in DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback()).
     pending_resolution->owned_ = true;
     return pending_resolution.release();
   }

@@ -272,11 +272,11 @@ key:
   // No scope key matches "xyz-route".
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestHeaderMapImpl{{":method", "GET"},
-                              {":path", "/meh"},
-                              {":authority", "host"},
-                              {":scheme", "http"},
-                              {"Addr", "x-foo-key=xyz-route"}});
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=xyz-route"}});
   response->waitForEndStream();
   verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
@@ -285,12 +285,12 @@ key:
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
   for (const std::string& scope_key : std::vector<std::string>{"foo-route", "bar-route"}) {
     sendRequestAndVerifyResponse(
-        Http::TestHeaderMapImpl{{":method", "GET"},
-                                {":path", "/meh"},
-                                {":authority", "host"},
-                                {":scheme", "http"},
-                                {"Addr", fmt::format("x-foo-key={}", scope_key)}},
-        456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123,
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/meh"},
+                                       {":authority", "host"},
+                                       {":scheme", "http"},
+                                       {"Addr", fmt::format("x-foo-key={}", scope_key)}},
+        456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123,
         /*cluster_0*/ 0);
   }
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
@@ -320,22 +320,22 @@ key:
   // 'cluster_1'.
   for (const std::string& scope_key : std::vector<std::string>{"foo-route", "bar-route"}) {
     sendRequestAndVerifyResponse(
-        Http::TestHeaderMapImpl{{":method", "GET"},
-                                {":path", "/meh"},
-                                {":authority", "host"},
-                                {":scheme", "http"},
-                                {"Addr", fmt::format("x-foo-key={}", scope_key)}},
-        456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123,
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/meh"},
+                                       {":authority", "host"},
+                                       {":scheme", "http"},
+                                       {"Addr", fmt::format("x-foo-key={}", scope_key)}},
+        456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123,
         /*cluster_1*/ 1);
   }
   // Now requests within scope 'foo_scope3' get routed to 'cluster_0'.
   sendRequestAndVerifyResponse(
-      Http::TestHeaderMapImpl{{":method", "GET"},
-                              {":path", "/meh"},
-                              {":authority", "host"},
-                              {":scheme", "http"},
-                              {"Addr", fmt::format("x-foo-key={}", "baz-route")}},
-      456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", fmt::format("x-foo-key={}", "baz-route")}},
+      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
       /*cluster_0*/ 0);
 
   // Delete foo_scope1 and requests within the scope gets 400s.
@@ -343,11 +343,11 @@ key:
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 3);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestHeaderMapImpl{{":method", "GET"},
-                              {":path", "/meh"},
-                              {":authority", "host"},
-                              {":scheme", "http"},
-                              {"Addr", "x-foo-key=foo-route"}});
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
   response->waitForEndStream();
   verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
@@ -358,11 +358,11 @@ key:
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 4);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestHeaderMapImpl{{":method", "GET"},
-                              {":path", "/meh"},
-                              {":authority", "host"},
-                              {":scheme", "http"},
-                              {"Addr", "x-foo-key=xyz-route"}});
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=xyz-route"}});
   response->waitForEndStream();
   // Get 404 because RDS hasn't pushed route configuration "foo_route4" yet.
   // But scope is found and the Router::NullConfigImpl is returned.
@@ -375,12 +375,12 @@ key:
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route4", "cluster_1"), "3");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route4.update_success", 1);
   sendRequestAndVerifyResponse(
-      Http::TestHeaderMapImpl{{":method", "GET"},
-                              {":path", "/meh"},
-                              {":authority", "host"},
-                              {":scheme", "http"},
-                              {"Addr", "x-foo-key=xyz-route"}},
-      456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", "xyz-route"}}, 123,
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=xyz-route"}},
+      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "xyz-route"}}, 123,
       /*cluster_1 */ 1);
 }
 
@@ -403,12 +403,12 @@ key:
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
                                  1);
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response =
-      codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                   {":path", "/meh"},
-                                                                   {":authority", "host"},
-                                                                   {":scheme", "http"},
-                                                                   {"Addr", "x-foo-key=foo"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo"}});
   response->waitForEndStream();
   verifyResponse(std::move(response), "404", Http::TestHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
@@ -436,12 +436,13 @@ key:
   sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
   sendRequestAndVerifyResponse(
-      Http::TestHeaderMapImpl{{":method", "GET"},
-                              {":path", "/meh"},
-                              {":authority", "host"},
-                              {":scheme", "http"},
-                              {"Addr", "x-foo-key=foo"}},
-      456, Http::TestHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123, /*cluster_0*/ 0);
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo"}},
+      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
+      /*cluster_0*/ 0);
 }
 
 } // namespace

@@ -74,7 +74,8 @@ public:
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
 
 private:
   std::shared_ptr<FilterConfig> config_;

@@ -24,7 +24,7 @@ public:
    * @param message supplies the complete request to shadow.
    * @param timeout supplies the shadowed request timeout.
    */
-  virtual void shadow(const std::string& cluster, Http::MessagePtr&& request,
+  virtual void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
                       std::chrono::milliseconds timeout) PURE;
 };
 

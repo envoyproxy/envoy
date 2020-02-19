@@ -29,8 +29,9 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
 // Validate that the client can recover from bad JSON responses.
 TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   startSubscription({"cluster0", "cluster1"});
-  Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
-  Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
+  Http::ResponseHeaderMapPtr response_headers{
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
+  Http::ResponseMessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
   message->body() = std::make_unique<Buffer::OwnedImpl>(";!@#badjso n");
   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
   EXPECT_CALL(*timer_, enableTimer(_, _));

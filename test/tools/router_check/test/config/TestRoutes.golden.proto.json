@@ -324,6 +324,28 @@
           }
         ]
       }
+    },
+    {
+      "test_name": "Header_Fields Response",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/ping",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_redirect": "http://www.lyft.com/ping",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "header_fields": [
+          {
+            "key": "content-type",
+            "value": "text/plain"
+          }
+        ]
+      }
     }
   ]
 }
