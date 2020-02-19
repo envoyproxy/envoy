@@ -38,8 +38,6 @@ public:
 
 private:
   void getBody();
-  bool active() const { return decoder_callbacks_; }
-
   void onHeaders(LookupResult&& result);
   void onBody(Buffer::InstancePtr&& body);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);

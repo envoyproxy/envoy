@@ -76,9 +76,6 @@ Http::FilterDataStatus CacheFilter::encodeData(Buffer::Instance& data, bool end_
 }
 
 void CacheFilter::onHeaders(LookupResult&& result) {
-  if (!active()) {
-    return;
-  }
   switch (result.cache_entry_status_) {
   case CacheEntryStatus::RequiresValidation:
   case CacheEntryStatus::FoundNotModified:
@@ -114,9 +111,6 @@ void CacheFilter::getBody() {
 
 // TODO(toddmgreer): Handle downstream backpressure.
 void CacheFilter::onBody(Buffer::InstancePtr&& body) {
-  if (!active()) {
-    return;
-  }
   ASSERT(!remaining_body_.empty(),
          "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
          "bogus callback.");
@@ -144,9 +138,7 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
 }
 
 void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
-  if (active()) {
-    decoder_callbacks_->encodeTrailers(std::move(trailers));
-  }
+  decoder_callbacks_->encodeTrailers(std::move(trailers));
 }
 } // namespace Cache
 } // namespace HttpFilters
