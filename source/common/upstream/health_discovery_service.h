@@ -125,11 +125,11 @@ public:
               ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override;
   void onReceiveMessage(
       std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse sendResponse();
 

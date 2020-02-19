@@ -112,7 +112,7 @@ TEST_F(KafkaRequestParserTest, RequestDataParserShouldHandleDeserializerExceptio
     int32_t get() const override { throw std::runtime_error("should not be invoked at all"); };
   };
 
-  RequestContextSharedPtr request_context{new RequestContext{1024, {}}};
+  RequestContextSharedPtr request_context{new RequestContext{1024, {0, 0, 0, absl::nullopt}}};
   RequestDataParser<int32_t, ThrowingDeserializer> testee{request_context};
 
   absl::string_view data = putGarbageIntoBuffer();
@@ -146,7 +146,8 @@ TEST_F(KafkaRequestParserTest,
        RequestDataParserShouldHandleDeserializerReturningReadyButLeavingData) {
   // given
   const int32_t request_size = 1024; // There are still 1024 bytes to read to complete the request.
-  RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
+  RequestContextSharedPtr request_context{
+      new RequestContext{request_size, {0, 0, 0, absl::nullopt}}};
 
   RequestDataParser<int32_t, SomeBytesDeserializer> testee{request_context};
 

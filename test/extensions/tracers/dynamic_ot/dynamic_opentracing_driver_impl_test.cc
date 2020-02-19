@@ -40,7 +40,7 @@ public:
   Stats::IsolatedStoreImpl stats_;
 
   const std::string operation_name_{"test"};
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
   NiceMock<Tracing::MockConfig> config_;

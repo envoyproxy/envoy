@@ -93,7 +93,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     return Api::ioCallUint64ResultNoError();
   }
 
-  struct msghdr message;
+  msghdr message;
   message.msg_name = reinterpret_cast<void*>(sock_addr);
   message.msg_namelen = address_base->sockAddrLen();
   message.msg_iov = iov.begin();

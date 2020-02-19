@@ -74,7 +74,7 @@ CsrfFilterConfig::CsrfFilterConfig(
 
 CsrfFilter::CsrfFilter(const CsrfFilterConfigSharedPtr config) : config_(config) {}
 
-Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   determinePolicy();
 
   if (!policy_->enabled() && !policy_->shadowEnabled()) {

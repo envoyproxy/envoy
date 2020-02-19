@@ -39,7 +39,7 @@ TEST_F(QuicIoHandleWrapperTest, Close) {
 }
 
 TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
-  int fd = socket_.ioHandle().fd();
+  os_fd_t fd = socket_.ioHandle().fd();
   char data[5];
   Buffer::RawSlice slice{data, 5};
   EXPECT_CALL(os_sys_calls_, readv(fd, _, 1)).WillOnce(Return(Api::SysCallSizeResult{5u, 0}));
@@ -49,7 +49,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   wrapper_->writev(&slice, 1);
 
   EXPECT_CALL(os_sys_calls_, socket(AF_INET6, SOCK_STREAM, 0))
-      .WillRepeatedly(Return(Api::SysCallIntResult{1, 0}));
+      .WillRepeatedly(Return(Api::SysCallSocketResult{1, 0}));
   EXPECT_CALL(os_sys_calls_, close(1)).WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
 
   Network::Address::InstanceConstSharedPtr addr(new Network::Address::Ipv4Instance(12345));
@@ -57,7 +57,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
 
   Network::IoHandle::RecvMsgOutput output(nullptr);
-  EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, 0)).WillOnce(Invoke([](int, struct msghdr* msg, int) {
+  EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, 0)).WillOnce(Invoke([](os_fd_t, msghdr* msg, int) {
     sockaddr_storage ss;
     auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
     memset(ipv6_addr, 0, sizeof(sockaddr_in6));
