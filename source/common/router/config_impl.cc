@@ -164,8 +164,7 @@ Upstream::RetryHeaderSharedPtr RetryPolicyImpl::retryHeader() const {
   }
 
   return retry_header_config_.first->createRetryHeader(*retry_header_config_.second,
-                                                       *validation_visitor_, retry_on_,
-                                                       retriable_status_codes_, retriable_headers_);
+                                                       *validation_visitor_);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,

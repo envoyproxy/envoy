@@ -19,9 +19,7 @@ public:
 
   Upstream::RetryHeaderSharedPtr
   createRetryHeader(const Protobuf::Message& config,
-                    ProtobufMessage::ValidationVisitor& validation_visitor, const uint32_t retry_on,
-                    const std::vector<uint32_t>& retriable_status_codes,
-                    const std::vector<Http::HeaderMatcherSharedPtr>& retriable_headers) override;
+                    ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr(
