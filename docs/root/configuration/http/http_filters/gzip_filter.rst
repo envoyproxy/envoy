@@ -46,7 +46,7 @@ By *default* compression will be *skipped* when:
   is "gzip;q=0,\*;q=1", the filter will not compress. But if the header is set to
   "\*;q=0,gzip;q=1", the filter will compress.
 - A request whose *accept-encoding* header includes any encoding type with a higher
-  weight than "gzip"'s.
+  weight than "gzip"'s given the corresponding compression filter is present in the chain.
 - A response contains a *content-encoding* header.
 - A response contains a *cache-control* header whose value includes "no-transform".
 - A response contains a *transfer-encoding* header whose value includes "gzip".
