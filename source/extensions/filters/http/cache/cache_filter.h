@@ -29,9 +29,11 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override;
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
 
 private:
@@ -43,12 +45,12 @@ private:
   void onHeadersAsync(LookupResult&& result);
   void onBody(Buffer::InstancePtr&& body);
   void onBodyAsync(Buffer::InstancePtr&& body);
-  void onTrailers(Http::HeaderMapPtr&& trailers);
-  void onTrailersAsync(Http::HeaderMapPtr&& trailers);
+  void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
+  void onTrailersAsync(Http::ResponseTrailerMapPtr&& trailers);
 
   // These don't require private access, but are members per envoy convention.
-  static bool isCacheableRequest(Http::HeaderMap& headers);
-  static bool isCacheableResponse(Http::HeaderMap& headers);
+  static bool isCacheableRequest(Http::RequestHeaderMap& headers);
+  static bool isCacheableResponse(Http::ResponseHeaderMap& headers);
 
   TimeSource& time_source_;
   HttpCache& cache_;

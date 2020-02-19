@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-bool CacheFilter::isCacheableRequest(Http::HeaderMap& headers) {
+bool CacheFilter::isCacheableRequest(Http::RequestHeaderMap& headers) {
   const Http::HeaderEntry* method = headers.Method();
   const Http::HeaderEntry* forwarded_proto = headers.ForwardedProto();
   const Http::HeaderValues& header_values = Http::Headers::get();
@@ -21,7 +21,7 @@ bool CacheFilter::isCacheableRequest(Http::HeaderMap& headers) {
           forwarded_proto->value() == header_values.SchemeValues.Https);
 }
 
-bool CacheFilter::isCacheableResponse(Http::HeaderMap& headers) {
+bool CacheFilter::isCacheableResponse(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   // TODO(toddmgreer): fully check for cacheability. See for example
   // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/caching_headers.h.
@@ -49,7 +49,7 @@ void CacheFilter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
   if (!isCacheableRequest(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
@@ -65,7 +65,8 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::HeaderMap& headers, b
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                     bool end_stream) {
   if (lookup_ && isCacheableResponse(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeHeaders inserting headers", *encoder_callbacks_);
     insert_ = cache_.makeInsertContext(std::move(lookup_));
@@ -110,7 +111,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
       getBody();
     } else {
       lookup_->getTrailers(
-          [this](Http::HeaderMapPtr&& trailers) { onTrailersAsync(std::move(trailers)); });
+          [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailersAsync(std::move(trailers)); });
     }
   }
 }
@@ -169,17 +170,17 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
     getBody();
   } else if (response_has_trailers_) {
     lookup_->getTrailers(
-        [this](Http::HeaderMapPtr&& trailers) { onTrailersAsync(std::move(trailers)); });
+        [this](Http::ResponseTrailerMapPtr&& trailers) { onTrailersAsync(std::move(trailers)); });
   }
 }
 
-void CacheFilter::onTrailers(Http::HeaderMapPtr&& trailers) {
+void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   if (active()) {
     decoder_callbacks_->encodeTrailers(std::move(trailers));
   }
 }
 
-void CacheFilter::onTrailersAsync(Http::HeaderMapPtr&& trailers) {
+void CacheFilter::onTrailersAsync(Http::ResponseTrailerMapPtr&& trailers) {
   post([this, trailers = trailers.release()] { onTrailers(absl::WrapUnique(trailers)); });
 }
 
