@@ -14,6 +14,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/versioning.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -741,7 +742,7 @@ message RouteAction {
   //
   // Only one of *prefix_rewrite* or
   // :ref:`regex_rewrite <envoy_api_field_config.route.v3.RouteAction.regex_rewrite>`
-  // should be specified.  If both are specified, *prefix_rewrite* take precedence.
+  // may be specified.
   //
   // .. attention::
   //
@@ -764,7 +765,7 @@ message RouteAction {
   //
   //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
   //   requests to */prefix/etc* will be stripped to */etc*.
-  string prefix_rewrite = 5;
+  string prefix_rewrite = 5 [(udpa.annotations.field_migrate).oneof_promotion = "path_rewrite"];
 
   // Indicates that during forwarding, portions of the path that match the
   // pattern should be rewritten, even allowing the substitution of capture
@@ -776,8 +777,7 @@ message RouteAction {
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
   // Only one of :ref:`prefix_rewrite <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`
-  // or *regex_rewrite* should be specified.  If both are specified,
-  // *prefix_rewrite* take precedence.
+  // or *regex_rewrite* may be specified.
   //
   // Examples:
   //
@@ -795,7 +795,8 @@ message RouteAction {
   // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
   //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
   //   ``/aaa/yyy/bbb``.
-  RegexRewrite regex_rewrite = 32;
+  RegexRewrite regex_rewrite = 32
+      [(udpa.annotations.field_migrate).oneof_promotion = "path_rewrite"];
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with

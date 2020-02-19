@@ -381,6 +381,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (route.route().has_regex_rewrite()) {
+    if (!prefix_rewrite_.empty()) {
+      throw EnvoyException("Cannot specify both prefix_rewrite and regex_rewrite");
+    }
     auto rewrite_spec = route.route().regex_rewrite();
     regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
