@@ -254,6 +254,7 @@ public:
   virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
 
   // Reads the next chunk from the cache, calling cb when the chunk is ready.
+  // The Buffer::InstancePtr passed to cb must not be null.
   //
   // The cache must call cb with a range of bytes starting at range.start() and
   // ending at or before range.end(). Caller is responsible for tracking what
@@ -271,8 +272,8 @@ public:
   // getBody requests bytes 20-23 .......... callback with bytes 20-23
   virtual void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) PURE;
 
-  // Get the trailers from the cache. Only called if LookupResult::has_trailers
-  // == true.
+  // Get the trailers from the cache. Only called if LookupResult::has_trailers == true. The
+  // Http::ResponseTrailerMapPtr passed to cb must not be null.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
 
   /**

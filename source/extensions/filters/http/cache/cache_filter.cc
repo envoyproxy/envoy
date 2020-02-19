@@ -38,15 +38,17 @@ CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha:
     : time_source_(time_source), cache_(http_cache) {}
 
 void CacheFilter::onDestroy() {
-  // Clear decoder_callbacks_ so any pending callbacks will see that this filter is no longer
-  // active().
-  decoder_callbacks_ = nullptr;
   if (lookup_) {
     lookup_->onDestroy();
   }
   if (insert_) {
     insert_->onDestroy();
   }
+  // There should be no more calls to our async callbacks, so they won't be posting any more
+  // callbacks to our dispatcher. However, there may be already posted callbacks in the queue; we
+  // clear decoder_callbacks_ so they'll see that this filter is no longer active(), and will just
+  // return.
+  decoder_callbacks_ = nullptr;
 }
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
@@ -128,7 +130,7 @@ void CacheFilter::onHeadersAsync(LookupResult&& result) {
 void CacheFilter::getBody() {
   ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
   lookup_->getBody(remaining_body_[0],
-                   [this](Buffer::InstancePtr&& body) { onBody(std::move(body)); });
+                   [this](Buffer::InstancePtr&& body) { onBodyAsync(std::move(body)); });
 }
 
 void CacheFilter::onBodyAsync(Buffer::InstancePtr&& body) {
@@ -140,18 +142,10 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
   if (!active()) {
     return;
   }
-  if (remaining_body_.empty()) {
-    ASSERT(false, "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
-                  "bogus callback.");
-    decoder_callbacks_->resetStream();
-    return;
-  }
-
-  if (!body) {
-    ASSERT(false, "Cache said it had a body, but isn't giving it to us.");
-    decoder_callbacks_->resetStream();
-    return;
-  }
+  ASSERT(!remaining_body_.empty(),
+         "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
+         "bogus callback.");
+  ASSERT(body, "Cache said it had a body, but isn't giving it to us.");
 
   const uint64_t bytes_from_cache = body->length();
   if (bytes_from_cache < remaining_body_[0].length()) {
