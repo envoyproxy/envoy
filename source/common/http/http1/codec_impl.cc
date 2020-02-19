@@ -95,7 +95,7 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
   }
 }
 
-void ResponseEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
+void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   processing_100_continue_ = true;
   encodeHeaders(headers, false);
@@ -275,7 +275,7 @@ const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLoc
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
-void ResponseEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
   started_response_ = true;
 
   // The contract is that client codecs must ensure that :status is present.
@@ -311,7 +311,7 @@ void ResponseEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_strea
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
-void RequestEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   if (!method || !path) {
@@ -880,6 +880,10 @@ int ClientConnectionImpl::onHeadersComplete() {
       // Swallow the spurious onMessageComplete and continue processing.
       ignore_message_complete_for_100_continue_ = true;
       pending_responses_.front().decoder_->decode100ContinueHeaders(std::move(headers));
+
+      // Reset to ensure no information from the continue headers is used for the response headers
+      // in case the callee does not move the headers out.
+      headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
     } else if (cannotHaveBody()) {
       deferred_end_stream_headers_ = true;
     } else {

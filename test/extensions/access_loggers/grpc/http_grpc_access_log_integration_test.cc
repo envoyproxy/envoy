@@ -43,7 +43,7 @@ public:
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           auto* access_log = hcm.add_access_log();
-          access_log->set_name("envoy.access_loggers.http_grpc");
+          access_log->set_name("grpc_accesslog");
 
           envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();

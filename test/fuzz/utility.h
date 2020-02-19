@@ -78,12 +78,13 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
   return processed;
 }
 
-// Convert from test proto Headers to TestHeaderMapImpl. Validate proto if you intend to sanitize
+// Convert from test proto Headers to a variant of TestHeaderMapImpl. Validate proto if you intend to sanitize
 // for invalid header characters.
-inline Http::TestHeaderMapImpl fromHeaders(
+template <class T>
+inline T fromHeaders(
     const test::fuzz::Headers& headers,
     const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
-  Http::TestHeaderMapImpl header_map;
+  T header_map;
   for (const auto& header : headers.headers()) {
     if (ignore_headers.find(StringUtil::toLower(header.key())) == ignore_headers.end()) {
       header_map.addCopy(header.key(), header.value());

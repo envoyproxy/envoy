@@ -52,7 +52,7 @@ public:
         createClientConnection_(address, source_address, transport_socket, options)};
   }
 
-  FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+  FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override {
     return FileEventPtr{createFileEvent_(fd, cb, trigger, events)};
   }
@@ -99,7 +99,7 @@ public:
               (const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                const bool use_tcp_for_dns_lookups));
   MOCK_METHOD(FileEvent*, createFileEvent_,
-              (int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
+              (os_fd_t fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::ListenerCallbacks& cb,

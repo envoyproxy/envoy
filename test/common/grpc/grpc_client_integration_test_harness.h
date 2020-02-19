@@ -134,7 +134,7 @@ public:
   }
 
   void sendServerInitialMetadata(const TestMetadata& metadata) {
-    Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
+    Http::HeaderMapPtr reply_headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
     for (auto& value : metadata) {
       reply_headers->addReference(value.first, value.second);
     }

@@ -23,7 +23,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (enabled_) {
     start_decode_ = time_source_.monotonicTime();
     operation_ = RequestParser::parseOperation(headers);
@@ -46,7 +46,7 @@ Http::FilterDataStatus DynamoFilter::decodeData(Buffer::Instance& data, bool end
   }
 }
 
-Http::FilterTrailersStatus DynamoFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus DynamoFilter::decodeTrailers(Http::RequestTrailerMap&) {
   if (enabled_) {
     Buffer::OwnedImpl empty;
     onDecodeComplete(empty);
@@ -95,7 +95,8 @@ void DynamoFilter::onEncodeComplete(const Buffer::Instance& data) {
   }
 }
 
-Http::FilterHeadersStatus DynamoFilter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus DynamoFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                      bool end_stream) {
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
   if (enabled_) {
     response_headers_ = &headers;
@@ -124,7 +125,7 @@ Http::FilterDataStatus DynamoFilter::encodeData(Buffer::Instance& data, bool end
   }
 }
 
-Http::FilterTrailersStatus DynamoFilter::encodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus DynamoFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (enabled_) {
     Buffer::OwnedImpl empty;
     onEncodeComplete(empty);
