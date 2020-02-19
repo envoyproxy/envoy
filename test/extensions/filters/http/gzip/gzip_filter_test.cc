@@ -132,7 +132,7 @@ protected:
     EXPECT_EQ(28, config_->windowBits());
     EXPECT_EQ(false, config_->disableOnEtagHeader());
     EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
-    EXPECT_EQ(8, config_->contentTypeValues().size());
+    EXPECT_EQ(18, config_->contentTypeValues().size());
   }
 
   void doResponseNoCompression(Http::TestResponseHeaderMapImpl&& headers) {
@@ -183,7 +183,7 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
             config_->compressionStrategy());
   EXPECT_EQ(Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
             config_->compressionLevel());
-  EXPECT_EQ(8, config_->contentTypeValues().size());
+  EXPECT_EQ(18, config_->contentTypeValues().size());
 }
 
 TEST_F(GzipFilterTest, AvailableCombinationCompressionStrategyAndLevelConfig) {

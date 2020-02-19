@@ -172,7 +172,7 @@ TEST_F(CompressorFilterTest, DefaultConfigValues) {
   EXPECT_EQ(30, config_->minimumLength());
   EXPECT_EQ(false, config_->disableOnEtagHeader());
   EXPECT_EQ(false, config_->removeAcceptEncodingHeader());
-  EXPECT_EQ(8, config_->contentTypeValues().size());
+  EXPECT_EQ(18, config_->contentTypeValues().size());
 }
 
 // Acceptance Testing with default configuration.
