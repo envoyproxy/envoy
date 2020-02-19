@@ -13,10 +13,10 @@ public class EnvoyHTTPStream {
   private final long streamHandle;
   private final JvmCallbackContext callbacksContext;
 
-  EnvoyHTTPStream(long streamHandle, EnvoyHTTPCallbacks callbacks, boolean bufferForRetry) {
+  EnvoyHTTPStream(long streamHandle, EnvoyHTTPCallbacks callbacks) {
     this.streamHandle = streamHandle;
     callbacksContext = new JvmCallbackContext(callbacks);
-    JniLibrary.startStream(streamHandle, callbacksContext, bufferForRetry);
+    JniLibrary.startStream(streamHandle, callbacksContext);
   }
 
   /**

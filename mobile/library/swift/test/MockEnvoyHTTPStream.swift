@@ -5,18 +5,14 @@ final class MockEnvoyHTTPStream {
   static var onHeaders: (([String: [String]], Bool) -> Void)?
   static var onData: ((Data, Bool) -> Void)?
   static var onTrailers: (([String: [String]]) -> Void)?
-  private(set) static var bufferForRetry: Bool?
 
-  init(handle: Int, callbacks: EnvoyHTTPCallbacks, bufferForRetry: Bool) {
-    MockEnvoyHTTPStream.bufferForRetry = bufferForRetry
-  }
+  init(handle: Int, callbacks: EnvoyHTTPCallbacks) {}
 
   /// Reset the current state of the stream. Should be called between tests.
   static func reset() {
     self.onHeaders = nil
     self.onData = nil
     self.onTrailers = nil
-    self.bufferForRetry = nil
   }
 }
 

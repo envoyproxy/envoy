@@ -37,11 +37,9 @@ public:
    * there is no guarantee it will ever functionally represent an open stream.
    * @param stream, the stream to start.
    * @param bridge_callbacks, wrapper for callbacks for events on this stream.
-   * @param stream_options, the config options to start the stream with.
    * @return envoy_stream_t handle to the stream being created.
    */
-  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks,
-                             envoy_stream_options stream_options);
+  envoy_status_t startStream(envoy_stream_t stream, envoy_http_callbacks bridge_callbacks);
 
   /**
    * Send headers over an open HTTP stream. This method can be invoked once and needs to be called

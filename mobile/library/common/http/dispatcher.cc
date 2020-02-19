@@ -286,8 +286,7 @@ Dispatcher::Dispatcher(std::atomic<envoy_network_t>& preferred_network)
       address_(std::make_shared<Network::Address::SyntheticAddressImpl>()) {}
 
 envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle,
-                                       envoy_http_callbacks bridge_callbacks,
-                                       envoy_stream_options) {
+                                       envoy_http_callbacks bridge_callbacks) {
   post([this, new_stream_handle, bridge_callbacks]() -> void {
     Dispatcher::DirectStreamSharedPtr direct_stream{new DirectStream(new_stream_handle, *this)};
     direct_stream->callbacks_ =

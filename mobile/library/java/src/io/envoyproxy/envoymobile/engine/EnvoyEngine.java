@@ -6,13 +6,10 @@ public interface EnvoyEngine {
   /**
    * Creates a new stream with the provided callbacks.
    *
-   * @param callbacks      The callbacks for receiving callbacks from the stream.
-   * @param bufferForRetry Whether this stream should be buffered to support
-   *                       future retries. Must be true for requests that support
-   *                       retrying.
+   * @param callbacks The callbacks for receiving callbacks from the stream.
    * @return A stream that may be used for sending data.
    */
-  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean bufferForRetry);
+  EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks);
 
   /**
    * Run the Envoy engine with the provided yaml string and log level.

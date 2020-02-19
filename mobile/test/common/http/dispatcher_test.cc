@@ -83,7 +83,7 @@ TEST_F(DispatcherTest, PreferredNetwork) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -196,7 +196,7 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -267,7 +267,7 @@ TEST_F(DispatcherTest, BasicStream) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the
@@ -353,7 +353,7 @@ TEST_F(DispatcherTest, MultipleDataStream) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -438,7 +438,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream1, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream1, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -486,7 +486,7 @@ TEST_F(DispatcherTest, MultipleStreams) {
   // Create a stream.
   Event::PostCb start_stream_post_cb2;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb2));
-  EXPECT_EQ(http_dispatcher_.startStream(stream2, bridge_callbacks2, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream2, bridge_callbacks2), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -549,7 +549,7 @@ TEST_F(DispatcherTest, ResetStreamLocal) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -612,7 +612,7 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -674,7 +674,7 @@ TEST_F(DispatcherTest, StreamResetAfterOnComplete) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -746,7 +746,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRaceLocalWins) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -835,7 +835,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWinsDeletesStream) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -923,7 +923,7 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWins) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -1013,7 +1013,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRaceLocalWins) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -1099,7 +1099,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWinsDeletesStream) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -1184,7 +1184,7 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWins) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
@@ -1255,7 +1255,7 @@ TEST_F(DispatcherTest, ResetWhenRemoteClosesBeforeLocal) {
   // Create a stream.
   Event::PostCb start_stream_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&start_stream_post_cb));
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
 
   // Grab the response encoder in order to dispatch responses on the stream.
   // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher

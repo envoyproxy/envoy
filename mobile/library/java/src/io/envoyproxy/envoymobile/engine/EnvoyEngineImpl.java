@@ -14,16 +14,13 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   /**
    * Creates a new stream with the provided callbacks.
    *
-   * @param callbacks      The callbacks for the stream.
-   * @param bufferForRetry Whether this stream should be buffered to support
-   *                       future retries. Must be true for requests that support
-   *                       retrying.
+   * @param callbacks The callbacks for the stream.
    * @return A stream that may be used for sending data.
    */
   @Override
-  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks, boolean bufferForRetry) {
+  public EnvoyHTTPStream startStream(EnvoyHTTPCallbacks callbacks) {
     long streamHandle = JniLibrary.initStream(engineHandle);
-    return new EnvoyHTTPStream(streamHandle, callbacks, bufferForRetry);
+    return new EnvoyHTTPStream(streamHandle, callbacks);
   }
 
   /**
