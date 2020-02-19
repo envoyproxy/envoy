@@ -43,7 +43,7 @@ public:
                   principals:
                     - not_id:
                         any: true
-       -  name: envoy.echo
+       -  name: envoy.filters.network.echo
           config:
 )EOF";
   }

@@ -87,7 +87,7 @@ protected:
 
   SimpleHttpCache cache_;
   LookupResult lookup_result_;
-  Http::TestHeaderMapImpl request_headers_;
+  Http::TestRequestHeaderMapImpl request_headers_;
   Event::SimulatedTimeSystem time_source_;
   SystemTime current_time_ = time_source_.systemTime();
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
@@ -99,8 +99,8 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
   LookupContextPtr name_lookup_context = lookup(RequestPath1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
-                                           {"cache-control", "public,max-age=3600"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"}};
 
   const std::string Body1("Value");
   insert(move(name_lookup_context), response_headers, Body1);
@@ -117,9 +117,9 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
 }
 
 TEST_F(SimpleHttpCacheTest, PrivateResponse) {
-  Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
-                                           {"age", "2"},
-                                           {"cache-control", "private,max-age=3600"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"age", "2"},
+                                                   {"cache-control", "private,max-age=3600"}};
   const std::string request_path("Name");
 
   LookupContextPtr name_lookup_context = lookup(request_path);
@@ -139,8 +139,8 @@ TEST_F(SimpleHttpCacheTest, Miss) {
 }
 
 TEST_F(SimpleHttpCacheTest, Fresh) {
-  const Http::TestHeaderMapImpl response_headers = {{"date", formatter_.fromTime(current_time_)},
-                                                    {"cache-control", "public, max-age=3600"}};
+  const Http::TestResponseHeaderMapImpl response_headers = {
+      {"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   insert("/", response_headers, "");
   time_source_.sleep(std::chrono::seconds(3600));
@@ -149,8 +149,8 @@ TEST_F(SimpleHttpCacheTest, Fresh) {
 }
 
 TEST_F(SimpleHttpCacheTest, Stale) {
-  const Http::TestHeaderMapImpl response_headers = {{"date", formatter_.fromTime(current_time_)},
-                                                    {"cache-control", "public, max-age=3600"}};
+  const Http::TestResponseHeaderMapImpl response_headers = {
+      {"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}};
   // TODO(toddmgreer): Test with various date headers.
   insert("/", response_headers, "");
   time_source_.sleep(std::chrono::seconds(3601));
@@ -164,9 +164,9 @@ TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
-                                           {"age", "6000"},
-                                           {"cache-control", "public, max-age=9000"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"age", "6000"},
+                                                   {"cache-control", "public, max-age=9000"}};
   const std::string Body("Value");
   insert(move(name_lookup_context), response_headers, Body);
   EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path).get(), Body));
@@ -179,9 +179,9 @@ TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
   LookupContextPtr name_lookup_context = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
-                                           {"age", "7200"},
-                                           {"cache-control", "public, max-age=3600"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"age", "7200"},
+                                                   {"cache-control", "public, max-age=3600"}};
 
   const std::string Body("Value");
   insert(move(name_lookup_context), response_headers, Body);
@@ -189,9 +189,9 @@ TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
 }
 
 TEST_F(SimpleHttpCacheTest, StreamingPut) {
-  Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
-                                           {"age", "2"},
-                                           {"cache-control", "public, max-age=3600"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"age", "2"},
+                                                   {"cache-control", "public, max-age=3600"}};
   InsertContextPtr inserter = cache_.makeInsertContext(lookup("request_path"));
   inserter->insertHeaders(response_headers, false);
   inserter->insertBody(

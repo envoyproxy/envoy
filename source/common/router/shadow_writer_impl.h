@@ -20,11 +20,11 @@ public:
   ShadowWriterImpl(Upstream::ClusterManager& cm) : cm_(cm) {}
 
   // Router::ShadowWriter
-  void shadow(const std::string& cluster, Http::MessagePtr&& request,
+  void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
               std::chrono::milliseconds timeout) override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&&) override {}
+  void onSuccess(Http::ResponseMessagePtr&&) override {}
   void onFailure(Http::AsyncClient::FailureReason) override {}
 
 private:

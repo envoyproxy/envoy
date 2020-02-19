@@ -58,7 +58,7 @@ uint32_t CompressorFilterConfig::contentLengthUint(Protobuf::uint32 length) {
 CompressorFilter::CompressorFilter(CompressorFilterConfigSharedPtr config)
     : skip_compression_{true}, compressor_(), config_(std::move(config)) {}
 
-Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (config_->runtime().snapshot().featureEnabled(config_->featureName(), 100) &&
       isAcceptEncodingAllowed(headers)) {
     skip_compression_ = false;
@@ -88,7 +88,7 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   }
 }
 
-Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::HeaderMap& headers,
+Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
   if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
       isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
@@ -115,7 +115,7 @@ Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (!skip_compression_) {
     Buffer::OwnedImpl empty_buffer;
     compressor_->compress(empty_buffer, Compressor::State::Finish);
@@ -125,7 +125,7 @@ Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::HeaderMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-bool CompressorFilter::hasCacheControlNoTransform(Http::HeaderMap& headers) const {
+bool CompressorFilter::hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   if (cache_control) {
     return StringUtil::caseFindToken(cache_control->value().getStringView(), ",",
@@ -164,7 +164,7 @@ CompressorFilter::chooseEncoding(const Http::HeaderEntry* accept_encoding) const
     if (params != token) {
       const auto q_value = StringUtil::cropLeft(params, "=");
       if (q_value != params &&
-          StringUtil::caseCompare("q", StringUtil::trim(StringUtil::cropRight(params, "=")))) {
+          absl::EqualsIgnoreCase("q", StringUtil::trim(StringUtil::cropRight(params, "=")))) {
         auto result = absl::SimpleAtof(StringUtil::trim(q_value), &pair.second);
         if (!result) {
           continue;
@@ -231,10 +231,10 @@ CompressorFilter::chooseEncoding(const Http::HeaderEntry* accept_encoding) const
     }
   }
 
-  if (StringUtil::caseCompare(config_->contentEncoding(), choice.first)) {
+  if (absl::EqualsIgnoreCase(config_->contentEncoding(), choice.first)) {
     config_->stats().header_compressor_used_.inc();
     // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
-    if (StringUtil::caseCompare("gzip", choice.first)) {
+    if (absl::EqualsIgnoreCase("gzip", choice.first)) {
       config_->stats().header_gzip_.inc();
     }
     return std::make_unique<CompressorFilter::EncodingDecision>(
@@ -251,7 +251,7 @@ CompressorFilter::chooseEncoding(const Http::HeaderEntry* accept_encoding) const
       CompressorFilter::EncodingDecision::HeaderStat::NotValid);
 }
 
-bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) const {
+bool CompressorFilter::isAcceptEncodingAllowed(const Http::RequestHeaderMap& headers) const {
   const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
   if (!accept_encoding) {
     config_->stats().no_accept_header_.inc();
@@ -266,10 +266,10 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
   if (filter_state->hasData<CompressorFilter::EncodingDecision>(encoding_decision_key)) {
     const CompressorFilter::EncodingDecision& decision =
         filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
-    if (StringUtil::caseCompare(config_->contentEncoding(), decision.encoding())) {
+    if (absl::EqualsIgnoreCase(config_->contentEncoding(), decision.encoding())) {
       config_->stats().header_compressor_used_.inc();
       // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
-      if (StringUtil::caseCompare("gzip", config_->contentEncoding())) {
+      if (absl::EqualsIgnoreCase("gzip", config_->contentEncoding())) {
         config_->stats().header_gzip_.inc();
       }
       return true;
@@ -293,13 +293,13 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::HeaderMap& headers) c
   }
 
   std::unique_ptr<CompressorFilter::EncodingDecision> decision = chooseEncoding(accept_encoding);
-  bool result = StringUtil::caseCompare(config_->contentEncoding(), decision->encoding());
+  bool result = absl::EqualsIgnoreCase(config_->contentEncoding(), decision->encoding());
   filter_state->setData(encoding_decision_key, std::move(decision),
                         StreamInfo::FilterState::StateType::ReadOnly);
   return result;
 }
 
-bool CompressorFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
+bool CompressorFilter::isContentTypeAllowed(Http::ResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr && !config_->contentTypeValues().empty()) {
     const absl::string_view value =
@@ -310,7 +310,7 @@ bool CompressorFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
   return true;
 }
 
-bool CompressorFilter::isEtagAllowed(Http::HeaderMap& headers) const {
+bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
   const bool is_etag_allowed = !(config_->disableOnEtagHeader() && headers.Etag());
   if (!is_etag_allowed) {
     config_->stats().not_compressed_etag_.inc();
@@ -318,7 +318,7 @@ bool CompressorFilter::isEtagAllowed(Http::HeaderMap& headers) const {
   return is_etag_allowed;
 }
 
-bool CompressorFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
+bool CompressorFilter::isMinimumContentLength(Http::ResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length != nullptr) {
     uint64_t length;
@@ -337,17 +337,17 @@ bool CompressorFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
                                     Http::Headers::get().TransferEncodingValues.Chunked));
 }
 
-bool CompressorFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
+bool CompressorFilter::isTransferEncodingAllowed(Http::ResponseHeaderMap& headers) const {
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   if (transfer_encoding != nullptr) {
     for (absl::string_view header_value :
          StringUtil::splitToken(transfer_encoding->value().getStringView(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
-      if (StringUtil::caseCompare(trimmed_value, config_->contentEncoding()) ||
+      if (absl::EqualsIgnoreCase(trimmed_value, config_->contentEncoding()) ||
           // or any other compression type known to Envoy
-          StringUtil::caseCompare(trimmed_value,
+          absl::EqualsIgnoreCase(trimmed_value,
                                   Http::Headers::get().TransferEncodingValues.Gzip) ||
-          StringUtil::caseCompare(trimmed_value,
+          absl::EqualsIgnoreCase(trimmed_value,
                                   Http::Headers::get().TransferEncodingValues.Deflate)) {
         return false;
       }
@@ -357,7 +357,7 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const
   return true;
 }
 
-void CompressorFilter::insertVaryHeader(Http::HeaderMap& headers) {
+void CompressorFilter::insertVaryHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* vary = headers.Vary();
   if (vary != nullptr) {
     if (!StringUtil::findToken(vary->value().getStringView(), ",",
@@ -377,7 +377,7 @@ void CompressorFilter::insertVaryHeader(Http::HeaderMap& headers) {
 // https://bz.apache.org/bugzilla/show_bug.cgi?id=45023
 // This design attempts to stay more on the safe side by preserving weak etags and removing
 // the strong ones when disable_on_etag_header is false. Envoy does NOT re-write entity tags.
-void CompressorFilter::sanitizeEtagHeader(Http::HeaderMap& headers) {
+void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.Etag();
   if (etag != nullptr) {
     absl::string_view value(etag->value().getStringView());

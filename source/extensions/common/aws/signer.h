@@ -18,14 +18,14 @@ public:
    * @param sign_body include the message body in the signature. The body must be fully buffered.
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::Message& message, bool sign_body) PURE;
+  virtual void sign(Http::RequestMessage& message, bool sign_body) PURE;
 
   /**
    * Sign an AWS request.
    * @param headers AWS API request headers.
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual void sign(Http::HeaderMap& headers) PURE;
+  virtual void sign(Http::RequestHeaderMap& headers) PURE;
 };
 
 using SignerPtr = std::unique_ptr<Signer>;

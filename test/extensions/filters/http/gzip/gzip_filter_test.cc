@@ -68,11 +68,11 @@ protected:
     data_.drain(data_len);
   }
 
-  void doRequest(Http::TestHeaderMapImpl&& headers, bool end_stream) {
+  void doRequest(Http::TestRequestHeaderMapImpl&& headers, bool end_stream) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, end_stream));
   }
 
-  void doResponseCompression(Http::TestHeaderMapImpl&& headers, bool with_trailers) {
+  void doResponseCompression(Http::TestResponseHeaderMapImpl&& headers, bool with_trailers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
     feedBuffer(content_length);
@@ -84,7 +84,8 @@ protected:
       Buffer::OwnedImpl trailers_buffer;
       EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
           .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
-      EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(headers));
+      Http::TestResponseTrailerMapImpl trailers;
+      EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
     }
     verifyCompressedData(content_length);
     drainBuffer();
@@ -134,11 +135,11 @@ protected:
     EXPECT_EQ(8, config_->contentTypeValues().size());
   }
 
-  void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
+  void doResponseNoCompression(Http::TestResponseHeaderMapImpl&& headers) {
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
     feedBuffer(content_length);
-    Http::TestHeaderMapImpl continue_headers;
+    Http::TestResponseHeaderMapImpl continue_headers;
     EXPECT_EQ(Http::FilterHeadersStatus::Continue,
               filter_->encode100ContinueHeaders(continue_headers));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
@@ -146,7 +147,7 @@ protected:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-encoding"));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
-    Http::TestHeaderMapImpl trailers;
+    Http::TestResponseTrailerMapImpl trailers;
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
     EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed").value());
   }
@@ -207,7 +208,7 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  Http::TestHeaderMapImpl trailers;
+  Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   doResponseCompression({{":method", "get"}, {"content-length", "256"}}, false);
 }
@@ -216,7 +217,7 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncodingWithTrailers) {
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  Http::TestHeaderMapImpl trailers;
+  Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   doResponseCompression({{":method", "get"}, {"content-length", "256"}}, true);
 }
@@ -302,8 +303,8 @@ TEST_F(GzipFilterTest, EtagNoCompression) {
 // Verifies that compression is skipped when etag header is NOT allowed.
 TEST_F(GzipFilterTest, EtagCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  Http::TestHeaderMapImpl headers{
-      {":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}};
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}};
   feedBuffer(256);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_FALSE(headers.has("etag"));
@@ -328,7 +329,7 @@ TEST_F(GzipFilterTest, AcceptanceTransferEncodingGzip) {
 // Content-Encoding: upstream response is already encoded.
 TEST_F(GzipFilterTest, ContentEncodingAlreadyEncoded) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  Http::TestHeaderMapImpl response_headers{
+  Http::TestResponseHeaderMapImpl response_headers{
       {":method", "get"}, {"content-length", "256"}, {"content-encoding", "deflate, gzip"}};
   feedBuffer(256);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
@@ -340,7 +341,7 @@ TEST_F(GzipFilterTest, ContentEncodingAlreadyEncoded) {
 // No compression when upstream response is empty.
 TEST_F(GzipFilterTest, EmptyResponse) {
 
-  Http::TestHeaderMapImpl headers{{":method", "get"}, {":status", "204"}};
+  Http::TestResponseHeaderMapImpl headers{{":status", "204"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
   EXPECT_EQ("", headers.get_("content-length"));
   EXPECT_EQ("", headers.get_("content-encoding"));
@@ -350,7 +351,7 @@ TEST_F(GzipFilterTest, EmptyResponse) {
 // Filter should set Vary header value with `accept-encoding`.
 TEST_F(GzipFilterTest, NoVaryHeader) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  Http::TestHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"content-length", "256"}};
   feedBuffer(256);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
@@ -360,8 +361,8 @@ TEST_F(GzipFilterTest, NoVaryHeader) {
 // Filter should set Vary header value with `accept-encoding` and preserve other values.
 TEST_F(GzipFilterTest, VaryOtherValues) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  Http::TestHeaderMapImpl headers{
-      {":method", "get"}, {"content-length", "256"}, {"vary", "User-Agent, Cookie"}};
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"content-length", "256"}, {"vary", "User-Agent, Cookie"}};
   feedBuffer(256);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
@@ -371,8 +372,8 @@ TEST_F(GzipFilterTest, VaryOtherValues) {
 // Vary header should have only one `accept-encoding`value.
 TEST_F(GzipFilterTest, VaryAlreadyHasAcceptEncoding) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  Http::TestHeaderMapImpl headers{
-      {":method", "get"}, {"content-length", "256"}, {"vary", "accept-encoding"}};
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"content-length", "256"}, {"vary", "accept-encoding"}};
   feedBuffer(256);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
@@ -382,13 +383,13 @@ TEST_F(GzipFilterTest, VaryAlreadyHasAcceptEncoding) {
 // Verify removeAcceptEncoding header.
 TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
   {
-    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     setUpFilter(R"EOF({"remove_accept_encoding_header": true})EOF");
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }
   {
-    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     setUpFilter("{}");
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));

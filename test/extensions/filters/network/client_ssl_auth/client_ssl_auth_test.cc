@@ -96,7 +96,7 @@ ip_white_list:
     EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(
-            Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+            Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               callbacks_ = &callbacks;
               return &request_;
@@ -168,8 +168,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Respond.
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  Http::ResponseMessagePtr message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(
       api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
           "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json")));
@@ -226,7 +226,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Error response.
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   message = std::make_unique<Http::ResponseMessageImpl>(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}});
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.
@@ -236,7 +236,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Parsing error
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   message = std::make_unique<Http::ResponseMessageImpl>(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
   message->body() = std::make_unique<Buffer::OwnedImpl>("bad_json");
   callbacks_->onSuccess(std::move(message));
 
@@ -252,10 +252,11 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+            callbacks.onSuccess(
+                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));

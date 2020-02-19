@@ -29,7 +29,7 @@ public:
   void onDestroy() override{};
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     headers.addCopy(Http::LowerCaseString("secret"),
                     Config::DataSource::read(config_provider_->secret()->secret(), true, api_));
     return Http::FilterHeadersStatus::Continue;
@@ -39,7 +39,7 @@ public:
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
 
@@ -146,7 +146,7 @@ TEST_P(SdsGenericSecretIntegrationTest, FilterFetchSuccess) {
   initialize();
 
   codec_client_ = makeHttpConnection((lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 

@@ -58,8 +58,6 @@ public:
 /**
  * Stream encoder used for sending a request (client to server). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
- * TODO(mattklein123): In a future change the header types will be changed to differentiate from
- * the response path.
  */
 class RequestEncoder : public virtual StreamEncoder {
 public:
@@ -69,20 +67,18 @@ public:
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request.
    */
-  virtual void encodeHeaders(const HeaderMap& headers, bool end_stream) PURE;
+  virtual void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Encode trailers. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
    */
-  virtual void encodeTrailers(const HeaderMap& trailers) PURE;
+  virtual void encodeTrailers(const RequestTrailerMap& trailers) PURE;
 };
 
 /**
  * Stream encoder used for sending a response (server to client). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
- * TODO(mattklein123): In a future change the header types will be changed to differentiate from
- * the request path.
  */
 class ResponseEncoder : public virtual StreamEncoder {
 public:
@@ -90,7 +86,7 @@ public:
    * Encode 100-Continue headers.
    * @param headers supplies the 100-Continue header map to encode.
    */
-  virtual void encode100ContinueHeaders(const HeaderMap& headers) PURE;
+  virtual void encode100ContinueHeaders(const ResponseHeaderMap& headers) PURE;
 
   /**
    * Encode headers, optionally indicating end of stream. Response headers must
@@ -98,13 +94,13 @@ public:
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only response.
    */
-  virtual void encodeHeaders(const HeaderMap& headers, bool end_stream) PURE;
+  virtual void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Encode trailers. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
    */
-  virtual void encodeTrailers(const HeaderMap& trailers) PURE;
+  virtual void encodeTrailers(const ResponseTrailerMap& trailers) PURE;
 };
 
 /**
@@ -134,8 +130,6 @@ public:
 /**
  * Stream decoder used for receiving a request (client to server). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
- * TODO(mattklein123): In a future change the header types will be changed to differentiate from
- * the response path.
  */
 class RequestDecoder : public virtual StreamDecoder {
 public:
@@ -144,20 +138,18 @@ public:
    * @param headers supplies the decoded headers map.
    * @param end_stream supplies whether this is a header only request.
    */
-  virtual void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with a decoded trailers frame. This implicitly ends the stream.
    * @param trailers supplies the decoded trailers.
    */
-  virtual void decodeTrailers(HeaderMapPtr&& trailers) PURE;
+  virtual void decodeTrailers(RequestTrailerMapPtr&& trailers) PURE;
 };
 
 /**
  * Stream decoder used for receiving a response (server to client). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
- * TODO(mattklein123): In a future change the header types will be changed to differentiate from
- * the request path.
  */
 class ResponseDecoder : public virtual StreamDecoder {
 public:
@@ -165,20 +157,20 @@ public:
    * Called with decoded 100-Continue headers.
    * @param headers supplies the decoded 100-Continue headers map.
    */
-  virtual void decode100ContinueHeaders(HeaderMapPtr&& headers) PURE;
+  virtual void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
    * Called with decoded headers, optionally indicating end of stream.
    * @param headers supplies the decoded headers map.
    * @param end_stream supplies whether this is a header only response.
    */
-  virtual void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with a decoded trailers frame. This implicitly ends the stream.
    * @param trailers supplies the decoded trailers.
    */
-  virtual void decodeTrailers(HeaderMapPtr&& trailers) PURE;
+  virtual void decodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
 };
 
 /**

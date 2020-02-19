@@ -25,7 +25,11 @@ bazel build ${BAZEL_BUILD_OPTIONS} --//tools/api_proto_plugin:default_type_db_ta
   @envoy_api_canonical//docs:protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto \
   --action_env=CPROFILE_ENABLED=1 --host_force_python=PY3
 
-./tools/proto_sync.py "--mode=$1" ${PROTO_TARGETS}
+TOOLS=$(dirname $(dirname $(realpath $0)))
+# to satisfy dependency on api_proto_plugin
+export PYTHONPATH="$TOOLS"
+./tools/proto_format/proto_sync.py "--mode=$1" ${PROTO_TARGETS}
+
 bazel build ${BAZEL_BUILD_OPTIONS} //tools/type_whisperer:api_build_file 
 cp -f bazel-bin/tools/type_whisperer/BUILD.api_build_file api/BUILD
 

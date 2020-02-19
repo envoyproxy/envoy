@@ -80,7 +80,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceReturnFailure) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
             return nullptr;
@@ -124,10 +124,11 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWith503) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+            callbacks.onSuccess(
+                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
 
@@ -168,10 +169,11 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWithEmptyBody) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}})});
+            callbacks.onSuccess(
+                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}})});
             return nullptr;
           }));
 
@@ -215,10 +217,11 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessIncorrectSha256) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::MessagePtr response(new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
             response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
             callbacks.onSuccess(std::move(response));
@@ -264,10 +267,11 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccess) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::MessagePtr response(new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
             response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
             callbacks.onSuccess(std::move(response));
@@ -311,10 +315,11 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectNetworkFailure) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+            callbacks.onSuccess(
+                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
 
@@ -350,10 +355,11 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmptyExpectNetworkFail
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+            callbacks.onSuccess(
+                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
 
@@ -388,10 +394,11 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::MessagePtr response(new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
             response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
             callbacks.onSuccess(std::move(response));
@@ -432,10 +439,11 @@ TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(
-            Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+            Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              Http::MessagePtr response(new Http::ResponseMessageImpl(
-                  Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+              Http::ResponseMessagePtr response(
+                  new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                      new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
               response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
               callbacks.onSuccess(std::move(response));

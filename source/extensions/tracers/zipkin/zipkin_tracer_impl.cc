@@ -172,7 +172,7 @@ void ReporterImpl::flushSpans() {
   if (span_buffer_->pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_->pendingSpans());
     const std::string request_body = span_buffer_->serialize();
-    Http::MessagePtr message = std::make_unique<Http::RequestMessageImpl>();
+    Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setPath(collector_.endpoint_);
     message->headers().setHost(driver_.cluster()->name());
@@ -200,7 +200,7 @@ void ReporterImpl::onFailure(Http::AsyncClient::FailureReason) {
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void ReporterImpl::onSuccess(Http::MessagePtr&& http_response) {
+void ReporterImpl::onSuccess(Http::ResponseMessagePtr&& http_response) {
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
     driver_.tracerStats().reports_dropped_.inc();

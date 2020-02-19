@@ -1,3 +1,5 @@
+#include "extensions/filters/network/kafka/tagged_fields.h"
+
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
 
 namespace Envoy {
@@ -432,6 +434,23 @@ TEST(NullableCompactArrayDeserializer, ShouldConsumeNullArray) {
   const NullableArray<int32_t> value = absl::nullopt;
   serializeCompactThenDeserializeAndCheckEquality<
       NullableCompactArrayDeserializer<int32_t, Int32Deserializer>>(value);
+}
+
+// Tagged fields.
+
+TEST(TaggedFieldDeserializer, ShouldConsumeCorrectAmountOfData) {
+  const TaggedField value{200, Bytes{1, 2, 3, 4, 5, 6}};
+  serializeCompactThenDeserializeAndCheckEquality<TaggedFieldDeserializer>(value);
+}
+
+TEST(TaggedFieldsDeserializer, ShouldConsumeCorrectAmountOfData) {
+  std::vector<TaggedField> fields;
+  for (uint32_t i = 0; i < 200; ++i) {
+    const TaggedField tagged_field = {i, Bytes{1, 2, 3, 4}};
+    fields.push_back(tagged_field);
+  }
+  const TaggedFields value{fields};
+  serializeCompactThenDeserializeAndCheckEquality<TaggedFieldsDeserializer>(value);
 }
 
 } // namespace SerializationTest

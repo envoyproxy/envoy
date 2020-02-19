@@ -318,7 +318,8 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
 
-Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                     bool end_stream) {
   request_headers_ = &headers;
   if (end_stream) {
     onComplete();
@@ -341,7 +342,7 @@ Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::RequestTrailerMap&) {
   onComplete();
   return Http::FilterTrailersStatus::StopIteration;
 }
@@ -1342,7 +1343,7 @@ void AdminFilter::onComplete() {
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
-  Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
+  Http::ResponseHeaderMapPtr header_map{new Http::ResponseHeaderMapImpl};
   RELEASE_ASSERT(request_headers_, "");
   Http::Code code = parent_.runCallback(path, *header_map, response, *this);
   populateFallbackResponseHeaders(code, *header_map);
@@ -1618,7 +1619,7 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::HeaderMap& response_headers, std::string& body) {
   AdminFilter filter(*this);
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   request_headers.setMethod(method);
   filter.decodeHeaders(request_headers, false);
   Buffer::OwnedImpl response;

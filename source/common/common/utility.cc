@@ -294,19 +294,14 @@ bool StringUtil::caseFindToken(absl::string_view source, absl::string_view delim
   std::function<bool(absl::string_view)> predicate;
 
   if (trim_whitespace) {
-    predicate = [&](absl::string_view token) { return caseCompare(key_token, trim(token)); };
+    predicate = [&](absl::string_view token) {
+      return absl::EqualsIgnoreCase(key_token, trim(token));
+    };
   } else {
-    predicate = [&](absl::string_view token) { return caseCompare(key_token, token); };
+    predicate = [&](absl::string_view token) { return absl::EqualsIgnoreCase(key_token, token); };
   }
 
   return std::find_if(tokens.begin(), tokens.end(), predicate) != tokens.end();
-}
-
-bool StringUtil::caseCompare(absl::string_view lhs, absl::string_view rhs) {
-  if (rhs.size() != lhs.size()) {
-    return false;
-  }
-  return absl::StartsWithIgnoreCase(rhs, lhs);
 }
 
 absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter) {
@@ -460,7 +455,7 @@ std::string StringUtil::toLower(absl::string_view s) {
 
 bool StringUtil::CaseInsensitiveCompare::operator()(absl::string_view lhs,
                                                     absl::string_view rhs) const {
-  return StringUtil::caseCompare(lhs, rhs);
+  return absl::EqualsIgnoreCase(lhs, rhs);
 }
 
 uint64_t StringUtil::CaseInsensitiveHash::operator()(absl::string_view key) const {

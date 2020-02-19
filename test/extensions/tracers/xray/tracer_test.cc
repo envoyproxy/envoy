@@ -48,13 +48,17 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   constexpr auto expected_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X)";
   constexpr auto expected_status_code = "202";
   constexpr auto expected_content_length = "1337";
+  constexpr auto expected_client_ip = "10.0.0.100";
+  constexpr auto expected_x_forwarded_for = "false";
+  constexpr auto expected_upstream_address = "10.0.0.200";
+
   auto on_send = [](const std::string& json) {
     ASSERT_FALSE(json.empty());
     daemon::Segment s;
     MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
     ASSERT_FALSE(s.trace_id().empty());
     ASSERT_FALSE(s.id().empty());
-    ASSERT_TRUE(s.annotations().empty());
+    ASSERT_EQ(1, s.annotations().size());
     ASSERT_TRUE(s.parent_id().empty());
     ASSERT_STREQ(expected_span_name, s.name().c_str());
     ASSERT_STREQ(expected_http_method, s.http().request().at("method").c_str());
@@ -62,6 +66,9 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     ASSERT_STREQ(expected_user_agent, s.http().request().at("user_agent").c_str());
     ASSERT_STREQ(expected_status_code, s.http().response().at("status").c_str());
     ASSERT_STREQ(expected_content_length, s.http().response().at("content_length").c_str());
+    ASSERT_STREQ(expected_client_ip, s.http().request().at("client_ip").c_str());
+    ASSERT_STREQ(expected_x_forwarded_for, s.http().request().at("x_forwarded_for").c_str());
+    ASSERT_STREQ(expected_upstream_address, s.annotations().at("upstream_address").c_str());
   };
 
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
@@ -73,6 +80,8 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   span->setTag("user_agent", expected_user_agent);
   span->setTag("http.status_code", expected_status_code);
   span->setTag("response_size", expected_content_length);
+  span->setTag("peer.address", expected_client_ip);
+  span->setTag("upstream_address", expected_upstream_address);
   span->finishSpan();
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 // NOLINT(namespace-envoy)
 
@@ -8,8 +8,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-namespace spdy {
+namespace quiche {
 
-using SpdyStringPieceImpl = absl::string_view;
+template <typename T> using QuicheOptionalImpl = absl::optional<T>;
 
-} // namespace spdy
+} // namespace quiche
