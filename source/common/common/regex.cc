@@ -24,7 +24,11 @@ public:
 
   // CompiledMatcher
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override {
-    return std::regex_replace(std::string(value), regex_, std::string(substitution));
+    try {
+      return std::regex_replace(std::string(value), regex_, std::string(substitution));
+    } catch (const std::regex_error& e) {
+      return std::string(value);
+    }
   }
 
 private:

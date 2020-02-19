@@ -531,11 +531,17 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
   const auto& rewrite = getPathRewrite();
+  if (rewrite.empty() && regex_rewrite_ == nullptr) {
+    // There are no rewrites configured. Just return.
+    return;
+  }
+
+  std::string path(headers.Path()->value().getStringView());
+  if (insert_envoy_original_path) {
+    headers.setEnvoyOriginalPath(path);
+  }
+
   if (!rewrite.empty()) {
-    std::string path(headers.Path()->value().getStringView());
-    if (insert_envoy_original_path) {
-      headers.setEnvoyOriginalPath(path);
-    }
     ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
                            : absl::StartsWithIgnoreCase(path, matched_path));
     headers.setPath(path.replace(0, matched_path.size(), rewrite));
@@ -543,10 +549,6 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   }
 
   if (regex_rewrite_ != nullptr) {
-    std::string path(headers.Path()->value().getStringView());
-    if (insert_envoy_original_path) {
-      headers.setEnvoyOriginalPath(path);
-    }
     // Replace the entire path, but preserve the query parameters
     auto just_path(Http::PathUtil::removeQueryAndFragment(path));
     headers.setPath(path.replace(

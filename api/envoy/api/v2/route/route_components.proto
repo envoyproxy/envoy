@@ -708,9 +708,9 @@ message RouteAction {
     type.matcher.RegexMatcher pattern = 1;
 
     // The string that should be substituted into matching portions of the path.
-    // Capture groups in the pattern can be referenced in this string  Beware,
-    // however, that the syntax for referring to capture groups might vary
-    // among the regular expression engines. Google's `RE2 <https://github.com/google/re2>`_
+    // Capture groups in the pattern can be referenced in this string. Beware,
+    // however, that the syntax for referring to capture groups is defined by
+    // the regular expression engines. Google's `RE2 <https://github.com/google/re2>`_
     // regular expression engine uses backslash followed by the capture group
     // number to denote a numbered capture group. E.g., ``\1`` refers to capture
     // group 1, and ``\2`` refers to capture group 2.
@@ -802,7 +802,7 @@ message RouteAction {
   // Only one of :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`
   // or *regex_rewrite* may be specified.
   //
-  // Examples:
+  // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
   //
   // * The path pattern ``^/service/([^/]+)(/.*)$`` paired with a substitution
   //   string of ``\2/instance/\1`` would transform ``/service/foo/v1/api``

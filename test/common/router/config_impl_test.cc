@@ -454,7 +454,7 @@ virtual_hosts:
         pattern:
           google_re2: {}
           regex: "^/new(.*?)_endpoint(.*)$"
-        substitution: "/\\1_rewritten_endpoint\\2"
+        substitution: /\1_rewritten_endpoint\2
       cluster: www2
   - match:
       prefix: "/newforreg2_endpoint"
@@ -542,7 +542,7 @@ virtual_hosts:
         pattern:
           google_re2: {}
           regex: "(^.*)/(\\d{4})$"
-        substitution: "/four/\\2/endpoint\\1"
+        substitution: /four/\2/endpoint\1
   - match:
       safe_regex:
         google_re2: {}
