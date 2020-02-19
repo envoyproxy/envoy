@@ -66,7 +66,7 @@ public:
                                  ConnectionManagerTracingStats& tracing_stats);
   static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
                                                               Stats::Scope& scope);
-  static const HeaderMapImpl& continueHeader();
+  static const ResponseHeaderMap& continueHeader();
 
   // Currently the ConnectionManager creates a codec lazily when either:
   //   a) onConnection for H3.
@@ -142,7 +142,7 @@ private:
     virtual void doHeaders(bool end_stream) PURE;
     virtual void doData(bool end_stream) PURE;
     virtual void doTrailers() PURE;
-    virtual const HeaderMapPtr& trailers() PURE;
+    virtual bool hasTrailers() PURE;
     virtual void doMetadata() PURE;
     // TODO(soya3129): make this pure when adding impl to encoder filter.
     virtual void handleMetadataAfterHeadersCallback() PURE;
@@ -250,7 +250,7 @@ private:
       }
     }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
-    const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
+    bool hasTrailers() override { return parent_.request_trailers_ != nullptr; }
 
     void drainSavedRequestMetadata() {
       ASSERT(saved_request_metadata_ != nullptr);
@@ -278,17 +278,17 @@ private:
     }
 
     void sendLocalReply(Code code, absl::string_view body,
-                        std::function<void(HeaderMap& headers)> modify_headers,
+                        std::function<void(ResponseHeaderMap& headers)> modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       parent_.stream_info_.setResponseCodeDetails(details);
       parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
                              parent_.state_.is_head_request_, grpc_status, details);
     }
-    void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
-    void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
+    void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
+    void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
-    void encodeTrailers(HeaderMapPtr&& trailers) override;
+    void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
     void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -311,7 +311,7 @@ private:
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
-    FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
+    FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
       is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
       FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
       if (end_stream) {
@@ -373,7 +373,7 @@ private:
       }
     }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
-    const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
+    bool hasTrailers() override { return parent_.response_trailers_ != nullptr; }
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
@@ -463,39 +463,41 @@ private:
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addDecodedTrailers();
     MetadataMapVector& addDecodedMetadata();
-    void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
+    void decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
+                       bool end_stream);
     // Sends data through decoding filter chains. filter_iteration_start_state indicates which
     // filter to start the iteration with.
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
                     FilterIterationStartState filter_iteration_start_state);
-    void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
+    void decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTrailerMap& trailers);
     void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
     void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
-                        const std::function<void(HeaderMap& headers)>& modify_headers,
+                        const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details);
-    void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
+    void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
     // As with most of the encode functions, this runs encodeHeaders on various
     // filters before calling encodeHeadersInternal which does final header munging and passes the
     // headers to the encoder.
-    void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
+    void encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
+                       bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
     // filter to start the iteration with, and finally calls encodeDataInternal
     // to update stats, do end stream bookkeeping, and send the data to encoder.
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
                     FilterIterationStartState filter_iteration_start_state);
-    void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
+    void encodeTrailers(ActiveStreamEncoderFilter* filter, ResponseTrailerMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
 
     // This is a helper function for encodeHeaders and responseDataTooLarge which allows for shared
     // code for the two headers encoding paths. It does header munging, updates timing stats, and
     // sends the headers to the encoder.
-    void encodeHeadersInternal(HeaderMap& headers, bool end_stream);
+    void encodeHeadersInternal(ResponseHeaderMap& headers, bool end_stream);
     // This is a helper function for encodeData and responseDataTooLarge which allows for shared
     // code for the two data encoding paths. It does stats updates and tracks potential end of
     // stream.
@@ -684,13 +686,13 @@ private:
     Tracing::SpanPtr active_span_;
     const uint64_t stream_id_;
     ResponseEncoder* response_encoder_{};
-    HeaderMapPtr continue_headers_;
-    HeaderMapPtr response_headers_;
+    ResponseHeaderMapPtr continue_headers_;
+    ResponseHeaderMapPtr response_headers_;
     Buffer::WatermarkBufferPtr buffered_response_data_;
-    HeaderMapPtr response_trailers_{};
+    ResponseTrailerMapPtr response_trailers_{};
     RequestHeaderMapPtr request_headers_;
     Buffer::WatermarkBufferPtr buffered_request_data_;
-    HeaderMapPtr request_trailers_;
+    RequestTrailerMapPtr request_trailers_;
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;

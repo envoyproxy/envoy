@@ -103,12 +103,12 @@ TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
 TEST_P(AutoSniIntegrationTest, PassingHostWithoutPort) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const auto response_ =
-      sendRequestAndWaitForResponse(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                            {":path", "/"},
-                                                            {":scheme", "http"},
-                                                            {":authority", "example.com:8080"}},
-                                    0, default_response_headers_, 0);
+  const auto response_ = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "example.com:8080"}},
+      0, default_response_headers_, 0);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response_->complete());

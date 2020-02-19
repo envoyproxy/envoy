@@ -15,7 +15,7 @@ class CallDecodeDataOnceFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "call-decodedata-once-filter";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override {
     const Http::HeaderEntry* entry_content =
         header_map.get(Envoy::Http::LowerCaseString("content_size"));
     const Http::HeaderEntry* entry_added =
@@ -33,7 +33,7 @@ public:
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
 

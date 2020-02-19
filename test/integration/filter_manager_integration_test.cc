@@ -312,7 +312,7 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl headers{
+  Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/api"}, {":authority", "host"}, {":scheme", "http"}};
   auto response = codec_client_->makeRequestWithBody(headers, "hello!");
 
@@ -320,7 +320,7 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("hello!", upstream_request_->body().toString());
 
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   Buffer::OwnedImpl response_data{"greetings"};
   upstream_request_->encodeData(response_data, true);
 

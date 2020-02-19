@@ -87,7 +87,7 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
       &final_headers);
 }
 
-void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const HeaderMap& headers) {
+void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);
 }
@@ -99,7 +99,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
   // needed until submitHeaders has been called.
   Http::HeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
-    modified_headers = Http::HeaderMapImpl::create(headers);
+    modified_headers = createHeaderMap<HeaderMapImpl>(headers);
     transformUpgradeFromH1toH2(*modified_headers);
     buildHeaders(final_headers, *modified_headers);
   } else {
@@ -128,7 +128,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     ASSERT(!pending_trailers_to_encode_);
-    pending_trailers_to_encode_ = HeaderMapImpl::create(trailers);
+    pending_trailers_to_encode_ = createHeaderMap<HeaderMapImpl>(trailers);
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
