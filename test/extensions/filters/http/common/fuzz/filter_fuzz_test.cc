@@ -71,7 +71,7 @@ public:
       headers.setMethod("GET");
     }
     if (headers.Host() == nullptr) {
-      headers.setHost("authority");
+      headers.setHost("foo.com");
     }
 
     if (data.data().size() == 0 && !data.has_trailers()) {
@@ -145,10 +145,12 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
   static PostProcessorRegistration reg = {[](test::extensions::filters::http::FilterFuzzTestCase*
                                                  input,
                                              unsigned int seed) {
-    // This ensures that the mutated configs all have valid filter names and type_urls. This
-    // post-processor mutation is applied only when libprotobuf-mutator calls mutate on an input,
-    // and *not* during fuzz target execution. Replaying a corpus through the fuzzer will not be
-    // affected by the post-processor mutation.
+    // This ensures that the mutated configs all have valid filter names and type_urls. The list of
+    // names and type_urls is pulled from the NamedHttpFilterConfigFactory. All Envoy extensions are
+    // built with this test (see BUILD file).
+    // This post-processor mutation is applied only when libprotobuf-mutator calls mutate on an
+    // input, and *not* during fuzz target execution. Replaying a corpus through the fuzzer will not
+    // be affected by the post-processor mutation.
     static const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
         Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
     static const auto factories =

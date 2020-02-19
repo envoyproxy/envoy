@@ -26,6 +26,8 @@ envoy_cc_fuzz_test(
     name = "filter_fuzz_test",
     srcs = ["filter_fuzz_test.cc"],
     corpus = "filter_corpus",
+    # All Envoy extensions must be linked to the test in order for the fuzzer to pick
+    # these up via the NamedHttpFilterConfigFactory.
     deps = [
         ":filter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
