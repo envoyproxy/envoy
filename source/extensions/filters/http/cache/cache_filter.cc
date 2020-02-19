@@ -37,7 +37,10 @@ CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3alpha:
                          HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache) {}
 
-void CacheFilter::onDestroy() {}
+void CacheFilter::onDestroy() {
+  lookup_ = nullptr;
+  insert_ = nullptr;
+}
 
 Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
