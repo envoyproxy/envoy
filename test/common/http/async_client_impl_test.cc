@@ -53,9 +53,10 @@ public:
   }
 
   void expectSuccess(uint64_t code) {
-    EXPECT_CALL(callbacks_, onSuccess_(_)).WillOnce(Invoke([code](Message* response) -> void {
-      EXPECT_EQ(code, Utility::getResponseStatus(response->headers()));
-    }));
+    EXPECT_CALL(callbacks_, onSuccess_(_))
+        .WillOnce(Invoke([code](ResponseMessage* response) -> void {
+          EXPECT_EQ(code, Utility::getResponseStatus(response->headers()));
+        }));
   }
 
   void expectResponseHeaders(MockAsyncClientStreamCallbacks& callbacks, uint64_t code,
@@ -66,7 +67,7 @@ public:
         }));
   }
 
-  MessagePtr message_{new RequestMessageImpl()};
+  RequestMessagePtr message_{new RequestMessageImpl()};
   Stats::MockIsolatedStatsStore stats_store_;
   MockAsyncClientCallbacks callbacks_;
   MockAsyncClientStreamCallbacks stream_callbacks_;
@@ -100,7 +101,7 @@ TEST_F(AsyncClientImplTest, BasicStream) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.addCopy("x-envoy-internal", "true");
   headers.addCopy("x-forwarded-for", "127.0.0.1");
@@ -288,7 +289,7 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
 TEST_F(AsyncClientImplTest, Retry) {
   ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
       .WillByDefault(Return(true));
-  Message* message_copy = message_.get();
+  RequestMessage* message_copy = message_.get();
 
   message_->body() = std::make_unique<Buffer::OwnedImpl>("test body");
   Buffer::Instance& data = *message_->body();
@@ -344,7 +345,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
@@ -392,7 +393,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers(message_->headers());
+  TestRequestHeaderMapImpl headers(message_->headers());
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
 
@@ -418,7 +419,7 @@ TEST_F(AsyncClientImplTest, MultipleStreams) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers2(message_->headers());
+  TestRequestHeaderMapImpl headers2(message_->headers());
   EXPECT_CALL(stream_encoder2, encodeHeaders(HeaderMapEqualRef(&headers2), false));
   EXPECT_CALL(stream_encoder2, encodeData(BufferEqual(body2.get()), true));
 
@@ -458,7 +459,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
   client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
 
   // Send request 2.
-  MessagePtr message2{new RequestMessageImpl()};
+  RequestMessagePtr message2{new RequestMessageImpl()};
   HttpTestUtility::addDefaultHeaders(message2->headers());
   NiceMock<MockRequestEncoder> stream_encoder2;
   ResponseDecoder* response_decoder2{};
@@ -516,7 +517,7 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(stream_encoder2, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder2, encodeData(BufferEqual(body.get()), true));
@@ -543,9 +544,9 @@ TEST_F(AsyncClientImplTest, StreamAndRequest) {
 
 TEST_F(AsyncClientImplTest, StreamWithTrailers) {
   Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  TestHeaderMapImpl trailers{{"some", "request_trailer"}};
+  TestRequestTrailerMapImpl trailers{{"some", "request_trailer"}};
 
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseDecoder& decoder,
@@ -561,7 +562,7 @@ TEST_F(AsyncClientImplTest, StreamWithTrailers) {
 
   expectResponseHeaders(stream_callbacks_, 200, false);
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
-  TestHeaderMapImpl expected_trailers{{"some", "trailer"}};
+  TestResponseTrailerMapImpl expected_trailers{{"some", "trailer"}};
   EXPECT_CALL(stream_callbacks_, onTrailers_(HeaderMapEqualRef(&expected_trailers)));
   EXPECT_CALL(stream_callbacks_, onComplete());
 
@@ -631,7 +632,7 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.addCopy("x-envoy-internal", "true");
   headers.addCopy("x-forwarded-for", "127.0.0.1");
@@ -640,7 +641,7 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
   EXPECT_CALL(stream_callbacks_, onReset());
@@ -667,7 +668,7 @@ TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.addCopy("x-envoy-internal", "true");
   headers.addCopy("x-forwarded-for", "127.0.0.1");
@@ -675,7 +676,7 @@ TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
   EXPECT_CALL(stream_callbacks_, onComplete());
@@ -702,18 +703,18 @@ TEST_F(AsyncClientImplTest, SendTrailersRemoteClosure) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.addCopy("x-envoy-internal", "true");
   headers.addCopy("x-forwarded-for", "127.0.0.1");
   headers.addCopy(":scheme", "http");
 
-  TestHeaderMapImpl trailers;
+  TestRequestTrailerMapImpl trailers;
   trailers.addCopy("x-test-trailer", "1");
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
   EXPECT_CALL(stream_callbacks_, onComplete());
@@ -741,7 +742,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.addCopy("x-envoy-internal", "true");
   headers.addCopy("x-forwarded-for", "127.0.0.1");
@@ -752,7 +753,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
 
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false))
       .WillOnce(Invoke([&stream](HeaderMap&, bool) { stream->reset(); }));
   EXPECT_CALL(stream_callbacks_, onData(_, _)).Times(0);
@@ -778,7 +779,7 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.addCopy("x-envoy-internal", "true");
   headers.addCopy("x-forwarded-for", "127.0.0.1");
@@ -787,7 +788,7 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
   EXPECT_CALL(stream_callbacks_, onReset());
@@ -1018,7 +1019,7 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
         return nullptr;
       }));
 
-  MessagePtr message{new RequestMessageImpl()};
+  RequestMessagePtr message{new RequestMessageImpl()};
   HttpTestUtility::addDefaultHeaders(message->headers(), "HEAD");
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
@@ -1150,7 +1151,7 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
         return nullptr;
       }));
 
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.addCopy("x-envoy-internal", "true");
   headers.addCopy("x-forwarded-for", "127.0.0.1");
@@ -1159,7 +1160,7 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), false));
 
-  TestHeaderMapImpl expected_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl expected_headers{{":status", "200"}};
   EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), false));
 
@@ -1187,7 +1188,7 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
 }
 
 TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers, false);
@@ -1199,7 +1200,7 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
 }
 
 TEST_F(AsyncClientImplTest, RdsGettersTest) {
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers, false);
@@ -1223,7 +1224,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
 }
 
 TEST_F(AsyncClientImplTest, DumpState) {
-  TestHeaderMapImpl headers;
+  TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   Http::StreamDecoderFilterCallbacks* filter_callbacks =

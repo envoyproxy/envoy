@@ -50,7 +50,7 @@ public:
   ~RemoteDataFetcher() override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& response) override;
+  void onSuccess(Http::ResponseMessagePtr&& response) override;
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
   /**

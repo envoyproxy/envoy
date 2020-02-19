@@ -63,7 +63,7 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
 
   const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
-  Http::MessagePtr message = Grpc::Common::prepareHeaders(
+  Http::RequestMessagePtr message = Grpc::Common::prepareHeaders(
       driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
       lightstep::CollectorMethodName(), absl::optional<std::chrono::milliseconds>(timeout));
   message->body() = Grpc::Common::serializeToGrpcFrame(request);
@@ -75,7 +75,7 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
                 Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
 }
 
-void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& response) {
+void LightStepDriver::LightStepTransporter::onSuccess(Http::ResponseMessagePtr&& response) {
   try {
     active_request_ = nullptr;
     Grpc::Common::validateResponse(*response);

@@ -51,7 +51,7 @@ public:
              Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap&) override {}
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
   void onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,

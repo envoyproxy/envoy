@@ -45,7 +45,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
                                TransportSocketPtr&& transport_socket, bool connected)
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      filter_manager_(*this), stream_info_(dispatcher.timeSource()),
+      stream_info_(dispatcher.timeSource()), filter_manager_(*this),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),

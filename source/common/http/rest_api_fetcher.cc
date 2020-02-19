@@ -28,7 +28,7 @@ RestApiFetcher::~RestApiFetcher() {
 
 void RestApiFetcher::initialize() { refresh(); }
 
-void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
+void RestApiFetcher::onSuccess(Http::ResponseMessagePtr&& response) {
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
   if (response_code == enumToInt(Http::Code::NotModified)) {
     requestComplete();
@@ -55,7 +55,7 @@ void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
 }
 
 void RestApiFetcher::refresh() {
-  MessagePtr message(new RequestMessageImpl());
+  RequestMessagePtr message(new RequestMessageImpl());
   createRequest(*message);
   message->headers().setHost(remote_cluster_name_);
   active_request_ = cm_.httpAsyncClientForCluster(remote_cluster_name_)

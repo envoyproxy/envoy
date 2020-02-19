@@ -254,7 +254,7 @@ protected:
     return metadata;
   }
 
-  DangerousDeprecatedTestTime test_time_;
+  Event::SimulatedTimeSystem test_time_;
 };
 
 // Return the current request protocol.

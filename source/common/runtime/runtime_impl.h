@@ -21,7 +21,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/init/target_impl.h"
@@ -93,7 +92,7 @@ public:
   bool featureEnabled(absl::string_view key,
                       const envoy::type::v3::FractionalPercent& default_value,
                       uint64_t random_value) const override;
-  const std::string& get(absl::string_view key) const override;
+  const std::string& get(absl::string_view key, const std::string& default_value) const override;
   uint64_t getInteger(absl::string_view key, uint64_t default_value) const override;
   double getDouble(absl::string_view key, double default_value) const override;
   bool getBoolean(absl::string_view key, bool value) const override;
