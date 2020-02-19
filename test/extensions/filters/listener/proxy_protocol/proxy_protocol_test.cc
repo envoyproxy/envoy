@@ -299,15 +299,13 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::writev(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.writev(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::readv(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -325,9 +323,8 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
-    const int rc = ::close(fd);
-    return Api::SysCallIntResult{rc, errno};
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+    return os_sys_calls_actual_.close(fd);
   }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -347,15 +344,13 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
   EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::writev(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.writev(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::readv(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -373,9 +368,8 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
-    const int rc = ::close(fd);
-    return Api::SysCallIntResult{rc, errno};
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+    return os_sys_calls_actual_.close(fd);
   }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -576,15 +570,13 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::writev(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.writev(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::readv(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -602,9 +594,8 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
-    const int rc = ::close(fd);
-    return Api::SysCallIntResult{rc, errno};
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+    return os_sys_calls_actual_.close(fd);
   }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -722,15 +713,13 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::writev(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.writev(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::readv(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -748,9 +737,8 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
-    const int rc = ::close(fd);
-    return Api::SysCallIntResult{rc, errno};
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+    return os_sys_calls_actual_.close(fd);
   }));
   connect(false);
   write(buffer, 17);
@@ -785,15 +773,13 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::writev(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.writev(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
-        const ssize_t rc = ::readv(fd, iov, iovcnt);
-        return Api::SysCallSizeResult{rc, errno};
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -811,9 +797,8 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke(
           [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
-    const int rc = ::close(fd);
-    return Api::SysCallIntResult{rc, errno};
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+    return os_sys_calls_actual_.close(fd);
   }));
   connect(false);
   write(buffer, 10);
