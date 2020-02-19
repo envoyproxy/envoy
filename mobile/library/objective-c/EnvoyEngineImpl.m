@@ -47,11 +47,9 @@ static void ios_on_exit() {
   }
 }
 
-- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks
-                                 bufferForRetry:(BOOL)bufferForRetry {
+- (id<EnvoyHTTPStream>)startStreamWithCallbacks:(EnvoyHTTPCallbacks *)callbacks {
   return [[EnvoyHTTPStreamImpl alloc] initWithHandle:init_stream(_engineHandle)
-                                           callbacks:callbacks
-                                      bufferForRetry:bufferForRetry];
+                                           callbacks:callbacks];
 }
 
 @end

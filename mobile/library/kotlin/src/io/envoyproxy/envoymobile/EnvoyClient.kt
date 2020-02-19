@@ -21,10 +21,10 @@ enum class LogLevel(internal val level: String) {
  * Wrapper class that allows for easy calling of Envoy's JNI interface in native Java.
  */
 class Envoy private constructor(
-    private val engine: EnvoyEngine,
-    internal val envoyConfiguration: EnvoyConfiguration?,
-    internal val configurationYAML: String?,
-    internal val logLevel: LogLevel
+  private val engine: EnvoyEngine,
+  internal val envoyConfiguration: EnvoyConfiguration?,
+  internal val configurationYAML: String?,
+  internal val logLevel: LogLevel
 ) : HTTPClient {
 
   constructor(engine: EnvoyEngine, envoyConfiguration: EnvoyConfiguration, logLevel: LogLevel = LogLevel.INFO) : this(engine, envoyConfiguration, null, logLevel)
@@ -36,13 +36,13 @@ class Envoy private constructor(
   init {
     if (envoyConfiguration == null) {
       engine.runWithConfig(configurationYAML, logLevel.level)
-    }else {
+    } else {
       engine.runWithConfig(envoyConfiguration, logLevel.level)
     }
   }
 
   override fun send(request: Request, responseHandler: ResponseHandler): StreamEmitter {
-    val stream = engine.startStream(responseHandler.underlyingCallbacks, request.retryPolicy != null)
+    val stream = engine.startStream(responseHandler.underlyingCallbacks)
     stream.sendHeaders(request.outboundHeaders(), false)
     return EnvoyStreamEmitter(stream)
   }

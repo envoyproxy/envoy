@@ -155,7 +155,7 @@ TEST_P(DispatcherIntegrationTest, Basic) {
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
   http_dispatcher_.sendHeaders(stream, c_headers, true);
 
   terminal_callback.waitReady();
@@ -215,7 +215,7 @@ TEST_P(DispatcherIntegrationTest, RaceDoesNotCauseDoubleDeletion) {
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
   // Create a stream.
-  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks, {}), ENVOY_SUCCESS);
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
   http_dispatcher_.synchronizer().waitOn("dispatch_encode_final_data");
   http_dispatcher_.sendHeaders(stream, c_headers, true);
   http_dispatcher_.synchronizer().barrierOn("dispatch_encode_final_data");

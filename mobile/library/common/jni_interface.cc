@@ -293,7 +293,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_startStream(
-    JNIEnv* env, jclass, jlong stream_handle, jobject j_context, jboolean buffer_for_retry) {
+    JNIEnv* env, jclass, jlong stream_handle, jobject j_context) {
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
 
@@ -302,9 +302,8 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   envoy_http_callbacks native_callbacks = {jvm_on_headers,  jvm_on_data,     jvm_on_metadata,
                                            jvm_on_trailers, jvm_on_error,    jvm_on_complete,
                                            jvm_on_cancel,   retained_context};
-  envoy_stream_options stream_options = {buffer_for_retry == JNI_TRUE ? true : false};
   envoy_status_t result =
-      start_stream(static_cast<envoy_stream_t>(stream_handle), native_callbacks, stream_options);
+      start_stream(static_cast<envoy_stream_t>(stream_handle), native_callbacks);
   if (result != ENVOY_SUCCESS) {
     env->DeleteGlobalRef(retained_context); // No callbacks are fired and we need to release
   }
