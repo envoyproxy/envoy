@@ -1386,7 +1386,7 @@ message HeaderMatcher {
   reserved "regex_match";
 
   // Specifies the name of the header in the request.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
