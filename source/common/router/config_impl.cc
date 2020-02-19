@@ -521,11 +521,11 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
 }
 
 // finalizePathHeaders does the "standard" path rewriting, meaning that it
-// handles the "prefix_rewrite" and "regex_rewrite" route actions. If
-// "prefix_rewrite" is specified, it takes precedence. The "matched_path"
-// argument applies only to the prefix rewriting, and describes the portion of
-// the path (excluding query parameters) that should be replaced by the
-// rewrite. A "regex_rewrite" applies to the entire path, regardless of what
+// handles the "prefix_rewrite" and "regex_rewrite" route actions, only one of
+// which can be specified. The "matched_path" argument applies only to the
+// prefix rewriting, and describes the portion of the path (excluding query
+// parameters) that should be replaced by the rewrite. A "regex_rewrite"
+// applies to the entire path (excluding query parameters), regardless of what
 // portion was matched.
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             absl::string_view matched_path,
