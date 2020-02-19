@@ -136,7 +136,7 @@ private:
   friend class CompressorFilterTest;
 
   bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
-  bool isAcceptEncodingAllowed(const Http::RequestHeaderMap& headers) const;
+  bool isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const;
   bool isContentTypeAllowed(Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
   bool isMinimumContentLength(Http::ResponseHeaderMap& headers) const;
@@ -158,12 +158,13 @@ private:
     const HeaderStat stat_;
   };
 
-  std::unique_ptr<EncodingDecision> chooseEncoding(const Http::HeaderEntry* accept_encoding) const;
+  std::unique_ptr<EncodingDecision> chooseEncoding(const Http::HeaderMap& headers) const;
 
   bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;
   std::unique_ptr<Compressor::Compressor> compressor_;
   CompressorFilterConfigSharedPtr config_;
+  std::unique_ptr<std::string> accept_encoding_;
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};

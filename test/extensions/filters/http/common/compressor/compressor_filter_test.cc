@@ -63,13 +63,16 @@ protected:
     return filter_->hasCacheControlNoTransform(headers);
   }
 
-  bool isAcceptEncodingAllowed(Http::RequestHeaderMap& headers,
+  bool isAcceptEncodingAllowed(const std::string accept_encoding,
                                const std::unique_ptr<CompressorFilter>& filter = nullptr) {
+    Http::TestResponseHeaderMapImpl headers;
     if (filter) {
+      filter->accept_encoding_ = std::make_unique<std::string>(accept_encoding);
       return filter->isAcceptEncodingAllowed(headers);
     } else {
       NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
       filter_->setDecoderFilterCallbacks(decoder_callbacks);
+      filter_->accept_encoding_ = std::make_unique<std::string>(accept_encoding);
       return filter_->isAcceptEncodingAllowed(headers);
     }
   }
@@ -107,12 +110,12 @@ protected:
   }
 
   void doRequest(Http::TestRequestHeaderMapImpl&& headers, bool end_stream) {
-    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-    filter_->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, end_stream));
   }
 
   void doResponseCompression(Http::TestResponseHeaderMapImpl&& headers, bool with_trailers) {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    filter_->setDecoderFilterCallbacks(decoder_callbacks);
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
     feedBuffer(content_length);
@@ -133,6 +136,8 @@ protected:
   }
 
   void doResponseNoCompression(Http::TestResponseHeaderMapImpl&& headers) {
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    filter_->setDecoderFilterCallbacks(decoder_callbacks);
     uint64_t content_length;
     ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
     feedBuffer(content_length);
@@ -212,7 +217,7 @@ TEST_F(CompressorFilterTest, hasCacheControlNoTransform) {
 
 // Verifies that compression is skipped when cache-control header has no-transform value.
 TEST_F(CompressorFilterTest, hasCacheControlNoTransformNoCompression) {
-  doRequest({{":method", "get"}, {"accept-encoding", "test;q=0, deflate"}}, true);
+  doRequest({{":method", "get"}, {"accept-encoding", "test;q=1, deflate"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-transform"}});
 }
@@ -225,125 +230,104 @@ TEST_F(CompressorFilterTest, hasCacheControlNoTransformCompression) {
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-cache"}}, false);
 }
 
+TEST_F(CompressorFilterTest, noAcceptEncodingHeader) {
+  doRequest({{":method", "get"}, {}}, true);
+  doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
+  EXPECT_EQ(1, stats_.counter("test.test.no_accept_header").value());
+}
+
 // Verifies isAcceptEncodingAllowed function.
 TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, br"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("deflate, test, br"));
     EXPECT_EQ(1, stats_.counter("test.test.header_compressor_used").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test;q=1.0, *;q=0.5"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("deflate, test;q=1.0, *;q=0.5"));
     EXPECT_EQ(2, stats_.counter("test.test.header_compressor_used").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {
-        {"accept-encoding", "\tdeflate\t, test\t ; q\t =\t 1.0,\t * ;q=0.5"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("\tdeflate\t, test\t ; q\t =\t 1.0,\t * ;q=0.5"));
     EXPECT_EQ(3, stats_.counter("test.test.header_compressor_used").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate,test;q=1.0,*;q=0"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("deflate,test;q=1.0,*;q=0"));
     EXPECT_EQ(4, stats_.counter("test.test.header_compressor_used").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test;q=0.2, br;q=1"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("deflate, test;q=0.2, br;q=1"));
     EXPECT_EQ(5, stats_.counter("test.test.header_compressor_used").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "*"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("*"));
     EXPECT_EQ(1, stats_.counter("test.test.header_wildcard").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "*;q=1"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("*;q=1"));
     EXPECT_EQ(2, stats_.counter("test.test.header_wildcard").value());
   }
   {
     // test header is not valid due to q=0.
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "test;q=0,*;q=1"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("test;q=0,*;q=1"));
     EXPECT_EQ(5, stats_.counter("test.test.header_compressor_used").value());
     EXPECT_EQ(1, stats_.counter("test.test.header_not_valid").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
-    EXPECT_EQ(1, stats_.counter("test.test.no_accept_header").value());
-  }
-  {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity, *;q=0"));
     EXPECT_EQ(1, stats_.counter("test.test.header_identity").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0.5, *;q=0"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity;q=0.5, *;q=0"));
     EXPECT_EQ(2, stats_.counter("test.test.header_identity").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0, *;q=0"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity;q=0, *;q=0"));
     EXPECT_EQ(2, stats_.counter("test.test.header_identity").value());
     EXPECT_EQ(2, stats_.counter("test.test.header_not_valid").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("xyz;q=1, br;q=0.2, *"));
     EXPECT_EQ(3, stats_.counter("test.test.header_wildcard").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *;q=0"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("xyz;q=1, br;q=0.2, *;q=0"));
     EXPECT_EQ(3, stats_.counter("test.test.header_wildcard").value());
     EXPECT_EQ(3, stats_.counter("test.test.header_not_valid").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("xyz;q=1, br;q=0.2"));
     EXPECT_EQ(4, stats_.counter("test.test.header_not_valid").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "identity"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity"));
     EXPECT_EQ(3, stats_.counter("test.test.header_identity").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "identity;q=1"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity;q=1"));
     EXPECT_EQ(4, stats_.counter("test.test.header_identity").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity;q=0"));
     EXPECT_EQ(4, stats_.counter("test.test.header_identity").value());
     EXPECT_EQ(5, stats_.counter("test.test.header_not_valid").value());
   }
   {
     // Test that we return identity and ignore the invalid wildcard.
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity, *;q=0"));
     EXPECT_EQ(5, stats_.counter("test.test.header_identity").value());
     EXPECT_EQ(5, stats_.counter("test.test.header_not_valid").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test;Q=.5, br"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_TRUE(isAcceptEncodingAllowed("deflate, test;Q=.5, br"));
     EXPECT_EQ(6, stats_.counter("test.test.header_compressor_used").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "identity;Q=0"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity;Q=0"));
     EXPECT_EQ(5, stats_.counter("test.test.header_identity").value());
     EXPECT_EQ(6, stats_.counter("test.test.header_not_valid").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", ""}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed(""));
     EXPECT_EQ(5, stats_.counter("test.test.header_identity").value());
     EXPECT_EQ(7, stats_.counter("test.test.header_not_valid").value());
   }
@@ -360,16 +344,14 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
 
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "test;Q=.5,test2;q=0.75"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers, filter2));
+    EXPECT_TRUE(isAcceptEncodingAllowed("test;Q=.5,test2;q=0.75"));
+    EXPECT_TRUE(isAcceptEncodingAllowed("test;Q=.5,test2;q=0.75", filter2));
     EXPECT_EQ(0, stats_.counter("test.test.header_compressor_overshadowed").value());
     EXPECT_EQ(7, stats_.counter("test.test.header_compressor_used").value());
     EXPECT_EQ(1, stats.counter("test2.test2.header_compressor_used").value());
   }
   {
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "test;q=invalid"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed("test;q=invalid"));
     EXPECT_EQ(8, stats_.counter("test.test.header_not_valid").value());
   }
   {
@@ -384,9 +366,47 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
     gzip_filter->setDecoderFilterCallbacks(decoder_callbacks);
 
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "gzip;q=0.75"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers, gzip_filter));
+    EXPECT_TRUE(isAcceptEncodingAllowed("gzip;q=0.75", gzip_filter));
     EXPECT_EQ(1, stats.counter("test2.gzip.header_gzip").value());
+    // This fake Accept-Encoding is ignored as a cached decision is used.
+    EXPECT_TRUE(isAcceptEncodingAllowed("fake", gzip_filter));
+    EXPECT_EQ(2, stats.counter("test2.gzip.header_gzip").value());
+  }
+  {
+    // check if identity stat is increased twice (the second time via the cached path).
+    Stats::IsolatedStoreImpl stats;
+    NiceMock<Runtime::MockLoader> runtime;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+    TestUtility::loadFromJson("{}", compressor);
+    CompressorFilterConfigSharedPtr config2;
+    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test"));
+    std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    filter2->setDecoderFilterCallbacks(decoder_callbacks);
+
+    EXPECT_FALSE(isAcceptEncodingAllowed("identity", filter2));
+    EXPECT_EQ(1, stats.counter("test2.test.header_identity").value());
+    // This fake Accept-Encoding is ignored as a cached decision is used.
+    EXPECT_FALSE(isAcceptEncodingAllowed("fake", filter2));
+    EXPECT_EQ(2, stats.counter("test2.test.header_identity").value());
+  }
+  {
+    // check if not_valid stat is increased twice (the second time via the cached path).
+    Stats::IsolatedStoreImpl stats;
+    NiceMock<Runtime::MockLoader> runtime;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+    TestUtility::loadFromJson("{}", compressor);
+    CompressorFilterConfigSharedPtr config2;
+    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test"));
+    std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    filter2->setDecoderFilterCallbacks(decoder_callbacks);
+
+    EXPECT_FALSE(isAcceptEncodingAllowed("test;q=invalid", filter2));
+    EXPECT_EQ(1, stats.counter("test2.test.header_not_valid").value());
+    // This fake Accept-Encoding is ignored as a cached decision is used.
+    EXPECT_FALSE(isAcceptEncodingAllowed("fake", filter2));
+    EXPECT_EQ(2, stats.counter("test2.test.header_not_valid").value());
   }
   {
     // Test that encoding decision is cached when used by multiple filters.
@@ -404,17 +424,38 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     filter1->setDecoderFilterCallbacks(decoder_callbacks);
     filter2->setDecoderFilterCallbacks(decoder_callbacks);
 
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "test1;Q=.5,test2;q=0.75"}};
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers, filter1));
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers, filter2));
+    std::string accept_encoding = "test1;Q=.5,test2;q=0.75";
+    EXPECT_FALSE(isAcceptEncodingAllowed(accept_encoding, filter1));
+    EXPECT_TRUE(isAcceptEncodingAllowed(accept_encoding, filter2));
     EXPECT_EQ(1, stats.counter("test1.test1.header_compressor_overshadowed").value());
     EXPECT_EQ(1, stats.counter("test2.test2.header_compressor_used").value());
-    EXPECT_FALSE(isAcceptEncodingAllowed(headers, filter1));
+    EXPECT_FALSE(isAcceptEncodingAllowed(accept_encoding, filter1));
     EXPECT_EQ(2, stats.counter("test1.test1.header_compressor_overshadowed").value());
-    // These headers are ignored. Instead the cached decision is used.
-    Http::TestRequestHeaderMapImpl headers2 = {{"accept-encoding", "fake"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers2, filter2));
+    // These fake Accept-Encoding header is ignored. Instead the cached decision is used.
+    EXPECT_TRUE(isAcceptEncodingAllowed("fake", filter2));
     EXPECT_EQ(2, stats.counter("test2.test2.header_compressor_used").value());
+  }
+  {
+    // Test that first registered filter is used when handling wildcard.
+    Stats::IsolatedStoreImpl stats;
+    NiceMock<Runtime::MockLoader> runtime;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+    TestUtility::loadFromJson("{}", compressor);
+    CompressorFilterConfigSharedPtr config1;
+    config1.reset(new MockCompressorFilterConfig(compressor, "test1.", stats, runtime, "test1"));
+    std::unique_ptr<CompressorFilter> filter1 = std::make_unique<CompressorFilter>(config1);
+    CompressorFilterConfigSharedPtr config2;
+    config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test2"));
+    std::unique_ptr<CompressorFilter> filter2 = std::make_unique<CompressorFilter>(config2);
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    filter1->setDecoderFilterCallbacks(decoder_callbacks);
+    filter2->setDecoderFilterCallbacks(decoder_callbacks);
+
+    std::string accept_encoding = "*";
+    EXPECT_TRUE(isAcceptEncodingAllowed(accept_encoding, filter1));
+    EXPECT_FALSE(isAcceptEncodingAllowed(accept_encoding, filter2));
+    EXPECT_EQ(1, stats.counter("test1.test1.header_wildcard").value());
+    EXPECT_EQ(1, stats.counter("test2.test2.header_wildcard").value());
   }
 }
 
@@ -561,7 +602,7 @@ TEST_F(CompressorFilterTest, isContentTypeAllowed) {
   }
 }
 
-// Verifies that compression is skipped when content-encoding header is NOT allowed.
+// Verifies that compression is skipped when content-type header is NOT allowed.
 TEST_F(CompressorFilterTest, ContentTypeNoCompression) {
   setUpFilter(R"EOF(
     {
@@ -579,6 +620,7 @@ TEST_F(CompressorFilterTest, ContentTypeNoCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"content-type", "image/jpeg"}});
+  EXPECT_EQ(1, stats_.counter("test.test.header_not_valid").value());
 }
 
 // Verifies that compression is NOT skipped when content-encoding header is allowed.
@@ -662,6 +704,8 @@ TEST_F(CompressorFilterTest, EtagCompression) {
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}};
   feedBuffer(256);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_FALSE(headers.has("etag"));
   EXPECT_EQ("test", headers.get_("content-encoding"));
@@ -720,6 +764,8 @@ TEST_F(CompressorFilterTest, AcceptanceTransferEncoding) {
 
 // Content-Encoding: upstream response is already encoded.
 TEST_F(CompressorFilterTest, ContentEncodingAlreadyEncoded) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   Http::TestResponseHeaderMapImpl response_headers{
       {":method", "get"}, {"content-length", "256"}, {"content-encoding", "deflate, gzip"}};
@@ -771,6 +817,8 @@ TEST_F(CompressorFilterTest, insertVaryHeader) {
 
 // Filter should set Vary header value with `accept-encoding`.
 TEST_F(CompressorFilterTest, NoVaryHeader) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
   feedBuffer(256);
@@ -781,6 +829,8 @@ TEST_F(CompressorFilterTest, NoVaryHeader) {
 
 // Filter should set Vary header value with `accept-encoding` and preserve other values.
 TEST_F(CompressorFilterTest, VaryOtherValues) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"vary", "User-Agent, Cookie"}};
@@ -792,6 +842,8 @@ TEST_F(CompressorFilterTest, VaryOtherValues) {
 
 // Vary header should have only one `accept-encoding`value.
 TEST_F(CompressorFilterTest, VaryAlreadyHasAcceptEncoding) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
   doRequest({{":method", "get"}, {"accept-encoding", "test"}}, true);
   Http::TestResponseHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"vary", "accept-encoding"}};
@@ -804,25 +856,16 @@ TEST_F(CompressorFilterTest, VaryAlreadyHasAcceptEncoding) {
 // Verify removeAcceptEncoding header.
 TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter_->setDecoderFilterCallbacks(decoder_callbacks);
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter(R"EOF({"remove_accept_encoding_header": true})EOF");
-    filter_->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }
   {
-    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks2;
-    filter_->setDecoderFilterCallbacks(decoder_callbacks2);
-    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
-    EXPECT_TRUE(headers.has("accept-encoding"));
-    EXPECT_EQ("deflate, gzip, br", headers.get_("accept-encoding"));
-  }
-  {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter("{}");
-    filter_->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));
     EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));

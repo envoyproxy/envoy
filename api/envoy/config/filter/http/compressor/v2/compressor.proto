@@ -31,5 +31,9 @@ message Compressor {
 
   // If true, removes accept-encoding from the request headers before dispatching it to the upstream
   // so that responses do not get compressed before reaching the filter.
+  // .. attention:
+  //
+  //    To avoid interfering with other compression filters in the same chain use this option in
+  //    the filter closest to the upstream.
   bool remove_accept_encoding_header = 4;
 }
