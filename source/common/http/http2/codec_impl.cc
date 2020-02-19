@@ -1076,7 +1076,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(const Http2Settings& http
 }
 
 void ConnectionImpl::onError(int lib_error_code, const char* msg, size_t len) {
-  ENVOY_CONN_LOG(trace, "nghttp2 error: lib_error_code: {}, message: {}", connection_,
+  ENVOY_CONN_LOG(debug, "nghttp2 error: lib_error_code: {}, message: {}", connection_,
                  lib_error_code, absl::string_view(msg, len));
 }
 
