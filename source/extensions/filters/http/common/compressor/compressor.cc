@@ -143,7 +143,7 @@ bool CompressorFilter::hasCacheControlNoTransform(Http::ResponseHeaderMap& heade
 }
 
 std::unique_ptr<CompressorFilter::EncodingDecision>
-CompressorFilter::chooseEncoding(const Http::HeaderMap& headers) const {
+CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
   absl::string_view content_type_value;
