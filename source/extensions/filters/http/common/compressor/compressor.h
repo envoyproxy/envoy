@@ -52,7 +52,6 @@ struct CompressorStats {
 };
 
 class CompressorFilterConfig {
-
 public:
   CompressorFilterConfig() = delete;
   virtual ~CompressorFilterConfig() = default;
@@ -101,10 +100,10 @@ using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
  */
 class CompressorFilter : public Http::StreamFilter {
 public:
-  CompressorFilter(CompressorFilterConfigSharedPtr config);
+  explicit CompressorFilter(const CompressorFilterConfigSharedPtr config);
 
   // Http::StreamFilterBase
-  void onDestroy() override{};
+  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) override;

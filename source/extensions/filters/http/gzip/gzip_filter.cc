@@ -80,7 +80,7 @@ GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip:
     compressor.set_allocated_content_length(
         new Protobuf::UInt32Value(gzip.hidden_envoy_deprecated_content_length()));
   }
-  for (const auto& ctype : gzip.hidden_envoy_deprecated_content_type()) {
+  for (const std::string& ctype : gzip.hidden_envoy_deprecated_content_type()) {
     compressor.add_content_type(ctype);
   }
   compressor.set_disable_on_etag_header(gzip.hidden_envoy_deprecated_disable_on_etag_header());

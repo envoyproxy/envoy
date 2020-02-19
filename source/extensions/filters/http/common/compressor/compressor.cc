@@ -57,7 +57,7 @@ uint32_t CompressorFilterConfig::contentLengthUint(Protobuf::uint32 length) {
   return length > 0 ? length : DefaultMinimumContentLength;
 }
 
-CompressorFilter::CompressorFilter(CompressorFilterConfigSharedPtr config)
+CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
     : skip_compression_{true}, config_(std::move(config)) {}
 
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
