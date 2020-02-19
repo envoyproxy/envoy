@@ -206,12 +206,12 @@ TEST_F(TlsInspectorTest, ClientHelloTooBig) {
   ASSERT(client_hello.size() > max_size);
   init();
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke([=, &client_hello](os_fd_t, void* buffer, size_t length,
-                                          int) -> Api::SysCallSizeResult {
-        ASSERT(length == max_size);
-        memcpy(buffer, client_hello.data(), length);
-        return Api::SysCallSizeResult{ssize_t(length), 0};
-      }));
+      .WillOnce(Invoke(
+          [=, &client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length == max_size);
+            memcpy(buffer, client_hello.data(), length);
+            return Api::SysCallSizeResult{ssize_t(length), 0};
+          }));
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
