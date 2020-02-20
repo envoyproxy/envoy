@@ -195,7 +195,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoder) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  MethodInfoPtr method_info;
+  MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
@@ -216,7 +216,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, CreateTranscoderAutoMap) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  MethodInfoPtr method_info;
+  MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
@@ -235,7 +235,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidQueryParameter) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  MethodInfoPtr method_info;
+  MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
@@ -255,7 +255,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnknownQueryParameterIsIgnored) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  MethodInfoPtr method_info;
+  MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
@@ -274,7 +274,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, IgnoredQueryParameter) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  MethodInfoPtr method_info;
+  MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
@@ -296,7 +296,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
 
   TranscoderInputStreamImpl request_in, response_in;
   std::unique_ptr<Transcoder> transcoder;
-  MethodInfoPtr method_info;
+  MethodInfoSharedPtr method_info;
   const auto status =
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
