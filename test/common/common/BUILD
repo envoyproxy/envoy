@@ -193,12 +193,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "to_lower_table_test",
-    srcs = ["to_lower_table_test.cc"],
-    deps = ["//source/common/common:to_lower_table_lib"],
-)
-
-envoy_cc_test(
     name = "token_bucket_impl_test",
     srcs = ["token_bucket_impl_test.cc"],
     deps = [

@@ -23,7 +23,7 @@ namespace {
 class ShadowWriterImplTest : public testing::Test {
 public:
   void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
-    Http::MessagePtr message(new Http::RequestMessageImpl());
+    Http::RequestMessagePtr message(new Http::RequestMessageImpl());
     message->headers().setHost(host);
     EXPECT_CALL(cm_, get(Eq("foo")));
     EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).WillOnce(ReturnRef(cm_.async_client_));
@@ -31,9 +31,9 @@ public:
     EXPECT_CALL(
         cm_.async_client_,
         send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5))))
-        .WillOnce(
-            Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
-                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        .WillOnce(Invoke(
+            [&](Http::RequestMessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
+                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               EXPECT_EQ(message, inner_message);
               EXPECT_EQ(shadowed_host, message->headers().Host()->value().getStringView());
               callback_ = &callbacks;
@@ -51,7 +51,7 @@ TEST_F(ShadowWriterImplTest, Success) {
   InSequence s;
 
   expectShadowWriter("cluster1", "cluster1-shadow");
-  Http::MessagePtr response(new Http::RequestMessageImpl());
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl());
   callback_->onSuccess(std::move(response));
 }
 
@@ -65,7 +65,7 @@ TEST_F(ShadowWriterImplTest, Failure) {
 TEST_F(ShadowWriterImplTest, NoCluster) {
   InSequence s;
 
-  Http::MessagePtr message(new Http::RequestMessageImpl());
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl());
   EXPECT_CALL(cm_, get(Eq("foo"))).WillOnce(Return(nullptr));
   EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).Times(0);
   writer_.shadow("foo", std::move(message), std::chrono::milliseconds(5));

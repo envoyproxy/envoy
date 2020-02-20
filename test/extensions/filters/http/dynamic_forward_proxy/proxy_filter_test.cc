@@ -64,7 +64,7 @@ public:
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks callbacks_;
-  Http::TestHeaderMapImpl request_headers_{{":authority", "foo"}};
+  Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
 };
 
 // Default port 80 if upstream TLS not configured.
@@ -215,7 +215,7 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar:82"), 80, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
 
-  Http::TestHeaderMapImpl headers{{":authority", "foo"}, {"x-set-header", "bar:82"}};
+  Http::TestRequestHeaderMapImpl headers{{":authority", "foo"}, {"x-set-header", "bar:82"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(headers, false));
 

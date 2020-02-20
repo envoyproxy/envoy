@@ -16,7 +16,7 @@ namespace Envoy {
 class ResponseMetadataStreamFilter : public Http::PassThroughFilter {
 public:
   // Inserts one new metadata_map.
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     Http::MetadataMap metadata_map = {{"headers", "headers"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
@@ -32,7 +32,7 @@ public:
   }
 
   // Inserts two metadata_maps by calling decoder_callbacks_->encodeMetadata() twice.
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
     Http::MetadataMap metadata_map = {{"trailers", "trailers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
@@ -43,7 +43,7 @@ public:
   }
 
   // Inserts two metadata_maps by calling decoder_callbacks_->encodeMetadata() twice.
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
     Http::MetadataMap metadata_map = {{"100-continue", "100-continue"}, {"duplicate", "duplicate"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));

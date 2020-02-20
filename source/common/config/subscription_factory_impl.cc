@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "common/config/delta_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
@@ -66,29 +65,24 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           /*is_aggregated*/ false);
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
-      return std::make_unique<DeltaSubscriptionImpl>(
+      return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope)
                   ->create(),
               dispatcher_, deltaGrpcMethod(type_url), api_config_source.transport_api_version(),
               random_, scope, Utility::parseRateLimitSettings(api_config_source), local_info_),
-          type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config), false);
+          callbacks, stats, type_url, dispatcher_, Utility::configSourceInitialFetchTimeout(config),
+          false);
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
-    if (cm_.adsMux()->isDelta()) {
-      return std::make_unique<DeltaSubscriptionImpl>(
-          cm_.adsMux(), type_url, callbacks, stats,
-          Utility::configSourceInitialFetchTimeout(config), true);
-    } else {
-      return std::make_unique<GrpcSubscriptionImpl>(
-          cm_.adsMux(), callbacks, stats, type_url, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config), true);
-    }
+    return std::make_unique<GrpcSubscriptionImpl>(
+        cm_.adsMux(), callbacks, stats, type_url, dispatcher_,
+        Utility::configSourceInitialFetchTimeout(config), true);
   }
   default:
     throw EnvoyException("Missing config source specifier in envoy::api::v2::core::ConfigSource");

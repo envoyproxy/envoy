@@ -135,7 +135,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
 
 void testHealthCheckHeaderMatch(
     const envoy::extensions::filters::http::health_check::v3::HealthCheck& input_config,
-    Http::TestHeaderMapImpl& input_headers, bool expect_health_check_response) {
+    Http::TestRequestHeaderMapImpl& input_headers, bool expect_health_check_response) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ProtobufTypes::MessagePtr config_msg = healthCheckFilterConfig.createEmptyConfigProto();
@@ -163,7 +163,7 @@ void testHealthCheckHeaderMatch(
 
   if (expect_health_check_response) {
     // Expect that the filter intercepts this request because all headers match.
-    Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
+    Http::TestResponseHeaderMapImpl health_check_response{{":status", "200"}};
     EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true));
     EXPECT_EQ(health_check_filter->decodeHeaders(input_headers, true),
               Http::FilterHeadersStatus::StopIteration);
@@ -186,7 +186,8 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
-  Http::TestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"}, {"y-healthcheck", "foo"}};
+  Http::TestRequestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"},
+                                         {"y-healthcheck", "foo"}};
 
   testHealthCheckHeaderMatch(config, headers, true);
 }
@@ -204,7 +205,8 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
-  Http::TestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"}, {"y-healthcheck", "bar"}};
+  Http::TestRequestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"},
+                                         {"y-healthcheck", "bar"}};
 
   testHealthCheckHeaderMatch(config, headers, false);
 }
@@ -222,7 +224,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
-  Http::TestHeaderMapImpl headers{{"y-healthcheck", "foo"}};
+  Http::TestRequestHeaderMapImpl headers{{"y-healthcheck", "foo"}};
 
   testHealthCheckHeaderMatch(config, headers, false);
 }
@@ -240,7 +242,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
   envoy::config::route::v3::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
 
-  Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
+  Http::TestRequestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
 
   testHealthCheckHeaderMatch(config, headers, true);
 }
@@ -259,7 +261,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   dup_header.set_name("x-healthcheck");
   dup_header.set_exact_match("bar");
 
-  Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
+  Http::TestRequestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
 
   testHealthCheckHeaderMatch(config, headers, false);
 }

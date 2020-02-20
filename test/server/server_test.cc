@@ -655,7 +655,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
 TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string response_body;
   EXPECT_EQ(Http::Code::OK,
             server_->admin().request("/runtime", "GET", response_headers, response_body));

@@ -58,8 +58,8 @@ class RequiresReformatError(ProtoSyncError):
 
   def __init__(self, message):
     super(RequiresReformatError, self).__init__(
-        '%s; either run ./ci/do_ci.sh fix_format or ./tools/proto_format.sh fix to reformat.\n' %
-        message)
+        '%s; either run ./ci/do_ci.sh fix_format or ./tools/proto_format/proto_format.sh fix to reformat.\n'
+        % message)
 
 
 def GetDirectoryFromPackage(package):
