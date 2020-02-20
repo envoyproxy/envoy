@@ -44,7 +44,7 @@ func main() {
 
 func startCollectingStats(server server.Server, cluster string, upstreamClusters []string, frequency int64) {
 	// Send LoadStatsResponse after 10 seconds to initiate the Load Reporting
-	ticker := time.NewTicker(time.Duration(5) * time.Second)
+	ticker := time.NewTicker(time.Duration(10) * time.Second)
 	go func() {
 		for range ticker.C {
 			server.SendResponse(cluster, upstreamClusters, frequency)
