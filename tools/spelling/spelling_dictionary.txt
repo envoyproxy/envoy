@@ -964,6 +964,7 @@ sched
 schemas
 scopekey
 sendmsg
+sendmmsg
 sendto
 serializable
 serializer

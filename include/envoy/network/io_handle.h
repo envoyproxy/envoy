@@ -105,7 +105,7 @@ public:
     uint32_t* dropped_packets_;
 
     // Packet headers for each received packet. It's populated according to packet receive order.
-    // Only the first entry is used to return per packet infomation by recvmsg.
+    // Only the first entry is used to return per packet information by recvmsg.
     absl::FixedArray<RecvMsgPerPacketInfo> msg_;
   };
 

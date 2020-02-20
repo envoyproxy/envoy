@@ -172,7 +172,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
 TEST_P(UdpListenerImplTest, UdpEcho) {
   // We send 17 packets and expect it to echo.
   absl::FixedArray<std::string> client_data({"first", "second", "third", "forth", "fifth", "sixth",
-                                             "seventh", "eighth", "nineth", "tenth", "eleventh",
+                                             "seventh", "eighth", "ninth", "tenth", "eleventh",
                                              "twelveth", "thirteenth", "fourteenth", "fifteenth",
                                              "sixteenth", "seventeenth"});
   for (size_t i = 0; i < client_data.size(); ++i) {
