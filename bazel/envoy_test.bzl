@@ -70,6 +70,7 @@ def _envoy_test_linkopts():
 def envoy_cc_fuzz_test(
         name,
         corpus,
+        dictionaries = [],
         repository = "",
         size = "medium",
         deps = [],
@@ -84,9 +85,12 @@ def envoy_cc_fuzz_test(
         )
     else:
         corpus_name = corpus
+    tar_src = [corpus_name]
+    if dictionaries:
+        tar_src += dictionaries
     pkg_tar(
         name = name + "_corpus_tar",
-        srcs = [corpus_name],
+        srcs = tar_src,
         testonly = 1,
     )
     test_lib_name = name + "_lib"
@@ -159,7 +163,8 @@ def envoy_cc_test(
         shard_count = None,
         coverage = True,
         local = False,
-        size = "medium"):
+        size = "medium",
+        flaky = False):
     if coverage:
         coverage_tags = tags + ["coverage_test_lib"]
     else:
@@ -195,6 +200,7 @@ def envoy_cc_test(
         local = local,
         shard_count = shard_count,
         size = size,
+        flaky = flaky,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified

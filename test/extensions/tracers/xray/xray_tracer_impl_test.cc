@@ -26,7 +26,7 @@ public:
   NiceMock<Server::MockInstance> server_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Tracing::MockConfig> tracing_config_;
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":authority", "api.amazon.com"}, {":path", "/"}, {":method", "GET"}};
 };
 

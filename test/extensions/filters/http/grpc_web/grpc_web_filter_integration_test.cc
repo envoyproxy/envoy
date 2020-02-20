@@ -25,17 +25,19 @@ TEST_P(GrpcWebFilterIntegrationTest, GRPCWebTrailersNotDuplicated) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
-  Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
-  Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"request1", "trailer1"},
+                                                   {"request2", "trailer2"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"response1", "trailer1"},
+                                                     {"response2", "trailer2"}};
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                          {":path", "/test/long/url"},
-                                                          {":scheme", "http"},
-                                                          {"content-type", "application/grpc-web"},
-                                                          {":authority", "host"}});
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {"content-type", "application/grpc-web"},
+                                     {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, 1, false);

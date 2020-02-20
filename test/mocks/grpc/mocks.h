@@ -45,7 +45,7 @@ public:
     onSuccess_(*response, span);
   }
 
-  MOCK_METHOD(void, onCreateInitialMetadata, (Http::HeaderMap & metadata));
+  MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
   MOCK_METHOD(void, onSuccess_, (const ResponseType& response, Tracing::Span& span));
   MOCK_METHOD(void, onFailure,
               (Status::GrpcStatus status, const std::string& message, Tracing::Span& span));
@@ -54,25 +54,28 @@ public:
 template <class ResponseType>
 class MockAsyncStreamCallbacks : public AsyncStreamCallbacks<ResponseType> {
 public:
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
     onReceiveInitialMetadata_(*metadata);
   }
 
   void onReceiveMessage(std::unique_ptr<ResponseType>&& message) { onReceiveMessage_(*message); }
 
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
     onReceiveTrailingMetadata_(*metadata);
   }
 
-  MOCK_METHOD(void, onCreateInitialMetadata, (Http::HeaderMap & metadata));
-  MOCK_METHOD(void, onReceiveInitialMetadata_, (const Http::HeaderMap& metadata));
+  MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
+  MOCK_METHOD(void, onReceiveInitialMetadata_, (const Http::ResponseHeaderMap& metadata));
   MOCK_METHOD(void, onReceiveMessage_, (const ResponseType& message));
-  MOCK_METHOD(void, onReceiveTrailingMetadata_, (const Http::HeaderMap& metadata));
+  MOCK_METHOD(void, onReceiveTrailingMetadata_, (const Http::ResponseTrailerMap& metadata));
   MOCK_METHOD(void, onRemoteClose, (Status::GrpcStatus status, const std::string& message));
 };
 
 class MockAsyncClient : public RawAsyncClient {
 public:
+  MockAsyncClient();
+  ~MockAsyncClient();
+
   MOCK_METHOD(AsyncRequest*, sendRaw,
               (absl::string_view service_full_name, absl::string_view method_name,
                Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
@@ -81,6 +84,8 @@ public:
               (absl::string_view service_full_name, absl::string_view method_name,
                RawAsyncStreamCallbacks& callbacks,
                const Http::AsyncClient::StreamOptions& options));
+
+  std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {

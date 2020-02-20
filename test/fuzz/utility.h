@@ -76,11 +76,12 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
   return processed;
 }
 
-// Convert from test proto Headers to TestHeaderMapImpl.
-inline Http::TestHeaderMapImpl fromHeaders(
+// Convert from test proto Headers to a variant of TestHeaderMapImpl.
+template <class T>
+inline T fromHeaders(
     const test::fuzz::Headers& headers,
     const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
-  Http::TestHeaderMapImpl header_map;
+  T header_map;
   for (const auto& header : headers.headers()) {
     // HeaderMapImpl and places such as the route lookup should never see strings with embedded
     // {NULL, CR, LF} values, the HTTP codecs should reject them. So, don't inject any such strings
@@ -89,7 +90,7 @@ inline Http::TestHeaderMapImpl fromHeaders(
     // not supposed to do this.
     const std::string key =
         header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
-    if (ignore_headers.find(StringUtil::toLower(key)) == ignore_headers.end()) {
+    if (ignore_headers.find(absl::AsciiStrToLower(key)) == ignore_headers.end()) {
       header_map.addCopy(key, replaceInvalidCharacters(header.value()));
     }
   }

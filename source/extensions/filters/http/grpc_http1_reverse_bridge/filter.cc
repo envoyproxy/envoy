@@ -63,7 +63,7 @@ void adjustContentLength(Http::HeaderMap& headers,
 }
 } // namespace
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   // Short circuit if header only.
   if (end_stream) {
     return Http::FilterHeadersStatus::Continue;
@@ -124,7 +124,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (enabled_) {
     auto content_type = headers.ContentType();
 
@@ -190,7 +190,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
   }
 }
 
-Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   trailers.setGrpcStatus(grpc_status_);
 
   if (withhold_grpc_frames_) {

@@ -95,10 +95,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "54597f640c0ab5e5d783d2f3d3cfe8ad6da999ef1a194d89c2c5ab89a1fd8e13",
-        strip_prefix = "libprotobuf-mutator-dd89da92b59b1714bab6e2a135093948a1cf1c6a",
-        # 2019-10-08
-        urls = ["https://github.com/google/libprotobuf-mutator/archive/dd89da92b59b1714bab6e2a135093948a1cf1c6a.tar.gz"],
+        sha256 = "",
+        strip_prefix = "libprotobuf-mutator-3521f47a2828da9ace403e4ecc4aece1a84feb36",
+        # 2020-02-04
+        urls = ["https://github.com/google/libprotobuf-mutator/archive/3521f47a2828da9ace403e4ecc4aece1a84feb36.tar.gz"],
     ),
     com_github_gperftools_gperftools = dict(
         # TODO(cmluciano): Bump to release 2.8
@@ -109,9 +109,11 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "ffbe61269160ea745e487f79b0fd06b6edd3d50c6d9123f053b5634737cf2f69",
-        strip_prefix = "grpc-1.25.0",
-        urls = ["https://github.com/grpc/grpc/archive/v1.25.0.tar.gz"],
+        # TODO(JimmyCYJ): Bump to release 1.27
+        # This sha on grpc:v1.25.x branch is specifically chosen to fix gRPC STS call credential options.
+        sha256 = "bbc8f020f4e85ec029b047fab939b8c81f3d67254b5c724e1003a2bc49ddd123",
+        strip_prefix = "grpc-d8f4928fa779f6005a7fe55a176bdb373b0f910f",
+        urls = ["https://github.com/grpc/grpc/archive/d8f4928fa779f6005a7fe55a176bdb373b0f910f.tar.gz"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
@@ -134,9 +136,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
-        sha256 = "052fd37cd698e24ab73ee18fc3fa55acd1d43153c12a0e65b0fba0447de1117e",
-        strip_prefix = "dd-opentracing-cpp-1.1.1",
-        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.1.tar.gz"],
+        sha256 = "6dc1088ab7f788b6c849fbaa6300517c8fdf88991a70b778be79c284c36857bf",
+        strip_prefix = "dd-opentracing-cpp-1.1.3",
+        urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v1.1.3.tar.gz"],
     ),
     com_github_google_benchmark = dict(
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
@@ -268,9 +270,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz
-        sha256 = "63ca7aa58511beb8cd6e6b93dbb25154bd14c8c8a316a1b20430e830060fa7db",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/372452f3cea7ef3888eb1bedb19a041a037fd7a7.tar.gz
+        sha256 = "4993b776fe596f141366d62f09c1f8e91be9f968631477a8e8e1432f0569391c",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/372452f3cea7ef3888eb1bedb19a041a037fd7a7.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "b4eaf871d4910c599bb70eaef2eec852747989f15f26885353b7c5188a940ca8",
@@ -303,18 +305,18 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/protocolbuffers/upb/archive/8a3ae1ef3e3e3f26b45dec735c5776737fc7247f.tar.gz"],
     ),
     kafka_source = dict(
-        sha256 = "feaa32e5c42acf42bd587f8f0b1ccce679db227620da97eed013f4c44a44f64d",
-        strip_prefix = "kafka-2.3.1/clients/src/main/resources/common/message",
-        urls = ["https://github.com/apache/kafka/archive/2.3.1.zip"],
+        sha256 = "e7b748a62e432b5770db6dbb3b034c68c0ea212812cb51603ee7f3a8a35f06be",
+        strip_prefix = "kafka-2.4.0/clients/src/main/resources/common/message",
+        urls = ["https://github.com/apache/kafka/archive/2.4.0.zip"],
     ),
     kafka_server_binary = dict(
-        sha256 = "5a3ddd4148371284693370d56f6f66c7a86d86dd96c533447d2a94d176768d2e",
-        strip_prefix = "kafka_2.12-2.3.1",
-        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.3.1/kafka_2.12-2.3.1.tgz"],
+        sha256 = "b9582bab0c3e8d131953b1afa72d6885ca1caae0061c2623071e7f396f2ccfee",
+        strip_prefix = "kafka_2.12-2.4.0",
+        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.4.0/kafka_2.12-2.4.0.tgz"],
     ),
     kafka_python_client = dict(
-        sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",
-        strip_prefix = "kafka-python-1.4.7",
-        urls = ["https://github.com/dpkp/kafka-python/archive/1.4.7.tar.gz"],
+        sha256 = "454bf3aafef9348017192417b7f0828a347ec2eaf3efba59336f3a3b68f10094",
+        strip_prefix = "kafka-python-2.0.0",
+        urls = ["https://github.com/dpkp/kafka-python/archive/2.0.0.tar.gz"],
     ),
 )

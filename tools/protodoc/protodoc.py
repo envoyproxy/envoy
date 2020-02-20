@@ -15,6 +15,7 @@ from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 
+from udpa.annotations import status_pb2
 from validate import validate_pb2
 
 # Namespace prefix for Envoy core APIs.
@@ -576,8 +577,13 @@ class RstFormatVisitor(visitor.Visitor):
     # toctrees.
     if not has_messages:
       header = ':orphan:\n\n' + header
+    warnings = ''
+    if file_proto.options.HasExtension(status_pb2.file_status):
+      if file_proto.options.Extensions[status_pb2.file_status].work_in_progress:
+        warnings += ('.. warning::\n   This API is work-in-progress and is '
+                     'subject to breaking changes.\n\n')
     debug_proto = FormatProtoAsBlockComment(file_proto)
-    return header + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
+    return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 
 
 def Main():

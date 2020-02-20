@@ -37,8 +37,8 @@ public:
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
   // Http::RestApiFetcher
-  void createRequest(Http::Message& request) override;
-  void parseResponse(const Http::Message& response) override;
+  void createRequest(Http::RequestMessage& request) override;
+  void parseResponse(const Http::ResponseMessage& response) override;
   void onFetchComplete() override;
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 

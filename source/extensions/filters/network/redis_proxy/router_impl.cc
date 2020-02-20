@@ -25,8 +25,7 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
     return false;
   }
 
-  std::string to_lower_string(command);
-  to_lower_table_.toLowerCase(to_lower_string);
+  std::string to_lower_string = absl::AsciiStrToLower(command);
 
   if (exclude_read_commands_ && Common::Redis::SupportedCommands::isReadCommand(to_lower_string)) {
     return false;
@@ -63,7 +62,7 @@ PrefixRoutes::PrefixRoutes(
     std::string copy(route.prefix());
 
     if (case_insensitive_) {
-      to_lower_table_.toLowerCase(copy);
+      absl::AsciiStrToLower(&copy);
     }
 
     auto success = prefix_lookup_table_.add(
@@ -77,8 +76,7 @@ PrefixRoutes::PrefixRoutes(
 RouteSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
   PrefixSharedPtr value = nullptr;
   if (case_insensitive_) {
-    std::string copy(key);
-    to_lower_table_.toLowerCase(copy);
+    std::string copy = absl::AsciiStrToLower(key);
     value = prefix_lookup_table_.findLongestPrefix(copy.c_str());
   } else {
     value = prefix_lookup_table_.findLongestPrefix(key.c_str());

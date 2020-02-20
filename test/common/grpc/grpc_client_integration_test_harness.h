@@ -134,12 +134,12 @@ public:
   }
 
   void sendServerInitialMetadata(const TestMetadata& metadata) {
-    Http::HeaderMapPtr reply_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
+    Http::HeaderMapPtr reply_headers{new Http::TestResponseHeaderMapImpl{{":status", "200"}}};
     for (auto& value : metadata) {
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(Http::HeaderMapImpl(*reply_headers), false);
+    fake_stream_->encodeHeaders(Http::TestHeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {

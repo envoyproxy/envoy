@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
@@ -172,6 +173,15 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span, const Http::HeaderMap
     span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
     span.setTag(Tracing::Tags::get().HttpProtocol,
                 AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol()));
+
+    const auto& remote_address = stream_info.downstreamDirectRemoteAddress();
+
+    if (remote_address->type() == Network::Address::Type::Ip) {
+      const auto remote_ip = remote_address->ip();
+      span.setTag(Tracing::Tags::get().PeerAddress, remote_ip->addressAsString());
+    } else {
+      span.setTag(Tracing::Tags::get().PeerAddress, remote_address->logicalName());
+    }
 
     if (request_headers->ClientTraceId()) {
       span.setTag(Tracing::Tags::get().GuidXClientTraceId,
