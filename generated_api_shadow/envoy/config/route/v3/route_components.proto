@@ -14,7 +14,6 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/versioning.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -839,8 +838,7 @@ message RouteAction {
   //
   //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
   //   requests to */prefix/etc* will be stripped to */etc*.
-  string prefix_rewrite = 5
-      [(udpa.annotations.field_migrate).oneof_promotion = "path_rewrite_specifier"];
+  string prefix_rewrite = 5;
 
   // Indicates that during forwarding, portions of the path that match the
   // pattern should be rewritten, even allowing the substitution of capture
@@ -870,8 +868,7 @@ message RouteAction {
   // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
   //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
   //   ``/aaa/yyy/bbb``.
-  RegexRewrite regex_rewrite = 32
-      [(udpa.annotations.field_migrate).oneof_promotion = "path_rewrite_specifier"];
+  RegexRewrite regex_rewrite = 32;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
