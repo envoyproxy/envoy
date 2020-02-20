@@ -1407,6 +1407,11 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      "priority": 6,
      "local_origin_success_rate": {
       "value": 93.2
+     },
+     "locality": {
+       "region": "test_region",
+       "zone": "test_zone",
+       "sub_zone": "test_sub_zone"
      }
     }
    ]
