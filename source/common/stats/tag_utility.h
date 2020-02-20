@@ -10,7 +10,8 @@ namespace Stats {
 namespace TagUtility {
 
 /**
- * Combines a stat name with its tag to create the final stat name to use.
+ * Combines a stat name with its tag to create the final stat name to use. The resulting
+ * StatNames will be valid through the lifetime of this object and all provided stat names.
  */
 class TagStatNameJoiner {
 public:
@@ -21,12 +22,7 @@ public:
    * @param stat_name_tags StatNameTagVector the stat name tags to add to the stat name.
    */
   TagStatNameJoiner(StatName prefix, StatName stat_name, const StatNameTagVector& stat_name_tags,
-                    SymbolTable& symbol_table) {
-    prefix_storage_ = symbol_table.join({prefix, stat_name});
-    name_ = StatName(prefix_storage_.get());
-    full_name_storage_ =
-        joinNameAndTags(StatName(prefix_storage_.get()), stat_name_tags, symbol_table);
-  }
+                    SymbolTable& symbol_table);
 
   /**
    * Combines a stat name and tags into a single stat name.
@@ -34,10 +30,7 @@ public:
    * @param stat_name_tags StatNameTagVector the stat name tags to add to the stat name.
    */
   TagStatNameJoiner(StatName stat_name, const StatNameTagVector& stat_name_tags,
-                    SymbolTable& symbol_table) {
-    name_ = stat_name;
-    full_name_storage_ = joinNameAndTags(stat_name, stat_name_tags, symbol_table);
-  }
+                    SymbolTable& symbol_table);
 
   /**
    * @return StatName the full stat name.
