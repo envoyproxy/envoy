@@ -174,6 +174,20 @@ public:
     return copy_size;
   }
 
+  /**
+   * Describe the in-memory representation of the slice. For use
+   * in tests that want to make assertions about the specific arrangement of
+   * bytes in a slice.
+   */
+  struct SliceRepresentation {
+    uint64_t data;
+    uint64_t reservable;
+    uint64_t capacity;
+  };
+  SliceRepresentation describeSliceForTest() const {
+    return SliceRepresentation{dataSize(), reservableSize(), capacity_};
+  }
+
 protected:
   Slice(uint64_t data, uint64_t reservable, uint64_t capacity)
       : data_(data), reservable_(reservable), capacity_(capacity) {}
@@ -540,6 +554,13 @@ public:
    *          the same destination.
    */
   static void useOldImpl(bool use_old_impl);
+
+  /**
+   * Describe the in-memory representation of the slices in the buffer. For use
+   * in tests that want to make assertions about the specific arrangement of
+   * bytes in the buffer.
+   */
+  std::vector<OwnedSlice::SliceRepresentation> describeSlicesForTest() const;
 
 private:
   /**
