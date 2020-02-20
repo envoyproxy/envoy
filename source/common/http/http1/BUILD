@@ -29,7 +29,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:to_lower_table_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_helper_lib",
         "//source/common/http:codes_lib",
