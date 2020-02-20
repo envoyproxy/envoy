@@ -50,9 +50,8 @@ private:
 class HistogramImplHelper : public MetricImpl<Histogram> {
 public:
   HistogramImplHelper(StatName name, const std::string& tag_extracted_name,
-                      const std::vector<Tag>& tags, const StatNameTagVector& stat_name_tags,
-                      SymbolTable& symbol_table)
-      : MetricImpl<Histogram>(name, tag_extracted_name, tags, stat_name_tags, symbol_table) {}
+                      const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table)
+      : MetricImpl<Histogram>(name, tag_extracted_name, stat_name_tags, symbol_table) {}
   HistogramImplHelper(SymbolTable& symbol_table) : MetricImpl<Histogram>(symbol_table) {}
 
   // RefcountInterface
@@ -70,8 +69,8 @@ private:
 class HistogramImpl : public HistogramImplHelper {
 public:
   HistogramImpl(StatName name, Unit unit, Store& parent, const std::string& tag_extracted_name,
-                const std::vector<Tag>& tags, const StatNameTagVector& stat_name_tags)
-      : HistogramImplHelper(name, tag_extracted_name, tags, stat_name_tags, parent.symbolTable()),
+                const StatNameTagVector& stat_name_tags)
+      : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, parent.symbolTable()),
         unit_(unit), parent_(parent) {}
   ~HistogramImpl() override {
     // We must explicitly free the StatName here in order to supply the

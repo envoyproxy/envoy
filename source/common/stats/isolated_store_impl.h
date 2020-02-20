@@ -103,8 +103,8 @@ public:
   // Stats::Scope
   Counter& counterFromStatName(StatName name) override { return counters_.get(name); }
   Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
-    SymbolTable::StoragePtr suffixed_storage = TagUtility::addTagSuffix(name, tags, symbolTable());
-    Counter& counter = counters_.get(StatName(suffixed_storage.get()));
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Counter& counter = counters_.get(joiner.fullStatName());
     return counter;
   }
   ScopePtr createScope(const std::string& name) override;
@@ -116,8 +116,8 @@ public:
   }
   Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
                            Gauge::ImportMode import_mode) override {
-    SymbolTable::StoragePtr suffixed_storage = TagUtility::addTagSuffix(name, tags, symbolTable());
-    Gauge& gauge = gauges_.get(StatName(suffixed_storage.get()));
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Gauge& gauge = gauges_.get(joiner.fullStatName());
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
@@ -129,8 +129,8 @@ public:
   }
   Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
                                    Histogram::Unit unit) override {
-    SymbolTable::StoragePtr suffixed_storage = TagUtility::addTagSuffix(name, tags, symbolTable());
-    Histogram& histogram = histograms_.get(StatName(suffixed_storage.get()), unit);
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Histogram& histogram = histograms_.get(joiner.fullStatName(), unit);
     return histogram;
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
