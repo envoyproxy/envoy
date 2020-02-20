@@ -4,9 +4,9 @@ package envoy.admin.v3;
 
 import "envoy/admin/v3/metrics.proto";
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "envoy/type/v3/percent.proto";
-import "envoy/config/core/v3/base.proto";
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.admin.v3";
@@ -128,7 +128,7 @@ message HostStatus {
   type.v3.Percent local_origin_success_rate = 8;
 
   // locality of the host.
-  envoy.config.core.v3.Locality locality = 9;
+  config.core.v3.Locality locality = 9;
 }
 
 // Health status for a host.
