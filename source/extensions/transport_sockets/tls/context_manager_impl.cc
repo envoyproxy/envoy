@@ -15,7 +15,7 @@ namespace Tls {
 
 ContextManagerImpl::~ContextManagerImpl() {
   removeEmptyContexts();
-  KNOWN_ISSUE_ASSERT(contexts_.empty(), "issue https://github.com/envoyproxy/envoy/issues/10030");
+  KNOWN_ISSUE_ASSERT(contexts_.empty(), "https://github.com/envoyproxy/envoy/issues/10030");
 }
 
 void ContextManagerImpl::removeEmptyContexts() {
