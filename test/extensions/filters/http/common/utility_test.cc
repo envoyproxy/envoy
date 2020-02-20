@@ -27,7 +27,7 @@ TEST(FilterNameUtilTest, TestIgnoreCanonicalName) {
 }
 
 // Test that deprecated names are canonicalized.
-TEST(FilterNameUtilTest, TestDeprecatedName) {
+TEST(FilterNameUtilTest, DEPRECATED_FEATURE_TEST(TestDeprecatedName)) {
   NiceMock<Runtime::MockLoader> runtime;
 
   EXPECT_CALL(
