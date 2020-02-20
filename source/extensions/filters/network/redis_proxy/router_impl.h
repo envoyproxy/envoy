@@ -13,8 +13,6 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/to_lower_table.h"
-
 #include "extensions/filters/network/common/redis/supported_commands.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "extensions/filters/network/redis_proxy/router.h"
@@ -42,7 +40,6 @@ private:
   const bool exclude_read_commands_;
   ConnPool::InstanceSharedPtr upstream_;
   Runtime::Loader& runtime_;
-  const ToLowerTable to_lower_table_;
 };
 
 class Prefix : public Route {
@@ -75,7 +72,6 @@ public:
 
 private:
   TrieLookupTable<PrefixSharedPtr> prefix_lookup_table_;
-  const ToLowerTable to_lower_table_;
   const bool case_insensitive_;
   Upstreams upstreams_;
   RouteSharedPtr catch_all_route_;

@@ -88,10 +88,10 @@ private:
   };
 
   // Callback for events on sockets tracked in events_.
-  void onEventCallback(int fd, uint32_t events);
+  void onEventCallback(os_fd_t fd, uint32_t events);
   // c-ares callback when a socket state changes, indicating that libevent
   // should listen for read/write events.
-  void onAresSocketStateChange(int fd, int read, int write);
+  void onAresSocketStateChange(os_fd_t fd, int read, int write);
   // Initialize the channel.
   void initializeChannel(ares_options* options, int optmask);
   // Update timer for c-ares timeouts.

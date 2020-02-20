@@ -70,6 +70,7 @@ public:
   std::unique_ptr<Filter> filter_;
   std::unique_ptr<MockVerifier> mock_verifier_;
   NiceMock<MockVerifierCallbacks> verifier_callback_;
+  Http::TestRequestTrailerMapImpl trailers_;
 };
 
 // This test verifies Verifier::Callback is called inline with OK status.
@@ -81,7 +82,7 @@ TEST_F(FilterTest, InlineOK) {
     context->callback()->onComplete(Status::Ok);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
@@ -89,12 +90,12 @@ TEST_F(FilterTest, InlineOK) {
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 }
 
 // This test verifies Verifier::Callback is not called for CORS preflight request.
 TEST_F(FilterTest, CorsPreflight) {
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "OPTIONS"},
       {":path", "/"},
       {":scheme", "http"},
@@ -126,13 +127,13 @@ TEST_F(FilterTest, TestSetPayloadCall) {
         EXPECT_TRUE(TestUtility::protoEqual(out_payload, payload));
       }));
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 }
 
 // This test verifies Verifier::Callback is called inline with a failure(401 Unauthorized) status.
@@ -146,13 +147,13 @@ TEST_F(FilterTest, InlineUnauthorizedFailure) {
     context->callback()->onComplete(Status::JwtBadFormat);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1U, mock_config_->stats().denied_.value());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
   EXPECT_EQ("jwt_authn_access_denied", filter_callbacks_.details_);
 }
 
@@ -167,13 +168,13 @@ TEST_F(FilterTest, InlineForbiddenFailure) {
     context->callback()->onComplete(Status::JwtAudienceNotAllowed);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1U, mock_config_->stats().denied_.value());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
   EXPECT_EQ("jwt_authn_access_denied", filter_callbacks_.details_);
 }
 
@@ -186,19 +187,19 @@ TEST_F(FilterTest, OutBoundOK) {
     m_cb = context->callback();
   }));
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(trailers_));
 
   // Callback is called now with OK status.
   m_cb->onComplete(Status::Ok);
 
   EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 }
 
 // This test verifies Verifier::Callback is called with a failure(401 Unauthorized) after verify()
@@ -211,12 +212,12 @@ TEST_F(FilterTest, OutBoundUnauthorizedFailure) {
     m_cb = context->callback();
   }));
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(trailers_));
 
   // Callback is called now with a failure status.
   EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
@@ -224,7 +225,7 @@ TEST_F(FilterTest, OutBoundUnauthorizedFailure) {
 
   EXPECT_EQ(1U, mock_config_->stats().denied_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 
   // Should be OK to call the onComplete() again.
   m_cb->onComplete(Status::JwtBadFormat);
@@ -240,12 +241,12 @@ TEST_F(FilterTest, OutBoundForbiddenFailure) {
     m_cb = context->callback();
   }));
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(trailers_));
 
   // Callback is called now with a failure status.
   EXPECT_CALL(filter_callbacks_, sendLocalReply(Http::Code::Forbidden, _, _, _, _));
@@ -253,7 +254,7 @@ TEST_F(FilterTest, OutBoundForbiddenFailure) {
 
   EXPECT_EQ(1U, mock_config_->stats().denied_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 
   // Should be OK to call the onComplete() again.
   m_cb->onComplete(Status::JwtAudienceNotAllowed);
@@ -263,13 +264,13 @@ TEST_F(FilterTest, OutBoundForbiddenFailure) {
 TEST_F(FilterTest, TestNoRouteMatched) {
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(nullptr));
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 }
 
 } // namespace

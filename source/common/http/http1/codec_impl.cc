@@ -19,6 +19,7 @@
 #include "common/runtime/runtime_impl.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Http {
@@ -94,7 +95,7 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
   }
 }
 
-void ResponseEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
+void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   processing_100_continue_ = true;
   encodeHeaders(headers, false);
@@ -274,7 +275,7 @@ const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLoc
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
-void ResponseEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
   started_response_ = true;
 
   // The contract is that client codecs must ensure that :status is present.
@@ -310,7 +311,7 @@ void ResponseEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_strea
 
 static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 
-void RequestEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
+void RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
   if (!method || !path) {
@@ -361,11 +362,6 @@ http_parser_settings ConnectionImpl::settings_{
     nullptr  // on_chunk_complete
 };
 
-const ToLowerTable& ConnectionImpl::toLowerTable() {
-  static auto* table = new ToLowerTable();
-  return *table;
-}
-
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                                http_parser_type type, uint32_t max_headers_kb,
                                const uint32_t max_headers_count,
@@ -391,7 +387,7 @@ void ConnectionImpl::completeLastHeader() {
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
   if (!current_header_field_.empty()) {
-    toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
+    current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
     headers().addViaMove(std::move(current_header_field_), std::move(current_header_value_));
   }
 
@@ -583,8 +579,8 @@ int ConnectionImpl::onHeadersCompleteBase() {
     absl::string_view encoding = current_headers.TransferEncoding()->value().getStringView();
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
-        encoding != Headers::get().TransferEncodingValues.Identity &&
-        encoding != Headers::get().TransferEncodingValues.Chunked) {
+        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Identity) &&
+        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError();
       throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
@@ -884,6 +880,10 @@ int ClientConnectionImpl::onHeadersComplete() {
       // Swallow the spurious onMessageComplete and continue processing.
       ignore_message_complete_for_100_continue_ = true;
       pending_responses_.front().decoder_->decode100ContinueHeaders(std::move(headers));
+
+      // Reset to ensure no information from the continue headers is used for the response headers
+      // in case the callee does not move the headers out.
+      headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
     } else if (cannotHaveBody()) {
       deferred_end_stream_headers_ = true;
     } else {

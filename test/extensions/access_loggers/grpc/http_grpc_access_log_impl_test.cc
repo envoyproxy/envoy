@@ -87,7 +87,7 @@ public:
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", request_method},
     };
 
@@ -241,7 +241,7 @@ response: {}
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":scheme", "scheme_value"},
         {":authority", "authority_value"},
         {":path", "path_value"},
@@ -252,7 +252,7 @@ response: {}
         {"x-request-id", "x-request-id_value"},
         {"x-envoy-original-path", "x-envoy-original-path_value"},
     };
-    Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
     expectLog(R"EOF(
 common_properties:
@@ -325,7 +325,7 @@ response:
     stream_info.start_time_ = SystemTime(1h);
     stream_info.upstream_transport_failure_reason_ = "TLS error";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -377,7 +377,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -437,7 +437,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -487,7 +487,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -537,7 +537,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -587,7 +587,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -646,7 +646,7 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":scheme", "scheme_value"},
         {":authority", "authority_value"},
         {":path", "path_value"},
@@ -655,14 +655,14 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
         {"x-custom-request", "custom_value"},
         {"x-custom-empty", ""},
     };
-    Http::TestHeaderMapImpl response_headers{
+    Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
         {"x-custom-response", "custom_value"},
         {"x-custom-empty", ""},
     };
 
-    Http::TestHeaderMapImpl response_trailers{
+    Http::TestResponseTrailerMapImpl response_trailers{
         {"x-logged-trailer", "value"},
         {"x-empty-trailer", ""},
         {"x-unlogged-trailer", "2"},

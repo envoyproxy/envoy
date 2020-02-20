@@ -65,11 +65,11 @@ public:
   void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
 
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override {
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 
@@ -83,7 +83,7 @@ public:
     callbacks_->onDiscoveryResponse(std::move(message));
   }
 
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 

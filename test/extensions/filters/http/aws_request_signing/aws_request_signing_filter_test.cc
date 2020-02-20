@@ -1,6 +1,7 @@
 #include "extensions/common/aws/signer.h"
 #include "extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
+#include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/http/mocks.h"
 
 #include "gmock/gmock.h"
@@ -12,20 +13,14 @@ namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 namespace {
 
-class MockSigner : public Common::Aws::Signer {
-public:
-  MOCK_METHOD(void, sign, (Http::HeaderMap&));
-  MOCK_METHOD(void, sign, (Http::Message&, bool));
-};
-
 class MockFilterConfig : public FilterConfig {
 public:
-  MockFilterConfig() { signer_ = std::make_shared<MockSigner>(); }
+  MockFilterConfig() { signer_ = std::make_shared<Common::Aws::MockSigner>(); }
 
   Common::Aws::Signer& signer() override { return *signer_; }
   FilterStats& stats() override { return stats_; }
 
-  std::shared_ptr<MockSigner> signer_;
+  std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;
   FilterStats stats_{Filter::generateStats("test", stats_store_)};
 };
@@ -46,7 +41,7 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   setup();
   EXPECT_CALL(*(filter_config_->signer_), sign(_)).Times(1);
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
 }
@@ -58,7 +53,7 @@ TEST_F(AwsRequestSigningFilterTest, SignFails) {
     throw EnvoyException("failed");
   }));
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
 }

@@ -162,7 +162,7 @@ message DatadogConfig {
 }
 
 // Configuration for the OpenCensus tracer.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 // [#extension: envoy.tracers.opencensus]
 message OpenCensusConfig {
   option (udpa.annotations.versioning).previous_message_type =
@@ -219,13 +219,18 @@ message OpenCensusConfig {
   // The URL to Zipkin, e.g. "http://127.0.0.1:9411/api/v2/spans"
   string zipkin_url = 6;
 
-  // Enables the OpenCensus Agent exporter if set to true. The address must also
-  // be set.
+  // Enables the OpenCensus Agent exporter if set to true. The ocagent_address or
+  // ocagent_grpc_service must also be set.
   bool ocagent_exporter_enabled = 11;
 
   // The address of the OpenCensus Agent, if its exporter is enabled, in gRPC
   // format: https://github.com/grpc/grpc/blob/master/doc/naming.md
+  // [#comment:TODO: deprecate this field]
   string ocagent_address = 12;
+
+  // (optional) The gRPC server hosted by the OpenCensus Agent. Only Google gRPC is supported.
+  // This is only used if the ocagent_address is left empty.
+  core.v3.GrpcService ocagent_grpc_service = 14;
 
   // List of incoming trace context headers we will accept. First one found
   // wins.

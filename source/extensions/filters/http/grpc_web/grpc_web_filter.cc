@@ -48,7 +48,7 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
 
 // Implements StreamDecoderFilter.
 // TODO(fengli): Implements the subtypes of gRPC-Web content-type other than proto, like +json, etc.
-Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (!isGrpcWebRequest(headers)) {
     return Http::FilterHeadersStatus::Continue;
@@ -136,7 +136,7 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
 }
 
 // Implements StreamEncoderFilter.
-Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (!is_grpc_web_request_) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -186,7 +186,7 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (!is_grpc_web_request_) {
     return Http::FilterTrailersStatus::Continue;
   }

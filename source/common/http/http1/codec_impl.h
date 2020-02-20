@@ -14,7 +14,6 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/assert.h"
-#include "common/common/to_lower_table.h"
 #include "common/http/codec_helper.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
@@ -117,9 +116,9 @@ public:
   bool startedResponse() { return started_response_; }
 
   // Http::ResponseEncoder
-  void encode100ContinueHeaders(const HeaderMap& headers) override;
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
-  void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+  void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+  void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool started_response_{};
@@ -135,8 +134,8 @@ public:
   bool headRequest() { return head_request_; }
 
   // Http::RequestEncoder
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
-  void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+  void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const RequestTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
   bool head_request_{};
@@ -314,7 +313,6 @@ private:
   virtual void onBelowLowWatermark() PURE;
 
   static http_parser_settings settings_;
-  static const ToLowerTable& toLowerTable();
 
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;

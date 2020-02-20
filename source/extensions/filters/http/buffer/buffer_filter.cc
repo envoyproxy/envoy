@@ -56,7 +56,8 @@ void BufferFilter::initConfig() {
   settings_ = route_local ? route_local : settings_;
 }
 
-Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                      bool end_stream) {
   if (end_stream) {
     // If this is a header-only request, we don't need to do any buffering.
     return Http::FilterHeadersStatus::Continue;
@@ -86,7 +87,7 @@ Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance& data, bool end
   return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
-Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::RequestTrailerMap&) {
   maybeAddContentLength();
 
   return Http::FilterTrailersStatus::Continue;
