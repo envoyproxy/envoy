@@ -61,7 +61,6 @@ const Http::LowerCaseString& trailerHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
 }
 
-constexpr uint32_t HttpBodyFieldNumber = 2;
 constexpr uint32_t ProtobufLengthDelimitedField = 2;
 
 // Transcoder:
@@ -221,30 +220,30 @@ Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* 
                                               MethodInfoPtr& method_info) {
   method_info = std::make_shared<MethodInfo>();
   method_info->descriptor_ = descriptor;
-  method_info->output_type_is_http_body_ =
+  method_info->response_type_is_http_body_ =
       descriptor->output_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
 
-  const Protobuf::Type* input_type = type_helper_->Info()->GetTypeByTypeUrl(
+  const Protobuf::Type* request_type = type_helper_->Info()->GetTypeByTypeUrl(
       Grpc::Common::typeUrl(descriptor->input_type()->full_name()));
-  if (input_type == nullptr) {
+  if (request_type == nullptr) {
     return ProtobufUtil::Status(Code::NOT_FOUND,
                                 "Could not resolve type: " + descriptor->input_type()->full_name());
   }
 
   if (http_rule.body() != "*") {
-    Status status = type_helper_->ResolveFieldPath(*input_type, http_rule.body(),
-                                                   &method_info->input_body_field_path);
+    Status status = type_helper_->ResolveFieldPath(*request_type, http_rule.body(),
+                                                   &method_info->request_body_field_path);
     if (!status.ok()) {
       return status;
     }
 
-    if (method_info->input_body_field_path.empty()) {
-      method_info->input_type_is_http_body_ =
+    if (method_info->request_body_field_path.empty()) {
+      method_info->request_type_is_http_body_ =
           descriptor->input_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
     } else {
       const Protobuf::Type* body_type = type_helper_->Info()->GetTypeByTypeUrl(
-          method_info->input_body_field_path.back()->type_url());
-      method_info->input_type_is_http_body_ =
+          method_info->request_body_field_path.back()->type_url());
+      method_info->request_type_is_http_body_ =
           body_type != nullptr &&
           body_type->name() == google::api::HttpBody::descriptor()->full_name();
     }
@@ -308,7 +307,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
 
   std::unique_ptr<RequestMessageTranslator> request_translator;
   std::unique_ptr<JsonRequestTranslator> json_request_translator;
-  if (method_info->input_type_is_http_body_) {
+  if (method_info->request_type_is_http_body_) {
     request_translator = std::make_unique<RequestMessageTranslator>(*type_helper_->Resolver(),
                                                                     false, std::move(request_info));
     request_translator->Input().StartObject(nullptr)->EndObject();
@@ -365,16 +364,23 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     // just pass-through the request to upstream.
     return Http::FilterHeadersStatus::Continue;
   }
-  has_http_body_output_ =
-      !method_->descriptor_->server_streaming() && method_->output_type_is_http_body_;
-  if (method_->input_type_is_http_body_) {
+  has_http_body_response_ =
+      !method_->descriptor_->server_streaming() && method_->response_type_is_http_body_;
+  if (method_->request_type_is_http_body_) {
     if (headers.ContentType() != nullptr) {
       absl::string_view content_type = headers.ContentType()->value().getStringView();
       content_type_.assign(content_type.begin(), content_type.end());
     }
 
     bool done = !readToBuffer(*transcoder_->RequestOutput(), request_prefix_);
-    RELEASE_ASSERT(done, "request transcoder should have been done");
+    if (!done) {
+      ENVOY_LOG(debug, "Transcoding HttpBody request is not done");
+      error_ = true;
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt,
+          absl::StrCat(RcDetails::get().GrpcTranscodeFailedEarly, "{BAD_REQUEST}"));
+      return Http::FilterHeadersStatus::StopIteration;
+    }
     if (checkIfTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -392,7 +398,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     decoder_callbacks_->clearRouteCache();
   }
 
-  if (end_stream && method_->input_type_is_http_body_) {
+  if (end_stream && method_->request_type_is_http_body_) {
     maybeSendHttpBodyRequestMessage();
   } else if (end_stream) {
     request_in_.finish();
@@ -418,7 +424,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
     return Http::FilterDataStatus::Continue;
   }
 
-  if (method_->input_type_is_http_body_) {
+  if (method_->request_type_is_http_body_) {
     request_data_.move(data);
     // TODO(elessar): Upper bound message size for streaming case.
     if (end_stream || method_->descriptor_->client_streaming()) {
@@ -450,7 +456,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::RequestTra
     return Http::FilterTrailersStatus::Continue;
   }
 
-  if (method_->input_type_is_http_body_) {
+  if (method_->request_type_is_http_body_) {
     maybeSendHttpBodyRequestMessage();
   } else {
     request_in_.finish();
@@ -512,7 +518,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   has_body_ = true;
 
   // TODO(dio): Add support for streaming case.
-  if (has_http_body_output_) {
+  if (has_http_body_response_) {
     buildResponseFromHttpBodyOutput(*response_headers_, data);
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
@@ -632,8 +638,8 @@ void JsonTranscoderFilter::createHttpBodyEnvelope(Buffer::Instance& data, uint64
   // Manually encode the grpc and protobuf envelope for the body.
   // See https://developers.google.com/protocol-buffers/docs/encoding#embedded for wire format.
 
-  Buffer::OwnedImpl request_prefix;
-  request_prefix.move(request_prefix_);
+  std::string request_prefix = request_prefix_.toString();
+  request_prefix_.drain(request_prefix.length());
 
   std::string proto_envelope;
   {
@@ -641,7 +647,7 @@ void JsonTranscoderFilter::createHttpBodyEnvelope(Buffer::Instance& data, uint64
     // we read the string.
 
     const uint32_t http_body_field_number =
-        (HttpBodyFieldNumber << 3) | ProtobufLengthDelimitedField;
+        (google::api::HttpBody::kDataFieldNumber << 3) | ProtobufLengthDelimitedField;
 
     ::google::api::HttpBody body;
     body.set_content_type(content_type_);
@@ -650,14 +656,14 @@ void JsonTranscoderFilter::createHttpBodyEnvelope(Buffer::Instance& data, uint64
                              CodedOutputStream::VarintSize32(http_body_field_number) +
                              CodedOutputStream::VarintSize64(content_length);
     std::vector<uint32_t> message_sizes;
-    message_sizes.reserve(method_->input_body_field_path.size());
-    for (auto it = method_->input_body_field_path.rbegin();
-         it != method_->input_body_field_path.rend(); ++it) {
+    message_sizes.reserve(method_->request_body_field_path.size());
+    for (auto it = method_->request_body_field_path.rbegin();
+         it != method_->request_body_field_path.rend(); ++it) {
       const Protobuf::Field* field = *it;
-      uint64_t message_size = envelope_size + content_length;
-      uint32_t field_number = (field->number() << 3) | ProtobufLengthDelimitedField;
-      uint64_t field_size = CodedOutputStream::VarintSize32(field_number) +
-                            CodedOutputStream::VarintSize64(message_size);
+      const uint64_t message_size = envelope_size + content_length;
+      const uint32_t field_number = (field->number() << 3) | ProtobufLengthDelimitedField;
+      const uint64_t field_size = CodedOutputStream::VarintSize32(field_number) +
+                                  CodedOutputStream::VarintSize64(message_size);
       message_sizes.push_back(message_size);
       envelope_size += field_size;
     }
@@ -670,21 +676,21 @@ void JsonTranscoderFilter::createHttpBodyEnvelope(Buffer::Instance& data, uint64
 
     proto_envelope.reserve(frame.size() + envelope_size);
     proto_envelope.append(frame.begin(), frame.end());
-    proto_envelope += request_prefix.toString();
+    proto_envelope += request_prefix;
 
     Envoy::Protobuf::io::StringOutputStream string_stream(&proto_envelope);
     Envoy::Protobuf::io::CodedOutputStream coded_stream(&string_stream);
 
     // Serialize body field definition manually to avoid the copy of the body.
-    for (size_t i = 0; i < method_->input_body_field_path.size(); ++i) {
-      const Protobuf::Field* field = method_->input_body_field_path[i];
-      uint32_t field_number = (field->number() << 3) | ProtobufLengthDelimitedField;
-      uint64_t message_size = message_sizes[i];
-      coded_stream.WriteVarint32(field_number);
+    for (size_t i = 0; i < method_->request_body_field_path.size(); ++i) {
+      const Protobuf::Field* field = method_->request_body_field_path[i];
+      const uint32_t field_number = (field->number() << 3) | ProtobufLengthDelimitedField;
+      const uint64_t message_size = message_sizes[i];
+      coded_stream.WriteTag(field_number);
       coded_stream.WriteVarint64(message_size);
     }
     body.SerializeToCodedStream(&coded_stream);
-    coded_stream.WriteVarint32(http_body_field_number);
+    coded_stream.WriteTag(http_body_field_number);
     coded_stream.WriteVarint64(content_length);
   }
 

@@ -43,9 +43,9 @@ struct VariableBinding {
 
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
-  std::vector<const Protobuf::Field*> input_body_field_path;
-  bool input_type_is_http_body_ = false;
-  bool output_type_is_http_body_ = false;
+  std::vector<const Protobuf::Field*> request_body_field_path;
+  bool request_type_is_http_body_ = false;
+  bool response_type_is_http_body_ = false;
 };
 typedef std::shared_ptr<MethodInfo> MethodInfoPtr;
 
@@ -181,7 +181,7 @@ private:
   std::string content_type_;
 
   bool error_{false};
-  bool has_http_body_output_{false};
+  bool has_http_body_response_{false};
   bool has_body_{false};
 };
 

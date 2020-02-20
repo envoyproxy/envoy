@@ -99,10 +99,7 @@ protected:
         }
         RequestType expected_message;
         EXPECT_TRUE(TextFormat::ParseFromString(grpc_request_messages[i], &expected_message));
-
-        EXPECT_TRUE(MessageDifferencer::Equivalent(expected_message, actual_message))
-            << "expected: " << expected_message.DebugString()
-            << "actual:" << actual_message.DebugString();
+        EXPECT_THAT(actual_message, ProtoEq(expected_message));
       }
 
       Http::TestResponseHeaderMapImpl response_headers;

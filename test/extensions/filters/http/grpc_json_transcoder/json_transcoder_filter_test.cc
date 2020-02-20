@@ -787,7 +787,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   bookstore::EchoBodyRequest request;
   request.ParseFromString(frames[0].data_->toString());
 
-  EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
+  EXPECT_THAT(request, ProtoEq(expected_request));
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
@@ -833,17 +833,17 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
   expected_request.mutable_nested()->mutable_content()->set_content_type("text/plain");
   expected_request.mutable_nested()->mutable_content()->set_data("hello");
   request.ParseFromString(frames[0].data_->toString());
-  EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
+  EXPECT_THAT(request, ProtoEq(expected_request));
 
   expected_request.Clear();
   expected_request.mutable_nested()->mutable_content()->set_data(" ");
   request.ParseFromString(frames[1].data_->toString());
-  EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
+  EXPECT_THAT(request, ProtoEq(expected_request));
 
   expected_request.Clear();
   expected_request.mutable_nested()->mutable_content()->set_data("world!");
   request.ParseFromString(frames[2].data_->toString());
-  EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
+  EXPECT_THAT(request, ProtoEq(expected_request));
 }
 
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
