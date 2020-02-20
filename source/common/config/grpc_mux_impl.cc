@@ -25,14 +25,6 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
-GrpcMuxImpl::~GrpcMuxImpl() {
-  for (const auto& api_state : api_state_) {
-    for (auto watch : api_state.second.watches_) {
-      watch->clear();
-    }
-  }
-}
-
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
@@ -78,7 +70,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const std::set<std::string>& resources,
-                                      SubscriptionCallbacks& callbacks, std::chrono::milliseconds) {
+                                      SubscriptionCallbacks& callbacks) {
   auto watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, type_url, *this);
   ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
 
