@@ -61,8 +61,6 @@ const Http::LowerCaseString& trailerHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
 }
 
-constexpr uint32_t ProtobufLengthDelimitedField = 2;
-
 // Transcoder:
 // https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/master/src/include/grpc_transcoding/transcoder.h
 // implementation based on JsonRequestTranslator & ResponseToJsonTranslator
@@ -639,6 +637,9 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
 void JsonTranscoderFilter::createHttpBodyEnvelope(Buffer::Instance& data, uint64_t content_length) {
   // Manually encode the grpc and protobuf envelope for the body.
   // See https://developers.google.com/protocol-buffers/docs/encoding#embedded for wire format.
+
+  // Embedded messages are treated the same way as strings (wire type 2).
+  constexpr uint32_t ProtobufLengthDelimitedField = 2;
 
   std::string request_prefix = request_prefix_.toString();
   request_prefix_.drain(request_prefix.length());
