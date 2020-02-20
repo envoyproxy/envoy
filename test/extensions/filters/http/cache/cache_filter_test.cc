@@ -99,7 +99,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
                                               HeaderHasValueRef("age", "0")),
                                true));
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopIteration);
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
     filter.onDestroy();
   }
@@ -116,7 +116,7 @@ TEST_F(CacheFilterTest, DelayedHitNoBody) {
 
     // Decode request 1 header
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopIteration);
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     EXPECT_CALL(decoder_callbacks_, continueDecoding);
     delayed_cache_.delayed_cb_();
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
@@ -131,7 +131,7 @@ TEST_F(CacheFilterTest, DelayedHitNoBody) {
 
     // Decode request 2 header
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopIteration);
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     EXPECT_CALL(decoder_callbacks_,
                 encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
                                               HeaderHasValueRef("age", "0")),
@@ -175,7 +175,7 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
         decoder_callbacks_,
         encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopIteration);
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
     filter.onDestroy();
   }

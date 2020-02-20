@@ -62,7 +62,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // onHeaders hasn't been called yet--stop iteration to wait for it, and tell it that we stopped
   // iteration.
   state_ = GetHeadersState::FinishedGetHeadersCall;
-  return Http::FilterHeadersStatus::StopIteration;
+  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
 Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -93,7 +93,7 @@ void CacheFilter::onHeaders(LookupResult&& result) {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
   case CacheEntryStatus::Unusable:
     if (state_ == GetHeadersState::FinishedGetHeadersCall) {
-      // decodeHeader returned Http::FilterHeadersStatus::StopIteration--restart it
+      // decodeHeader returned Http::FilterHeadersStatus::StopAllIterationAndWatermark--restart it
       decoder_callbacks_->continueDecoding();
     } else {
       // decodeHeader hasn't yet returned--tell it to return Http::FilterHeadersStatus::Continue.
