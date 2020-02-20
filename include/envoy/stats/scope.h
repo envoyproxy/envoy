@@ -54,6 +54,7 @@ public:
   virtual Counter& counterFromStatName(StatName name) PURE;
 
   /**
+   * Creates a Counter from the stat name and tags, performing tag extraction on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @return a counter within the scope's namespace.
    */
@@ -74,6 +75,7 @@ public:
   virtual Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) PURE;
 
   /**
+   * Creates a Gauge from the stat name and tags, performing tag extraction on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param tags The tags to associate with this gauge.
    * @param import_mode Whether hot-restart should accumulate this value.
@@ -96,6 +98,7 @@ public:
   virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
 
   /**
+   * Creates a Histogram from the stat name and tags, performing tag extraction on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
