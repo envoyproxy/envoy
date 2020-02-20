@@ -65,20 +65,20 @@ TEST_P(OwnedImplTest, AddBufferFragmentNoCleanup) {
 }
 
 TEST_P(OwnedImplTest, AddBufferFragmentWithCleanup) {
-  char input[] = "hello world";
-  BufferFragmentImpl frag(input, 11, [this](const void*, size_t, const BufferFragmentImpl*) {
-    release_callback_called_ = true;
-  });
+  std::string input(2048, 'a');
+  BufferFragmentImpl frag(
+      input.c_str(), input.size(),
+      [this](const void*, size_t, const BufferFragmentImpl*) { release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
   verifyImplementation(buffer);
   buffer.addBufferFragment(frag);
-  EXPECT_EQ(11, buffer.length());
+  EXPECT_EQ(2048, buffer.length());
 
-  buffer.drain(5);
-  EXPECT_EQ(6, buffer.length());
+  buffer.drain(2000);
+  EXPECT_EQ(48, buffer.length());
   EXPECT_FALSE(release_callback_called_);
 
-  buffer.drain(6);
+  buffer.drain(48);
   EXPECT_EQ(0, buffer.length());
   EXPECT_TRUE(release_callback_called_);
 }
@@ -102,12 +102,12 @@ TEST_P(OwnedImplTest, AddEmptyFragment) {
 }
 
 TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
-  char input_stack[] = "hello world";
-  char* input = new char[11];
-  std::copy(input_stack, input_stack + 11, input);
+  std::string input_str(2048, 'a');
+  char* input = new char[2048];
+  std::copy(input_str.c_str(), input_str.c_str() + 11, input);
 
   BufferFragmentImpl* frag = new BufferFragmentImpl(
-      input, 11, [this](const void* data, size_t, const BufferFragmentImpl* frag) {
+      input, 2048, [this](const void* data, size_t, const BufferFragmentImpl* frag) {
         release_callback_called_ = true;
         delete[] static_cast<const char*>(data);
         delete frag;
@@ -116,9 +116,9 @@ TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   Buffer::OwnedImpl buffer;
   verifyImplementation(buffer);
   buffer.addBufferFragment(*frag);
-  EXPECT_EQ(11, buffer.length());
+  EXPECT_EQ(2048, buffer.length());
 
-  buffer.drain(5);
+  buffer.drain(2042);
   EXPECT_EQ(6, buffer.length());
   EXPECT_FALSE(release_callback_called_);
 
@@ -128,10 +128,10 @@ TEST_P(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
 }
 
 TEST_P(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
-  char input[] = "hello world";
-  const size_t expected_length = sizeof(input) - 1;
+  std::string input(2048, 'a');
+  const size_t expected_length = input.size();
   auto frag = OwnedBufferFragmentImpl::create(
-      {input, expected_length},
+      {input.c_str(), expected_length},
       [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
   verifyImplementation(buffer);
@@ -150,10 +150,10 @@ TEST_P(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
 
 // Verify that OwnedBufferFragment work correctly when input buffer is allocated on the heap.
 TEST_P(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
-  char input_stack[] = "hello world";
-  const size_t expected_length = sizeof(input_stack) - 1;
+  std::string input_str(2048, 'a');
+  const size_t expected_length = input_str.size();
   char* input = new char[expected_length];
-  std::copy(input_stack, input_stack + expected_length, input);
+  std::copy(input_str.c_str(), input_str.c_str() + expected_length, input);
 
   auto* frag = OwnedBufferFragmentImpl::create({input, expected_length},
                                                [this, input](const OwnedBufferFragmentImpl* frag) {
@@ -728,6 +728,54 @@ TEST(OverflowDetectingUInt64, Arithmetic) {
   length += half;
   length += (half - 1); // length is now 2^64 - 1
   EXPECT_DEATH(length += 1, "overflow");
+}
+
+void TestBufferMove(uint64_t buffer1_length, uint64_t buffer2_length,
+                    uint64_t expected_slice_count) {
+  Buffer::OwnedImpl buffer1;
+  buffer1.add(std::string(buffer1_length, 'a'));
+  EXPECT_EQ(1, buffer1.getRawSlices(nullptr, 0));
+
+  Buffer::OwnedImpl buffer2;
+  buffer2.add(std::string(buffer2_length, 'b'));
+  EXPECT_EQ(1, buffer2.getRawSlices(nullptr, 0));
+
+  buffer1.move(buffer2);
+  EXPECT_EQ(expected_slice_count, buffer1.getRawSlices(nullptr, 0));
+  EXPECT_EQ(buffer1_length + buffer2_length, buffer1.length());
+  // Make sure `buffer2` was drained.
+  EXPECT_EQ(0, buffer2.length());
+}
+
+// Slice size large enough to prevent slice content from being coalesced into an existing slice
+constexpr uint64_t kLargeSliceSize = 2048;
+
+TEST(OwnedImplTest, MoveBuffersWithLargeSlices) {
+  // Large slices should not be coalesced together
+  TestBufferMove(kLargeSliceSize, kLargeSliceSize, 2);
+}
+
+TEST(OwnedImplTest, MoveBuffersWithSmallSlices) {
+  // Small slices should be coalesced together
+  TestBufferMove(1, 1, 1);
+}
+
+TEST(OwnedImplTest, MoveSmallSliceIntoLargeSlice) {
+  // Small slices should be coalesced with a large one
+  TestBufferMove(kLargeSliceSize, 1, 1);
+}
+
+TEST(OwnedImplTest, MoveLargeSliceIntoSmallSlice) {
+  // Large slice should NOT be coalesced into the small one
+  TestBufferMove(1, kLargeSliceSize, 2);
+}
+
+TEST(OwnedImplTest, MoveSmallSliceIntoNotEnoughFreeSpace) {
+  // Small slice will not be coalesced if a previous slice does not have enough free space
+  // Slice buffer sizes are allocated in 4Kb increments
+  // Make first slice have 127 of free space (it is actually less as there is small overhead of the
+  // OwnedSlice object) And second slice 128 bytes
+  TestBufferMove(4096 - 127, 128, 2);
 }
 
 } // namespace

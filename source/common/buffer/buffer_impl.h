@@ -188,6 +188,11 @@ public:
     return SliceRepresentation{dataSize(), reservableSize(), capacity_};
   }
 
+  /**
+   * @return true if content in this Slice can be coalesced into another Slice.
+   */
+  virtual bool canCoalesce() const { return true; }
+
 protected:
   Slice(uint64_t data, uint64_t reservable, uint64_t capacity)
       : data_(data), reservable_(reservable), capacity_(capacity) {}
@@ -415,6 +420,13 @@ public:
 
   ~UnownedSlice() override { fragment_.done(); }
 
+  /**
+   * BufferFragment objects encapsulated by UnownedSlice are used to track when response content
+   * is written into transport connection. As a result these slices can not be coalesced when moved
+   * between buffers.
+   */
+  bool canCoalesce() const override { return false; }
+
 private:
   BufferFragment& fragment_;
 };
@@ -569,6 +581,15 @@ private:
    *         uses the same internal implementation as this buffer.
    */
   bool isSameBufferImpl(const Instance& rhs) const;
+
+  void addImpl(const void* data, uint64_t size);
+
+  /**
+   * Moves contents of the `other_slice` by either taking its ownership or coalescing it
+   * into an existing slice.
+   * NOTE: the caller is responsible for draining the buffer that contains the `other_slice`.
+   */
+  void coalesceOrAddSlice(SlicePtr&& other_slice);
 
   /** Whether to use the old evbuffer implementation when constructing new OwnedImpl objects. */
   static bool use_old_impl_;

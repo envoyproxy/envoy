@@ -10,8 +10,15 @@
 
 namespace Envoy {
 namespace Buffer {
+namespace {
+// This size has been determined to be optimal from running the
+// //test/integration:http_benchmark benchmark tests.
+// TODO(yanavlasov): This may not be optimal for all hardware configurations or traffic patterns and
+// may need to be configurable in the future.
+constexpr uint64_t CopyThreshold = 512;
+} // namespace
 
-void OwnedImpl::add(const void* data, uint64_t size) {
+void OwnedImpl::addImpl(const void* data, uint64_t size) {
   if (old_impl_) {
     evbuffer_add(buffer_.get(), data, size);
   } else {
@@ -29,6 +36,8 @@ void OwnedImpl::add(const void* data, uint64_t size) {
     }
   }
 }
+
+void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
   if (old_impl_) {
@@ -309,6 +318,26 @@ void* OwnedImpl::linearize(uint32_t size) {
   }
 }
 
+void OwnedImpl::coalesceOrAddSlice(SlicePtr&& other_slice) {
+  const uint64_t slice_size = other_slice->dataSize();
+  // The `other_slice` content can be coalesced into the existing slice IFF:
+  // 1. The `other_slice` can be coalesced. Objects of type UnownedSlice can not be coalesced. See
+  //    comment in the UnownedSlice class definition;
+  // 2. There are existing slices;
+  // 3. The `other_slice` content length is under the CopyThreshold;
+  // 4. There is enough unused space in the existing slice to accommodate the `other_slice` content.
+  if (other_slice->canCoalesce() && !slices_.empty() && slice_size < CopyThreshold &&
+      slices_.back()->reservableSize() >= slice_size) {
+    // Copy content of the `other_slice`. The `move` methods which call this method effectively
+    // drain the source buffer.
+    addImpl(other_slice->data(), slice_size);
+  } else {
+    // Take ownership of the slice.
+    slices_.emplace_back(std::move(other_slice));
+    length_ += slice_size;
+  }
+}
+
 void OwnedImpl::move(Instance& rhs) {
   ASSERT(&rhs != this);
   ASSERT(isSameBufferImpl(rhs));
@@ -328,10 +357,9 @@ void OwnedImpl::move(Instance& rhs) {
     OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
     while (!other.slices_.empty()) {
       const uint64_t slice_size = other.slices_.front()->dataSize();
-      slices_.emplace_back(std::move(other.slices_.front()));
-      other.slices_.pop_front();
-      length_ += slice_size;
+      coalesceOrAddSlice(std::move(other.slices_.front()));
       other.length_ -= slice_size;
+      other.slices_.pop_front();
     }
     other.postProcess();
   }
@@ -361,9 +389,8 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
         other.slices_.front()->drain(copy_size);
         other.length_ -= copy_size;
       } else {
-        slices_.emplace_back(std::move(other.slices_.front()));
+        coalesceOrAddSlice(std::move(other.slices_.front()));
         other.slices_.pop_front();
-        length_ += slice_size;
         other.length_ -= slice_size;
       }
       length -= copy_size;

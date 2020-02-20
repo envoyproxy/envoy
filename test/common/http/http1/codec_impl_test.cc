@@ -24,6 +24,7 @@
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -840,7 +841,13 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
-  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+  ON_CALL(connection_, write(_, _)).WillByDefault(Invoke([&output](Buffer::Instance& data, bool) {
+    // Verify that individual writes into the codec's output buffer were coalesced into a single
+    // slice
+    ASSERT_EQ(1, data.getRawSlices(nullptr, 0));
+    output.append(data.toString());
+    data.drain(data.length());
+  }));
 
   TestHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, false);
