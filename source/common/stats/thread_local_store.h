@@ -291,19 +291,27 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatName(StatName name) override { return counterFromStatName(name, {}); }
-    Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override;
+    Counter& counterFromStatName(StatName name) override {
+      return counterFromStatName(name, {}, true);
+    }
+    Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+      return counterFromStatName(name, tags, false);
+    }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-      return gaugeFromStatName(name, {}, import_mode);
+      return gaugeFromStatName(name, {}, import_mode, true);
     }
     Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
-                             Gauge::ImportMode import_mode) override;
+                             Gauge::ImportMode import_mode) override {
+      return gaugeFromStatName(name, tags, import_mode, false);
+    }
     Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-      return histogramFromStatName(name, {}, unit);
+      return histogramFromStatName(name, {}, unit, true);
     }
     Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
-                                     Histogram::Unit unit) override;
+                                     Histogram::Unit unit) override {
+      return histogramFromStatName(name, tags, unit, false);
+    }
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
@@ -337,6 +345,12 @@ private:
                                                            absl::string_view tag_extracted_name,
                                                            const StatNameTagVector& tags)>;
 
+    Counter& counterFromStatName(StatName name, const StatNameTagVector& tags,
+                                 bool do_tag_extraction);
+    Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+                             Gauge::ImportMode import_mode, bool do_tag_extraction);
+    Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
+                                     Histogram::Unit unit, bool do_tag_extraction);
     /**
      * Makes a stat either by looking it up in the central cache,
      * generating it from the parent allocator, or as a last
@@ -345,6 +359,7 @@ private:
      * @param full_stat_name the full name of the stat with appended tags.
      * @param name_no_tags the full name of the stat (not tag extracted) without appended tags.
      * @param stat_name_tags the tags provided at creation time.
+     * @param do_tag_extraction whether RE-based tag extraction should be performed on the name.
      * @param central_cache_map a map from name to the desired object in the central cache.
      * @param make_stat a function to generate the stat object, called if it's not in cache.
      * @param tls_ref possibly null reference to a cache entry for this stat, which will be
@@ -352,7 +367,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
-                           const StatNameTagVector& stat_name_tags,
+                           const StatNameTagVector& stat_name_tags, bool do_tag_extraction,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
