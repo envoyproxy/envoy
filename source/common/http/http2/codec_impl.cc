@@ -25,6 +25,32 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+class Http2ResponseCodeDetailValues {
+  // Invalid HTTP header field was received and stream is going to be
+  // closed.
+  const absl::string_view NgHttp2ErrHttpHeader = "http2.invalid.header.field";
+
+  // Violation in HTTP messaging rule.
+  const absl::string_view NgHttp2ErrHttpMessaging = "http2.violation.of.messaging.rule";
+
+  // none of the above
+  const absl::string_view NgHttp2ErrUnknown = "http2.unknown.nghttp2.error";
+
+public:
+  const absl::string_view strerror(int error_code) const {
+    switch (error_code) {
+    case NGHTTP2_ERR_HTTP_HEADER:
+      return NgHttp2ErrHttpHeader;
+    case NGHTTP2_ERR_HTTP_MESSAGING:
+      return NgHttp2ErrHttpMessaging;
+    default:
+      return NgHttp2ErrUnknown;
+    }
+  }
+};
+
+using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
+
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
                                           HeaderString& cookies) {
   if (key != Headers::get().Cookie.get().c_str()) {
@@ -51,9 +77,8 @@ template <typename T> static T* remove_const(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-    : parent_(parent), headers_(new HeaderMapImpl()), local_end_stream_sent_(false),
-      remote_end_stream_(false), data_deferred_(false),
-      waiting_for_non_informational_headers_(false),
+    : parent_(parent), local_end_stream_sent_(false), remote_end_stream_(false),
+      data_deferred_(false), waiting_for_non_informational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
   if (buffer_limit > 0) {
@@ -63,10 +88,10 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
   uint8_t flags = 0;
-  if (header.key().type() == HeaderString::Type::Reference) {
+  if (header.key().isReference()) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_NAME;
   }
-  if (header.value().type() == HeaderString::Type::Reference) {
+  if (header.value().isReference()) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
   }
   const absl::string_view header_key = header.key().getStringView();
@@ -88,7 +113,7 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
       &final_headers);
 }
 
-void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const HeaderMap& headers) {
+void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);
 }
@@ -100,7 +125,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
   // needed until submitHeaders has been called.
   Http::HeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
-    modified_headers = std::make_unique<Http::HeaderMapImpl>(headers);
+    modified_headers = createHeaderMap<HeaderMapImpl>(headers);
     transformUpgradeFromH1toH2(*modified_headers);
     buildHeaders(final_headers, *modified_headers);
   } else {
@@ -128,8 +153,8 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   if (pending_send_data_.length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
-    ASSERT(!pending_trailers_);
-    pending_trailers_ = std::make_unique<HeaderMapImpl>(trailers);
+    ASSERT(!pending_trailers_to_encode_);
+    pending_trailers_to_encode_ = createHeaderMap<HeaderMapImpl>(trailers);
   } else {
     submitTrailers(trailers);
     parent_.sendPendingFrames();
@@ -186,31 +211,35 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
-  if (!upgrade_type_.empty() && headers_->Status()) {
-    Http::Utility::transformUpgradeResponseFromH2toH1(*headers_, upgrade_type_);
+  auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
+  if (!upgrade_type_.empty() && headers->Status()) {
+    Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
   }
 
-  if (headers_->Status()->value() == "100") {
+  if (headers->Status()->value() == "100") {
     ASSERT(!remote_end_stream_);
-    response_decoder_.decode100ContinueHeaders(std::move(headers_));
+    response_decoder_.decode100ContinueHeaders(std::move(headers));
   } else {
-    response_decoder_.decodeHeaders(std::move(headers_), remote_end_stream_);
+    response_decoder_.decodeHeaders(std::move(headers), remote_end_stream_);
   }
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
-  response_decoder_.decodeTrailers(std::move(headers_));
+  response_decoder_.decodeTrailers(
+      std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
-  if (Http::Utility::isH2UpgradeRequest(*headers_)) {
-    Http::Utility::transformUpgradeRequestFromH2toH1(*headers_);
+  auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+  if (Http::Utility::isH2UpgradeRequest(*headers)) {
+    Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
-  request_decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
+  request_decoder_->decodeHeaders(std::move(headers), remote_end_stream_);
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
-  request_decoder_->decodeTrailers(std::move(headers_));
+  request_decoder_->decodeTrailers(
+      std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -229,7 +258,7 @@ void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
 
 void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& value) {
   if (!Utility::reconstituteCrumbledCookies(name, value, cookies_)) {
-    headers_->addViaMove(std::move(name), std::move(value));
+    headers().addViaMove(std::move(name), std::move(value));
   }
 }
 
@@ -258,11 +287,11 @@ ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* 
     *data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
     if (local_end_stream_ && pending_send_data_.length() <= length) {
       *data_flags |= NGHTTP2_DATA_FLAG_EOF;
-      if (pending_trailers_) {
+      if (pending_trailers_to_encode_) {
         // We need to tell the library to not set end stream so that we can emit the trailers.
         *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
-        submitTrailers(*pending_trailers_);
-        pending_trailers_.reset();
+        submitTrailers(*pending_trailers_to_encode_);
+        pending_trailers_to_encode_.reset();
       }
     }
 
@@ -507,12 +536,12 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     if (!stream->cookies_.empty()) {
       HeaderString key(Headers::get().Cookie);
-      stream->headers_->addViaMove(std::move(key), std::move(stream->cookies_));
+      stream->headers().addViaMove(std::move(key), std::move(stream->cookies_));
     }
 
     switch (frame->headers.cat) {
     case NGHTTP2_HCAT_RESPONSE: {
-      if (CodeUtility::is1xx(Http::Utility::getResponseStatus(*stream->headers_))) {
+      if (CodeUtility::is1xx(Http::Utility::getResponseStatus(stream->headers()))) {
         stream->waiting_for_non_informational_headers_ = true;
       }
       FALLTHRU;
@@ -559,7 +588,6 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
-    stream->headers_.reset();
     break;
   }
   case NGHTTP2_DATA: {
@@ -620,13 +648,18 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, nghttp2_strerror(error_code),
                  stream_id);
 
+  // Set details of error_code in the stream whenever we have one.
+  StreamImpl* stream = getStream(stream_id);
+  if (stream != nullptr) {
+    stream->setDetails(Http2ResponseCodeDetails::get().strerror(error_code));
+  }
+
   if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
     stats_.rx_messaging_error_.inc();
 
     if (stream_error_on_invalid_http_messaging_) {
       // The stream is about to be closed due to an invalid header or messaging. Don't kill the
       // entire connection if one stream has bad headers or messaging.
-      StreamImpl* stream = getStream(stream_id);
       if (stream != nullptr) {
         // See comment below in onStreamClose() for why we do this.
         stream->reset_due_to_messaging_error_ = true;
@@ -798,8 +831,8 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
   }
   stream->saveHeader(std::move(name), std::move(value));
 
-  if (stream->headers_->byteSize() > max_headers_kb_ * 1024 ||
-      stream->headers_->size() > max_headers_count_) {
+  if (stream->headers().byteSize() > max_headers_kb_ * 1024 ||
+      stream->headers().size() > max_headers_count_) {
     // This will cause the library to reset/close the stream.
     stats_.header_overflow_.inc();
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
@@ -1099,8 +1132,7 @@ int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
                  "");
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
-    ASSERT(!stream->headers_);
-    stream->headers_ = std::make_unique<HeaderMapImpl>();
+    stream->allocTrailers();
   }
 
   return 0;
@@ -1142,8 +1174,7 @@ int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
     ASSERT(frame->headers.cat == NGHTTP2_HCAT_HEADERS);
 
     StreamImpl* stream = getStream(frame->hd.stream_id);
-    ASSERT(!stream->headers_);
-    stream->headers_ = std::make_unique<HeaderMapImpl>();
+    stream->allocTrailers();
     return 0;
   }
 

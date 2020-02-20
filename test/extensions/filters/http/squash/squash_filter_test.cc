@@ -188,10 +188,10 @@ protected:
 
     EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout(), _));
 
-    Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
-                                           {":authority", "www.solo.io"},
-                                           {"x-squash-debug", "true"},
-                                           {":path", "/getsomething"}};
+    Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                                  {":authority", "www.solo.io"},
+                                                  {"x-squash-debug", "true"},
+                                                  {":path", "/getsomething"}};
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(headers, false));
   }
@@ -201,7 +201,7 @@ protected:
 
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
     EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
-    Envoy::Http::TestHeaderMapImpl trailers{};
+    Http::TestRequestTrailerMapImpl trailers;
     // Complete a full request cycle
     Envoy::Buffer::OwnedImpl buffer("nothing here");
     EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationAndBuffer,
@@ -212,7 +212,7 @@ protected:
   void expectAsyncClientSend() {
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke(
-            [&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
+            [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
                 const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
               callbacks_.push_back(&cb);
               return &request_;
@@ -220,8 +220,8 @@ protected:
   }
 
   void completeRequest(const std::string& status, const std::string& body) {
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", status}}}));
+    Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", status}}}));
     msg->body() = std::make_unique<Buffer::OwnedImpl>(body);
     popPendingCallback()->onSuccess(std::move(msg));
   }
@@ -263,13 +263,13 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
-          [&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
+          [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
             callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
             return nullptr;
           }));
 
-  Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
                                          {"x-squash-debug", "true"},
                                          {":path", "/getsomething"}};
@@ -277,7 +277,8 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
   Envoy::Buffer::OwnedImpl data("nothing here");
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  Http::TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 }
 
 TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
@@ -289,7 +290,7 @@ TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
 
   Envoy::Buffer::OwnedImpl data("nothing here");
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  Envoy::Http::TestHeaderMapImpl trailers{};
+  Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 }
 
@@ -297,7 +298,7 @@ TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
   initFilter();
   EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
 
-  Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
                                          {"x-not-squash-debug", "true"},
                                          {":path", "/getsomething"}};
@@ -305,7 +306,8 @@ TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
   Envoy::Buffer::OwnedImpl data("nothing here");
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  Http::TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 }
 
 TEST_F(SquashFilterTest, Timeout) {
@@ -431,12 +433,12 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
       }));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
+      .WillOnce(Invoke([&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
                            const Http::AsyncClient::RequestOptions&)
                            -> Envoy::Http::AsyncClient::Request* { return &request_; }));
 
   EXPECT_CALL(request_, cancel());
-  Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
                                          {"x-squash-debug", "true"},
                                          {":path", "/getsomething"}};

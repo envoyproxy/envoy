@@ -11,10 +11,11 @@ MockUpstream::MockUpstream(Upstream::MockClusterManager& mock_cm, const std::str
     : request_(&mock_cm.async_client_), status_(status), response_body_(response_body) {
   ON_CALL(mock_cm.async_client_, send_(testing::_, testing::_, testing::_))
       .WillByDefault(testing::Invoke(
-          [this](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+          [this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::MessagePtr response_message(new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", status_}}}));
+            Http::ResponseMessagePtr response_message(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", status_}}}));
             if (response_body_.length()) {
               response_message->body() = std::make_unique<Buffer::OwnedImpl>(response_body_);
             } else {
@@ -30,7 +31,7 @@ MockUpstream::MockUpstream(Upstream::MockClusterManager& mock_cm,
     : request_(&mock_cm.async_client_) {
   ON_CALL(mock_cm.async_client_, send_(testing::_, testing::_, testing::_))
       .WillByDefault(testing::Invoke(
-          [this, reason](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+          [this, reason](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             cb.onFailure(reason);
             return &request_;

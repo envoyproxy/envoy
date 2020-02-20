@@ -26,6 +26,8 @@ private:
                                     Server::Configuration::FactoryContext& context) override;
 };
 
+DECLARE_FACTORY(GzipFilterFactory);
+
 } // namespace Gzip
 } // namespace HttpFilters
 } // namespace Extensions

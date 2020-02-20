@@ -26,7 +26,7 @@ TEST(RequestEncoderWrapper, HeaderOnlyEncode) {
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, true));
   wrapper.encodeHeaders(
-      TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, true);
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, true);
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 
@@ -35,7 +35,7 @@ TEST(RequestEncoderWrapper, HeaderAndBodyEncode) {
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, false));
   wrapper.encodeHeaders(
-      TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, false);
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, false);
   EXPECT_FALSE(wrapper.encodeComplete());
 
   Buffer::OwnedImpl data;
@@ -49,7 +49,7 @@ TEST(RequestEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeHeaders(_, false));
   wrapper.encodeHeaders(
-      TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, false);
+      TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}, false);
   EXPECT_FALSE(wrapper.encodeComplete());
 
   Buffer::OwnedImpl data;
@@ -58,7 +58,7 @@ TEST(RequestEncoderWrapper, HeaderAndBodyAndTrailersEncode) {
   EXPECT_FALSE(wrapper.encodeComplete());
 
   EXPECT_CALL(wrapper.innerEncoder(), encodeTrailers(_));
-  wrapper.encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
+  wrapper.encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
   EXPECT_TRUE(wrapper.encodeComplete());
 }
 

@@ -15,6 +15,8 @@ envoy_proto_library(
     deps = ["@envoy_api//envoy/config/core/v3:pkg"],
 )
 
+exports_files(["headers.dict"])
+
 envoy_cc_test_library(
     name = "main",
     srcs = ["main.cc"],

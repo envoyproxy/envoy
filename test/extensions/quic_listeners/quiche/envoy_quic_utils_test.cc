@@ -48,7 +48,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   headers_block[":host"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
-  Http::HeaderMapImplPtr envoy_headers = spdyHeaderBlockToEnvoyHeaders(headers_block);
+  auto envoy_headers = spdyHeaderBlockToEnvoyHeaders<Http::RequestHeaderMapImpl>(headers_block);
   EXPECT_EQ(headers_block.size(), envoy_headers->size());
   EXPECT_EQ("www.google.com",
             envoy_headers->get(Http::LowerCaseString(":host"))->value().getStringView());
@@ -57,7 +57,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ("https", envoy_headers->get(Http::LowerCaseString(":scheme"))->value().getStringView());
 
   quic::QuicHeaderList quic_headers = quic::test::AsHeaderList(headers_block);
-  Http::HeaderMapImplPtr envoy_headers2 = quicHeadersToEnvoyHeaders(quic_headers);
+  auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
 }
 

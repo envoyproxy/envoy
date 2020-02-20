@@ -184,9 +184,6 @@ public:
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
 private:
-  static std::shared_ptr<grpc::Channel>
-  createChannel(const envoy::config::core::v3::GrpcService::GoogleGrpc& config);
-
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
   // This is shared with child streams, so that they can cleanup independent of
@@ -237,8 +234,8 @@ private:
   // Write the first PendingMessage in the write queue if non-empty.
   void writeQueued();
   // Deliver notification and update stats when the connection closes.
-  void notifyRemoteClose(Status::GrpcStatus grpc_status, Http::HeaderMapPtr trailing_metadata,
-                         const std::string& message);
+  void notifyRemoteClose(Status::GrpcStatus grpc_status,
+                         Http::ResponseTrailerMapPtr trailing_metadata, const std::string& message);
   // Schedule stream for deferred deletion.
   void deferredDelete();
   // Cleanup and schedule stream for deferred deletion if no inflight
@@ -322,10 +319,10 @@ public:
 
 private:
   // Grpc::RawAsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   Buffer::InstancePtr request_;

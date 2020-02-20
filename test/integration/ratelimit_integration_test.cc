@@ -68,9 +68,9 @@ public:
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
-                                    {":scheme", "http"},       {":authority", "host"},
-                                    {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
+    Http::TestRequestHeaderMapImpl headers{
+        {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+        {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
     response_ = codec_client_->makeRequestWithBody(headers, request_size_);
   }
 
@@ -108,7 +108,7 @@ public:
     result = upstream_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(response_size_, true);
     response_->waitForEndStream();
 
@@ -128,8 +128,8 @@ public:
   }
 
   void sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::Code code,
-                             const Http::HeaderMapImpl& response_headers_to_add,
-                             const Http::HeaderMapImpl& request_headers_to_add) {
+                             const Http::HeaderMap& response_headers_to_add,
+                             const Http::HeaderMap& request_headers_to_add) {
     ratelimit_request_->startGrpcStream();
     envoy::service::ratelimit::v3::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
@@ -216,7 +216,7 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   waitForRatelimitRequest();
   Http::TestHeaderMapImpl ratelimit_response_headers{{"x-ratelimit-limit", "1000"},
                                                      {"x-ratelimit-remaining", "500"}};
-  Http::TestHeaderMapImpl request_headers_to_add{{"x-ratelimit-done", "true"}};
+  Http::TestRequestHeaderMapImpl request_headers_to_add{{"x-ratelimit-done", "true"}};
 
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OK,
                         ratelimit_response_headers, request_headers_to_add);
@@ -288,7 +288,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
 TEST_P(RatelimitIntegrationTest, Error) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  ratelimit_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, true);
+  ratelimit_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, true);
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
   cleanup();
@@ -348,7 +348,7 @@ TEST_P(RatelimitIntegrationTest, FailedConnect) {
 TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  ratelimit_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  ratelimit_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   // Rate limiter fail closed
   waitForFailedUpstreamResponse(500);
   cleanup();

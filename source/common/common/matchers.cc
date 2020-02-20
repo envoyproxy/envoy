@@ -8,6 +8,7 @@
 
 #include "common/common/regex.h"
 #include "common/config/metadata.h"
+#include "common/http/path_utility.h"
 
 #include "absl/strings/match.h"
 
@@ -120,16 +121,16 @@ LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::v3::StringMatche
   switch (matcher.match_pattern_case()) {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
     lowercase.set_hidden_envoy_deprecated_regex(
-        StringUtil::toLower(matcher.hidden_envoy_deprecated_regex()));
+        absl::AsciiStrToLower(matcher.hidden_envoy_deprecated_regex()));
     break;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
-    lowercase.set_exact(StringUtil::toLower(matcher.exact()));
+    lowercase.set_exact(absl::AsciiStrToLower(matcher.exact()));
     break;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
-    lowercase.set_prefix(StringUtil::toLower(matcher.prefix()));
+    lowercase.set_prefix(absl::AsciiStrToLower(matcher.prefix()));
     break;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
-    lowercase.set_suffix(StringUtil::toLower(matcher.suffix()));
+    lowercase.set_suffix(absl::AsciiStrToLower(matcher.suffix()));
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -168,9 +169,27 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher
   value_matcher_ = ValueMatcher::create(v);
 }
 
+PathMatcherConstSharedPtr PathMatcher::createExact(const std::string& exact, bool ignore_case) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact(exact);
+  matcher.set_ignore_case(ignore_case);
+  return std::make_shared<const PathMatcher>(matcher);
+}
+
+PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, bool ignore_case) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix(prefix);
+  matcher.set_ignore_case(ignore_case);
+  return std::make_shared<const PathMatcher>(matcher);
+}
+
 bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) const {
   const auto& value = Envoy::Config::Metadata::metadataValue(metadata, matcher_.filter(), path_);
   return value_matcher_ && value_matcher_->match(value);
+}
+
+bool PathMatcher::match(const absl::string_view path) const {
+  return matcher_.match(Http::PathUtil::removeQueryAndFragment(path));
 }
 
 } // namespace Matchers

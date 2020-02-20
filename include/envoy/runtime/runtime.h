@@ -210,7 +210,8 @@ public:
    * @param key supplies the key to fetch.
    * @return const std::string& the value or empty string if the key does not exist.
    */
-  virtual const std::string& get(absl::string_view key) const PURE;
+  virtual const std::string& get(absl::string_view key,
+                                 const std::string& default_value) const PURE;
 
   /**
    * Returns whether the key has any value set.

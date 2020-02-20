@@ -38,7 +38,7 @@ namespace {
 absl::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string yaml = R"EOF(
-name: envoy.file_access_log
+name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
@@ -141,20 +141,22 @@ public:
             }));
     expectResponseTimerCreate();
 
-    Http::TestHeaderMapImpl headers(request_headers_init);
+    Http::TestRequestHeaderMapImpl headers(request_headers_init);
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
 
-    Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl(response_headers_init));
+    Http::ResponseHeaderMapPtr response_headers(
+        new Http::TestResponseHeaderMapImpl(response_headers_init));
     response_headers->setStatus(response_code);
 
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(response_code));
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
-    Http::HeaderMapPtr response_trailers(new Http::TestHeaderMapImpl(response_trailers_init));
+    Http::ResponseTrailerMapPtr response_trailers(
+        new Http::TestResponseTrailerMapImpl(response_trailers_init));
     response_decoder->decodeTrailers(std::move(response_trailers));
   }
 
@@ -178,9 +180,9 @@ public:
     expectPerTryTimerCreate();
     expectResponseTimerCreate();
 
-    Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
-                                    {"x-envoy-internal", "true"},
-                                    {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+    Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
+                                           {"x-envoy-internal", "true"},
+                                           {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
@@ -209,7 +211,8 @@ public:
 
     // Normal response.
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
-    Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+    Http::ResponseHeaderMapPtr response_headers(
+        new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(200));
     response_decoder->decodeHeaders(std::move(response_headers), true);
@@ -280,7 +283,7 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
 // Test timestamps and durations are emitted.
 TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
   const std::string yaml = R"EOF(
-name: envoy.file_access_log
+name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%

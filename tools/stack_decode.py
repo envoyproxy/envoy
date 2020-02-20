@@ -31,6 +31,9 @@ def decode_stacktrace_log(object_file, input_source):
   # or:
   #     ${backtrace_marker} #10: [0xADDR]
   stackaddr_re = re.compile("%s #\d+:(?: .*)? \[(0x[0-9a-fA-F]+)\]$" % backtrace_marker)
+  # Match something like:
+  #     #10 0xLOCATION (BINARY+0xADDR)
+  asan_re = re.compile(" *#\d+ *0x[0-9a-fA-F]+ *\([^+]*\+(0x[0-9a-fA-F]+)\)")
 
   try:
     while True:
@@ -38,6 +41,8 @@ def decode_stacktrace_log(object_file, input_source):
       if line == "":
         return  # EOF
       stackaddr_match = stackaddr_re.search(line)
+      if not stackaddr_match:
+        stackaddr_match = asan_re.search(line)
       if stackaddr_match:
         address = stackaddr_match.groups()[0]
         file_and_line_number = run_addr2line(object_file, address)

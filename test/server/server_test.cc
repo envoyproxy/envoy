@@ -644,9 +644,9 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
+  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo", ""));
   // This should access via the override/some_service overlay.
-  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz", ""));
   EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
@@ -655,7 +655,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
 TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string response_body;
   EXPECT_EQ(Http::Code::OK,
             server_->admin().request("/runtime", "GET", response_headers, response_body));

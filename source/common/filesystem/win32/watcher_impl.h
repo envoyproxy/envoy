@@ -32,7 +32,7 @@ public:
 private:
   static void issueFirstRead(ULONG_PTR param);
   static void directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLAPPED overlapped);
-  static void endDirectoryWatch(SOCKET_FD sock, HANDLE hEvent);
+  static void endDirectoryWatch(os_fd_t sock, HANDLE hEvent);
   void watchLoop();
   void onDirectoryEvent();
 
@@ -58,8 +58,8 @@ private:
   Api::Api& api_;
   std::unordered_map<std::string, DirectoryWatchPtr> callback_map_;
   Event::FileEventPtr directory_event_;
-  SOCKET_FD event_write_;
-  SOCKET_FD event_read_;
+  os_fd_t event_write_;
+  os_fd_t event_read_;
   Thread::ThreadPtr watch_thread_;
   Thread::ThreadFactoryImplWin32 thread_factory_;
   HANDLE thread_exit_event_;

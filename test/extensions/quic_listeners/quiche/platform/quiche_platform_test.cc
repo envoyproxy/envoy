@@ -7,6 +7,7 @@
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_arraysize.h"
 #include "quiche/common/platform/api/quiche_endian.h"
+#include "quiche/common/platform/api/quiche_ptr_util.h"
 #include "quiche/common/platform/api/quiche_string_piece.h"
 
 namespace quiche {
@@ -20,6 +21,11 @@ TEST(QuichePlatformTest, StringPiece) {
   std::string s = "bar";
   QuicheStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
+}
+
+TEST(QuichePlatformTest, WrapUnique) {
+  auto p = QuicheWrapUnique(new int(6));
+  EXPECT_EQ(6, *p);
 }
 
 } // namespace quiche

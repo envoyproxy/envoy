@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -212,6 +213,27 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
   SyncPacketProcessor processor(data);
   return Network::Utility::readFromSocket(handle, local_address, processor,
                                           MonotonicTime(std::chrono::seconds(0)), nullptr);
+}
+
+UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
+    : socket_(
+          std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
+  // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
+  // modification back to the abstraction layer so it will work for multiple platforms.
+  RELEASE_ASSERT(fcntl(socket_->ioHandle().fd(), F_SETFL, 0) != -1, "");
+}
+
+void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {
+  const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
+                                                  nullptr, peer);
+  ASSERT_EQ(rc.rc_, buffer.length());
+}
+
+void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
+  datagram = Network::UdpRecvData();
+  const auto rc =
+      Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(), datagram);
+  ASSERT_TRUE(rc.ok());
 }
 
 } // namespace Test

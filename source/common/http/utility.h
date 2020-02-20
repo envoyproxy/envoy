@@ -206,12 +206,12 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
  *                  type.
  * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
  */
-void sendLocalReply(bool is_grpc,
-                    std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
-                    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
-                    const bool& is_reset, Code response_code, absl::string_view body_text,
-                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    bool is_head_request = false);
+void sendLocalReply(
+    bool is_grpc,
+    std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
+    Code response_code, absl::string_view body_text,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request = false);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
@@ -261,7 +261,7 @@ void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& hos
 /**
  * Prepare headers for a HttpUri.
  */
-MessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
+RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
 
 /**
  * Serialize query-params into a string.

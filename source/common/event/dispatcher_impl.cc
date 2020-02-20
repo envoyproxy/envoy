@@ -125,7 +125,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
       new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
   return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};

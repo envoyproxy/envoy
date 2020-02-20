@@ -301,6 +301,16 @@ message CertificateValidationContext {
   // An optional list of Subject Alternative name matchers. Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified matches.
   //
+  // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
+  // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.v3.StringMatcher>`.
+  // For example if the certificate has "\*.example.com" as DNS SAN entry, to allow only "api.example.com",
+  // it should be configured as shown below.
+  //
+  // .. code-block:: yaml
+  //
+  //  match_subject_alt_names:
+  //    exact: "api.example.com"
+  //
   // .. attention::
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
@@ -458,6 +468,13 @@ message DownstreamTlsContext {
   }];
 }
 
+message GenericSecret {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.GenericSecret";
+
+  // Secret of generic type and is available to filters.
+  config.core.v3.DataSource secret = 1 [(udpa.annotations.sensitive) = true];
+}
+
 message SdsSecretConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.SdsSecretConfig";
 
@@ -469,6 +486,7 @@ message SdsSecretConfig {
   config.core.v3.ConfigSource sds_config = 2;
 }
 
+// [#next-free-field: 6]
 message Secret {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.Secret";
 
@@ -481,5 +499,7 @@ message Secret {
     TlsSessionTicketKeys session_ticket_keys = 3;
 
     CertificateValidationContext validation_context = 4;
+
+    GenericSecret generic_secret = 5;
   }
 }
