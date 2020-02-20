@@ -231,15 +231,6 @@ public:
   // Inserts trailers into the cache.
   virtual void insertTrailers(const Http::ResponseTrailerMap& trailers) PURE;
 
-  /**
-   * This routine is called prior to an InsertContext being destroyed. InsertContext is responsible
-   * for making sure that any async events are cleaned up in the context of this routine. This
-   * includes timers, network calls, etc. The reason there is an onDestroy() method vs. doing this
-   * type of cleanup in the destructor is due to the deferred deletion model that Envoy uses to
-   * avoid stack unwind complications. InsertContext must not invoke any callbacks after having
-   * onDestroy() invoked.
-   */
-  virtual void onDestroy() PURE;
   virtual ~InsertContext() = default;
 };
 using InsertContextPtr = std::unique_ptr<InsertContext>;

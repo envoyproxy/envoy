@@ -74,8 +74,6 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(toddmgreer): support trailers
   }
 
-  void onDestroy() override {}
-
 private:
   void commit() {
     committed_ = true;
