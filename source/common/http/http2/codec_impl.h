@@ -154,7 +154,7 @@ protected:
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
-    void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
+    void encodeHeadersBase(const std::vector<nghttp2_nv>& final_headers, bool end_stream);
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
@@ -206,7 +206,7 @@ protected:
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
-    virtual void decodeHeaders() PURE;
+    virtual void decodeHeaders(nghttp2_headers_category category) PURE;
     virtual void decodeTrailers() PURE;
 
     // Get MetadataEncoder for this stream.
@@ -215,8 +215,6 @@ protected:
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
-
-    virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
 
     bool buffers_overrun() const { return read_disable_count_ > 0; }
 
@@ -259,12 +257,8 @@ protected:
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
-    void transformUpgradeFromH1toH2(HeaderMap& headers) override {
-      upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
-      Http::Utility::transformUpgradeRequestFromH1toH2(headers);
-    }
     StreamDecoder& decoder() override { return response_decoder_; }
-    void decodeHeaders() override;
+    void decodeHeaders(nghttp2_headers_category category) override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
@@ -286,9 +280,7 @@ protected:
     }
 
     // RequestEncoder
-    void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
-      encodeHeadersBase(headers, end_stream);
-    }
+    void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
     void encodeTrailers(const RequestTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
@@ -311,11 +303,8 @@ protected:
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
-    void transformUpgradeFromH1toH2(HeaderMap& headers) override {
-      Http::Utility::transformUpgradeResponseFromH1toH2(headers);
-    }
     StreamDecoder& decoder() override { return *request_decoder_; }
-    void decodeHeaders() override;
+    void decodeHeaders(nghttp2_headers_category category) override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
@@ -330,11 +319,7 @@ protected:
 
     // ResponseEncoder
     void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
-    void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override {
-      // The contract is that client codecs must ensure that :status is present.
-      ASSERT(headers.Status() != nullptr);
-      encodeHeadersBase(headers, end_stream);
-    }
+    void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
