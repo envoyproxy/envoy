@@ -248,7 +248,7 @@ TEST_F(GzipFilterTest, AcceptanceGzipEncodingWithTrailers) {
 }
 
 // Verifies isAcceptEncodingAllowed function.
-TEST_F(GzipFilterTest, hasCacheControlNoTransform) {
+TEST_F(GzipFilterTest, HasCacheControlNoTransform) {
   {
     Http::TestRequestHeaderMapImpl headers = {{"cache-control", "no-cache"}};
     EXPECT_FALSE(hasCacheControlNoTransform(headers));
@@ -264,7 +264,7 @@ TEST_F(GzipFilterTest, hasCacheControlNoTransform) {
 }
 
 // Verifies that compression is skipped when cache-control header has no-transform value.
-TEST_F(GzipFilterTest, hasCacheControlNoTransformNoCompression) {
+TEST_F(GzipFilterTest, HasCacheControlNoTransformNoCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip;q=0, deflate"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-transform"}});
@@ -272,14 +272,14 @@ TEST_F(GzipFilterTest, hasCacheControlNoTransformNoCompression) {
 
 // Verifies that compression is NOT skipped when cache-control header does NOT have no-transform
 // value.
-TEST_F(GzipFilterTest, hasCacheControlNoTransformCompression) {
+TEST_F(GzipFilterTest, HasCacheControlNoTransformCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip, deflate"}}, true);
   doResponseCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-cache"}}, false);
 }
 
 // Verifies isAcceptEncodingAllowed function.
-TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
+TEST_F(GzipFilterTest, IsAcceptEncodingAllowed) {
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
@@ -406,7 +406,7 @@ TEST_F(GzipFilterTest, AcceptEncodingCompression) {
 }
 
 // Verifies isMinimumContentLength function.
-TEST_F(GzipFilterTest, isMinimumContentLength) {
+TEST_F(GzipFilterTest, IsMinimumContentLength) {
   {
     Http::TestRequestHeaderMapImpl headers = {{"content-length", "31"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
@@ -453,7 +453,7 @@ TEST_F(GzipFilterTest, ContentLengthCompression) {
 }
 
 // Verifies isContentTypeAllowed function.
-TEST_F(GzipFilterTest, isContentTypeAllowed) {
+TEST_F(GzipFilterTest, IsContentTypeAllowed) {
 
   {
     Http::TestRequestHeaderMapImpl headers = {{"content-type", "text/html"}};
@@ -566,7 +566,7 @@ TEST_F(GzipFilterTest, ContentTypeCompression) {
 }
 
 // Verifies sanitizeEtagHeader function.
-TEST_F(GzipFilterTest, sanitizeEtagHeader) {
+TEST_F(GzipFilterTest, SanitizeEtagHeader) {
   {
     std::string etag_header{R"EOF(W/"686897696a7c876b7e")EOF"};
     Http::TestRequestHeaderMapImpl headers = {{"etag", etag_header}};
@@ -587,7 +587,7 @@ TEST_F(GzipFilterTest, sanitizeEtagHeader) {
 }
 
 // Verifies isEtagAllowed function.
-TEST_F(GzipFilterTest, isEtagAllowed) {
+TEST_F(GzipFilterTest, IsEtagAllowed) {
   {
     Http::TestRequestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_TRUE(isEtagAllowed(headers));
@@ -643,7 +643,7 @@ TEST_F(GzipFilterTest, EtagCompression) {
 }
 
 // Verifies isTransferEncodingAllowed function.
-TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
+TEST_F(GzipFilterTest, IsTransferEncodingAllowed) {
   {
     Http::TestRequestHeaderMapImpl headers = {};
     EXPECT_TRUE(isTransferEncodingAllowed(headers));
@@ -716,7 +716,7 @@ TEST_F(GzipFilterTest, EmptyResponse) {
 }
 
 // Verifies insertVaryHeader function.
-TEST_F(GzipFilterTest, insertVaryHeader) {
+TEST_F(GzipFilterTest, InsertVaryHeader) {
   {
     Http::TestRequestHeaderMapImpl headers = {};
     insertVaryHeader(headers);
