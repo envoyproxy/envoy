@@ -3109,8 +3109,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
     filter_chains:
     - filter_chain_match:
       filters:
-      - name: envoy.filters.network.http_connection_manager
-        config:
+      - name: http
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: metadata_test
           route_config:
             virtual_hosts:

@@ -790,8 +790,7 @@ void ConfigHelper::storeHttpConnectionManager(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         hcm) {
   RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_config_any = getFilterFromListener("http")
-                             ->mutable_typed_config();
+  auto* hcm_config_any = getFilterFromListener("http")->mutable_typed_config();
 
   hcm_config_any->PackFrom(hcm);
 }
