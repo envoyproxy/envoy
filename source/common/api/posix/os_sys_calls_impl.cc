@@ -57,6 +57,11 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
   return {rc, errno};
 #else
   PANIC("revmmsg is not implemented on non-Linux platform.");
+  (void)sockfd;
+  (void)msgvec;
+  (void)vlen;
+  (void)flags;
+  (void)timeout;
 #endif
 }
 
