@@ -1,7 +1,6 @@
 # Word list for check_spelling_pedantic.py -- any entry in ALLCAPS will also be accepted in
 # lower case and title case (e.g. HTTP will accept http and Http). Entries in all lower case
 # will accept title case (e.g. lyft matches Lyft).
-AAAA
 ABI
 ACK
 AES
@@ -337,8 +336,6 @@ XNOR
 XSS
 YAML
 ZXID
-aaa
-abc
 absl
 accesslog
 accessor
@@ -391,7 +388,6 @@ balancers
 barbaz
 baz
 bazel
-bbb
 behaviour
 benchmarked
 benchmarking
@@ -1209,8 +1205,6 @@ xid
 xmodem
 xxhash
 xxs
-xyz
-yyy
 zag
 zig
 zipkin
@@ -1218,4 +1212,3 @@ zlib
 OBQ
 SemVer
 SCM
-zzz

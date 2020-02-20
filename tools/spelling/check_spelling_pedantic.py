@@ -32,7 +32,7 @@ CURR_DIR = os.path.dirname(os.path.realpath(__file__))
 # Single line comments: // comment OR /* comment */
 # Limit the characters that may precede // to help filter out some code
 # mistakenly processed as a comment.
-INLINE_COMMENT = re.compile(r'(?:^|[^:"])//(.*?)$|/\*+(.*?)\*+/')
+INLINE_COMMENT = re.compile(r'(?:^|[^:"])//( .*?$|$)|/\*+(.*?)\*+/')
 
 # Multi-line comments: /* comment */ (multiple lines)
 MULTI_COMMENT_START = re.compile(r'/\*(.*?)$')
@@ -68,13 +68,38 @@ AB_FIELDS = re.compile(r'\W([AB]+)\W')
 IPV6_ADDR = re.compile(r'\W([A-Fa-f0-9]+:[A-Fa-f0-9:]+/[0-9]{1,3})\W')
 
 # Quoted words: "word", 'word', or *word*.
-QUOTED_WORD = re.compile(r'(["\'*])[A-Za-z0-9]+(\1)')
+QUOTED_WORD = re.compile(r'((["\'])[A-Za-z0-9.:-]+(\2))|(\*[A-Za-z0-9.:-]+\*)')
+
+# Backtick-quoted words that look like code. Note the overlap with RST_LINK.
+QUOTED_EXPR = re.compile(r'`[A-Za-z0-9:()<>_.,/{}\[\]&*-]+`')
+
+# Tuple expressions like (abc, def).
+TUPLE_EXPR = re.compile(r'\([A-Za-z0-9]+(?:, *[A-Za-z0-9]+){1,}\)')
 
 # Command flags (e.g. "-rf") and percent specifiers.
 FLAG = re.compile(r'\W([-%][A-Za-z]+)')
 
 # Bare github users (e.g. @user).
 USER = re.compile(r'\W(@[A-Za-z0-9-]+)')
+
+# RST Links (e.g. `text <https://example.com>`_, :ref:`text <internal_ref>`)
+RST_LINK=re.compile(r'`([^`<]|\\[`<])+<([^ ]+)>`')
+
+# RST inline literals.
+RST_LITERAL=re.compile(r'``.*``')
+
+# RST code block marker.
+RST_CODE_BLOCK='.. code-block::'
+
+# Start of string indent.
+INDENT=re.compile(r'^( *)')
+
+SMART_QUOTES={
+  "\u2018": "'",
+  "\u2019": "'",
+  "\u201c": '"',
+  "\u201d": '"',
+}
 
 # Valid dictionary words. Anything else crashes aspell.
 DICTIONARY_WORD = re.compile(r"^[A-Za-z']+$")
@@ -262,48 +287,66 @@ def check_camel_case(checker, err):
 # matching group with spaces. If secondary is defined, the matching
 # group must also match secondary to be masked.
 def mask_with_regex(comment, regex, group, secondary=None):
+  found = False
   for m in regex.finditer(comment):
     if secondary and secondary.search(m.group(group)) is None:
       continue
 
     start = m.start(group)
     end = m.end(group)
-    comment = comment[:start] + (' ' * (end - start)) + comment[end:]
 
-  return comment
+    comment = comment[:start] + (' ' * (end - start)) + comment[end:]
+    found = True
+
+  return (comment, found)
 
 
 # Checks the comment at offset against the spell checker. Result is an array
 # of tuples where each tuple is the misspelled word, it's offset from the
 # start of the line, and an array of possible replacements.
 def check_comment(checker, offset, comment):
+  # Strip smart quotes which cause problems sometimes.
+  for sq, q in SMART_QUOTES.items():
+    comment = comment.replace(sq, q)
+
   # Replace TODO comments with spaces to preserve string offsets.
-  comment = mask_with_regex(comment, TODO, 0)
+  comment, _ = mask_with_regex(comment, TODO, 0)
 
   # Ignore @param varname
-  comment = mask_with_regex(comment, METHOD_DOC, 0)
+  comment, _ = mask_with_regex(comment, METHOD_DOC, 0)
 
   # Similarly, look for base64 sequences, but they must have at least one
   # digit.
-  comment = mask_with_regex(comment, BASE64, 1, NUMBER)
+  comment, _ = mask_with_regex(comment, BASE64, 1, NUMBER)
 
   # Various hex constants:
-  comment = mask_with_regex(comment, HEX, 1)
-  comment = mask_with_regex(comment, HEX_SIG, 1)
-  comment = mask_with_regex(comment, PREFIXED_HEX, 0)
-  comment = mask_with_regex(comment, BIT_FIELDS, 0)
-  comment = mask_with_regex(comment, AB_FIELDS, 1)
-  comment = mask_with_regex(comment, UUID, 0)
-  comment = mask_with_regex(comment, IPV6_ADDR, 1)
+  comment, _ = mask_with_regex(comment, HEX, 1)
+  comment, _ = mask_with_regex(comment, HEX_SIG, 1)
+  comment, _ = mask_with_regex(comment, PREFIXED_HEX, 0)
+  comment, _ = mask_with_regex(comment, BIT_FIELDS, 0)
+  comment, _ = mask_with_regex(comment, AB_FIELDS, 1)
+  comment, _ = mask_with_regex(comment, UUID, 0)
+  comment, _ = mask_with_regex(comment, IPV6_ADDR, 1)
 
   # Single words in quotes:
-  comment = mask_with_regex(comment, QUOTED_WORD, 0)
+  comment, _ = mask_with_regex(comment, QUOTED_WORD, 0)
+
+  # RST inline literals:
+  comment, _ = mask_with_regex(comment, RST_LITERAL, 0)
+
+  # Mask the reference part of an RST link (but not the link text). Otherwise, check for a quoted
+  # code-like expression (which would mask the link text if not guarded).
+  comment, found = mask_with_regex(comment, RST_LINK, 2)
+  if not found:
+    comment, _ = mask_with_regex(comment, QUOTED_EXPR, 0)
+
+  comment, _ = mask_with_regex(comment, TUPLE_EXPR, 0)
 
   # Command flags:
-  comment = mask_with_regex(comment, FLAG, 1)
+  comment, _ = mask_with_regex(comment, FLAG, 1)
 
   # Github user refs:
-  comment = mask_with_regex(comment, USER, 1)
+  comment, _ = mask_with_regex(comment, USER, 1)
 
   # Everything got masked, return early.
   if comment == "" or comment.strip() == "":
@@ -461,46 +504,99 @@ def fix_error(checker, file, line_offset, lines, errors):
   checker.add_words(additions)
 
 
-def check_file(checker, file, lines, error_handler):
+class Comment:
+  """Comment represents a comment at a location within a file."""
+
+  def __init__(self, line, col, text, last_on_line):
+    self.line = line
+    self.col = col
+    self.text = text
+    self.last_on_line = last_on_line
+
+
+# Extract comments from lines. Returns an array of Comment.
+def extract_comments(lines):
   in_comment = False
-  num_comments = 0
-  num_errors = 0
+  comments = []
   for line_idx, line in enumerate(lines):
-    errors = []
+    line_comments = []
     last = 0
     if in_comment:
       mc_end = MULTI_COMMENT_END.search(line)
       if mc_end is None:
         # Full line is within a multi-line comment.
-        errors += check_comment(checker, 0, line)
-        num_comments += 1
+        line_comments.append((0, line))
       else:
         # Start of line is the end of a multi-line comment.
-        errors += check_comment(checker, 0, mc_end.group(1))
-        num_comments += 1
+        line_comments.append((0, mc_end.group(1)))
         last = mc_end.end()
         in_comment = False
 
     if not in_comment:
       for inline in INLINE_COMMENT.finditer(line, last):
         # Single-line comment.
-        m = inline.lastindex  # 1 or 2 depending on group matched.
-        errors += check_comment(checker, inline.start(m), inline.group(m))
-        num_comments += 1
+        m = inline.lastindex  # 1 is //, 2 is /* ... */
+        line_comments.append((inline.start(m), inline.group(m)))
         last = inline.end(m)
+
       if last < len(line):
         mc_start = MULTI_COMMENT_START.search(line, last)
         if mc_start is not None:
           # New multi-lie comment starts at end of line.
-          errors += check_comment(checker, mc_start.start(1), mc_start.group(1))
-          num_comments += 1
+          line_comments.append((mc_start.start(1), mc_start.group(1)))
           in_comment = True
 
-    if errors:
-      num_errors += len(errors)
-      error_handler(file, line_idx, lines, errors)
+    for idx, line_comment in enumerate(line_comments):
+      col, text = line_comment
+      last_on_line = idx + 1 >= len(line_comments)
+      comments.append(Comment(line=line_idx, col=col, text=text, last_on_line=last_on_line))
 
-  return (num_comments, num_errors)
+  # Filter out comments that are part of RST code block directives.
+  result = []
+  n = 0
+  nc = len(comments)
+  while n < nc:
+    if comments[n].text.strip().startswith(RST_CODE_BLOCK):
+      # Start of a code block.
+      indent = len(INDENT.search(comments[n].text).group(1))
+      last_line = comments[n].line
+      n += 1
+
+      while n < nc:
+        if comments[n].line - last_line > 1:
+          # Gap in comments. Code block is finished.
+          break
+        last_line = comments[n].line
+
+        if comments[n].text.strip() != "":
+          # Blank lines are ignored in code blocks.
+          if len(INDENT.search(comments[n].text).group(1)) <= indent:
+            # Back to original indent, or less. The code block is done.
+            break
+        n += 1
+    else:
+      result.append(comments[n])
+      n += 1
+
+  return result
+
+
+def check_file(checker, file, lines, error_handler):
+  in_code_block = 0
+  code_block_indent = 0
+  num_errors = 0
+
+  comments = extract_comments(lines)
+  errors = []
+  for comment in comments:
+    errors += check_comment(checker, comment.col, comment.text)
+    if comment.last_on_line and len(errors) > 0:
+      # Handle all the errors in a line.
+      num_errors += len(errors)
+      error_handler(file, comment.line, lines, errors)
+      errors = []
+
+  return (len(comments), num_errors)
 
 
 def execute(files, dictionary_file, fix):
