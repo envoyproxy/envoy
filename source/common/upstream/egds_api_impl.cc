@@ -1,11 +1,13 @@
 #include "common/upstream/egds_api_impl.h"
 
+#include "envoy/api/v2/endpoint.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/utility.h"
 
@@ -32,10 +34,7 @@ EgdsApiImpl::EgdsApiImpl(
 
   for (auto& pair : config_source_map) {
     auto subscription = subscription_factory.subscriptionFromConfigSource(
-        pair.first,
-        Grpc::Common::typeUrl(
-            envoy::config::endpoint::v3::EndpointGroup().GetDescriptor()->full_name()),
-        *scope_, *this);
+        pair.first, loadTypeUrl(pair.first.resource_api_version()), *scope_, *this);
     subscription_map_.emplace(std::move(subscription), std::move(pair.second));
   }
 }
@@ -121,6 +120,21 @@ void EgdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason 
                                        const EnvoyException*) {
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
   initialization_fail_callback_();
+}
+
+std::string EgdsApiImpl::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
+  // automatically set api version as V2
+  case envoy::config::core::v3::ApiVersion::AUTO:
+  case envoy::config::core::v3::ApiVersion::V2:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::EndpointGroup().GetDescriptor()->full_name()));
+  case envoy::config::core::v3::ApiVersion::V3:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::config::endpoint::v3::EndpointGroup().GetDescriptor()->full_name()));
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 } // namespace Upstream

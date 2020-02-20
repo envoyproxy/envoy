@@ -70,6 +70,8 @@ public:
   }
 
 private:
+  std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
+
   EndpointGroupsManager& endpoint_group_mananger_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   std::unordered_map<Config::SubscriptionPtr, std::set<std::string>> subscription_map_;

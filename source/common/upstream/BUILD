@@ -645,6 +645,7 @@ envoy_cc_library(
         "//include/envoy/upstream:locality_lib",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
