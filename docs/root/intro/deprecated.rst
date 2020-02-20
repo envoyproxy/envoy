@@ -57,7 +57,7 @@ Deprecated items below are listed in chronological order.
     envoy.tracers.zipkin, envoy.zipkin
 
   .. note::
-    Some renamed filters produce metadata using their filter name as the namespace metadata:
+    Some renamed filters produce metadata using their filter name as the metadata namespace:
 
     * Mongo Proxy Filter
     * Zookeeper Filter
