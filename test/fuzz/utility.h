@@ -86,7 +86,7 @@ inline T fromHeaders(
     const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
   T header_map;
   for (const auto& header : headers.headers()) {
-    if (ignore_headers.find(StringUtil::toLower(header.key())) == ignore_headers.end()) {
+    if (ignore_headers.find(absl::AsciiStrToLower(header.key())) == ignore_headers.end()) {
       header_map.addCopy(header.key(), header.value());
     }
   }
