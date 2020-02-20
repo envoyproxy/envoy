@@ -374,7 +374,9 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
 
     bool done = !readToBuffer(*transcoder_->RequestOutput(), request_prefix_);
     if (!done) {
-      ENVOY_LOG(debug, "Transcoding HttpBody request is not done");
+      ENVOY_LOG(
+          debug,
+          "Transcoding of query arguments of HttpBody request is not done (unexpected state)");
       error_ = true;
       decoder_callbacks_->sendLocalReply(
           Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt,
