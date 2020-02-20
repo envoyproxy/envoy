@@ -40,6 +40,11 @@ message StreamAction {
     DirectionalAction request = 2;
     DirectionalAction response = 3;
   }
+  // Optionally set a dispatching action. This is a directional action that will
+  // be called while the stream action is sending headers, data, or trailers.
+  // This will only apply to request stream actions (so that the dispatching
+  // action occurs in the response direction).
+  DirectionalAction dispatching_action = 4;
 }
 
 message MutateAction {
