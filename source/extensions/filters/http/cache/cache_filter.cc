@@ -55,6 +55,13 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
   lookup_->getHeaders([this](LookupResult&& result) { onHeaders(std::move(result)); });
+  if (state_ == GetHeadersState::GetHeadersResultUnusable) {
+    // onHeaders has already been called, and no usable cache entry was found--continue iteration.
+    return Http::FilterHeadersStatus::Continue;
+  }
+  // onHeaders hasn't been called yet--stop iteration to wait for it, and tell it that we stopped
+  // iteration.
+  state_ = GetHeadersState::FinishedGetHeadersCall;
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -85,7 +92,13 @@ void CacheFilter::onHeaders(LookupResult&& result) {
   case CacheEntryStatus::UnsatisfiableRange:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
   case CacheEntryStatus::Unusable:
-    decoder_callbacks_->continueDecoding();
+    if (state_ == GetHeadersState::FinishedGetHeadersCall) {
+      // decodeHeader returned Http::FilterHeadersStatus::StopIteration--restart it
+      decoder_callbacks_->continueDecoding();
+    } else {
+      // decodeHeader hasn't yet returned--tell it to return Http::FilterHeadersStatus::Continue.
+      state_ = GetHeadersState::GetHeadersResultUnusable;
+    }
     return;
   case CacheEntryStatus::Ok:
     response_has_trailers_ = result.has_trailers_;

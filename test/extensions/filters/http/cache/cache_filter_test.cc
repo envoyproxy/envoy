@@ -47,10 +47,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
     CacheFilter filter = makeFilter();
 
     // Decode request 1 header
-    EXPECT_CALL(decoder_callbacks_, continueDecoding);
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopIteration);
-    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
 
     // Encode response header
     EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
@@ -83,10 +80,7 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
     CacheFilter filter = makeFilter();
 
     // Decode request 1 header
-    EXPECT_CALL(decoder_callbacks_, continueDecoding);
-    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
-              Http::FilterHeadersStatus::StopIteration);
-    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
 
     // Encode response header
     Buffer::OwnedImpl buffer(body);

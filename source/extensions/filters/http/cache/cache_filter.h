@@ -59,6 +59,10 @@ private:
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
   bool response_has_trailers_;
+
+  // Used for coordinating between decodeHeaders and onHeaders.
+  enum class GetHeadersState { Initial, FinishedGetHeadersCall, GetHeadersResultUnusable };
+  GetHeadersState state_ = GetHeadersState::Initial;
 };
 
 } // namespace Cache
