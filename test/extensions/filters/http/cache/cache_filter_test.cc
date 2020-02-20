@@ -13,17 +13,53 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
+// Wrapper for SimpleHttpCache that delays the onHeaders callback from getHeaders, for verifying
+// that CacheFilter works correctly whether the onHeaders call happens immediately, or after
+// getHeaders and decodeHeaders return.
+class DelayedCache : public SimpleHttpCache {
+public:
+  // HttpCache
+  LookupContextPtr makeLookupContext(LookupRequest&& request) override {
+    return std::make_unique<DelayedLookupContext>(
+        SimpleHttpCache::makeLookupContext(std::move(request)), delayed_cb_);
+  }
+  InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context) override {
+    return SimpleHttpCache::makeInsertContext(
+        std::move(dynamic_cast<DelayedLookupContext&>(*lookup_context).context_));
+  }
+
+  std::function<void()> delayed_cb_;
+
+private:
+  class DelayedLookupContext : public LookupContext {
+  public:
+    DelayedLookupContext(LookupContextPtr&& context, std::function<void()>& delayed_cb)
+        : context_(std::move(context)), delayed_cb_(delayed_cb) {}
+    void getHeaders(LookupHeadersCallback&& cb) override {
+      delayed_cb_ = [this, cb]() mutable { context_->getHeaders(std::move(cb)); };
+    }
+    void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
+      context_->getBody(range, std::move(cb));
+    }
+    void getTrailers(LookupTrailersCallback&& cb) override { context_->getTrailers(std::move(cb)); }
+
+    LookupContextPtr context_;
+    std::function<void()>& delayed_cb_;
+  };
+};
+
 class CacheFilterTest : public ::testing::Test {
 protected:
-  CacheFilter makeFilter() {
+  CacheFilter makeFilter(HttpCache& cache) {
     CacheFilter filter(config_, /*stats_prefix=*/"", context_.scope(), context_.timeSource(),
-                       cache_);
+                       cache);
     filter.setDecoderFilterCallbacks(decoder_callbacks_);
     filter.setEncoderFilterCallbacks(encoder_callbacks_);
     return filter;
   }
 
-  SimpleHttpCache cache_;
+  SimpleHttpCache simple_cache_;
+  DelayedCache delayed_cache_;
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Event::SimulatedTimeSystem time_source_;
@@ -44,7 +80,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
 
   {
     // Create filter for request 1
-    CacheFilter filter = makeFilter();
+    CacheFilter filter = makeFilter(simple_cache_);
 
     // Decode request 1 header
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
@@ -55,7 +91,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
   }
   {
     // Create filter for request 2
-    CacheFilter filter = makeFilter();
+    CacheFilter filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
@@ -69,6 +105,43 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
   }
 }
 
+TEST_F(CacheFilterTest, DelayedHitNoBody) {
+  request_headers_.setHost("ImmediateHitNoBody");
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+
+  {
+    // Create filter for request 1
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Decode request 1 header
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopIteration);
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
+    delayed_cache_.delayed_cb_();
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Encode response header
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+    filter.onDestroy();
+  }
+  {
+    // Create filter for request 2
+    CacheFilter filter = makeFilter(delayed_cache_);
+
+    // Decode request 2 header
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopIteration);
+    EXPECT_CALL(decoder_callbacks_,
+                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                              HeaderHasValueRef("age", "0")),
+                               true));
+    delayed_cache_.delayed_cb_();
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
+}
+
 TEST_F(CacheFilterTest, ImmediateHitBody) {
   request_headers_.setHost("ImmediateHitBody");
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
@@ -77,7 +150,7 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
 
   {
     // Create filter for request 1
-    CacheFilter filter = makeFilter();
+    CacheFilter filter = makeFilter(simple_cache_);
 
     // Decode request 1 header
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true), Http::FilterHeadersStatus::Continue);
@@ -91,7 +164,7 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
   }
   {
     // Create filter for request 2
-    CacheFilter filter = makeFilter();
+    CacheFilter filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
     EXPECT_CALL(decoder_callbacks_,
