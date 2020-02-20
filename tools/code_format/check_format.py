@@ -579,6 +579,8 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
   if line.startswith("using testing::TestWithParams;"):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
+  if re.search("TEST_.\(.*,\s[a-z].*\)\s\{", line):
+    reportError("Test names should be CamelCase, starting with a capital letter")
   if not whitelistedForSerializeAsString(file_path) and "SerializeAsString" in line:
     # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
     # use MessageUtil::hash instead.
