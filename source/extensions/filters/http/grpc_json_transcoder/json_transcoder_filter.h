@@ -47,7 +47,7 @@ struct MethodInfo {
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
-typedef std::shared_ptr<MethodInfo> MethodInfoPtr;
+typedef std::shared_ptr<MethodInfo> MethodInfoSharedPtr;
 
 /**
  * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
@@ -76,7 +76,7 @@ public:
   createTranscoder(const Http::HeaderMap& headers, Protobuf::io::ZeroCopyInputStream& request_input,
                    google::grpc::transcoding::TranscoderInputStream& response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-                   MethodInfoPtr& method_info);
+                   MethodInfoSharedPtr& method_info);
 
   /**
    * Converts an arbitrary protobuf message to JSON.
@@ -101,7 +101,7 @@ private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
    */
-  ProtobufUtil::Status methodToRequestInfo(const MethodInfoPtr& method_info,
+  ProtobufUtil::Status methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                            google::grpc::transcoding::RequestInfo* info);
 
 private:
@@ -109,10 +109,10 @@ private:
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                         const google::api::HttpRule& http_rule,
-                                        MethodInfoPtr& method_info);
+                                        MethodInfoSharedPtr& method_info);
 
   Protobuf::DescriptorPool descriptor_pool_;
-  google::grpc::transcoding::PathMatcherPtr<MethodInfoPtr> path_matcher_;
+  google::grpc::transcoding::PathMatcherPtr<MethodInfoSharedPtr> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
   Protobuf::util::JsonPrintOptions print_options_;
 
@@ -171,7 +171,7 @@ private:
   TranscoderInputStreamImpl response_in_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
-  MethodInfoPtr method_;
+  MethodInfoSharedPtr method_;
   Http::HeaderMap* response_headers_{nullptr};
   Grpc::Decoder decoder_;
 

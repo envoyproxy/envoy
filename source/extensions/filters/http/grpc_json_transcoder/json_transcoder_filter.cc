@@ -142,7 +142,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::Common::typeUrlPrefix(),
                                                        &descriptor_pool_));
 
-  PathMatcherBuilder<MethodInfoPtr> pmb;
+  PathMatcherBuilder<MethodInfoSharedPtr> pmb;
   std::unordered_set<std::string> ignored_query_parameters;
   for (const auto& query_param : proto_config.ignored_query_parameters()) {
     ignored_query_parameters.insert(query_param);
@@ -166,7 +166,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
         http_rule.set_body("*");
       }
 
-      MethodInfoPtr method_info;
+      MethodInfoSharedPtr method_info;
       Status status = createMethodInfo(method, http_rule, method_info);
       if (!status.ok()) {
         throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
@@ -217,7 +217,7 @@ void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_
 
 Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                               const HttpRule& http_rule,
-                                              MethodInfoPtr& method_info) {
+                                              MethodInfoSharedPtr& method_info) {
   method_info = std::make_shared<MethodInfo>();
   method_info->descriptor_ = descriptor;
   method_info->response_type_is_http_body_ =
@@ -261,7 +261,7 @@ bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_statu
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
-    std::unique_ptr<Transcoder>& transcoder, MethodInfoPtr& method_info) {
+    std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) {
   if (Grpc::Common::hasGrpcContentType(headers)) {
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
@@ -330,7 +330,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
 }
 
 ProtobufUtil::Status
-JsonTranscoderConfig::methodToRequestInfo(const MethodInfoPtr& method_info,
+JsonTranscoderConfig::methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                           google::grpc::transcoding::RequestInfo* info) {
   const std::string& request_type_full_name = method_info->descriptor_->input_type()->full_name();
   auto request_type_url = Grpc::Common::typeUrl(request_type_full_name);
@@ -428,11 +428,11 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
 
   if (method_->request_type_is_http_body_) {
     request_data_.move(data);
-    // TODO(elessar): Upper bound message size for streaming case.
+    // TODO(euroelessar): Upper bound message size for streaming case.
     if (end_stream || method_->descriptor_->client_streaming()) {
       maybeSendHttpBodyRequestMessage();
     } else {
-      // TODO(elessar): Avoid buffering if content length is already known.
+      // TODO(euroelessar): Avoid buffering if content length is already known.
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
   } else {
