@@ -82,8 +82,7 @@ void TagProducerImpl::forEachExtractorMatching(
   }
 }
 
-std::string TagProducerImpl::produceTags(absl::string_view metric_name,
-                                         std::vector<Tag>& tags) const {
+std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVector& tags) const {
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   IntervalSetImpl<size_t> remove_characters;
   forEachExtractorMatching(

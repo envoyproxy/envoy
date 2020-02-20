@@ -27,7 +27,7 @@ namespace {
 // TODO(snowp): Combine with TagExtraction?
 class StatNameTagHelper {
 public:
-  StatNameTagHelper(const std::vector<Tag>& string_tags, const StatNameTagVector& stat_name_tags,
+  StatNameTagHelper(const TagVector& string_tags, const StatNameTagVector& stat_name_tags,
                     SymbolTable& symbol_table)
       : pool_(symbol_table), stat_name_tags_(stat_name_tags) {
     for (const auto& tag : string_tags) {
@@ -296,11 +296,11 @@ public:
     });
   }
 
-  const std::vector<Tag>& tags() { return tags_; }
+  const TagVector& tags() { return tags_; }
   const std::string& tagExtractedName() { return tag_extracted_name_; }
 
 private:
-  std::vector<Tag> tags_;
+  TagVector tags_;
   std::string tag_extracted_name_;
 };
 
@@ -581,7 +581,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
     }
   }
 
-  std::vector<Tag> tags;
+  TagVector tags;
   std::string tag_extracted_name =
       parent_.tagProducer().produceTags(symbolTable().toString(name), tags);
 

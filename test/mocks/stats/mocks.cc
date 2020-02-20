@@ -81,7 +81,7 @@ MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
         auto* histogram = new NiceMock<MockHistogram>(); // symbol_table_);
         histogram->name_ = symbolTable().toString(name);
         histogram->unit_ = unit;
-        std::vector<Tag> tags;
+        TagVector tags;
         for (const auto& stat_name_tag : stat_name_tags) {
           tags.emplace_back(Tag{symbolTable().toString(stat_name_tag.first),
                                 symbolTable().toString(stat_name_tag.second)});

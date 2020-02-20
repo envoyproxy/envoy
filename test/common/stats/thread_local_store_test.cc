@@ -332,7 +332,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   StatNameManagedStorage tag_value("b", *symbol_table_);
   StatNameTagVector tags{{StatName(tag_key.statName()), StatName(tag_value.statName())}};
 
-  const std::vector<Tag> expectedTags = {Tag{"a", "b"}};
+  const TagVector expectedTags = {Tag{"a", "b"}};
 
   {
     StatNameManagedStorage storage("c3", *symbol_table_);

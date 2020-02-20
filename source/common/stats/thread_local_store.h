@@ -374,7 +374,7 @@ private:
 
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
-                                std::vector<Tag>& tags, std::string& tag_extracted_name);
+                                TagVector& tags, std::string& tag_extracted_name);
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
@@ -396,7 +396,7 @@ private:
     absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
-  std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
+  std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);

@@ -40,7 +40,7 @@ TEST_F(MetricImplTest, NoTags) {
 TEST_F(MetricImplTest, OneTag) {
   CounterSharedPtr counter = alloc_.makeCounter(makeStat("counter.name.value"), "counter",
                                                 {{makeStat("name"), makeStat("value")}});
-  std::vector<Tag> tags = counter->tags();
+  TagVector tags = counter->tags();
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("name", tags[0].name_);
   EXPECT_EQ("value", tags[0].value_);

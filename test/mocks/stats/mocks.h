@@ -86,7 +86,7 @@ public:
   // creates a deadlock in gmock and is an unintended use of mock functions.
   std::string name() const override { return name_.name(); }
   StatName statName() const override { return name_.statName(); }
-  std::vector<Tag> tags() const override { return tags_; }
+  TagVector tags() const override { return tags_; }
   void setTagExtractedName(absl::string_view name) {
     tag_extracted_name_ = std::string(name);
     tag_extracted_stat_name_ =
@@ -108,7 +108,7 @@ public:
   TestSymbolTable symbol_table_; // Must outlive name_.
   MetricName name_;
 
-  void setTags(const std::vector<Tag>& tags) {
+  void setTags(const TagVector& tags) {
     tag_pool_.clear();
     tags_ = tags;
     for (const Tag& tag : tags) {
@@ -123,7 +123,7 @@ public:
   }
 
 private:
-  std::vector<Tag> tags_;
+  TagVector tags_;
   std::vector<StatName> tag_names_and_values_;
   std::string tag_extracted_name_;
   StatNamePool tag_pool_;

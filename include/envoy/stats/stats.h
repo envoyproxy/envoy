@@ -16,6 +16,7 @@ namespace Stats {
 
 class Allocator;
 struct Tag;
+using TagVector = std::vector<Tag>;
 
 /**
  * General interface for all stats objects.
@@ -42,7 +43,7 @@ public:
   /**
    * Returns a vector of configurable tags to identify this Metric.
    */
-  virtual std::vector<Tag> tags() const PURE;
+  virtual TagVector tags() const PURE;
 
   /**
    * See a more detailed description in tagExtractedStatName(), which is the
