@@ -68,9 +68,9 @@ actions:
                           "value length must be at least");
 }
 
-static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
-                                          const std::string& method) {
-  return Http::TestHeaderMapImpl{
+static Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
+                                                 const std::string& method) {
+  return Http::TestRequestHeaderMapImpl{
       {":authority", host}, {":path", path}, {":method", method}, {"x-forwarded-proto", "http"}};
 }
 

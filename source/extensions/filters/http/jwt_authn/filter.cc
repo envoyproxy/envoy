@@ -16,7 +16,7 @@ namespace JwtAuthn {
 
 namespace {
 
-bool isCorsPreflightRequest(const Http::HeaderMap& headers) {
+bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
   return headers.Method() &&
          headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
          headers.Origin() && !headers.Origin()->value().empty() &&

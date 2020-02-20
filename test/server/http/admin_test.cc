@@ -619,9 +619,9 @@ public:
     admin_filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response, absl::string_view method,
-                         absl::string_view body = absl::string_view()) {
+  Http::Code runCallback(absl::string_view path_and_query,
+                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                         absl::string_view method, absl::string_view body = absl::string_view()) {
     if (!body.empty()) {
       request_headers_.setReferenceContentType(
           Http::Headers::get().ContentTypeValues.FormUrlEncoded);
@@ -634,14 +634,14 @@ public:
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
   }
 
-  Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response) {
+  Http::Code getCallback(absl::string_view path_and_query,
+                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
     return runCallback(path_and_query, response_headers, response,
                        Http::Headers::get().MethodValues.Get);
   }
 
-  Http::Code postCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                          Buffer::Instance& response) {
+  Http::Code postCallback(absl::string_view path_and_query,
+                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
     return runCallback(path_and_query, response_headers, response,
                        Http::Headers::get().MethodValues.Post);
   }
@@ -662,7 +662,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
 
 TEST_P(AdminInstanceTest, AdminCpuProfiler) {
   Buffer::OwnedImpl data;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
 
   // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
   // a real profiler linked in (successful call to startProfiler).
@@ -681,7 +681,7 @@ TEST_P(AdminInstanceTest, AdminCpuProfiler) {
 
 TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
   Buffer::OwnedImpl data;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   auto repeatResultCode = Http::Code::BadRequest;
 #ifndef PROFILER_AVAILABLE
   repeatResultCode = Http::Code::NotImplemented;
@@ -696,7 +696,7 @@ TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
 
 TEST_P(AdminInstanceTest, AdminHeapProfiler) {
   Buffer::OwnedImpl data;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
 
   // The below flow need to begin with the profiler not running
   Profiler::Heap::stopProfiler();
@@ -716,7 +716,7 @@ TEST_P(AdminInstanceTest, AdminHeapProfiler) {
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   Buffer::OwnedImpl data;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   const std::string path("/healthcheck/fail");
   // TODO(jmarantz): the call to getCallback should be made to fail, but as an interim we will
   // just issue a warning, so that scripts using curl GET commands to mutate state can be fixed.
@@ -729,7 +729,7 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
   AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
                                    server_);
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.setMethod(post);
   admin_filter_.decodeHeaders(request_headers_, false);
@@ -740,7 +740,7 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
 }
 
 TEST_P(AdminInstanceTest, StatsInvalidRegex) {
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
   EXPECT_LOG_CONTAINS(
       "error", "Invalid regex: ",
@@ -755,7 +755,7 @@ TEST_P(AdminInstanceTest, StatsInvalidRegex) {
 }
 
 TEST_P(AdminInstanceTest, PrometheusStatsInvalidRegex) {
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl data;
   EXPECT_LOG_CONTAINS(
       "error", ": *.ptest",
@@ -794,7 +794,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 
@@ -842,7 +842,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   const std::string planets = "jupiter>saturn>mars";
   EXPECT_TRUE(admin_.addHandler("/planets", planets, callback, true, false));
 
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const Http::HeaderString& content_type = header_map.ContentType()->value();
@@ -853,7 +853,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
 }
 
 TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const std::string logging_action = "<form action='logging' method='post'";
@@ -864,7 +864,7 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
 
 TEST_P(AdminInstanceTest, ConfigDump) {
   Buffer::OwnedImpl response;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   auto entry = admin_.getConfigTracker().add("foo", [] {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("bar");
@@ -930,7 +930,7 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   // Run it multiple times and validate that order is preserved.
   for (size_t i = 0; i < 5; i++) {
     Buffer::OwnedImpl response;
-    Http::HeaderMapImpl header_map;
+    Http::ResponseHeaderMapImpl header_map;
     EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
     const std::string output = response.toString();
     EXPECT_EQ(expected_json, output);
@@ -942,7 +942,7 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
 // dynamic in the JSON with ?resource=dynamic_listeners.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   Buffer::OwnedImpl response;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
     auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
@@ -973,7 +973,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
 // dynamic in the JSON with ?mask=dynamic_listeners.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   Buffer::OwnedImpl response;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
     auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
@@ -1026,7 +1026,7 @@ ProtobufTypes::MessagePtr testDumpClustersConfig() {
 // only the desired resource and the fields specified in the mask.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   Buffer::OwnedImpl response;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
   const std::string expected_json = R"EOF({
  "configs": [
@@ -1055,7 +1055,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
 // of the config dump and the fields present in the mask query parameter.
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   Buffer::OwnedImpl response;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
   const std::string expected_json = R"EOF({
  "configs": [
@@ -1075,7 +1075,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
 // resource query parameter.
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
   Buffer::OwnedImpl response;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("listeners_config");
@@ -1088,7 +1088,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
 // repeated field.
 TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
   Buffer::OwnedImpl response;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", [] {
     auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
     msg->set_version_info("foo");
@@ -1099,7 +1099,7 @@ TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
 }
 
 TEST_P(AdminInstanceTest, Memory) {
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
   const std::string output_json = response.toString();
@@ -1113,7 +1113,7 @@ TEST_P(AdminInstanceTest, Memory) {
 }
 
 TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   // Setup a context that returns null cert details.
@@ -1142,7 +1142,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 }
 
 TEST_P(AdminInstanceTest, Runtime) {
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   Runtime::MockSnapshot snapshot;
@@ -1209,7 +1209,7 @@ TEST_P(AdminInstanceTest, Runtime) {
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   Runtime::MockLoader loader;
@@ -1235,14 +1235,14 @@ TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
 
   const std::string body = fmt::format("{}={}", key, value);
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, runCallback("/runtime_modify", header_map, response, "POST", body));
   EXPECT_EQ("OK\n", response.toString());
 }
 
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
   EXPECT_EQ(Http::Code::BadRequest, postCallback("/runtime_modify", header_map, response));
@@ -1339,7 +1339,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, priority()).WillByDefault(Return(6));
 
   Buffer::OwnedImpl response;
-  Http::HeaderMapImpl header_map;
+  Http::ResponseHeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
   std::string output_json = response.toString();
   envoy::admin::v3::Clusters output_proto;
@@ -1474,7 +1474,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
 
   {
-    Http::HeaderMapImpl response_headers;
+    Http::ResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
@@ -1493,7 +1493,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
   }
 
   {
-    Http::HeaderMapImpl response_headers;
+    Http::ResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
@@ -1510,7 +1510,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
   }
 
-  Http::HeaderMapImpl response_headers;
+  Http::ResponseHeaderMapImpl response_headers;
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
@@ -1532,7 +1532,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
 
   {
-    Http::HeaderMapImpl response_headers;
+    Http::ResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
@@ -1543,7 +1543,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
   }
 
   {
-    Http::HeaderMapImpl response_headers;
+    Http::ResponseHeaderMapImpl response_headers;
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
@@ -1554,7 +1554,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
                 HasSubstr("text/plain"));
   }
 
-  Http::HeaderMapImpl response_headers;
+  Http::ResponseHeaderMapImpl response_headers;
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
@@ -1566,7 +1566,7 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
-  Http::HeaderMapImpl response_headers;
+  Http::ResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_EQ(Http::Code::OK, admin_.request("/stats?format=json", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("{\"stats\":["));
@@ -1575,7 +1575,7 @@ TEST_P(AdminInstanceTest, GetRequestJson) {
 }
 
 TEST_P(AdminInstanceTest, RecentLookups) {
-  Http::HeaderMapImpl response_headers;
+  Http::ResponseHeaderMapImpl response_headers;
   std::string body;
 
   // Recent lookup tracking is disabled by default.
@@ -1589,7 +1589,7 @@ TEST_P(AdminInstanceTest, RecentLookups) {
 }
 
 TEST_P(AdminInstanceTest, PostRequest) {
-  Http::HeaderMapImpl response_headers;
+  Http::ResponseHeaderMapImpl response_headers;
   std::string body;
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
                            admin_.request("/healthcheck/fail", "POST", response_headers, body)));

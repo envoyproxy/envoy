@@ -65,7 +65,7 @@ public:
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
   void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
-  void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
+  void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
   void encodeTrailersBase(const HeaderMap& headers);
 
   static const std::string CRLF;

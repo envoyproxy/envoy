@@ -18,11 +18,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
-                      headers.GrpcStatus());
-}
-
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const bool grpc_request = Grpc::Common::hasGrpcContentType(headers);
   if (grpc_request) {
@@ -96,7 +91,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
+void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
   cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;
