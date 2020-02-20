@@ -693,6 +693,7 @@ lenenc
 lexically
 libc
 libevent
+libprotobuf
 libtool
 libstdc
 libtooling
@@ -756,6 +757,7 @@ multicast
 multikill
 multimap
 multivalue
+mutator
 mutex
 mutexes
 mux
