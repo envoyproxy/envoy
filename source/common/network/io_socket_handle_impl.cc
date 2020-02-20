@@ -1,5 +1,7 @@
 #include "common/network/io_socket_handle_impl.h"
 
+#include <bits/types/struct_timespec.h>
+
 #include <cerrno>
 #include <iostream>
 
@@ -7,7 +9,6 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
@@ -145,23 +146,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   }
 }
 
-Api::IoCallUint64Result
-IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& result) {
-  if (result.rc_ >= 0) {
-    // Return nullptr as IoError upon success.
-    return Api::IoCallUint64Result(result.rc_,
-                                   Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
-  }
-  RELEASE_ASSERT(result.errno_ != EINVAL, "Invalid argument passed in.");
-  return Api::IoCallUint64Result(
-      /*rc=*/0,
-      (result.errno_ == EAGAIN
-           // EAGAIN is frequent enough that its memory allocation should be avoided.
-           ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                             IoSocketError::deleteIoError)
-           : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
-}
-
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghdr& cmsg,
                                                              uint32_t self_port) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
@@ -212,6 +196,7 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
                                                     RecvMsgOutput& output) {
+  ASSERT(output.msg_.size() > 0);
 
   // The minimum cmsg buffer size to filled in destination address and packets dropped when
   // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
@@ -262,22 +247,22 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     // address and the socket is actually v6 only, the returned address will be
     // regarded as a v6 address from dual stack socket. However, this address is not going to be
     // used to create socket. Wrong knowledge of dual stack support won't hurt.
-    output.peer_address_ =
+    output.msg_[0].peer_address_ =
         Address::addressFromSockAddr(peer_addr, hdr.msg_namelen, /*v6only=*/false);
   } catch (const EnvoyException& e) {
     PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", fd_, e.what()));
   }
 
-  // Get overflow, local and peer addresses from control message.
+  // Get overflow, local address from control message.
   if (hdr.msg_controllen > 0) {
     struct cmsghdr* cmsg;
     for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-      if (output.local_address_ == nullptr) {
+      if (output.msg_[0].local_address_ == nullptr) {
         try {
           Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
           if (addr != nullptr) {
             // This is a IP packet info message.
-            output.local_address_ = std::move(addr);
+            output.msg_[0].local_address_ = std::move(addr);
             continue;
           }
         } catch (const EnvoyException& e) {
@@ -289,6 +274,114 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
         if (maybe_dropped) {
           *output.dropped_packets_ = *maybe_dropped;
         }
+      }
+    }
+  }
+  return sysCallResultToIoCallResult(result);
+}
+
+Api::IoCallUint64Result
+IoSocketHandleImpl::recvmmsg(absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>& slices,
+                             uint32_t self_port, RecvMsgOutput& output) {
+  ASSERT(output.msg_.size() == slices.size());
+  if (slices.size() == 0) {
+    return sysCallResultToIoCallResult(Api::SysCallIntResult{0, EAGAIN});
+  }
+  const uint32_t num_packets_per_mmsg_call = slices.size();
+  absl::FixedArray<mmsghdr> mmsg_hdr(num_packets_per_mmsg_call);
+  absl::FixedArray<absl::FixedArray<struct iovec>> iovs(
+      num_packets_per_mmsg_call, absl::FixedArray<struct iovec>(slices[0].size()));
+  absl::FixedArray<sockaddr_storage> raw_addresses(num_packets_per_mmsg_call);
+  absl::FixedArray<absl::FixedArray<char>> cbufs(num_packets_per_mmsg_call,
+                                                 absl::FixedArray<char>(cmsg_space_));
+
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
+    memset(&raw_addresses[i], 0, sizeof(sockaddr_storage));
+    memset(cbufs[i].data(), 0, cbufs[i].size());
+
+    mmsg_hdr[i].msg_len = 0;
+
+    msghdr* hdr = &mmsg_hdr[i].msg_hdr;
+    hdr->msg_name = &raw_addresses[i];
+    hdr->msg_namelen = sizeof(sockaddr_storage);
+    ASSERT(slices[i].size() > 0);
+
+    for (size_t j = 0; j < slices[i].size(); ++j) {
+      iovs[i][j].iov_base = slices[i][j].mem_;
+      iovs[i][j].iov_len = slices[i][j].len_;
+    }
+    hdr->msg_iov = iovs[i].data();
+    hdr->msg_iovlen = slices[i].size();
+    hdr->msg_control = cbufs[i].data();
+    hdr->msg_controllen = cbufs[i].size();
+  }
+
+  const Api::SysCallIntResult result = os_sys_calls.recvmmsg(
+      fd_, mmsg_hdr.data(), num_packets_per_mmsg_call, MSG_TRUNC | MSG_WAITFORONE, nullptr);
+
+  if (result.rc_ <= 0) {
+    return sysCallResultToIoCallResult(result);
+  }
+
+  int num_packets_read = result.rc_;
+
+  for (int i = 0; i < num_packets_read; ++i) {
+    if (mmsg_hdr[i].msg_len == 0) {
+      continue;
+    }
+    RELEASE_ASSERT((mmsg_hdr[i].msg_hdr.msg_flags & MSG_CTRUNC) == 0,
+                   fmt::format("Incorrectly set control message length: {}",
+                               mmsg_hdr[i].msg_hdr.msg_controllen));
+    RELEASE_ASSERT(mmsg_hdr[i].msg_hdr.msg_namelen > 0,
+                   fmt::format("Unable to get remote address from recvmmsg() for fd: {}", fd_));
+    if ((mmsg_hdr[i].msg_hdr.msg_flags & MSG_TRUNC) != 0) {
+      ENVOY_LOG_MISC(warn, "Dropping truncated QUIC packet with size: {}.", mmsg_hdr[i].msg_len);
+      continue;
+    }
+
+    output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
+    // Get local and peer addresses for each packet.
+    msghdr& hdr = mmsg_hdr[i].msg_hdr;
+    try {
+      // Set v6only to false so that mapped-v6 address can be normalize to v4
+      // address. Though dual stack may be disabled, it's still okay to assume the
+      // address is from a dual stack socket. This is because mapped-v6 address
+      // must come from a dual stack socket. An actual v6 address can come from
+      // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
+      // address and the socket is actually v6 only, the returned address will be
+      // regarded as a v6 address from dual stack socket. However, this address is not going to be
+      // used to create socket. Wrong knowledge of dual stack support won't hurt.
+      output.msg_[i].peer_address_ =
+          Address::addressFromSockAddr(raw_addresses[i], hdr.msg_namelen, /*v6only=*/false);
+    } catch (const EnvoyException& e) {
+      PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", fd_, e.what()));
+    }
+
+    if (hdr.msg_controllen > 0) {
+      struct cmsghdr* cmsg;
+      for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+        try {
+          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
+          if (addr != nullptr) {
+            // This is a IP packet info message.
+            output.msg_[i].local_address_ = std::move(addr);
+            break;
+          }
+        } catch (const EnvoyException& e) {
+          PANIC(fmt::format("Invalid destination address for fd: {}, error: {}", fd_, e.what()));
+        }
+      }
+    }
+  }
+  // Get overflow from first packet header.
+  if (output.dropped_packets_ != nullptr) {
+    msghdr& hdr = mmsg_hdr[0].msg_hdr;
+    struct cmsghdr* cmsg;
+    for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+      absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
+      if (maybe_dropped) {
+        *output.dropped_packets_ = *maybe_dropped;
       }
     }
   }

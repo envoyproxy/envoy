@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -81,9 +82,19 @@ protected:
               client_.localAddress()->ip()->addressAsString());
 
     EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
-    EXPECT_EQ(time_system_.monotonicTime(), data.receive_time_);
+
+#if ENVOY_MMSG_MORE
+    size_t num_packet_per_recv = 16u;
+#else
+    size_t num_packet_per_recv = 1u;
+#endif
+    EXPECT_EQ(time_system_.monotonicTime(),
+              data.receive_time_ +
+                  std::chrono::milliseconds(
+                      (num_packets_received_by_listener_ % num_packet_per_recv) * 100));
     // Advance time so that next onData() should have different received time.
     time_system_.sleep(std::chrono::milliseconds(100));
+    ++num_packets_received_by_listener_;
   }
 
   SocketSharedPtr server_socket_;
@@ -91,6 +102,7 @@ protected:
   Address::InstanceConstSharedPtr send_to_addr_;
   MockUdpListenerCallbacks listener_callbacks_;
   std::unique_ptr<UdpListenerImpl> listener_;
+  size_t num_packets_received_by_listener_{0};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
@@ -158,11 +170,14 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
  * Tests UDP listener for read and write callbacks with actual data.
  */
 TEST_P(UdpListenerImplTest, UdpEcho) {
-  // We send 2 packets and expect it to echo.
-  const std::string first("first");
-  client_.write(first, *send_to_addr_);
-  const std::string second("second");
-  client_.write(second, *send_to_addr_);
+  // We send 17 packets and expect it to echo.
+  absl::FixedArray<std::string> client_data({"first", "second", "third", "forth", "fifth", "sixth",
+                                             "seventh", "eighth", "nineth", "tenth", "eleventh",
+                                             "twelveth", "thirteenth", "fourteenth", "fifteenth",
+                                             "sixteenth", "seventeenth"});
+  for (size_t i = 0; i < client_data.size(); ++i) {
+    client_.write(client_data[i], *send_to_addr_);
+  }
 
   // For unit test purposes, we assume that the data was received in order.
   Address::InstanceConstSharedPtr test_peer_address;
@@ -177,15 +192,15 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         test_peer_address = data.addresses_.peer_;
 
         const std::string data_str = data.buffer_->toString();
-        EXPECT_EQ(data_str, first);
+        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
 
         server_received_data.push_back(data_str);
       }))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
 
         const std::string data_str = data.buffer_->toString();
-        EXPECT_EQ(data_str, second);
+        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
 
         server_received_data.push_back(data_str);
       }));
@@ -301,7 +316,12 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   // Inject mocked OsSysCalls implementation to mock a read failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+#if ENVOY_MMSG_MORE
+  EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, ENOTSUP}));
+#else
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
+#endif
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -317,7 +337,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // Use a self address that is unlikely to be picked by source address discovery
-  // algorithm if not specified in recvmsg. Port is not taken into
+  // algorithm if not specified in recvmsg/recvmmsg. Port is not taken into
   // consideration.
   Address::InstanceConstSharedPtr send_from_addr;
   if (version_ == Address::IpVersion::v4) {

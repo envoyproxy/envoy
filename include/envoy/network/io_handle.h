@@ -4,6 +4,8 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
+#include "absl/container/fixed_array.h"
+
 namespace Envoy {
 namespace Buffer {
 struct RawSlice;
@@ -74,21 +76,37 @@ public:
                                           int flags, const Address::Ip* self_ip,
                                           const Address::Instance& peer_address) PURE;
 
-  struct RecvMsgOutput {
-    /*
-     * @param dropped_packets points to a variable to store how many packets are
-     * dropped so far. If nullptr, recvmsg() won't try to get this information
-     * from transport header.
-     */
-    RecvMsgOutput(uint32_t* dropped_packets) : dropped_packets_(dropped_packets) {}
-
-    // If not nullptr, its value is the total number of packets dropped. recvmsg() will update it
-    // when more packets are dropped.
-    uint32_t* dropped_packets_;
+  struct RecvMsgPerPacketInfo {
     // The destination address from transport header.
     std::shared_ptr<const Address::Instance> local_address_;
     // The the source address from transport header.
     std::shared_ptr<const Address::Instance> peer_address_;
+    // The payload length of this packet.
+    unsigned int msg_len_{0};
+  };
+
+  /**
+   * The output parameter type for recvmsg and recvmmsg.
+   */
+  struct RecvMsgOutput {
+    /*
+     * @param num_packets_per_call is the max number of packets allowed per
+     * recvmmsg call. For recvmsg call, any value larger than 0 is allowed, but
+     * only the first one will be used for return.
+     * @param dropped_packets points to a variable to store how many packets are
+     * dropped so far. If nullptr, recvmsg() won't try to get this information
+     * from transport header.
+     */
+    RecvMsgOutput(size_t num_packets_per_call, uint32_t* dropped_packets)
+        : dropped_packets_(dropped_packets), msg_(num_packets_per_call) {}
+
+    // If not nullptr, its value is the total number of packets dropped. recvmsg() will update it
+    // when more packets are dropped.
+    uint32_t* dropped_packets_;
+
+    // Packet headers for each received packet. It's populated according to packet receive order.
+    // Only the first entry is used to return per packet infomation by recvmsg.
+    absl::FixedArray<RecvMsgPerPacketInfo> msg_;
   };
 
   /**
@@ -104,6 +122,18 @@ public:
    */
   virtual Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                           uint32_t self_port, RecvMsgOutput& output) PURE;
+
+  /**
+   * If the platform supports, receive multiple messages into given slices, output overflow,
+   * source/destination addresses per message via passed-in parameters upon success.
+   * @param slices are the receive buffers for the messages. Each message
+   * received are stored in an individual entry of |slices|.
+   * @param self_port is the same as the one in recvmsg().
+   * @param output is modified upon each call and each message received.
+   */
+  virtual Api::IoCallUint64Result
+  recvmmsg(absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>& slices, uint32_t self_port,
+           RecvMsgOutput& output) PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

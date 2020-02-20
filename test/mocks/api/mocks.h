@@ -65,6 +65,9 @@ public:
   MOCK_METHOD(SysCallSizeResult, readv, (os_fd_t, const iovec*, int));
   MOCK_METHOD(SysCallSizeResult, recv, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags));
+  MOCK_METHOD(SysCallIntResult, recvmmsg,
+              (os_fd_t socket, struct mmsghdr* msgvec, unsigned int vlen, int flags,
+               struct timespec* timeout));
   MOCK_METHOD(SysCallIntResult, ftruncate, (int fd, off_t length));
   MOCK_METHOD(SysCallPtrResult, mmap,
               (void* addr, size_t length, int prot, int flags, int fd, off_t offset));

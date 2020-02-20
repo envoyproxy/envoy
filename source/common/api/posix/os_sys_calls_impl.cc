@@ -45,9 +45,15 @@ SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t leng
   return {rc, rc != -1 ? 0 : errno};
 }
 
-SysCallSizeResult OsSysCallsImpl::recvmsg(int sockfd, msghdr* msg, int flags) {
+SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags) {
   const ssize_t rc = ::recvmsg(sockfd, msg, flags);
   return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
+                                          int flags, struct timespec* timeout) {
+  const int rc = ::recvmmsg(sockfd, msgvec, vlen, flags, timeout);
+  return {rc, errno};
 }
 
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {

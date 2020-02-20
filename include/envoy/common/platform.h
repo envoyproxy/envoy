@@ -147,3 +147,16 @@ using os_fd_t = int;
 #define ENVOY_SHUT_RDWR SHUT_RDWR
 
 #endif
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#define ENVOY_MMSG_MORE 1
+#else
+#define ENVOY_MMSG_MORE 0
+#define MSG_WAITFORONE 0x10000 // recvmmsg(): block until 1+ packets avail.
+// Posix structure for describing messages sent by 'sendmmsg` and received by
+// 'recvmmsg'
+struct mmsghdr {
+  struct msghdr msg_hdr;
+  unsigned int msg_len;
+};
+#endif

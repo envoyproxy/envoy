@@ -1,11 +1,14 @@
 #pragma once
 
+#include <cstddef>
+
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
 #include "envoy/network/io_handle.h"
 
 #include "common/common/logger.h"
+#include "common/network/io_socket_error_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -39,11 +42,32 @@ public:
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override;
 
+  Api::IoCallUint64Result recvmmsg(absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>& slices,
+                                   uint32_t self_port, RecvMsgOutput& output) override;
+
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.
-  Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallSizeResult& result);
+  template <typename T>
+  Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
+    if (result.rc_ >= 0) {
+      // Return nullptr as IoError upon success.
+      return Api::IoCallUint64Result(result.rc_,
+                                     Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+    }
+    RELEASE_ASSERT(result.errno_ != EINVAL, "Invalid argument passed in.");
+    return Api::IoCallUint64Result(
+        /*rc=*/0,
+        (result.errno_ == EAGAIN
+             // EAGAIN is frequent enough that its memory allocation should be avoided.
+             ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)
+             : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
+  }
 
   os_fd_t fd_;
+
+  const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
+                           CMSG_SPACE(sizeof(struct in6_pktinfo))};
 };
 
 } // namespace Network
