@@ -38,28 +38,28 @@ TEST_EmptyDeserializerShouldNotBeReady(NullableBytesDeserializer);
 
 TEST(ArrayDeserializer, EmptyBufferShouldNotBeReady) {
   // given
-  const ArrayDeserializer<int8_t, Int8Deserializer> testee{};
+  const ArrayDeserializer<Int8Deserializer> testee{};
   // when, then
   ASSERT_EQ(testee.ready(), false);
 }
 
 TEST(CompactArrayDeserializer, EmptyBufferShouldNotBeReady) {
   // given
-  const CompactArrayDeserializer<int32_t, Int32Deserializer> testee{};
+  const CompactArrayDeserializer<Int32Deserializer> testee{};
   // when, then
   ASSERT_EQ(testee.ready(), false);
 }
 
 TEST(NullableArrayDeserializer, EmptyBufferShouldNotBeReady) {
   // given
-  const NullableArrayDeserializer<int8_t, Int8Deserializer> testee{};
+  const NullableArrayDeserializer<Int8Deserializer> testee{};
   // when, then
   ASSERT_EQ(testee.ready(), false);
 }
 
 TEST(NullableCompactArrayDeserializer, EmptyBufferShouldNotBeReady) {
   // given
-  const NullableCompactArrayDeserializer<int32_t, Int32Deserializer> testee{};
+  const NullableCompactArrayDeserializer<Int32Deserializer> testee{};
   // when, then
   ASSERT_EQ(testee.ready(), false);
 }
@@ -351,13 +351,12 @@ TEST(NullableBytesDeserializer, ShouldThrowOnInvalidLength) {
 
 TEST(ArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const std::vector<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
-  serializeThenDeserializeAndCheckEquality<ArrayDeserializer<std::string, StringDeserializer>>(
-      value);
+  serializeThenDeserializeAndCheckEquality<ArrayDeserializer<StringDeserializer>>(value);
 }
 
 TEST(ArrayDeserializer, ShouldThrowOnInvalidLength) {
   // given
-  ArrayDeserializer<std::string, StringDeserializer> testee;
+  ArrayDeserializer<StringDeserializer> testee;
   Buffer::OwnedImpl buffer;
 
   const int32_t len = -1; // ARRAY accepts length >= 0.
@@ -374,13 +373,13 @@ TEST(ArrayDeserializer, ShouldThrowOnInvalidLength) {
 
 TEST(CompactArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const std::vector<int32_t> value{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}};
-  serializeCompactThenDeserializeAndCheckEquality<
-      CompactArrayDeserializer<int32_t, Int32Deserializer>>(value);
+  serializeCompactThenDeserializeAndCheckEquality<CompactArrayDeserializer<Int32Deserializer>>(
+      value);
 }
 
 TEST(CompactArrayDeserializer, ShouldThrowOnInvalidLength) {
   // given
-  CompactArrayDeserializer<int8_t, Int8Deserializer> testee;
+  CompactArrayDeserializer<Int8Deserializer> testee;
   Buffer::OwnedImpl buffer;
 
   const uint32_t len = 0; // COMPACT_ARRAY accepts length >= 1.
@@ -397,19 +396,17 @@ TEST(CompactArrayDeserializer, ShouldThrowOnInvalidLength) {
 
 TEST(NullableArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const NullableArray<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
-  serializeThenDeserializeAndCheckEquality<
-      NullableArrayDeserializer<std::string, StringDeserializer>>(value);
+  serializeThenDeserializeAndCheckEquality<NullableArrayDeserializer<StringDeserializer>>(value);
 }
 
 TEST(NullableArrayDeserializer, ShouldConsumeNullArray) {
   const NullableArray<std::string> value = absl::nullopt;
-  serializeThenDeserializeAndCheckEquality<
-      NullableArrayDeserializer<std::string, StringDeserializer>>(value);
+  serializeThenDeserializeAndCheckEquality<NullableArrayDeserializer<StringDeserializer>>(value);
 }
 
 TEST(NullableArrayDeserializer, ShouldThrowOnInvalidLength) {
   // given
-  NullableArrayDeserializer<std::string, StringDeserializer> testee;
+  NullableArrayDeserializer<StringDeserializer> testee;
   Buffer::OwnedImpl buffer;
 
   const int32_t len = -2; // -1 is OK for NULLABLE_ARRAY.
@@ -427,13 +424,13 @@ TEST(NullableArrayDeserializer, ShouldThrowOnInvalidLength) {
 TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const NullableArray<int32_t> value{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}};
   serializeCompactThenDeserializeAndCheckEquality<
-      NullableCompactArrayDeserializer<int32_t, Int32Deserializer>>(value);
+      NullableCompactArrayDeserializer<Int32Deserializer>>(value);
 }
 
 TEST(NullableCompactArrayDeserializer, ShouldConsumeNullArray) {
   const NullableArray<int32_t> value = absl::nullopt;
   serializeCompactThenDeserializeAndCheckEquality<
-      NullableCompactArrayDeserializer<int32_t, Int32Deserializer>>(value);
+      NullableCompactArrayDeserializer<Int32Deserializer>>(value);
 }
 
 // Tagged fields.

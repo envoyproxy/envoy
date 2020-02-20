@@ -145,7 +145,7 @@ public:
     stream.getStream().addCallbacks(stream_callbacks);
 
     std::string host("www.abc.com");
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":authority", host}, {":method", "GET"}, {":path", "/"}};
     stream.encodeHeaders(request_headers, true);
     return stream;

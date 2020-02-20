@@ -72,7 +72,7 @@ do
     done
 
     # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
-    "$SCRIPT_DIR"/proto_format.sh check
+    "$SCRIPT_DIR"/proto_format/proto_format.sh check
     if [[ $? -ne 0 ]]; then
       exit 1
     fi

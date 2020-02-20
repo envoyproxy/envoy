@@ -370,12 +370,12 @@ void Filter::chargeUpstreamCode(Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
   const uint64_t response_status_code = enumToInt(code);
-  const auto fake_response_headers = Http::HeaderMapImpl::create(
+  const auto fake_response_headers = Http::createHeaderMap<Http::HeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(response_status_code)}});
   chargeUpstreamCode(response_status_code, *fake_response_headers, upstream_host, dropped);
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
   // These get stripped by HTTP/1 codec where applicable.
   ASSERT(headers.Path());
@@ -686,7 +686,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
 
   // upstream_requests_.size() cannot be 0 because we add to it unconditionally
@@ -739,13 +739,13 @@ void Filter::maybeDoShadowing() {
     const auto& shadow_policy = shadow_policy_wrapper.get();
 
     ASSERT(!shadow_policy.cluster().empty());
-    Http::MessagePtr request(
-        new Http::RequestMessageImpl(Http::HeaderMapImpl::create(*downstream_headers_)));
+    Http::RequestMessagePtr request(new Http::RequestMessageImpl(
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_)));
     if (callbacks_->decodingBuffer()) {
       request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
     }
     if (downstream_trailers_) {
-      request->trailers(Http::HeaderMapImpl::create(*downstream_trailers_));
+      request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*downstream_trailers_));
     }
 
     config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request),
@@ -1066,7 +1066,7 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
   }
 }
 
-void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
                                           UpstreamRequest& upstream_request) {
   chargeUpstreamCode(100, *headers, upstream_request.upstream_host_, false);
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
@@ -1111,7 +1111,7 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
   final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
-void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
+void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                UpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
@@ -1261,7 +1261,8 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   callbacks_->encodeData(data, end_stream);
 }
 
-void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest& upstream_request) {
+void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                                UpstreamRequest& upstream_request) {
   // This should be true because when we saw headers we either reset the stream
   // (hence wouldn't have made it to onUpstreamTrailers) or all other in-flight
   // streams.
@@ -1510,7 +1511,7 @@ void Filter::UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers
 
   awaiting_headers_ = false;
   if (!parent_.config_.upstream_logs_.empty()) {
-    upstream_headers_ = Http::HeaderMapImpl::create(*headers);
+    upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
@@ -1530,7 +1531,7 @@ void Filter::UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trail
 
   maybeEndDecode(true);
   if (!parent_.config_.upstream_logs_.empty()) {
-    upstream_trailers_ = Http::HeaderMapImpl::create(*trailers);
+    upstream_trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers);
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
@@ -1585,7 +1586,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
   }
 }
 
-void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
+void Filter::UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   ASSERT(!encode_complete_);
   encode_complete_ = true;
   encode_trailers_ = true;

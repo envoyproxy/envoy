@@ -85,11 +85,11 @@ private:
     LocalStream(GrpcAccessLoggerImpl& parent) : parent_(parent) {}
 
     // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::HeaderMap&) override {}
-    void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
+    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
     void onReceiveMessage(
         std::unique_ptr<envoy::service::accesslog::v3::StreamAccessLogsResponse>&&) override {}
-    void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
+    void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
     GrpcAccessLoggerImpl& parent_;

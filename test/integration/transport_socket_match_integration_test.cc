@@ -164,16 +164,16 @@ require_client_certificate: true
   }
 
   const uint32_t num_hosts_;
-  Http::TestHeaderMapImpl type_a_request_headers_{{":method", "GET"},
-                                                  {":path", "/test"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"x-type", "a"}};
-  Http::TestHeaderMapImpl type_b_request_headers_{{":method", "GET"},
-                                                  {":path", "/test"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"x-type", "b"}};
+  Http::TestRequestHeaderMapImpl type_a_request_headers_{{":method", "GET"},
+                                                         {":path", "/test"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"x-type", "a"}};
+  Http::TestRequestHeaderMapImpl type_b_request_headers_{{":method", "GET"},
+                                                         {":path", "/test"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"x-type", "b"}};
   const std::string host_type_header_{"x-host-type"};
   const std::string host_header_{"x-host"};
   const std::string type_header_{"x-type"};

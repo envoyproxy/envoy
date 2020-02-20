@@ -52,8 +52,8 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
     : engine_(Filters::Common::RBAC::createEngine(per_route_config.rbac())),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(per_route_config.rbac())) {}
 
-Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
-                                                                      bool) {
+Http::FilterHeadersStatus
+RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(
       debug,
       "checking request: remoteAddress: {}, localAddress: {}, ssl: {}, headers: {}, "

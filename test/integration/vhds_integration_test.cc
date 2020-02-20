@@ -439,11 +439,11 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
 
   // an upstream request to an (now) unknown domain
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/"},
-                                          {":scheme", "http"},
-                                          {":authority", "vhost.first"},
-                                          {"x-lyft-user-id", "123"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost.first")}, {},
@@ -506,11 +506,11 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/"},
-                                          {":scheme", "http"},
-                                          {":authority", "vhost.first"},
-                                          {"x-lyft-user-id", "123"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost.first")}, {},
@@ -547,11 +547,11 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
 
   // Attempt to make a request to an unknown host
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/"},
-                                          {":scheme", "http"},
-                                          {":authority", "vhost_1"},
-                                          {"x-lyft-user-id", "123"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost_1"},
+                                                 {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
@@ -593,11 +593,11 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
 
   // Attempt to make a request to an unknown host
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/"},
-                                          {":scheme", "http"},
-                                          {":authority", "vhost.third"},
-                                          {"x-lyft-user-id", "123"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.third"},
+                                                 {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost.third")}, {},
@@ -634,11 +634,11 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral)
 
   // Attempt to make a request to an unknown host
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/"},
-                                          {":scheme", "http"},
-                                          {":authority", "vhost.third"},
-                                          {"x-lyft-user-id", "123"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.third"},
+                                                 {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost.third")}, {},

@@ -206,13 +206,13 @@ public:
   ~MockShadowWriter() override;
 
   // Router::ShadowWriter
-  void shadow(const std::string& cluster, Http::MessagePtr&& request,
+  void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
               std::chrono::milliseconds timeout) override {
     shadow_(cluster, request, timeout);
   }
 
   MOCK_METHOD(void, shadow_,
-              (const std::string& cluster, Http::MessagePtr& request,
+              (const std::string& cluster, Http::RequestMessagePtr& request,
                std::chrono::milliseconds timeout));
 };
 

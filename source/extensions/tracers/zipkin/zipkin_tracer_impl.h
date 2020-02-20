@@ -194,7 +194,7 @@ public:
 
   // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.
-  void onSuccess(Http::MessagePtr&&) override;
+  void onSuccess(Http::ResponseMessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
   /**

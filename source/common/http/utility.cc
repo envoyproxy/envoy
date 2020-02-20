@@ -295,7 +295,7 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                              bool is_head_request) {
   sendLocalReply(
       is_grpc,
-      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+      [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
         callbacks.encodeHeaders(std::move(headers), end_stream);
       },
       [&](Buffer::Instance& data, bool end_stream) -> void {
@@ -305,7 +305,8 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
 }
 
 void Utility::sendLocalReply(
-    bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    bool is_grpc,
+    std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
     Code response_code, absl::string_view body_text,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
@@ -313,7 +314,7 @@ void Utility::sendLocalReply(
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (is_grpc) {
-    HeaderMapPtr response_headers{HeaderMapImpl::create(
+    ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
         {{Headers::get().Status, std::to_string(enumToInt(Code::OK))},
          {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
          {Headers::get().GrpcStatus,
@@ -329,8 +330,8 @@ void Utility::sendLocalReply(
     return;
   }
 
-  HeaderMapPtr response_headers{
-      HeaderMapImpl::create({{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
+  ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
+      {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Text);
@@ -555,11 +556,11 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
-MessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
+RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
   absl::string_view host, path;
   extractHostPathFromUri(http_uri.uri(), host, path);
 
-  MessagePtr message(new RequestMessageImpl());
+  RequestMessagePtr message(new RequestMessageImpl());
   message->headers().setPath(path);
   message->headers().setHost(host);
 

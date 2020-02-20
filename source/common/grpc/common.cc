@@ -218,11 +218,11 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::Heade
   headers.setGrpcTimeout(absl::StrCat(time, absl::string_view(unit, 1)));
 }
 
-Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
-                                        const std::string& service_full_name,
-                                        const std::string& method_name,
-                                        const absl::optional<std::chrono::milliseconds>& timeout) {
-  Http::MessagePtr message(new Http::RequestMessageImpl());
+Http::RequestMessagePtr
+Common::prepareHeaders(const std::string& upstream_cluster, const std::string& service_full_name,
+                       const std::string& method_name,
+                       const absl::optional<std::chrono::milliseconds>& timeout) {
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl());
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   message->headers().setPath(absl::StrCat("/", service_full_name, "/", method_name));
   message->headers().setHost(upstream_cluster);
@@ -237,7 +237,7 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
   return message;
 }
 
-void Common::checkForHeaderOnlyError(Http::Message& http_response) {
+void Common::checkForHeaderOnlyError(Http::ResponseMessage& http_response) {
   // First check for grpc-status in headers. If it is here, we have an error.
   absl::optional<Status::GrpcStatus> grpc_status_code =
       Common::getGrpcStatus(http_response.headers());
@@ -252,7 +252,7 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
   throw Exception(grpc_status_code.value(), Common::getGrpcMessage(http_response.headers()));
 }
 
-void Common::validateResponse(Http::Message& http_response) {
+void Common::validateResponse(Http::ResponseMessage& http_response) {
   if (Http::Utility::getResponseStatus(http_response.headers()) != enumToInt(Http::Code::OK)) {
     throw Exception(absl::optional<uint64_t>(), "non-200 response code");
   }
