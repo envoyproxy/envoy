@@ -101,8 +101,8 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 
 #if !defined(ENVOY_DISABLE_KNOWN_ISSUE_ASSERTS)
 /**
- * Assert wrapper for an as-yet unidentified issue. Even with ASSERTS compiled in, it will be
- * excluded, unless ENVOY_DEBUG_KNOWN_ISSUES is defined. It represents a condition that
+ * Assert wrapper for an as-yet unidentified issue. Even with ASSERTs compiled in, it may be
+ * excluded, by defining ENVOY_DISABLE_KNOWN_ISSUE_ASSERTS. It represents a condition that
  * should always pass but that sometimes fails for an unknown reason. The macro allows it to
  * be temporarily compiled out while the failure is triaged and investigated.
  */
