@@ -12,26 +12,33 @@ namespace Api {
 class OsSysCallsImpl : public OsSysCalls {
 public:
   // Api::OsSysCalls
-  SysCallIntResult bind(int sockfd, const sockaddr* addr, socklen_t addrlen) override;
+  SysCallIntResult bind(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) override;
   SysCallIntResult chmod(const std::string& path, mode_t mode) override;
-  SysCallIntResult ioctl(int sockfd, unsigned long int request, void* argp) override;
-  SysCallSizeResult writev(int fd, const iovec* iovec, int num_iovec) override;
-  SysCallSizeResult readv(int fd, const iovec* iovec, int num_iovec) override;
-  SysCallSizeResult recv(int socket, void* buffer, size_t length, int flags) override;
-  SysCallSizeResult recvmsg(int sockfd, struct msghdr* msg, int flags) override;
-  SysCallIntResult close(int fd) override;
+  SysCallIntResult ioctl(os_fd_t sockfd, unsigned long int request, void* argp) override;
+  SysCallSizeResult writev(os_fd_t fd, const iovec* iov, int num_iov) override;
+  SysCallSizeResult readv(os_fd_t fd, const iovec* iov, int num_iov) override;
+  SysCallSizeResult recv(os_fd_t socket, void* buffer, size_t length, int flags) override;
+  SysCallSizeResult recvmsg(os_fd_t sockfd, msghdr* msg, int flags) override;
+  SysCallIntResult close(os_fd_t fd) override;
   SysCallIntResult ftruncate(int fd, off_t length) override;
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
                         off_t offset) override;
   SysCallIntResult stat(const char* pathname, struct stat* buf) override;
-  SysCallIntResult setsockopt(int sockfd, int level, int optname, const void* optval,
+  SysCallIntResult setsockopt(os_fd_t sockfd, int level, int optname, const void* optval,
                               socklen_t optlen) override;
-  SysCallIntResult getsockopt(int sockfd, int level, int optname, void* optval,
+  SysCallIntResult getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                               socklen_t* optlen) override;
-  SysCallIntResult socket(int domain, int type, int protocol) override;
-  SysCallSizeResult sendmsg(int fd, const msghdr* message, int flags) override;
-  SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) override;
+  SysCallSocketResult socket(int domain, int type, int protocol) override;
+  SysCallSizeResult sendmsg(os_fd_t fd, const msghdr* message, int flags) override;
+  SysCallIntResult getsockname(os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) override;
   SysCallIntResult gethostname(char* name, size_t length) override;
+  SysCallIntResult getpeername(os_fd_t sockfd, sockaddr* name, socklen_t* namelen) override;
+  SysCallIntResult setsocketblocking(os_fd_t sockfd, bool blocking) override;
+  SysCallIntResult connect(os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) override;
+  SysCallIntResult shutdown(os_fd_t sockfd, int how) override;
+  SysCallIntResult socketpair(int domain, int type, int protocol, os_fd_t sv[2]) override;
+  SysCallIntResult listen(os_fd_t sockfd, int backlog) override;
+  SysCallSizeResult write(os_fd_t socket, const void* buffer, size_t length) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

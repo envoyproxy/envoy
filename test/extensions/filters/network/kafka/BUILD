@@ -39,6 +39,7 @@ envoy_extension_cc_test(
     deps = [
         ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:serialization_lib",
+        "//source/extensions/filters/network/kafka:tagged_fields_lib",
         "//test/mocks/server:server_mocks",
     ],
 )

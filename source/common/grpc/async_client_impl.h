@@ -55,9 +55,9 @@ public:
   void sendMessage(const Protobuf::Message& request, bool end_stream);
 
   // Http::AsyncClient::StreamCallbacks
-  void onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
+  void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
-  void onTrailers(Http::HeaderMapPtr&& trailers) override;
+  void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void onComplete() override;
   void onReset() override;
 
@@ -77,7 +77,7 @@ private:
                        const std::string& grpc_message);
 
   Event::Dispatcher* dispatcher_{};
-  Http::MessagePtr headers_message_;
+  Http::RequestMessagePtr headers_message_;
   AsyncClientImpl& parent_;
   std::string service_full_name_;
   std::string method_name_;
@@ -106,10 +106,10 @@ public:
 
 private:
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   Buffer::InstancePtr request_;

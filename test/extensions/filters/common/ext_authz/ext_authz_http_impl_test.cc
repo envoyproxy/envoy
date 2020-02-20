@@ -87,7 +87,7 @@ public:
     return std::make_shared<ClientConfig>(ClientConfig{proto_config, timeout, path_prefix});
   }
 
-  Http::MessagePtr sendRequest(std::unordered_map<std::string, std::string>&& headers) {
+  Http::RequestMessagePtr sendRequest(std::unordered_map<std::string, std::string>&& headers) {
     envoy::service::auth::v3::CheckRequest request{};
     auto mutable_headers =
         request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
@@ -95,10 +95,10 @@ public:
       (*mutable_headers)[header.first] = header.second;
     }
 
-    Http::MessagePtr message_ptr;
+    Http::RequestMessagePtr message_ptr;
     EXPECT_CALL(async_client_, send_(_, _, _))
         .WillOnce(Invoke(
-            [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
+            [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
                 const Envoy::Http::AsyncClient::RequestOptions) -> Http::AsyncClient::Request* {
               message_ptr = std::move(message);
               return nullptr;
@@ -189,7 +189,7 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
 // Verify client response when the authorization server returns a 200 OK and path_prefix is
 // configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
-  Http::MessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
+  Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
 
   const auto* path = message_ptr->headers().get(Http::Headers::get().Path);
   ASSERT_NE(path, nullptr);
@@ -198,7 +198,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
 
 // Test the client when a request contains Content-Length greater than 0.
 TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
-  Http::MessagePtr message_ptr =
+  Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
                    {Http::Headers::get().Method.get(), std::string{"POST"}}});
 
@@ -230,7 +230,7 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 
-  Http::MessagePtr message_ptr =
+  Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
                    {Http::Headers::get().Method.get(), std::string{"POST"}}});
 
@@ -245,7 +245,7 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
 
 // Test the client when a request contains headers in the prefix matchers.
 TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
-  Http::MessagePtr message_ptr =
+  Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().XContentTypeOptions.get(), "foobar"},
                    {Http::Headers::get().XSquashDebug.get(), "foo"},
                    {Http::Headers::get().ContentType.get(), "bar"}});
@@ -443,8 +443,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
 
 // Test the client when a call to authorization server returns a 5xx error status.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
-  Http::MessagePtr check_response(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
+  Http::ResponseMessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   envoy::service::auth::v3::CheckRequest request;
 
@@ -465,8 +465,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
 // Test the client when a call to authorization server returns a status code that cannot be
 // parsed.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
-  Http::MessagePtr check_response(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "foo"}}}));
+  Http::ResponseMessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "foo"}}}));
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   envoy::service::auth::v3::CheckRequest request;
 

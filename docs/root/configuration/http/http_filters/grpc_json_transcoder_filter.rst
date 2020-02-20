@@ -105,7 +105,7 @@ gRPC or RESTful JSON requests to localhost:51051.
         socket_address: { address: 0.0.0.0, port_value: 51051 }
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: grpc_json
@@ -121,9 +121,9 @@ gRPC or RESTful JSON requests to localhost:51051.
                 - match: { prefix: "/helloworld.Greeter" }
                   route: { cluster: grpc, timeout: { seconds: 60 } }
             http_filters:
-            - name: envoy.
-              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+            - name: envoy.grpc_json_transcoder
               typed_config:
+                "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
                 proto_descriptor: "/tmp/envoy/proto.pb"
                 services: ["helloworld.Greeter"]
                 print_options:

@@ -63,7 +63,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   }
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (!config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -84,7 +84,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   ASSERT(state_ != State::Responded);
   return state_ == State::Calling ? Http::FilterTrailersStatus::StopIteration
                                   : Http::FilterTrailersStatus::Continue;
@@ -94,11 +94,11 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::HeaderMap&) {
+Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   populateResponseHeaders(headers);
   return Http::FilterHeadersStatus::Continue;
 }
@@ -107,7 +107,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 

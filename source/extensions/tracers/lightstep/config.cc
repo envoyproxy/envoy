@@ -38,7 +38,7 @@ Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the lightstep tracer. @see RegisterFactory.
  */
-REGISTER_FACTORY(LightstepTracerFactory, Server::Configuration::TracerFactory);
+REGISTER_FACTORY(LightstepTracerFactory, Server::Configuration::TracerFactory){"envoy.lightstep"};
 
 } // namespace Lightstep
 } // namespace Tracers

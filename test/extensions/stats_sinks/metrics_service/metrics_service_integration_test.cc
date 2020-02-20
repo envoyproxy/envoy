@@ -40,7 +40,7 @@ public:
       metrics_service_cluster->mutable_http2_protocol_options();
       // metrics_service gRPC service definition.
       auto* metrics_sink = bootstrap.add_stats_sinks();
-      metrics_sink->set_name("envoy.metrics_service");
+      metrics_sink->set_name("envoy.stat_sinks.metrics_service");
       envoy::config::metrics::v3::MetricsServiceConfig config;
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
@@ -148,11 +148,11 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
   initialize();
   // Send an empty request so that histogram values merged for cluster_0.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-lyft-user-id", "123"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-lyft-user-id", "123"}};
   sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
   ASSERT_TRUE(waitForMetricsServiceConnection());

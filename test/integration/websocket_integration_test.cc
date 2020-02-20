@@ -19,8 +19,8 @@
 namespace Envoy {
 namespace {
 
-Http::TestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
-                                              uint32_t content_length = 0) {
+Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
+                                                     uint32_t content_length = 0) {
   return Http::TestHeaderMapImpl{{":authority", "host"},
                                  {"content-length", fmt::format("{}", content_length)},
                                  {":path", "/websocket/test"},
@@ -30,11 +30,11 @@ Http::TestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websoc
                                  {"connection", "keep-alive, upgrade"}};
 }
 
-Http::TestHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
-  return Http::TestHeaderMapImpl{{":status", "101"},
-                                 {"connection", "upgrade"},
-                                 {"upgrade", upgrade_type},
-                                 {"content-length", "0"}};
+Http::TestResponseHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
+  return Http::TestResponseHeaderMapImpl{{":status", "101"},
+                                         {"connection", "upgrade"},
+                                         {"upgrade", upgrade_type},
+                                         {"content-length", "0"}};
 }
 
 } // namespace
@@ -131,8 +131,8 @@ void WebsocketIntegrationTest::initialize() {
 }
 
 void WebsocketIntegrationTest::performUpgrade(
-    const Http::TestHeaderMapImpl& upgrade_request_headers,
-    const Http::TestHeaderMapImpl& upgrade_response_headers) {
+    const Http::TestRequestHeaderMapImpl& upgrade_request_headers,
+    const Http::TestResponseHeaderMapImpl& upgrade_response_headers) {
   // Establish the initial connection.
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -371,11 +371,11 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 
   // HTTP requests are configured to disallow large bodies.
   {
-    Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                            {":path", "/"},
-                                            {"content-length", "2048"},
-                                            {":authority", "host"},
-                                            {":scheme", "https"}};
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {"content-length", "2048"},
+                                                   {":authority", "host"},
+                                                   {":scheme", "https"}};
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     response_ = std::move(encoder_decoder.second);

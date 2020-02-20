@@ -27,7 +27,7 @@ FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope
   return {ALL_TAP_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (tapper_ != nullptr) {
     tapper_->onRequestHeaders(headers);
   }
@@ -41,14 +41,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   if (tapper_ != nullptr) {
     tapper_->onRequestTrailers(trailers);
   }
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (tapper_ != nullptr) {
     tapper_->onResponseHeaders(headers);
   }
@@ -62,7 +62,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (tapper_ != nullptr) {
     tapper_->onResponseTrailers(trailers);
   }

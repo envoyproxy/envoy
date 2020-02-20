@@ -28,7 +28,7 @@ const char* const ok_times[] = {
 INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(ok_times));
 
 TEST_P(HttpTimeTest, Ok) {
-  Http::TestHeaderMapImpl response_headers{{"date", GetParam()}};
+  Http::TestResponseHeaderMapImpl response_headers{{"date", GetParam()}};
   // Manually confirmed that 784111777 is 11/6/94, 8:46:37.
   EXPECT_EQ(784111777, SystemTime::clock::to_time_t(Utils::httpTime(response_headers.Date())));
 }

@@ -52,7 +52,7 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.redis_proxy
+        name: envoy.filters.network.redis_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
@@ -147,7 +147,7 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.redis_proxy
+        name: envoy.filters.network.redis_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
@@ -206,7 +206,7 @@ static_resources:
     - name: cluster_0
       type: STATIC
       typed_extension_protocol_options:
-        envoy.redis_proxy:
+        envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
           auth_password: { inline_string: cluster_0_password }
       lb_policy: RANDOM
@@ -223,7 +223,7 @@ static_resources:
       type: STATIC
       lb_policy: RANDOM
       typed_extension_protocol_options:
-        envoy.redis_proxy:
+        envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
           auth_password: { inline_string: cluster_1_password }
       load_assignment:
@@ -238,7 +238,7 @@ static_resources:
     - name: cluster_2
       type: STATIC
       typed_extension_protocol_options:
-        envoy.redis_proxy:
+        envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
           auth_password: { inline_string: cluster_2_password }
       lb_policy: RANDOM
@@ -259,7 +259,7 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.redis_proxy
+        name: envoy.filters.network.redis_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
