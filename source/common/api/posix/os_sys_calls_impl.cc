@@ -52,8 +52,12 @@ SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags
 
 SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
                                           int flags, struct timespec* timeout) {
+#if ENVOY_MMSG_MORE
   const int rc = ::recvmmsg(sockfd, msgvec, vlen, flags, timeout);
   return {rc, errno};
+#else
+  PANIC("revmmsg is not implemented on non-Linux platform.");
+#endif
 }
 
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
