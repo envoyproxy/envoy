@@ -10,7 +10,6 @@
 #include "envoy/stats/timespan.h"
 
 #include "common/common/logger.h"
-#include "common/common/to_lower_table.h"
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
 #include "common/stats/timespan_impl.h"
@@ -296,7 +295,6 @@ private:
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
-  const ToLowerTable to_lower_table_;
   TimeSource& time_source_;
 };
 
