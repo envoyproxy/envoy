@@ -5,7 +5,7 @@
 
 static void ios_on_exit() {
   // Currently nothing needs to happen in iOS on exit. Just log.
-  NSLog(@"Envoy is exiting.");
+  NSLog(@"[Envoy] library is exiting");
 }
 
 @implementation EnvoyEngineImpl {
@@ -40,8 +40,8 @@ static void ios_on_exit() {
     envoy_engine_callbacks native_callbacks = {ios_on_exit};
     return (int)run_engine(_engineHandle, native_callbacks, configYAML.UTF8String,
                            logLevel.UTF8String);
-  } @catch (...) {
-    NSLog(@"Envoy exception caught.");
+  } @catch (NSException *exception) {
+    NSLog(@"[Envoy] exception caught: %@", exception);
     [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyError" object:self];
     return 1;
   }
