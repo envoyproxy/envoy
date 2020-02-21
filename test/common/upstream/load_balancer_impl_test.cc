@@ -921,7 +921,7 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedBiasAvoiding) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 98),
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  // Initiate current_time to 0.49999, and makes two hosts' initial deadlines both 0.5.
+  // Initiate current_time to 0.49999, and make two hosts' initial deadlines to be both 0.5.
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(49999));
   init(false);
   // Initial weights respected.
