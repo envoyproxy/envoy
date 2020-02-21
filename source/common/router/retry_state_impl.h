@@ -95,7 +95,6 @@ private:
   bool wouldRetryFromReset(const Http::StreamResetReason reset_reason);
   RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
 
-  const Http::HeaderMap& request_headers_;
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
@@ -108,7 +107,6 @@ private:
   BackOffStrategyPtr backoff_strategy_;
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
-  Upstream::RetryHeaderSharedPtr retry_header_;
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;

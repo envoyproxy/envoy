@@ -104,15 +104,6 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
     host_selection_attempts_ = host_selection_attempts;
   }
 
-  const auto& retry_header = retry_policy.retry_header();
-  if (!retry_header.name().empty()) {
-    auto& factory =
-        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHeaderFactory>(retry_header);
-    retry_header_config_ =
-        std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
-                                     retry_header, validation_visitor, factory));
-  }
-
   for (auto code : retry_policy.retriable_status_codes()) {
     retriable_status_codes_.emplace_back(code);
   }
@@ -156,16 +147,6 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
 
   return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
                                                            *validation_visitor_, num_retries_);
-}
-
-Upstream::RetryHeaderSharedPtr RetryPolicyImpl::retryHeader() const {
-  if (retry_header_config_.first == nullptr) {
-    return nullptr;
-  }
-
-  return retry_header_config_.first->createRetryHeader(*retry_header_config_.second,
-                                                       *validation_visitor_, retry_on_,
-                                                       retriable_status_codes_, retriable_headers_);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,
