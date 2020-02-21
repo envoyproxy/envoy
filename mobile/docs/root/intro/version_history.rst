@@ -1,6 +1,26 @@
 Version history
 ---------------
 
+0.2.3 (Feb 21, 2020)
+====================
+
+This release provides stabilization fixes as follow-up changes to 0.2.2:
+
+- Fixes race that caused double-deletion of HCM active streams crashing (#669)
+- Fixes DNS resolution when starting Envoy Mobile offline on iOS (#672)
+- Fixes for API listener crashes (#667 and #674)
+- Fixes for linking and assertions (#663)
+- Fixes bad access in ~DnsCache() in Envoy upstream (#690)
+- Fixes bug in Dynamic Forward Proxy Cluster in Envoy Upstream (#678)
+- Adds known issue assertion that prevents crash on force-close (#699)
+
+Additional changes:
+
+- Allows zero for upstream timeout specification (#659)
+- Adds process logging for Android (#684)
+- Adds the ability to decide upstream protocol for requests (#697)
+
+
 0.2.2 (Feb 3, 2020)
 ===================
 
