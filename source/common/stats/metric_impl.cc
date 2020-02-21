@@ -23,8 +23,8 @@ MetricHelper::MetricHelper(StatName name, absl::string_view tag_extracted_name,
   const uint32_t num_names = 2 + 2 * stat_name_tags.size();
   absl::FixedArray<StatName> names(num_names);
   names[0] = name;
-  StatNamePool pool(symbol_table);
-  names[1] = pool.add(tag_extracted_name);
+  StatNameManagedStorage storage(tag_extracted_name, symbol_table);
+  names[1] = storage.statName();
   int index = 1;
   for (auto& stat_name_tag : stat_name_tags) {
     names[++index] = stat_name_tag.first;
