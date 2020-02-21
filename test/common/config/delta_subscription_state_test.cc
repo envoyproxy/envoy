@@ -25,8 +25,7 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 
 class DeltaSubscriptionStateTest : public testing::Test {
 protected:
-  DeltaSubscriptionStateTest()
-      : state_(TypeUrl, callbacks_, local_info_, std::chrono::milliseconds(0U), dispatcher_) {
+  DeltaSubscriptionStateTest() : state_(TypeUrl, callbacks_, local_info_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
         state_.getNextRequestAckless();
