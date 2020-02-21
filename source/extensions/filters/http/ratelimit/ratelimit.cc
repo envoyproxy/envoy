@@ -171,7 +171,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
-      cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
+      cluster_->statsScope()
+          .counterFromStatName(stat_names.failure_mode_allowed_, absl::nullopt)
+          .inc();
       if (!initiating_call_) {
         appendRequestHeaders(req_headers_to_add);
         callbacks_->continueDecoding();
