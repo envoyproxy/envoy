@@ -93,8 +93,8 @@ public:
   }
 
 protected:
-  void testPreflight(Http::TestHeaderMapImpl&& request_headers,
-                     Http::TestHeaderMapImpl&& expected_response_headers) {
+  void testPreflight(Http::TestRequestHeaderMapImpl&& request_headers,
+                     Http::TestResponseHeaderMapImpl&& expected_response_headers) {
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -103,8 +103,8 @@ protected:
     compareHeaders(response->headers(), expected_response_headers);
   }
 
-  void testNormalRequest(Http::TestHeaderMapImpl&& request_headers,
-                         Http::TestHeaderMapImpl&& expected_response_headers) {
+  void testNormalRequest(Http::TestRequestHeaderMapImpl&& request_headers,
+                         Http::TestResponseHeaderMapImpl&& expected_response_headers) {
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
@@ -113,8 +113,8 @@ protected:
     compareHeaders(response->headers(), expected_response_headers);
   }
 
-  void compareHeaders(Http::TestHeaderMapImpl&& response_headers,
-                      Http::TestHeaderMapImpl& expected_response_headers) {
+  void compareHeaders(Http::TestResponseHeaderMapImpl&& response_headers,
+                      Http::TestResponseHeaderMapImpl& expected_response_headers) {
     response_headers.remove(Envoy::Http::LowerCaseString{"date"});
     response_headers.remove(Envoy::Http::LowerCaseString{"x-envoy-upstream-service-time"});
     EXPECT_EQ(expected_response_headers, response_headers);

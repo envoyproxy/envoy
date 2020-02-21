@@ -63,7 +63,7 @@ void HttpSubscriptionImpl::updateResourceInterest(
 }
 
 // Http::RestApiFetcher
-void HttpSubscriptionImpl::createRequest(Http::Message& request) {
+void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
   ENVOY_LOG(debug, "Sending REST request for {}", path_);
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
@@ -74,7 +74,7 @@ void HttpSubscriptionImpl::createRequest(Http::Message& request) {
   request.headers().setContentLength(request.body()->length());
 }
 
-void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
+void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {
   disableInitFetchTimeoutTimer();
   envoy::service::discovery::v3::DiscoveryResponse message;
   try {

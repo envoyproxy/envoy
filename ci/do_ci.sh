@@ -304,11 +304,11 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
   echo "protoxform_test..."
-  ./tools/protoxform_test.sh
+  ./tools/protoxform/protoxform_test.sh
   echo "fix_format..."
   ./tools/code_format/check_format.py fix
   ./tools/code_format/format_python_tools.sh fix
-  ./tools/proto_format.sh fix
+  ./tools/proto_format/proto_format.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
@@ -318,7 +318,7 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format..."
   ./tools/code_format/check_format.py check
   ./tools/code_format/format_python_tools.sh check
-  ./tools/proto_format.sh check
+  ./tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
@@ -326,19 +326,19 @@ elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling" ]]; then
   echo "check_spelling..."
-  ./tools/check_spelling.sh check
+  ./tools/spelling/check_spelling.sh check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling" ]];then
   echo "fix_spell..."
-  ./tools/check_spelling.sh fix
+  ./tools/spelling/check_spelling.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
   echo "check_spelling_pedantic..."
-  ./tools/check_spelling_pedantic.py --mark check
+  ./tools/spelling/check_spelling_pedantic.py --mark check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."
-  ./tools/check_spelling_pedantic.py fix
+  ./tools/spelling/check_spelling_pedantic.py fix
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."

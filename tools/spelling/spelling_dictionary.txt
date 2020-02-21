@@ -568,6 +568,7 @@ failover
 fallbacks
 fastbuild
 favicon
+fcntl
 fd
 fds
 filename
@@ -692,6 +693,7 @@ lenenc
 lexically
 libc
 libevent
+libprotobuf
 libtool
 libstdc
 libtooling
@@ -749,11 +751,13 @@ mongo
 moveable
 msec
 msg
+msghdr
 multi
 multicast
 multikill
 multimap
 multivalue
+mutator
 mutex
 mutexes
 mux
@@ -784,6 +788,7 @@ nullptr
 num
 numkeys
 observability
+ocagent
 offsetof
 oneof
 oneway
@@ -978,6 +983,7 @@ sizeof
 smatch
 snapshotted
 sockaddr
+socketpair
 sockfd
 sockopt
 sockopts
@@ -1082,6 +1088,7 @@ transcoded
 transcoder
 transcoding
 transferral
+triaged
 trie
 tuple
 tuples

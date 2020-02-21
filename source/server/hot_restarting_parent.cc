@@ -92,7 +92,7 @@ HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(serv
   // across hot-restarts. There's no other reason this particular stat-name
   // needs to be created dynamically.
   Stats::StatNameDynamicPool pool(server_->stats().symbolTable());
-  Stats::Gauge& gauge = server_->stats().gaugeFromStatName(pool.add("hotrestart.generation"),
+  Stats::Gauge& gauge = server_->stats().gaugeFromStatName(pool.add("server.hot_restart_generation"),
                                                            Stats::Gauge::ImportMode::Accumulate);
   gauge.inc();
 }

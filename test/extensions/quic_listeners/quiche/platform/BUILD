@@ -27,7 +27,6 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:http2_platform_reconstruct_object",
         "@com_googlesource_quiche//:http2_test_tools_random",
     ],
 )
@@ -107,11 +106,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "http2_platform_reconstruct_object_impl_lib",
-    hdrs = ["http2_reconstruct_object_impl.h"],
-)
-
-envoy_cc_test_library(
     name = "quic_platform_epoll_clock_lib",
     srcs = select({
         "//bazel:linux": ["quic_epoll_clock.cc"],
@@ -123,6 +117,7 @@ envoy_cc_test_library(
     }),
     tags = ["nofips"],
     deps = [
+        "@com_googlesource_quiche//:quic_core_clock_lib",
         "@com_googlesource_quiche//:quic_platform",
         "@com_googlesource_quiche//:quic_platform_epoll_lib",
     ],

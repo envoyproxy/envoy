@@ -133,9 +133,9 @@ function run_testsuite() {
     --use-fake-symbol-table "$FAKE_SYMBOL_TABLE" 2>&1)
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
 
-  start_test Checking hotrestart.generation 1
-  GENERATION_0=$(curl -sg http://${ADMIN_ADDRESS_0}/stats | grep hotrestart.generation)
-  check [ "$GENERATION_0" = "hotrestart.generation: 1" ];
+  start_test Checking server.hot_restart_generation 1
+  GENERATION_0=$(curl -sg http://${ADMIN_ADDRESS_0}/stats | grep server.hot_restart_generation)
+  check [ "$GENERATION_0" = "server.hot_restart_generation: 1" ];
 
   # Verify we can see server.live in the admin port.
   SERVER_LIVE_0=$(curl -sg http://${ADMIN_ADDRESS_0}/stats | grep server.live)
@@ -165,9 +165,9 @@ function run_testsuite() {
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
   [[ -z "${CONFIG_DIFF}" ]]
 
-  start_test Checking hotrestart.generation 2
-  GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep hotrestart.generation)
-  check [ "$GENERATION_1" = "hotrestart.generation: 2" ];
+  start_test Checking server.hot_restart_generation 2
+  GENERATION_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.hot_restart_generation)
+  check [ "$GENERATION_1" = "server.hot_restart_generation: 2" ];
 
   ADMIN_ADDRESS_PATH_2="${TEST_TMPDIR}"/admin.2."${TEST_INDEX}".address
   start_test Starting epoch 2
