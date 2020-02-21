@@ -22,16 +22,8 @@ class RequestBuilder(
   // Retry policy to use for this request.
   private var retryPolicy: RetryPolicy? = null
 
-  /**
-   * Add a retry policy to use for this request.
-   *
-   * @param retryPolicy the {@link io.envoyproxy.envoymobile.RetryPolicy} for this request.
-   * @return this builder.
-   */
-  fun addRetryPolicy(retryPolicy: RetryPolicy?): RequestBuilder {
-    this.retryPolicy = retryPolicy
-    return this
-  }
+  // The protocol version to use for upstream requests.
+  private var upstreamHttpProtocol: UpstreamHttpProtocol? = null
 
   /**
    * Append a value to the header key.
@@ -78,6 +70,28 @@ class RequestBuilder(
   }
 
   /**
+   * Add a retry policy to use for this request.
+   *
+   * @param retryPolicy the {@link io.envoyproxy.envoymobile.RetryPolicy} for this request.
+   * @return this builder.
+   */
+  fun addRetryPolicy(retryPolicy: RetryPolicy?): RequestBuilder {
+    this.retryPolicy = retryPolicy
+    return this
+  }
+
+  /**
+   * Add an HTTP protocol hint for this request.
+   *
+   * @param upstreamHttpProtocol the {@link io.envoyproxy.envoymobile.UpstreamHttpProtocol} for this request.
+   * @return this builder.
+   */
+  fun addUpstreamHttpProtocol(upstreamHttpProtocol: UpstreamHttpProtocol?): RequestBuilder {
+    this.upstreamHttpProtocol = upstreamHttpProtocol
+    return this
+  }
+
+  /**
    * Creates the {@link io.envoyproxy.envoymobile.Request} object using the data set in the builder.
    *
    * @return the {@link io.envoyproxy.envoymobile.Request} object.
@@ -89,7 +103,8 @@ class RequestBuilder(
         authority,
         path,
         headers,
-        retryPolicy
+        retryPolicy,
+        upstreamHttpProtocol
     )
   }
 

@@ -24,6 +24,7 @@ swift_static_framework(
         "RetryPolicy.swift",
         "RetryPolicyMapper.swift",
         "StreamEmitter.swift",
+        "UpstreamHttpProtocol.swift",
     ],
     module_name = "Envoy",
     objc_includes = [

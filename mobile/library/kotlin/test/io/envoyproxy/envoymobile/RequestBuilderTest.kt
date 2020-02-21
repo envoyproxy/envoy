@@ -25,6 +25,25 @@ class RequestBuilderTest {
   }
 
   @Test
+  fun `adding upstream http protocol should have hint present in request`() {
+
+    val retryPolicy = RetryPolicy(maxRetryCount = 23, retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE), perRetryTimeoutMS = 1234)
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
+        .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
+        .build()
+
+    assertThat(request.upstreamHttpProtocol).isEqualTo(UpstreamHttpProtocol.HTTP2)
+  }
+
+  @Test
+  fun `not adding upstream http protocol should have null upstream protocol in request`() {
+    val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
+        .build()
+
+    assertThat(request.upstreamHttpProtocol).isNull()
+  }
+
+  @Test
   fun `adding new headers should append to the list of header keys`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addHeader("header_a", "value_a1")

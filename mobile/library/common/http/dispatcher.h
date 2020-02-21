@@ -195,7 +195,7 @@ private:
   void post(Event::PostCb callback);
   DirectStreamSharedPtr getStream(envoy_stream_t stream_handle);
   void cleanup(envoy_stream_t stream_handle);
-  void attachPreferredNetwork(HeaderMap& headers);
+  void setDestinationCluster(HeaderMap& headers);
 
   Thread::MutexBasicLockable ready_lock_;
   std::list<Event::PostCb> init_queue_ GUARDED_BY(ready_lock_);

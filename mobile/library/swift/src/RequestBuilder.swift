@@ -14,8 +14,10 @@ public final class RequestBuilder: NSObject {
   /// Headers to send with the request.
   /// Multiple values for a given name are valid, and will be sent as comma-separated values.
   public private(set) var headers: [String: [String]] = [:]
-  // Retry policy to use for this request.
+  /// Retry policy to use for this request.
   public private(set) var retryPolicy: RetryPolicy?
+  /// The protocol version to use for upstream requests.
+  public private(set) var upstreamHttpProtocol: UpstreamHttpProtocol?
 
   // MARK: - Initializers
 
@@ -25,6 +27,7 @@ public final class RequestBuilder: NSObject {
     self.scheme = request.scheme
     self.authority = request.authority
     self.path = request.path
+    self.upstreamHttpProtocol = request.upstreamHttpProtocol
     self.headers = request.headers
     self.retryPolicy = request.retryPolicy
   }
@@ -61,7 +64,6 @@ public final class RequestBuilder: NSObject {
     if self.headers[name]?.isEmpty == true {
       self.headers.removeValue(forKey: name)
     }
-
     return self
   }
 
@@ -71,13 +73,22 @@ public final class RequestBuilder: NSObject {
     return self
   }
 
+  @discardableResult
+  public func addUpstreamHttpProtocol(_ upstreamHttpProtocol: UpstreamHttpProtocol)
+    -> RequestBuilder
+  {
+    self.upstreamHttpProtocol = upstreamHttpProtocol
+    return self
+  }
+
   public func build() -> Request {
     return Request(method: self.method,
                    scheme: self.scheme,
                    authority: self.authority,
                    path: self.path,
                    headers: self.headers,
-                   retryPolicy: self.retryPolicy)
+                   retryPolicy: self.retryPolicy,
+                   upstreamHttpProtocol: self.upstreamHttpProtocol)
   }
 }
 

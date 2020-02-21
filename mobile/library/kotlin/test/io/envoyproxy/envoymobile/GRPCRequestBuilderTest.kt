@@ -51,4 +51,13 @@ class GRPCRequestBuilderTest {
 
     assertThat(request.headers.containsKey("grpc-timeout")).isFalse()
   }
+
+  @Test
+  fun `h2 header is present`() {
+    val headers = GRPCRequestBuilder("/pb.api.v1.Foo/GetBar", "foo.bar.com", false)
+        .build()
+        .outboundHeaders()
+
+    assertThat(headers["x-envoy-mobile-upstream-protocol"]).containsExactly("http2")
+  }
 }

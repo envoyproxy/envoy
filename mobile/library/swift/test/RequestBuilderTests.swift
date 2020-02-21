@@ -96,6 +96,23 @@ final class RequestBuilderTests: XCTestCase {
     XCTAssertNil(request.headers["foo"])
   }
 
+  // MARK: - Upstream HTTP Protocol
+
+  func testAddingUpstreamHttpProtocolHasUpstreamHttpProtocolInRequest() {
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
+      .addUpstreamHttpProtocol(.http1)
+      .build()
+    XCTAssertEqual(.http1, request.upstreamHttpProtocol)
+  }
+
+  func testNotAddingUpstreamHttpProtocolHasNilUpstreamHttpProtocolInRequest() {
+    let request = RequestBuilder(method: .post, scheme: "https",
+                                 authority: "api.foo.com", path: "/foo")
+      .build()
+    XCTAssertNil(request.upstreamHttpProtocol)
+  }
+
   // MARK: - Request conversion
 
   func testRequestsAreEqualWhenPropertiesAreEqual() {

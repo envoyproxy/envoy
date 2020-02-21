@@ -66,6 +66,9 @@ NSString *_REQUEST_SCHEME = @"https";
   NSLog(@"Starting request to '%@'", _REQUEST_PATH);
 
   int requestID = self.requestCount;
+  // Note: this request will use an http/1.1 stream for the upstream request.
+  // The Swift example uses h2. This is done on purpose to test both paths in end-to-end tests
+  // in CI.
   RequestBuilder *builder = [[RequestBuilder alloc] initWithMethod:RequestMethodGet
                                                             scheme:_REQUEST_SCHEME
                                                          authority:_REQUEST_AUTHORITY

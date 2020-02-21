@@ -14,7 +14,8 @@ data class Request internal constructor(
     val authority: String,
     val path: String,
     val headers: Map<String, List<String>>,
-    val retryPolicy: RetryPolicy?
+    val retryPolicy: RetryPolicy?,
+    val upstreamHttpProtocol: UpstreamHttpProtocol?
 ) {
 
   /**
@@ -27,5 +28,6 @@ data class Request internal constructor(
     return RequestBuilder(method, scheme, authority, path)
         .setHeaders(headers)
         .addRetryPolicy(retryPolicy)
+        .addUpstreamHttpProtocol(upstreamHttpProtocol)
   }
 }

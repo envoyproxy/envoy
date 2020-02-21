@@ -96,6 +96,48 @@ static_resources:
           dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
+  - name: base_h2
+    http2_protocol_options: {}
+    connect_timeout: {{ connect_timeout_seconds }}s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: AUTO
+          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+    transport_socket: *base_transport_socket
+    upstream_connection_options: *upstream_opts
+  - name: base_wlan_h2
+    http2_protocol_options: {}
+    connect_timeout: {{ connect_timeout_seconds }}s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: AUTO
+          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+    transport_socket: *base_transport_socket
+    upstream_connection_options: *upstream_opts
+  - name: base_wwan_h2
+    http2_protocol_options: {}
+    connect_timeout: {{ connect_timeout_seconds }}s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.dynamic_forward_proxy
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+        dns_cache_config:
+          name: dynamic_forward_proxy_cache_config
+          dns_lookup_family: AUTO
+          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+    transport_socket: *base_transport_socket
+    upstream_connection_options: *upstream_opts
   - name: stats
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
