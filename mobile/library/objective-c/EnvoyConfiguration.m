@@ -41,7 +41,7 @@
   }
 
   if ([templateYAML rangeOfString:@"{{"].length != 0) {
-    NSLog(@"Error: Could not resolve all configuration template keys");
+    NSLog(@"[Envoy] error: could not resolve all template keys in config:\n%@", templateYAML);
     return nil;
   }
 
