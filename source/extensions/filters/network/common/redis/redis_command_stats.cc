@@ -44,7 +44,7 @@ Stats::Histogram& RedisCommandStats::histogram(Stats::Scope& scope,
                                                Stats::Histogram::Unit unit) {
   const Stats::SymbolTable::StoragePtr storage_ptr = symbol_table_.join(stat_names);
   Stats::StatName full_stat_name = Stats::StatName(storage_ptr.get());
-  return scope.histogramFromStatName(full_stat_name, abls::nullopt, unit);
+  return scope.histogramFromStatName(full_stat_name, absl::nullopt, unit);
 }
 
 Stats::TimespanPtr RedisCommandStats::createCommandTimer(Stats::Scope& scope,
