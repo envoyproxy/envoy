@@ -38,17 +38,12 @@ public:
   virtual void decNumConnections() PURE;
 
   /**
-   * Adds a listener to the handler.
+   * Adds a listener to the handler. and replace the existing listener.
+   * @param overrided_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    */
-  virtual void addListener(ListenerConfig& config) PURE;
-
-  /**
-   * Adds a listener to the handler and replace the existing listener.
-   * @param overrided_listener supplies the tag of the existing listener.
-   * @param config listener configuration options.
-   */
-  virtual void addIntelligentListener(uint64_t overrided_listener, ListenerConfig& config) PURE;
+  virtual void addListener(absl::optional<uint64_t> overrided_listener,
+                           ListenerConfig& config) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed

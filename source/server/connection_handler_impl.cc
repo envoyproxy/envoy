@@ -28,9 +28,22 @@ void ConnectionHandlerImpl::decNumConnections() {
   --num_handler_connections_;
 }
 
-void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
+void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overrided_listener,
+                                        Network::ListenerConfig& config) {
   ActiveListenerDetails details;
   if (config.listenSocketFactory().socketType() == Network::Address::SocketType::Stream) {
+    if (overrided_listener.has_value()) {
+      for (auto& listener : listeners_) {
+        if (listener.second.listener_->listenerTag() == overrided_listener) {
+          listener.second.tcp_listener_->get().updateListenerConfig(config);
+          return;
+        }
+      }
+      ASSERT(false, absl::StrCat("fail to replace tcp listener ", config.name(), " tagged ",
+                                 overrided_listener.value()));
+      // TODO(lambdai): Fallback to addListener.
+      // Requires returning code to trigger a remove listener on failure.
+    }
     auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
     details.tcp_listener_ = *tcp_listener;
     details.listener_ = std::move(tcp_listener);
@@ -43,24 +56,6 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
     details.listener_->listener()->disable();
   }
   listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
-}
-
-void ConnectionHandlerImpl::addIntelligentListener(uint64_t overrided_listener,
-                                                   Network::ListenerConfig& config) {
-
-  if (config.listenSocketFactory().socketType() != Network::Address::SocketType::Stream) {
-    ASSERT(false, "UDP listener is not supporting intelligent update");
-    return;
-  }
-  for (auto& listener : listeners_) {
-    if (listener.second.listener_->listenerTag() == overrided_listener) {
-      listener.second.tcp_listener_->get().updateListenerConfig(config);
-      return;
-    }
-  }
-  ASSERT(false, absl::StrCat("fail to replace tcp listener ", config.name(), " tagged ",
-                             overrided_listener));
-  // Fallback to addListener. Not sure if this could ever reach.
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {

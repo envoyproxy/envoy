@@ -66,9 +66,8 @@ public:
   uint64_t numConnections() override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
-  void addListener(Network::ListenerConfig& config) override;
-  void addIntelligentListener(uint64_t overrided_listener,
-                              Network::ListenerConfig& config) override;
+  void addListener(absl::optional<uint64_t> overrided_listener,
+                   Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
   void removeUntrackedFilterChains(uint64_t listener_tag,
                                    std::function<void()> completion) override;

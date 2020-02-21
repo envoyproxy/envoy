@@ -34,32 +34,15 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
       [this](OverloadActionState state) { stopAcceptingConnectionsCb(state); });
 }
 
-void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) {
-  // All listener additions happen via post. However, we must deal with the case where the listener
-  // can not be created on the worker. There is a race condition where 2 processes can successfully
-  // bind to an address, but then fail to listen() with EADDRINUSE. During initial startup, we want
-  // to surface this.
-  dispatcher_->post([this, &listener, completion]() -> void {
-    try {
-      handler_->addListener(listener);
-      hooks_.onWorkerListenerAdded();
-      completion(true);
-    } catch (const Network::CreateListenerException& e) {
-      completion(false);
-    }
-  });
-}
-
-void WorkerImpl::addIntelligentListener(uint64_t overrided_listener,
-                                        Network::ListenerConfig& listener,
-                                        AddListenerCompletion completion) {
+void WorkerImpl::addListener(absl::optional<uint64_t> overrided_listener,
+                             Network::ListenerConfig& listener, AddListenerCompletion completion) {
   // All listener additions happen via post. However, we must deal with the case where the listener
   // can not be created on the worker. There is a race condition where 2 processes can successfully
   // bind to an address, but then fail to listen() with EADDRINUSE. During initial startup, we want
   // to surface this.
   dispatcher_->post([this, overrided_listener, &listener, completion]() -> void {
     try {
-      handler_->addIntelligentListener(overrided_listener, listener);
+      handler_->addListener(overrided_listener, listener);
       hooks_.onWorkerListenerAdded();
       completion(true);
     } catch (const Network::CreateListenerException& e) {

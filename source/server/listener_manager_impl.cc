@@ -608,8 +608,21 @@ std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl
   return ret;
 }
 
-void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& listener) {
-  worker.addListener(listener, [this, &listener](bool success) -> void {
+void ListenerManagerImpl::addListenerToWorker(Worker& worker,
+                                              absl::optional<uint64_t> overrided_listener,
+                                              ListenerImpl& listener) {
+  if (overrided_listener.has_value()) {
+    worker.addListener(overrided_listener, listener, [this, &listener](bool success) -> void {
+      server_.dispatcher().post([this, success, &listener]() -> void {
+        // TODO: I don't have a concrete case to generate the failure.
+        UNREFERENCED_PARAMETER(success);
+        UNREFERENCED_PARAMETER(listener);
+        stats_.listener_create_success_.inc();
+      });
+    });
+    return;
+  }
+  worker.addListener(overrided_listener, listener, [this, &listener](bool success) -> void {
     // The add listener completion runs on the worker thread. Post back to the main thread to
     // avoid locking.
     server_.dispatcher().post([this, success, &listener]() -> void {
@@ -634,25 +647,11 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
   });
 }
 
-void ListenerManagerImpl::addIntelligentListenerToWorker(Worker& worker,
-                                                         uint64_t overrided_listener,
-                                                         ListenerImpl& listener) {
-  worker.addIntelligentListener(overrided_listener, listener,
-                                [this, &listener](bool success) -> void {
-                                  server_.dispatcher().post([this, success, &listener]() -> void {
-                                    // TODO: I don't have a concrete case to generate the failure.
-                                    UNREFERENCED_PARAMETER(success);
-                                    UNREFERENCED_PARAMETER(listener);
-                                    stats_.listener_create_success_.inc();
-                                  });
-                                });
-}
-
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, listener);
+    addListenerToWorker(*worker, absl::nullopt, listener);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -683,7 +682,7 @@ void ListenerManagerImpl::onIntelligentListenerWarmed(ListenerImpl& listener) {
     // The warmed listener should be added first so that the worker will accept new connections
     // when it stops listening on the old listener.
     for (const auto& worker : workers_) {
-      addIntelligentListenerToWorker(*worker, (*existing_active_listener)->listenerTag(), listener);
+      addListenerToWorker(*worker, (*existing_active_listener)->listenerTag(), listener);
     }
     // Finish active_listeners_ transformation before calling `drainListener` as it depends on their
     // state.
@@ -692,7 +691,7 @@ void ListenerManagerImpl::onIntelligentListenerWarmed(ListenerImpl& listener) {
     drainFilterChains(std::move(listener), **existing_active_listener);
   } else {
     for (const auto& worker : workers_) {
-      addListenerToWorker(*worker, listener);
+      addListenerToWorker(*worker, absl::nullopt, listener);
     }
     active_listeners_.emplace_back(std::move(*existing_warming_listener));
   }
@@ -826,7 +825,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     ENVOY_LOG(info, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
-      addListenerToWorker(*worker, *listener);
+      addListenerToWorker(*worker, absl::nullopt, *listener);
     }
     worker->start(guard_dog);
     if (enable_dispatcher_stats_) {

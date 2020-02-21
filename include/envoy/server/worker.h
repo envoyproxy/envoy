@@ -24,22 +24,17 @@ public:
   using AddListenerCompletion = std::function<void(bool success)>;
 
   /**
-   * Add a listener to the worker.
+   * Add a listener to the worker and replace the previous listener if any. If the previous listener
+   * doesn't exist, the behavior should be equivalent to add a new listener.
+   * @param overrided_listener The previous listener tag to be replaced. nullopt if it's a new
+   * listener.
    * @param listener supplies the listener to add.
    * @param completion supplies the completion to call when the listener has been added (or not) on
    *                   the worker.
    */
-  virtual void addListener(Network::ListenerConfig& listener,
+  virtual void addListener(absl::optional<uint64_t> overrided_listener,
+                           Network::ListenerConfig& listener,
                            AddListenerCompletion completion) PURE;
-
-  // TODO: deprecate addListener?
-  /**
-   * Replace the existing listener if any. If the previous listener doesn't exist, e.g. failed to
-   * start, the behavior should be equivalent to add a new listener.
-   */
-  virtual void addIntelligentListener(uint64_t overrided_listener,
-                                      Network::ListenerConfig& listener,
-                                      AddListenerCompletion completion) PURE;
 
   /**
    * @return uint64_t the number of connections across all listeners that the worker owns.

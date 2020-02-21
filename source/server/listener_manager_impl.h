@@ -183,9 +183,8 @@ private:
     uint64_t workers_pending_removal_;
   };
 
-  void addListenerToWorker(Worker& worker, ListenerImpl& listener);
-  void addIntelligentListenerToWorker(Worker& worker, uint64_t overrided_listener,
-                                      ListenerImpl& listener);
+  void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overrided_listener,
+                           ListenerImpl& listener);
   ProtobufTypes::MessagePtr dumpListenerConfigs();
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,

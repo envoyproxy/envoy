@@ -42,9 +42,8 @@ public:
              Api::Api& api, const std::string& worker_name);
 
   // Server::Worker
-  void addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) override;
-  void addIntelligentListener(uint64_t overrided_listener, Network::ListenerConfig& listener,
-                              AddListenerCompletion completion) override;
+  void addListener(absl::optional<uint64_t> overrided_listener, Network::ListenerConfig& listener,
+                   AddListenerCompletion completion) override;
   uint64_t numConnections() override;
   void removeListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
   void removeUntrackedFilterChains(const Network::ListenerConfig& listener,
