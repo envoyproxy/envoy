@@ -89,7 +89,7 @@ public:
 REGISTER_FACTORY(TestWithDeprecatedPublishedFactory,
                  PublishedFactory){"testing.published.deprecated_name"};
 
-TEST(RegistryTest, WithDeprecatedFactoryPublished) {
+TEST(RegistryTest, DEPRECATED_FEATURE_TEST(WithDeprecatedFactoryPublished)) {
   EXPECT_EQ("testing.published.instead_name",
             Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
                 "testing.published.deprecated_name")
