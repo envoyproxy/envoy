@@ -47,9 +47,14 @@ final class ViewController: UITableViewController {
     NSLog("Starting request to '\(kRequestPath)'")
 
     let requestID = self.requestCount
+    // Note: this request will use an h2 stream for the upstream request.
+    // The Objective-C example uses http/1.1. This is done on purpose to test both paths in
+    // end-to-end tests in CI.
     let request = RequestBuilder(method: .get, scheme: kRequestScheme,
                                  authority: kRequestAuthority,
-                                 path: kRequestPath).build()
+                                 path: kRequestPath)
+        .addUpstreamHttpProtocol(.http2)
+        .build()
     let handler = ResponseHandler()
       .onHeaders { [weak self] headers, statusCode, _ in
         NSLog("Response status (\(requestID)): \(statusCode)\n\(headers)")

@@ -27,6 +27,7 @@ class RequestTest {
   fun `requests converted to a builder should build to the same request`() {
     val request = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "foo")
         .addRetryPolicy(RetryPolicy(23, listOf(RetryRule.STATUS_5XX, RetryRule.CONNECT_FAILURE), 1234))
+        .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
         .addHeader("header_a", "value_a1")
         .addHeader("header_a", "value_a2")
         .addHeader("header_b", "value_b1")

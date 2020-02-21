@@ -52,6 +52,7 @@ envoy_mobile_kt_library(
         "RetryPolicy.kt",
         "RetryPolicyMapper.kt",
         "StreamEmitter.kt",
+        "UpstreamHttpProtocol.kt",
     ],
     visibility = ["//visibility:public"],
     deps = [

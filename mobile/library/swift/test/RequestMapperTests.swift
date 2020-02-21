@@ -30,6 +30,22 @@ final class RequestMapperTests: XCTestCase {
     XCTAssertEqual(["/foo"], headers[":path"])
   }
 
+  func testAddsH1ToHeaders() {
+    let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
+      .addUpstreamHttpProtocol(.http1)
+      .build()
+      .outboundHeaders()
+    XCTAssertEqual(["http1"], headers["x-envoy-mobile-upstream-protocol"])
+  }
+
+  func testAddsH2ToHeaders() {
+    let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
+      .addUpstreamHttpProtocol(.http2)
+      .build()
+      .outboundHeaders()
+    XCTAssertEqual(["http2"], headers["x-envoy-mobile-upstream-protocol"])
+  }
+
   func testJoinsHeaderValuesWithTheSameKey() {
     let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
       .addHeader(name: "foo", value: "1")
@@ -47,17 +63,28 @@ final class RequestMapperTests: XCTestCase {
     XCTAssertNil(headers[":restricted"])
   }
 
+  func testStripsHeadersWithXEnvoyMobilePrefix() {
+    let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
+      .addHeader(name: "x-envoy-mobile-test", value: "someValue")
+      .build()
+      .outboundHeaders()
+    XCTAssertNil(headers["x-envoy-mobile-test"])
+  }
+
   func testCannotOverrideStandardRestrictedHeaders() {
     let headers = RequestBuilder(method: .post, scheme: "https", authority: "x.y.z", path: "/foo")
+      .addUpstreamHttpProtocol(.http2)
       .addHeader(name: ":scheme", value: "override")
       .addHeader(name: ":authority", value: "override")
       .addHeader(name: ":path", value: "override")
+      .addHeader(name: "x-envoy-mobile-upstream-protocol", value: "override")
       .build()
       .outboundHeaders()
 
     XCTAssertEqual(["https"], headers[":scheme"])
     XCTAssertEqual(["x.y.z"], headers[":authority"])
     XCTAssertEqual(["/foo"], headers[":path"])
+    XCTAssertEqual(["http2"], headers["x-envoy-mobile-upstream-protocol"])
   }
 
   func testIncludesRetryPolicyHeaders() {

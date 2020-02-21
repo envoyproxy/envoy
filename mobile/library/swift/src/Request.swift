@@ -14,8 +14,10 @@ public final class Request: NSObject {
   /// Headers to send with the request.
   /// Multiple values for a given name are valid, and will be sent as comma-separated values.
   public let headers: [String: [String]]
-  // Retry policy to use for this request.
+  /// Retry policy to use for this request.
   public let retryPolicy: RetryPolicy?
+  /// The protocol version to use for upstream requests.
+  public let upstreamHttpProtocol: UpstreamHttpProtocol?
 
   /// Converts the request back to a builder so that it can be modified (i.e., by a filter).
   ///
@@ -30,7 +32,8 @@ public final class Request: NSObject {
        authority: String,
        path: String,
        headers: [String: [String]] = [:],
-       retryPolicy: RetryPolicy?)
+       retryPolicy: RetryPolicy?,
+       upstreamHttpProtocol: UpstreamHttpProtocol?)
   {
     self.method = method
     self.scheme = scheme
@@ -38,6 +41,7 @@ public final class Request: NSObject {
     self.path = path
     self.headers = headers
     self.retryPolicy = retryPolicy
+    self.upstreamHttpProtocol = upstreamHttpProtocol
   }
 }
 
@@ -55,5 +59,6 @@ extension Request {
       && self.path == other.path
       && self.headers == other.headers
       && self.retryPolicy == other.retryPolicy
+      && self.upstreamHttpProtocol == other.upstreamHttpProtocol
   }
 }

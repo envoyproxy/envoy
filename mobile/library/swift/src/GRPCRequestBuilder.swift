@@ -16,6 +16,7 @@ public final class GRPCRequestBuilder: NSObject {
                                             authority: authority,
                                             path: path)
     self.underlyingBuilder.addHeader(name: "content-type", value: "application/grpc")
+    self.underlyingBuilder.addUpstreamHttpProtocol(.http2)
   }
 
   /// Append a value to the header key.

@@ -321,7 +321,7 @@ envoy_status_t Dispatcher::sendHeaders(envoy_stream_t stream, envoy_headers head
       RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
       ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
                 *internal_headers);
-      attachPreferredNetwork(*internal_headers);
+      setDestinationCluster(*internal_headers);
       direct_stream->request_decoder_->decodeHeaders(std::move(internal_headers), end_stream);
       direct_stream->closeLocal(end_stream);
     }
@@ -478,19 +478,41 @@ const LowerCaseString ClusterHeader{"x-envoy-mobile-cluster"};
 const std::string BaseCluster = "base";
 const std::string BaseWlanCluster = "base_wlan";
 const std::string BaseWwanCluster = "base_wwan";
+const LowerCaseString H2UpstreamHeader{"x-envoy-mobile-upstream-protocol"};
+const std::string H2Suffix = "_h2";
+const std::string BaseClusterH2 = BaseCluster + H2Suffix;
+const std::string BaseWlanClusterH2 = BaseWlanCluster + H2Suffix;
+const std::string BaseWwanClusterH2 = BaseWwanCluster + H2Suffix;
 } // namespace
 
-void Dispatcher::attachPreferredNetwork(HeaderMap& headers) {
+void Dispatcher::setDestinationCluster(HeaderMap& headers) {
+
+  // Determine upstream protocol. Use http2 if selected for explicitly, otherwise (any other value,
+  // absence of value) select http1.
+  // TODO(junr03): once http3 is available this would probably benefit from some sort of struct that
+  // maps to appropriate cluster names. However, with only two options (http1/2) this suffices.
+  bool use_h2_cluster{};
+  const HeaderEntry* entry = headers.get(H2UpstreamHeader);
+  if (entry) {
+    if (entry->value() == "http2") {
+      use_h2_cluster = true;
+    } else {
+      ASSERT(entry->value() == "http1",
+             fmt::format("using unsupported protocol version {}", entry->value().getStringView()));
+    }
+    headers.remove(H2UpstreamHeader);
+  }
+
   switch (preferred_network_.load()) {
   case ENVOY_NET_WLAN:
-    headers.addReference(ClusterHeader, BaseWlanCluster);
+    headers.addReference(ClusterHeader, use_h2_cluster ? BaseWlanClusterH2 : BaseWlanCluster);
     break;
   case ENVOY_NET_WWAN:
-    headers.addReference(ClusterHeader, BaseWwanCluster);
+    headers.addReference(ClusterHeader, use_h2_cluster ? BaseWwanClusterH2 : BaseWwanCluster);
     break;
   case ENVOY_NET_GENERIC:
   default:
-    headers.addReference(ClusterHeader, BaseCluster);
+    headers.addReference(ClusterHeader, use_h2_cluster ? BaseClusterH2 : BaseCluster);
   }
 }
 

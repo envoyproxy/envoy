@@ -43,6 +43,26 @@ class RequestMapperTest {
   }
 
   @Test
+  fun `h1 is added to outbound request headers`() {
+    val requestHeaders = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "/foo")
+        .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP1)
+        .build()
+        .outboundHeaders()
+
+    assertThat(requestHeaders["x-envoy-mobile-upstream-protocol"]).containsExactly("http1")
+  }
+
+  @Test
+  fun `h2 is added to outbound request headers`() {
+    val requestHeaders = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "/foo")
+        .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
+        .build()
+        .outboundHeaders()
+
+    assertThat(requestHeaders["x-envoy-mobile-upstream-protocol"]).containsExactly("http2")
+  }
+
+  @Test
   fun `same key headers are joined to outbound request headers`() {
     val requestHeaders = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "/foo")
         .addHeader("header_1", "value_a")
@@ -54,27 +74,32 @@ class RequestMapperTest {
   }
 
   @Test
-  fun `invalid semicolon prefixed header keys are filtered out of outbound request headers`() {
+  fun `restricted header keys are filtered out of outbound request headers`() {
     val requestHeaders = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "/foo")
         .addHeader(":restricted", "value")
+        .addHeader("x-envoy-mobile-test", "value")
         .build()
         .outboundHeaders()
 
     assertThat(requestHeaders).doesNotContainKey(":restricted")
+    assertThat(requestHeaders).doesNotContainKey("x-envoy-mobile-test")
   }
 
   @Test
   fun `restricted headers are not overwritten in outbound request headers`() {
     val requestHeaders = RequestBuilder(method = RequestMethod.POST, scheme = "https", authority = "api.foo.com", path = "/foo")
+        .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
         .addHeader(":scheme", "override")
         .addHeader(":authority", "override")
         .addHeader(":path", "override")
+        .addHeader("x-envoy-mobile-upstream-protocol", "override")
         .build()
         .outboundHeaders()
 
     assertThat(requestHeaders[":scheme"]).containsExactly("https")
     assertThat(requestHeaders[":authority"]).containsExactly("api.foo.com")
     assertThat(requestHeaders[":path"]).containsExactly("/foo")
+    assertThat(requestHeaders["x-envoy-mobile-upstream-protocol"]).containsExactly("http2")
   }
 
   @Test

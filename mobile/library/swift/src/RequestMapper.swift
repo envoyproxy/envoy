@@ -1,4 +1,4 @@
-private let kRestrictedHeaderPrefix = ":"
+private let kRestrictedHeaderPrefixes = [":", "x-envoy-mobile"]
 
 extension Request {
   /// Returns a set of outbound headers that include HTTP
@@ -7,7 +7,7 @@ extension Request {
   /// - returns: Outbound headers to send with an HTTP request.
   func outboundHeaders() -> [String: [String]] {
     var headers = self.headers
-      .filter { !$0.key.hasPrefix(kRestrictedHeaderPrefix) }
+      .filter { !kRestrictedHeaderPrefixes.contains(where: $0.key.hasPrefix) }
       .reduce(into: [
         ":method": [self.method.stringValue],
         ":scheme": [self.scheme],
@@ -17,6 +17,10 @@ extension Request {
 
     if let retryPolicy = self.retryPolicy {
       headers = headers.merging(retryPolicy.outboundHeaders()) { _, retryHeader in retryHeader }
+    }
+
+    if let upstreamHttpProtocol = self.upstreamHttpProtocol {
+      headers["x-envoy-mobile-upstream-protocol"] = [upstreamHttpProtocol.stringValue]
     }
 
     return headers

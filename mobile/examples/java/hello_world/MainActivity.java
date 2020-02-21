@@ -74,6 +74,9 @@ public class MainActivity extends Activity {
   }
 
   private void makeRequest() {
+    // Note: this request will use an http/1.1 stream for the upstream request.
+    // The Kotlin example uses h2. This is done on purpose to test both paths in end-to-end tests
+    // in CI.
     Request request =
         new RequestBuilder(RequestMethod.GET, REQUEST_SCHEME, REQUEST_AUTHORITY, REQUEST_PATH)
             .build();
