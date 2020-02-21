@@ -110,6 +110,8 @@ public:
    * @return std::string the metric_name with tags removed.
    */
   std::string produceTagsReverse(const std::string& metric_name, TagVector& tags) const {
+    // TODO(jmarantz): Skip the creation of string-based tags, creating a StatNameTagVector instead.
+
     // Note: one discrepancy between this and TagProducerImpl::produceTags is that this
     // version does not add in tag_extractors_.default_tags_ into tags. That doesn't matter
     // for this test, however.
