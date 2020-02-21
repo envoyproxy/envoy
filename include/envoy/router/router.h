@@ -231,6 +231,11 @@ public:
   virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
 
   /**
+   * @return std::string name of the pluggable retry policy
+   */
+  virtual const std::string name() const PURE;
+
+  /**
    * @return Upstream::RetryPolicySharedPtr pluggable retry policy
    */
   virtual Upstream::RetryPolicySharedPtr

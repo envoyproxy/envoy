@@ -258,6 +258,7 @@ public:
   }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
+  const std::string name() const override { return name_; }
   Upstream::RetryPolicySharedPtr retryPolicy(const Http::HeaderMap& request_header) const override;
 
 private:
@@ -283,6 +284,7 @@ private:
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
+  std::string name_;
 };
 
 /**
