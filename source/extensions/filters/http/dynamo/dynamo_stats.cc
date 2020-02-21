@@ -56,13 +56,14 @@ Stats::SymbolTable::StoragePtr DynamoStats::addPrefix(const Stats::StatNameVec& 
 
 Stats::Counter& DynamoStats::counter(const Stats::StatNameVec& names) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
+  return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt);
 }
 
 Stats::Histogram& DynamoStats::histogram(const Stats::StatNameVec& names,
                                          Stats::Histogram::Unit unit) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit);
+  return scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt,
+                                      unit);
 }
 
 Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_name,
@@ -75,7 +76,7 @@ Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_
   const Stats::SymbolTable::StoragePtr stat_name_storage =
       addPrefix({table_, dynamic.add(table_name), capacity_,
                  getBuiltin(operation, unknown_operation_), partition});
-  return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
+  return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt);
 }
 
 size_t DynamoStats::groupIndex(uint64_t status) {

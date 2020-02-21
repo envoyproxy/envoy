@@ -75,23 +75,6 @@ MockStore::MockStore() : StoreImpl(*global_symbol_table_) {
         histograms_.emplace_back(histogram);
         return *histogram;
       }));
-  ON_CALL(*this, histogramFromStatName(_, _, _))
-      .WillByDefault(Invoke([this](StatName name, const StatNameTagVector& stat_name_tags,
-                                   Histogram::Unit unit) -> Histogram& {
-        auto* histogram = new NiceMock<MockHistogram>(); // symbol_table_);
-        histogram->name_ = symbolTable().toString(name);
-        histogram->unit_ = unit;
-        TagVector tags;
-        for (const auto& stat_name_tag : stat_name_tags) {
-          tags.emplace_back(Tag{symbolTable().toString(stat_name_tag.first),
-                                symbolTable().toString(stat_name_tag.second)});
-        }
-        histogram->setTags(tags);
-        histogram->store_ = this;
-
-        histograms_.emplace_back(histogram);
-        return *histogram;
-      }));
 }
 MockStore::~MockStore() = default;
 

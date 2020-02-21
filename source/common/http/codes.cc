@@ -49,18 +49,19 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope, const Stats::StatNameVec& names) const {
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-  scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+  scope.counterFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt).inc();
 }
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const {
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({a, b});
-  scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+  scope.counterFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt).inc();
 }
 
 void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const Stats::StatNameVec& names,
                                     Stats::Histogram::Unit unit, uint64_t count) const {
   const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-  scope.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit).recordValue(count);
+  scope.histogramFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt, unit)
+      .recordValue(count);
 }
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,

@@ -101,36 +101,27 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override { return counters_.get(name); }
-  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+  Counter& counterFromStatName(StatName name,
+                               const absl::optional<StatNameTagVector>& tags) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Counter& counter = counters_.get(joiner.fullStatName());
+    Counter& counter = counters_.get(joiner.nameWithTags());
     return counter;
   }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    Gauge& gauge = gauges_.get(name, import_mode);
-    gauge.mergeImportMode(import_mode);
-    return gauge;
-  }
-  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+  Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                            Gauge::ImportMode import_mode) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Gauge& gauge = gauges_.get(joiner.fullStatName());
+    Gauge& gauge = gauges_.get(joiner.nameWithTags(), import_mode);
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
   NullCounterImpl& nullCounter() { return *null_counter_; }
   NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    Histogram& histogram = histograms_.get(name, unit);
-    return histogram;
-  }
-  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
+  Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                                    Histogram::Unit unit) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Histogram& histogram = histograms_.get(joiner.fullStatName(), unit);
+    Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit);
     return histogram;
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
@@ -155,15 +146,15 @@ public:
 
   Counter& counter(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return counterFromStatName(storage.statName());
+    return counterFromStatName(storage.statName(), absl::nullopt);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName(), import_mode);
+    return gaugeFromStatName(storage.statName(), absl::nullopt, import_mode);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName(), unit);
+    return histogramFromStatName(storage.statName(), absl::nullopt, unit);
   }
 
 private:

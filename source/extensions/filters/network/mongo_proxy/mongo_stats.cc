@@ -41,13 +41,14 @@ Stats::SymbolTable::StoragePtr MongoStats::addPrefix(const std::vector<Stats::St
 
 void MongoStats::incCounter(const std::vector<Stats::StatName>& names) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+  scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt).inc();
 }
 
 void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names,
                                  Stats::Histogram::Unit unit, uint64_t sample) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit).recordValue(sample);
+  scope_.histogramFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt, unit)
+      .recordValue(sample);
 }
 
 } // namespace MongoProxy

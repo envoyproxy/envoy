@@ -81,32 +81,19 @@ public:
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
-  Counter& counterFromStatName(StatName name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterFromStatName(name);
-  }
-
-  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+  Counter& counterFromStatName(StatName name,
+                               const absl::optional<StatNameTagVector>& tags) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->counterFromStatName(name, tags);
   }
 
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugeFromStatName(name, import_mode);
-  }
-
-  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+  Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                            Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->gaugeFromStatName(name, tags, import_mode);
   }
 
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramFromStatName(name, unit);
-  }
-  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
+  Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                                    Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatName(name, tags, unit);
@@ -117,15 +104,15 @@ public:
 
   Counter& counter(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return counterFromStatName(storage.statName());
+    return counterFromStatName(storage.statName(), absl::nullopt);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName(), import_mode);
+    return gaugeFromStatName(storage.statName(), absl::nullopt, import_mode);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName(), unit);
+    return histogramFromStatName(storage.statName(), absl::nullopt, unit);
   }
 
   CounterOptConstRef findCounter(StatName name) const override {
@@ -158,11 +145,8 @@ private:
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override {
-    Thread::LockGuard lock(lock_);
-    return store_.counterFromStatName(name);
-  }
-  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+  Counter& counterFromStatName(StatName name,
+                               const absl::optional<StatNameTagVector>& tags) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatName(name, tags);
   }
@@ -175,11 +159,7 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromStatName(name, import_mode);
-  }
-  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+  Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                            Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
     return store_.gaugeFromStatName(name, tags, import_mode);
@@ -188,11 +168,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatName(name, unit);
-  }
-  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
+  Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                                    Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatName(name, tags, unit);

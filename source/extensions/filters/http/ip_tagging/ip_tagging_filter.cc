@@ -62,7 +62,7 @@ void IpTaggingFilterConfig::incCounter(Stats::StatName name, absl::string_view t
     Stats::StatNameDynamicStorage tag_storage(tag, scope_.symbolTable());
     storage = scope_.symbolTable().join({stats_prefix_, tag_storage.statName(), name});
   }
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  scope_.counterFromStatName(Stats::StatName(storage.get()), absl::nullopt).inc();
 }
 
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}

@@ -597,7 +597,7 @@ void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value
   Stats::SymbolTable& symbol_table = scope_.symbolTable();
   Stats::SymbolTable::StoragePtr storage =
       symbol_table.join({name, stat_name_set_->getBuiltin(value, fallback)});
-  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+  scope_.counterFromStatName(Stats::StatName(storage.get()), absl::nullopt).inc();
 
 #ifdef LOG_BUILTIN_STAT_NAMES
   std::cerr << absl::StrCat("Builtin ", symbol_table.toString(name), ": ", value, "\n")

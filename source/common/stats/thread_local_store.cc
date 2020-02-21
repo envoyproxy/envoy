@@ -279,10 +279,9 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
 class StatNameTagHelper {
 public:
   StatNameTagHelper(ThreadLocalStoreImpl& tls, StatName name,
-                    const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table,
-                    bool do_extraction)
-      : pool_(symbol_table), stat_name_tags_(stat_name_tags) {
-    if (do_extraction) {
+                    const absl::optional<StatNameTagVector>& stat_name_tags)
+      : pool_(tls.symbolTable()), stat_name_tags_(stat_name_tags.value_or(StatNameTagVector())) {
+    if (!stat_name_tags) {
       TagVector tags;
       tls.symbolTable().callWithStringView(name, [&tags, &tls, this](absl::string_view name_str) {
         tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags);
@@ -333,8 +332,9 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
-    StatName full_stat_name, StatName name_no_tags, const StatNameTagVector& stat_name_tags,
-    bool do_tag_extraction, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
+    StatName full_stat_name, StatName name_no_tags,
+    const absl::optional<StatNameTagVector>& stat_name_tags,
+    StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
     StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
     StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
 
@@ -363,8 +363,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     // Note that again we do the name-rejection lookup on the untruncated name.
     return null_stat;
   } else {
-    StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags, symbolTable(),
-                                 do_tag_extraction);
+    StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);
 
     RefcountPtr<StatType> stat = make_stat(
         parent_.alloc_, full_stat_name, tag_helper.tagExtractedName(), tag_helper.statNameTags());
@@ -396,7 +395,7 @@ ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(
-    StatName name, const StatNameTagVector& stat_name_tags, bool do_tag_extraction) {
+    StatName name, const absl::optional<StatNameTagVector>& stat_name_tags) {
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -411,7 +410,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(
   // strategy costs an extra hash lookup for each miss, but saves time
   // re-copying the string and significant memory overhead.
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
-  Stats::StatName final_stat_name = joiner.fullStatName();
+  Stats::StatName final_stat_name = joiner.nameWithTags();
 
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
@@ -424,8 +423,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(
   }
 
   return safeMakeStat<Counter>(
-      final_stat_name, joiner.statNameNoTags(), stat_name_tags, do_tag_extraction,
-      central_cache_->counters_, central_cache_->rejected_stats_,
+      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counters_,
+      central_cache_->rejected_stats_,
       [](Allocator& allocator, StatName name, absl::string_view final_name,
          const StatNameTagVector& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, final_name, tags);
@@ -449,10 +448,9 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
-                                                          const StatNameTagVector& stat_name_tags,
-                                                          Gauge::ImportMode import_mode,
-                                                          bool do_tag_extraction) {
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(
+    StatName name, const absl::optional<StatNameTagVector>& stat_name_tags,
+    Gauge::ImportMode import_mode) {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -466,7 +464,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   // do a find() first, using that if it succeeds. If it fails, then after we
   // construct the stat we can insert it into the required maps.
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
-  StatName final_stat_name = joiner.fullStatName();
+  StatName final_stat_name = joiner.nameWithTags();
 
   StatRefMap<Gauge>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
@@ -477,8 +475,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   }
 
   Gauge& gauge = safeMakeStat<Gauge>(
-      final_stat_name, joiner.statNameNoTags(), stat_name_tags, do_tag_extraction,
-      central_cache_->gauges_, central_cache_->rejected_stats_,
+      final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->gauges_,
+      central_cache_->rejected_stats_,
       [import_mode](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
                     const StatNameTagVector& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
@@ -489,8 +487,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(
-    StatName name, const StatNameTagVector& stat_name_tags, Histogram::Unit unit,
-    bool do_tag_extraction) {
+    StatName name, const absl::optional<StatNameTagVector>& stat_name_tags, Histogram::Unit unit) {
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
@@ -505,7 +502,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(
   // construct the stat we can insert it into the required maps.
 
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
-  StatName final_stat_name = joiner.fullStatName();
+  StatName final_stat_name = joiner.nameWithTags();
 
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
@@ -531,8 +528,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(
                                                tls_rejected_stats)) {
     return parent_.null_histogram_;
   } else {
-    StatNameTagHelper tag_helper(parent_, joiner.statNameNoTags(), stat_name_tags, symbolTable(),
-                                 do_tag_extraction);
+    StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), stat_name_tags);
 
     RefcountPtr<ParentHistogramImpl> stat(
         new ParentHistogramImpl(final_stat_name, unit, parent_, *this,
@@ -582,7 +578,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
     }
   }
 
-  StatNameTagHelper tag_helper(parent_, name, StatNameTagVector{}, symbolTable(), true);
+  StatNameTagHelper tag_helper(parent_, name, absl::nullopt);
 
   TlsHistogramSharedPtr hist_tls_ptr(
       new ThreadLocalHistogramImpl(name, parent.unit(), tag_helper.tagExtractedName(),

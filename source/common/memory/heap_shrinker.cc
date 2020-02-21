@@ -21,7 +21,7 @@ HeapShrinker::HeapShrinker(Event::Dispatcher& dispatcher, Server::OverloadManage
                                          })) {
     Envoy::Stats::StatNameManagedStorage stat_name(
         absl::StrCat("overload.", action_name, ".shrink_count"), stats.symbolTable());
-    shrink_counter_ = &stats.counterFromStatName(stat_name.statName());
+    shrink_counter_ = &stats.counterFromStatName(stat_name.statName(), absl::nullopt);
     timer_ = dispatcher.createTimer([this] {
       shrinkHeap();
       timer_->enableTimer(kTimerInterval);

@@ -109,7 +109,7 @@ public:
   const ExtAuthzFilterStats& stats() const { return stats_; }
 
   void incCounter(Stats::Scope& scope, Stats::StatName name) {
-    scope.counterFromStatName(name).inc();
+    scope.counterFromStatName(name, absl::nullopt).inc();
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }

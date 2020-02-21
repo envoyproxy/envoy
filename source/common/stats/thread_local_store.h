@@ -160,10 +160,8 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override {
-    return default_scope_->counterFromStatName(name);
-  }
-  Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
+  Counter& counterFromStatName(StatName name,
+                               const absl::optional<StatNameTagVector>& tags) override {
     return default_scope_->counterFromStatName(name, tags);
   }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
@@ -171,20 +169,14 @@ public:
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromStatName(name, import_mode);
-  }
-  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
+  Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                            Gauge::ImportMode import_mode) override {
     return default_scope_->gaugeFromStatName(name, tags, import_mode);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    return default_scope_->histogramFromStatName(name, unit);
-  }
-  Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
+  Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                                    Histogram::Unit unit) override {
     return default_scope_->histogramFromStatName(name, tags, unit);
   }
@@ -291,27 +283,13 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatName(StatName name) override {
-      return counterFromStatName(name, {}, true);
-    }
-    Counter& counterFromStatName(StatName name, const StatNameTagVector& tags) override {
-      return counterFromStatName(name, tags, false);
-    }
+    Counter& counterFromStatName(StatName name,
+                                 const absl::optional<StatNameTagVector>& tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-      return gaugeFromStatName(name, {}, import_mode, true);
-    }
-    Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
-                             Gauge::ImportMode import_mode) override {
-      return gaugeFromStatName(name, tags, import_mode, false);
-    }
-    Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-      return histogramFromStatName(name, {}, unit, true);
-    }
-    Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
-                                     Histogram::Unit unit) override {
-      return histogramFromStatName(name, tags, unit, false);
-    }
+    Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
+                             Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
+                                     Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
@@ -321,15 +299,15 @@ private:
 
     Counter& counter(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return counterFromStatName(storage.statName());
+      return counterFromStatName(storage.statName(), absl::nullopt);
     }
     Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return gaugeFromStatName(storage.statName(), import_mode);
+      return gaugeFromStatName(storage.statName(), absl::nullopt, import_mode);
     }
     Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return histogramFromStatName(storage.statName(), unit);
+      return histogramFromStatName(storage.statName(), absl::nullopt, unit);
     }
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
@@ -345,12 +323,6 @@ private:
                                                            absl::string_view tag_extracted_name,
                                                            const StatNameTagVector& tags)>;
 
-    Counter& counterFromStatName(StatName name, const StatNameTagVector& tags,
-                                 bool do_tag_extraction);
-    Gauge& gaugeFromStatName(StatName name, const StatNameTagVector& tags,
-                             Gauge::ImportMode import_mode, bool do_tag_extraction);
-    Histogram& histogramFromStatName(StatName name, const StatNameTagVector& tags,
-                                     Histogram::Unit unit, bool do_tag_extraction);
     /**
      * Makes a stat either by looking it up in the central cache,
      * generating it from the parent allocator, or as a last
@@ -358,8 +330,7 @@ private:
      *
      * @param full_stat_name the full name of the stat with appended tags.
      * @param name_no_tags the full name of the stat (not tag extracted) without appended tags.
-     * @param stat_name_tags the tags provided at creation time.
-     * @param do_tag_extraction whether RE-based tag extraction should be performed on the name.
+     * @param stat_name_tags the tags provided at creation time. If empty, tag extraction occurs.
      * @param central_cache_map a map from name to the desired object in the central cache.
      * @param make_stat a function to generate the stat object, called if it's not in cache.
      * @param tls_ref possibly null reference to a cache entry for this stat, which will be
@@ -367,7 +338,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
-                           const StatNameTagVector& stat_name_tags, bool do_tag_extraction,
+                           const absl::optional<StatNameTagVector>& stat_name_tags,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,

@@ -7,18 +7,31 @@ namespace Stats {
 namespace TagUtility {
 
 TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatName stat_name,
-                                     const StatNameTagVector& stat_name_tags,
+                                     const absl::optional<StatNameTagVector>& stat_name_tags,
                                      SymbolTable& symbol_table) {
   prefix_storage_ = symbol_table.join({prefix, stat_name});
-  name_ = StatName(prefix_storage_.get());
-  full_name_storage_ =
-      joinNameAndTags(StatName(prefix_storage_.get()), stat_name_tags, symbol_table);
+  tag_extracted_name_ = StatName(prefix_storage_.get());
+
+  if (stat_name_tags) {
+    full_name_storage_ =
+        joinNameAndTags(StatName(prefix_storage_.get()), *stat_name_tags, symbol_table);
+    name_with_tags_ = StatName(full_name_storage_.get());
+  } else {
+    name_with_tags_ = StatName(prefix_storage_.get());
+  }
 }
 
-TagStatNameJoiner::TagStatNameJoiner(StatName stat_name, const StatNameTagVector& stat_name_tags,
+TagStatNameJoiner::TagStatNameJoiner(StatName stat_name,
+                                     const absl::optional<StatNameTagVector>& stat_name_tags,
                                      SymbolTable& symbol_table) {
-  name_ = stat_name;
-  full_name_storage_ = joinNameAndTags(stat_name, stat_name_tags, symbol_table);
+  tag_extracted_name_ = stat_name;
+
+  if (stat_name_tags) {
+    full_name_storage_ = joinNameAndTags(stat_name, *stat_name_tags, symbol_table);
+    name_with_tags_ = StatName(full_name_storage_.get());
+  } else {
+    name_with_tags_ = stat_name;
+  }
 }
 
 SymbolTable::StoragePtr TagStatNameJoiner::joinNameAndTags(StatName name,

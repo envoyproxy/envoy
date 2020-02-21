@@ -49,7 +49,9 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
       symbol_table_.join({protocolStatName(protocol), request_names.service_, request_names.method_,
                           status_stat_name});
 
-  cluster.statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+  cluster.statsScope()
+      .counterFromStatName(Stats::StatName(stat_name_storage.get()), absl::nullopt)
+      .inc();
   chargeStat(cluster, protocol, request_names, success);
 }
 
@@ -62,8 +64,8 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
       symbol_table_.join({prefix, successStatName(success)});
   const Stats::SymbolTable::StoragePtr total = symbol_table_.join({prefix, total_});
 
-  cluster.statsScope().counterFromStatName(Stats::StatName(status.get())).inc();
-  cluster.statsScope().counterFromStatName(Stats::StatName(total.get())).inc();
+  cluster.statsScope().counterFromStatName(Stats::StatName(status.get()), absl::nullopt).inc();
+  cluster.statsScope().counterFromStatName(Stats::StatName(total.get()), absl::nullopt).inc();
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
@@ -80,7 +82,7 @@ void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
       symbol_table_.join({prefix, request_message_count_});
 
   cluster.statsScope()
-      .counterFromStatName(Stats::StatName(request_message_count.get()))
+      .counterFromStatName(Stats::StatName(request_message_count.get()), absl::nullopt)
       .add(amount);
 }
 
@@ -93,7 +95,7 @@ void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster
       symbol_table_.join({prefix, response_message_count_});
 
   cluster.statsScope()
-      .counterFromStatName(Stats::StatName(response_message_count.get()))
+      .counterFromStatName(Stats::StatName(response_message_count.get()), absl::nullopt)
       .add(amount);
 }
 

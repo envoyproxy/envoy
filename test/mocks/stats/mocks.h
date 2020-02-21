@@ -294,26 +294,19 @@ public:
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
   MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
 
-  Counter& counterFromStatName(StatName name) override {
+  Counter& counterFromStatName(StatName name, const absl::optional<StatNameTagVector>&) override {
+    // We always just respond with the mocked counter, so the tags don't matter.
     return counter(symbol_table_->toString(name));
   }
-  Counter& counterFromStatName(StatName name, const StatNameTagVector&) override {
-    // We always just respond with the mocked counter, so the tags don't matter.
-    return counterFromStatName(name);
-  }
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    return gauge(symbol_table_->toString(name), import_mode);
-  }
-  Gauge& gaugeFromStatName(StatName name, const StatNameTagVector&,
+  Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>&,
                            Gauge::ImportMode import_mode) override {
     // We always just respond with the mocked gauge, so the tags don't matter.
-    return gaugeFromStatName(name, import_mode);
+    return gauge(symbol_table_->toString(name), import_mode);
   }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
+  Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>&,
+                                   Histogram::Unit unit) override {
     return histogram(symbol_table_->toString(name), unit);
   }
-  MOCK_METHOD(Histogram&, histogramFromStatName,
-              (StatName name, const StatNameTagVector&, Histogram::Unit unit));
 
   TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;

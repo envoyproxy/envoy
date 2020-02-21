@@ -135,13 +135,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.ok_, absl::nullopt).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
-    cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.error_, absl::nullopt).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.over_limit_, absl::nullopt).inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
                                            empty_stat_name,
