@@ -141,12 +141,13 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   stats_.dns_query_attempt_.inc();
   host_info.active_query_ =
       resolver_->resolve(host_info.host_info_->resolved_host_, dns_lookup_family_,
-                         [this, host](std::list<Network::DnsResponse>&& response) {
-                           finishResolve(host, std::move(response));
+                         [this, host](Network::DnsResolver::ResolutionStatus status,
+                                      std::list<Network::DnsResponse>&& response) {
+                           finishResolve(host, status, std::move(response));
                          });
 }
 
-void DnsCacheImpl::finishResolve(const std::string& host,
+void DnsCacheImpl::finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus,
                                  std::list<Network::DnsResponse>&& response) {
   ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
   const auto primary_host_it = primary_hosts_.find(host);

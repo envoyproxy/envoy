@@ -150,7 +150,8 @@ protected:
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, dns_lookup_family, _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                              Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-          cb(TestUtility::makeDnsResponse(resolved_addresses));
+          cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse(resolved_addresses));
           return nullptr;
         }));
   }
@@ -631,7 +632,8 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         std::list<std::string> address_pair = std::get<2>(GetParam());
-        cb(TestUtility::makeDnsResponse(address_pair));
+        cb(Network::DnsResolver::ResolutionStatus::Success,
+           TestUtility::makeDnsResponse(address_pair));
         EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _)).Times(1);
         expectClusterSlotResponse(
             singleSlotMasterReplica(address_pair.front(), address_pair.back(), 22120));
@@ -887,14 +889,16 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", _, _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})));
+        cb(Network::DnsResolver::ResolutionStatus::Success,
+           TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})));
         return nullptr;
       }));
 
   EXPECT_CALL(*dns_resolver_, resolve("foo1.bar.com", _, _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.3", "127.0.0.4"})));
+        cb(Network::DnsResolver::ResolutionStatus::Success,
+           TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.3", "127.0.0.4"})));
         return nullptr;
       }));
 
