@@ -20,6 +20,7 @@ Version history
   :ref:`validated <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>`.
 * runtime: enabling the runtime feature "envoy.deprecated_features.allow_deprecated_extension_names"
   disables the use of deprecated extension names.
+* router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
 * sds: added :ref:`GenericSecret <envoy_api_msg_auth.GenericSecret>` to support secret of generic type.
 * stat sinks: stat sink extensions use the "envoy.stat_sinks" name space. A mapping of extension
   names is available in the :ref:`deprecated <deprecated>` documentation.
