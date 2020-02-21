@@ -25,8 +25,9 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.zipkin
-    config:
+    name: zipkin
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster
       collector_endpoint: /api/v1/spans
       collector_endpoint_version: HTTP_JSON
@@ -50,7 +51,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.zipkin
+    name: zipkin
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster

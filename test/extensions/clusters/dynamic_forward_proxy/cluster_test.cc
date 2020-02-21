@@ -133,7 +133,7 @@ public:
 name: name
 connect_timeout: 0.25s
 cluster_type:
-  name: envoy.clusters.dynamic_forward_proxy
+  name: dynamic_forward_proxy
   typed_config:
     "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
     dns_cache_config:
@@ -236,7 +236,7 @@ TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidSNI)) {
 name: name
 connect_timeout: 0.25s
 cluster_type:
-  name: envoy.clusters.dynamic_forward_proxy
+  name: dynamic_forward_proxy
   typed_config:
     "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
     dns_cache_config:
@@ -260,7 +260,7 @@ TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidVerifySubjectAltName))
 name: name
 connect_timeout: 0.25s
 cluster_type:
-  name: envoy.clusters.dynamic_forward_proxy
+  name: dynamic_forward_proxy
   typed_config:
     "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
     dns_cache_config:
@@ -283,7 +283,7 @@ TEST_F(ClusterFactoryTest, InvalidUpstreamHttpProtocolOptions) {
 name: name
 connect_timeout: 0.25s
 cluster_type:
-  name: envoy.clusters.dynamic_forward_proxy
+  name: dynamic_forward_proxy
   typed_config:
     "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
     dns_cache_config:
