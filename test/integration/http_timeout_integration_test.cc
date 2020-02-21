@@ -272,14 +272,14 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
-      Http::TestHeaderMapImpl{{":method", "POST"},
-                              {":path", "/test/long/url"},
-                              {":scheme", "http"},
-                              {":authority", "host"},
-                              {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-retry-on", "5xx"},
-                              {"x-envoy-upstream-rq-timeout-ms", "0"},
-                              {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}});
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "0"},
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
