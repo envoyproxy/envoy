@@ -70,13 +70,13 @@ public:
                               std::function<void()> completion) PURE;
   /**
    * Remove the stale filter chains of the given listener but leave the listener running.
-   * @param listener supplies the listener to remove.
+   * @param draining_filter_chains supplies the filter chains to be removed.
    * @param completion supplies the completion to be called when the listener removed all the
    * untracked connections. This completion is called on the worker thread. No locking is performed
    * by the worker.
    */
-  virtual void removeUntrackedFilterChains(const Network::ListenerConfig& listener,
-                                           std::function<void()> completion) PURE;
+  virtual void removeFilterChains(Network::DrainingFilterChains& draining_filter_chains,
+                                  std::function<void()> completion) PURE;
 
   /**
    * Stop a listener from accepting new connections. This is used for server draining.

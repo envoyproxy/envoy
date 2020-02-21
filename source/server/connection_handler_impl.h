@@ -69,8 +69,8 @@ public:
   void addListener(absl::optional<uint64_t> overrided_listener,
                    Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
-  void removeUntrackedFilterChains(uint64_t listener_tag,
-                                   std::function<void()> completion) override;
+  void removeFilterChains(Network::DrainingFilterChains& draining_filter_chains,
+                          std::function<void()> completion) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
   void disableListeners() override;
@@ -150,7 +150,7 @@ private:
      * Schedule to remove and destroy the active connections which are not tracked by listener
      * config. Caution: The connection are not destroyed yet when function returns.
      */
-    void removeUntrackedFilterChains();
+    void removeFilterChains(std::list<const Network::FilterChain*> draining_fitler_chains);
 
     /**
      * Update the listener config. The follow up connections will see the new config. The existing

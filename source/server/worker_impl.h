@@ -46,8 +46,8 @@ public:
                    AddListenerCompletion completion) override;
   uint64_t numConnections() override;
   void removeListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
-  void removeUntrackedFilterChains(const Network::ListenerConfig& listener,
-                                   std::function<void()> completion) override;
+  void removeFilterChains(Network::DrainingFilterChains& draining_filter_chains,
+                          std::function<void()> completion) override;
   void start(GuardDog& guard_dog) override;
   void initializeStats(Stats::Scope& scope, const std::string& prefix) override;
   void stop() override;

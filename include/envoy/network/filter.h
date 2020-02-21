@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -452,6 +453,13 @@ public:
    */
   virtual void createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
                                             UdpReadFilterCallbacks& callbacks) PURE;
+};
+
+class DrainingFilterChains {
+public:
+  virtual ~DrainingFilterChains() = default;
+  virtual uint64_t getDrainingListenerTag() PURE;
+  virtual std::list<const FilterChain*>& getDrainingFilterChains() PURE;
 };
 
 } // namespace Network

@@ -68,17 +68,30 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
   }
 }
 
-void ConnectionHandlerImpl::removeUntrackedFilterChains(uint64_t listener_tag,
-                                                        std::function<void()> completion) {
+void ConnectionHandlerImpl::removeFilterChains(
+    Network::DrainingFilterChains& draining_filter_chains, std::function<void()> completion) {
   for (auto& listener : listeners_) {
-    if (listener.second.listener_->listenerTag() == listener_tag) {
-      // So far only tcp listener supports removing filter chains.
-      ASSERT(listener.second.tcp_listener_.has_value());
-      listener.second.tcp_listener_->get().removeUntrackedFilterChains();
+    // TODO(lambdai):
+    if (listener.second.listener_->listenerTag() ==
+        draining_filter_chains.getDrainingListenerTag()) {
+      ASSERT(!listener.second.tcp_listener_.has_value());
+      listener.second.tcp_listener_->get().removeFilterChains(
+          draining_filter_chains.getDrainingFilterChains());
       Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
       return;
     }
   }
+  // Fallback to iterate over all listeners. The reason is that the target listener might have began
+  // another update and the previous tag is lost.
+  // TODO(lambdai): lookup the correct listener
+  for (auto& listener : listeners_) {
+    if (listener.second.tcp_listener_.has_value()) {
+      listener.second.tcp_listener_->get().removeFilterChains(
+          draining_filter_chains.getDrainingFilterChains());
+      Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
+    }
+  }
+  Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
@@ -399,17 +412,18 @@ ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
   return *connections;
 }
 
-void ConnectionHandlerImpl::ActiveTcpListener::removeUntrackedFilterChains() {
+void ConnectionHandlerImpl::ActiveTcpListener::removeFilterChains(
+    std::list<const Network::FilterChain*> draining_fitler_chains) {
   // need to recover the original deleting state
-  // TODO(lambdai): determine if removeUntackedFilterChains could be invoked when is_deleting
+  // TODO(lambdai): determine if removFilterChains could be invoked when is_deleting
   // TODO(lambdai): RAII
   // alternatively, erase the iterator of connections prior to the connection removal
   bool was_deleting = is_deleting_;
   is_deleting_ = true;
-  const auto& tracking_chains = config_->filterChainManager().allFilterChains();
-  for (auto iter = connections_by_context_.begin(); iter != connections_by_context_.end();) {
-    if (tracking_chains.find(iter->first) != tracking_chains.end()) {
-      ++iter;
+  for (const auto* filter_chain : draining_fitler_chains) {
+    auto iter = connections_by_context_.find(filter_chain);
+    if (iter == connections_by_context_.end()) {
+      // It is possible when listener is stopping.
     } else {
       auto& connections = iter->second->connections_;
       while (!connections.empty()) {

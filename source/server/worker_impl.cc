@@ -70,12 +70,11 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
   });
 }
 
-void WorkerImpl::removeUntrackedFilterChains(const Network::ListenerConfig& listener,
-                                             std::function<void()> completion) {
+void WorkerImpl::removeFilterChains(Network::DrainingFilterChains& draining_filter_chains,
+                                    std::function<void()> completion) {
   ASSERT(thread_);
-  const uint64_t listener_tag = listener.listenerTag();
-  dispatcher_->post([this, listener_tag, completion = std::move(completion)]() -> void {
-    handler_->removeUntrackedFilterChains(listener_tag, completion);
+  dispatcher_->post([this, &draining_filter_chains, completion = std::move(completion)]() -> void {
+    handler_->removeFilterChains(draining_filter_chains, completion);
   });
 }
 

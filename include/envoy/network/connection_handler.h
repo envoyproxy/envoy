@@ -58,8 +58,8 @@ public:
    * could be defered deleted!), inovke the completion.
    * @param listener_tag supplies the tag passed to addListener().
    */
-  virtual void removeUntrackedFilterChains(uint64_t listener_tag,
-                                           std::function<void()> completion) PURE;
+  virtual void removeFilterChains(DrainingFilterChains& draining_filter_chains,
+                                  std::function<void()> completion) PURE;
 
   /**
    * Stop listeners using the listener tag as a key. This will not close any connections and is used

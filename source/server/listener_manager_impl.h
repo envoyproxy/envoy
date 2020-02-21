@@ -128,14 +128,17 @@ struct ListenerManagerStats {
  * listener could take over some of the filter chains, the draining filter chains are a subset of
  * which listener manages.
  */
-struct DrainingFilterChains {
-  // The draining listener.
-  ListenerImplPtr draining_listener_;
-  // The draining filter chains.
-  // std::list<FilterChainImpl> draining_filter_chains_;
-  uint64_t workers_pending_removal_;
-
+struct DrainingFilterChains : public Network::DrainingFilterChains {
   DrainingFilterChains(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal);
+  virtual ~DrainingFilterChains() = default;
+  virtual uint64_t getDrainingListenerTag() override { return draining_listener_->listenerTag(); }
+  virtual std::list<const Network::FilterChain*>& getDrainingFilterChains() override {
+    return draining_filter_chains_;
+  }
+
+  ListenerImplPtr draining_listener_;
+  std::list<const Network::FilterChain*> draining_filter_chains_;
+  uint64_t workers_pending_removal_;
 };
 
 /**
@@ -178,7 +181,6 @@ private:
   struct DrainingListener {
     DrainingListener(ListenerImplPtr&& listener, uint64_t workers_pending_removal)
         : listener_(std::move(listener)), workers_pending_removal_(workers_pending_removal) {}
-
     ListenerImplPtr listener_;
     uint64_t workers_pending_removal_;
   };

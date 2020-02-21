@@ -288,6 +288,5 @@ class CreateListenerException : public EnvoyException {
 public:
   CreateListenerException(const std::string& what) : EnvoyException(what) {}
 };
-
 } // namespace Network
 } // namespace Envoy

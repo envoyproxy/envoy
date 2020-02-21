@@ -702,16 +702,15 @@ void ListenerManagerImpl::onIntelligentListenerWarmed(ListenerImpl& listener) {
 
 void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
                                             ListenerImpl& new_listener) {
-  int filter_chain_size = 0;
-  listener->diffFilterChain(new_listener,
-                            [&filter_chain_size](FilterChainImpl& filter_chain) mutable {
-                              filter_chain.setDrainClose();
-                              ++filter_chain_size;
-                            });
+
   // First add the listener to the draining list.
   std::list<DrainingFilterChains>::iterator draining_group = draining_filter_groups_.emplace(
       draining_filter_groups_.begin(), std::move(listener), workers_.size());
-
+  listener->diffFilterChain(new_listener, [&draining_group](FilterChainImpl& filter_chain) mutable {
+    filter_chain.setDrainClose();
+    draining_group->draining_filter_chains_.push_back(&filter_chain);
+  });
+  int filter_chain_size = draining_group->draining_filter_chains_.size();
   // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
   // restart. Same below inside the lambda.
   // TODO(lambdai): Currently the number of DrainFilterChains objects are tracked:
@@ -746,23 +745,20 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
           // Once the drain time has completed via the drain manager's timer, we tell the workers
           // to remove the filter chains.
           // TODO(lambdai): Fix race condition and duplicate the efforts in drainListener.
-          // TODO(lambdai): avoid the O(workers) post lambda as most threads does no more than
-          // refcount dec.
-          worker->removeUntrackedFilterChains(
-              *draining_group->draining_listener_, [this, draining_group]() -> void {
-                // The remove listener completion is called on the worker thread. We post back to
-                // the main thread to avoid locking. This makes sure that we don't destroy the
-                // listener while filters might still be using its context (stats, etc.).
-                server_.dispatcher().post([this, draining_group]() -> void {
-                  if (--draining_group->workers_pending_removal_ == 0) {
-                    draining_group->draining_listener_->debugLog(absl::StrCat(
-                        "draining listener ", draining_group->draining_listener_->name(),
-                        " removal complete"));
-                    draining_filter_groups_.erase(draining_group);
-                    stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
-                  }
-                });
-              });
+          worker->removeFilterChains(*draining_group, [this, draining_group]() -> void {
+            // The remove listener completion is called on the worker thread. We post back to
+            // the main thread to avoid locking. This makes sure that we don't destroy the
+            // listener while filters might still be using its context (stats, etc.).
+            server_.dispatcher().post([this, draining_group]() -> void {
+              if (--draining_group->workers_pending_removal_ == 0) {
+                draining_group->draining_listener_->debugLog(
+                    absl::StrCat("draining listener ", draining_group->draining_listener_->name(),
+                                 " removal complete"));
+                draining_filter_groups_.erase(draining_group);
+                stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
+              }
+            });
+          });
         }
       });
 
