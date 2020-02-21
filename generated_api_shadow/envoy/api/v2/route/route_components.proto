@@ -915,7 +915,7 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#next-free-field: 11]
+// [#next-free-field: 14]
 message RetryPolicy {
   message RetryPriority {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -1010,6 +1010,17 @@ message RetryPolicy {
 
   // HTTP headers which must be present in the request for retries to be attempted.
   repeated HeaderMatcher retriable_request_headers = 10;
+
+  // The name of the retry policy. The field is used for pluggable retry policy.
+  string name = 11 [(validate.rules).string = {min_bytes: 1}];
+
+  // Implementation specific configuration which depends on the implementation being instantiated.
+  // See the supported retry policy implementations for further documentation.
+  oneof config_type {
+    google.protobuf.Struct config = 12 [deprecated = true];
+
+    google.protobuf.Any typed_config = 13;
+  }
 }
 
 // HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.

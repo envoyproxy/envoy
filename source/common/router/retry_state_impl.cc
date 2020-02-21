@@ -61,8 +61,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
-      retriable_headers_(route_policy.retriableHeaders()) {
-
+      retriable_headers_(route_policy.retriableHeaders()),
+      pluggable_retry_policy_(route_policy.retryPolicy(request_headers)) {
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
   if (route_policy.baseInterval()) {

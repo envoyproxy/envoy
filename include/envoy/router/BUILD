@@ -63,6 +63,7 @@ envoy_cc_library(
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:retry_interface",
+        "//include/envoy/upstream:retry_policy_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

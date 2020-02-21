@@ -128,6 +128,14 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
       }
     }
   }
+
+  if (!retry_policy.name().empty()) {
+    auto& factory =
+        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPolicyFactory>(retry_policy);
+    retry_policy_config_ =
+        std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
+                                     retry_policy, validation_visitor, factory));
+  }
 }
 
 std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
@@ -147,6 +155,16 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
 
   return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
                                                            *validation_visitor_, num_retries_);
+}
+
+Upstream::RetryPolicySharedPtr
+RetryPolicyImpl::retryPolicy(const Http::HeaderMap& request_header) const {
+  if (retry_policy_config_.first == nullptr) {
+    return nullptr;
+  }
+
+  return retry_policy_config_.first->createRetryPolicy(*retry_policy_config_.second,
+                                                       request_header);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,

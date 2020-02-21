@@ -20,6 +20,7 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
+#include "envoy/upstream/retry_policy.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -228,6 +229,12 @@ public:
    * @return absl::optional<std::chrono::milliseconds> maximum retry interval
    */
   virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
+
+  /**
+   * @return Upstream::RetryPolicySharedPtr pluggable retry policy
+   */
+  virtual Upstream::RetryPolicySharedPtr
+  retryPolicy(const Http::HeaderMap& request_headers) const PURE;
 };
 
 /**

@@ -110,6 +110,7 @@ private:
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+  Upstream::RetryPolicySharedPtr pluggable_retry_policy_;
 };
 
 } // namespace Router
