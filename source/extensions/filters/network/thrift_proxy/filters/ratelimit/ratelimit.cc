@@ -71,7 +71,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.ok_, absl::nullopt).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
     cluster_->statsScope().counterFromStatName(stat_names.error_, absl::nullopt).inc();
@@ -89,7 +89,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
         .inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.over_limit_, absl::nullopt).inc();
     if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
       state_ = State::Responded;
       decoder_callbacks_->sendLocalReply(
