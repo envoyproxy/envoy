@@ -213,9 +213,6 @@ def runChecks():
   errors += checkUnfixableError("clang_format_double_off.cc", "clang-format nested off")
   errors += checkUnfixableError("clang_format_trailing_off.cc", "clang-format remains off")
   errors += checkUnfixableError("clang_format_double_on.cc", "clang-format nested on")
-  errors += checkUnfixableError(
-      "throw_exception.cc",
-      "Don't use `throw new`, just `throw` the exception directly, such as `throw EnvoyException`")
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",
       "Unable to find package name for proto file: ./api/missing_package.proto")
