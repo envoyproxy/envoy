@@ -413,6 +413,7 @@ builtins
 bulkstrings
 bursty
 bytecode
+cacheability
 callee
 callsite
 callsites
