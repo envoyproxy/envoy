@@ -310,6 +310,10 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
     prioritySet().updateHosts(priority,
                               HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
                               host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt);
+
+    if (egds_cluster_mapper_ && host_to_exclude) {
+      egds_cluster_mapper_->reloadHealthyHostsHelper(priority, host_to_exclude);
+    }
   }
 
   if (host_to_exclude != nullptr) {

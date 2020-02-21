@@ -451,6 +451,9 @@ public:
                bool(const envoy::config::endpoint::v3::EndpointGroup&, absl::string_view));
   MOCK_METHOD2(clearEndpointGroup, bool(absl::string_view, absl::string_view));
   MOCK_METHOD1(removeEndpointGroup, bool(absl::string_view));
+  MOCK_METHOD3(batchUpdateEndpointGroup,
+               bool(const std::vector<envoy::config::endpoint::v3::EndpointGroup>&,
+                    const std::vector<std::string>, absl::string_view));
 };
 
 class MockEgdsClusterMapperDelegate : public EgdsClusterMapper::Delegate {

@@ -17,8 +17,6 @@
 namespace Envoy {
 namespace Upstream {
 
-class EdsClusterImpl;
-
 class EgdsClusterMapper : Logger::Loggable<Logger::Id::upstream> {
 public:
   class Delegate {
@@ -46,6 +44,12 @@ public:
   void removeResource(absl::string_view name);
   std::set<std::string> egds_resource_names() const;
 
+  void reloadHealthyHostsHelper(const uint32_t priority, const HostSharedPtr& host_to_exclude);
+
+  const PrioritySet& getPrioritySetInMonitorForTest(const std::string& name) const {
+    return active_monitors_.at(name)->priority_set_;
+  }
+
 private:
   struct ActiveEndpointGroupMonitor
       : public EndpointGroupMonitor,
@@ -68,6 +72,8 @@ private:
                                      PriorityStateManager& priority_state_manager,
                                      LocalityWeightsMap& new_locality_weights_map,
                                      absl::optional<uint32_t> overprovisioning_factor);
+
+    void reloadHealthyHostsHelper(const uint32_t priority, const HostSharedPtr& host_to_exclude);
 
     EgdsClusterMapper& parent_;
     absl::optional<envoy::config::endpoint::v3::EndpointGroup> group_;

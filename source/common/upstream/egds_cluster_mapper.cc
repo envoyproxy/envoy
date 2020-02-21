@@ -140,7 +140,7 @@ bool EgdsClusterMapper::ActiveEndpointGroupMonitor::calculateUpdatedHostsPerLoca
     absl::optional<uint32_t> overprovisioning_factor) {
   auto& host_set = priority_set_.getOrCreateMutableHostSet(priority);
   ENVOY_LOG(debug,
-            "compute the updated host in the '{}' endpoint-group, added hosts count '{}', existed "
+            "compute the updated host in the '{}' endpoint-group, new hosts count '{}', existed "
             "hosts count '{}'",
             group_.value().name(), new_hosts.size(), host_set.mutableHosts().size());
   HostVector hosts_added;
@@ -153,6 +153,26 @@ bool EgdsClusterMapper::ActiveEndpointGroupMonitor::calculateUpdatedHostsPerLoca
   }
 
   return hosts_updated;
+}
+
+void EgdsClusterMapper::ActiveEndpointGroupMonitor::reloadHealthyHostsHelper(
+    const uint32_t priority, const HostSharedPtr& host_to_exclude) {
+  ASSERT(host_to_exclude->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+         host_to_exclude->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  if (priority_set_.hostSetsPerPriority().size() < priority + 1) {
+    // The priority queue does not exist.
+    return;
+  }
+
+  auto& hosts = priority_set_.getOrCreateMutableHostSet(priority).mutableHosts();
+  const auto& address = host_to_exclude->address()->asString();
+  const auto existing_itr =
+      std::find_if(hosts.begin(), hosts.end(), [address](const HostSharedPtr current) {
+        return current->address()->asString() == address;
+      });
+  if (existing_itr != hosts.end()) {
+    hosts.erase(existing_itr);
+  }
 }
 
 bool EgdsClusterMapper::clusterDataIsReady() {
@@ -193,6 +213,13 @@ void EgdsClusterMapper::batchHostUpdate() {
 
 void EgdsClusterMapper::addUpdatedActiveMonitor(ActiveEndpointGroupMonitorSharedPtr monitor) {
   batch_update_helper_.addUpdatedMonitor(monitor);
+}
+
+void EgdsClusterMapper::reloadHealthyHostsHelper(const uint32_t priority,
+                                                 const HostSharedPtr& host_to_exclude) {
+  for (auto& pair : active_monitors_) {
+    pair.second->reloadHealthyHostsHelper(priority, host_to_exclude);
+  }
 }
 
 } // namespace Upstream
