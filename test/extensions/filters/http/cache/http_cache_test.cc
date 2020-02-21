@@ -71,10 +71,10 @@ protected:
 };
 
 LookupResult makeLookupResult(const LookupRequest& lookup_request,
-                              const Http::TestHeaderMapImpl& response_headers,
+                              const Http::TestResponseHeaderMapImpl& response_headers,
                               uint64_t content_length = 0) {
   return lookup_request.makeLookupResult(
-      std::make_unique<Http::TestHeaderMapImpl>(response_headers), content_length);
+      std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers), content_length);
 }
 
 TEST_F(LookupRequestTest, MakeLookupResultNoBody) {
