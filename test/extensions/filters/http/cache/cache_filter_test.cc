@@ -69,8 +69,8 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
                                                     {"date", formatter_.now(time_source_)},
                                                     {"cache-control", "public,max-age=3600"}};
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
 TEST_F(CacheFilterTest, ImmediateHitNoBody) {
