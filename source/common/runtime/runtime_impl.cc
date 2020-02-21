@@ -342,10 +342,10 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
 
-  if (absl::EqualsIgnoreCase(stripped, "true")) {
+  if (absl::EqualsIgnoreCase(stripped, "true") || absl::EqualsIgnoreCase(stripped, "1")) {
     entry.bool_value_ = true;
     return true;
-  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
+  } else if (absl::EqualsIgnoreCase(stripped, "false") || absl::EqualsIgnoreCase(stripped, "0")) {
     entry.bool_value_ = false;
     return true;
   }
