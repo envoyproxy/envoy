@@ -694,6 +694,7 @@ lenenc
 lexically
 libc
 libevent
+libprotobuf
 libtool
 libstdc
 libtooling
@@ -757,6 +758,7 @@ multicast
 multikill
 multimap
 multivalue
+mutator
 mutex
 mutexes
 mux
@@ -1087,6 +1089,7 @@ transcoded
 transcoder
 transcoding
 transferral
+triaged
 trie
 tuple
 tuples

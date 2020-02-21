@@ -62,7 +62,9 @@ public:
   bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
 
 private:
-  void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
+  void lower() {
+    std::transform(string_.begin(), string_.end(), string_.begin(), absl::ascii_tolower);
+  }
   bool valid() const { return validHeaderString(string_); }
 
   std::string string_;

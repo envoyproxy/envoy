@@ -96,7 +96,6 @@ public:
 private:
   absl::string_view hashtag(absl::string_view v, bool enabled);
 
-  static const ToLowerTable& toLowerTable();
   static bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request);
 
   const absl::optional<uint64_t> hash_key_;
