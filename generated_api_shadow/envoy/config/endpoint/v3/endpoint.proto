@@ -129,7 +129,6 @@ message ClusterLoadAssignment {
 }
 
 // New xDS payload. The size of endpoints is fully arbitrary.
-// Also the Egds requests to Pilot can be merged into one to boost efficiency
 message EndpointGroup {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.EndpointGroup";
 
