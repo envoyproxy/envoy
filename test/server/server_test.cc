@@ -476,8 +476,7 @@ protected:
 class ServerStatsTest : public TestWithSimTimeAndRealSymbolTables, public ServerInstanceImplTest {
 protected:
   void flushStats() {
-    // Default flush interval is 5 seconds.
-    simTime().sleep(std::chrono::seconds(6));
+    server_->flushStats();
     server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
 };
