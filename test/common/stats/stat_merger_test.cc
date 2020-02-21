@@ -257,15 +257,17 @@ public:
     std::string name = symbol_table_->toString(stat_name);
     StatMerger::DynamicsMap dynamic_map;
     StatMerger::DynamicSpans spans = StatMerger::DynamicContext::encodeSegments(stat_name);
+    uint32_t size = 0;
     if (!spans.empty()) {
       dynamic_map[name] = spans;
+      size = spans.size();
     }
     StatMerger::DynamicContext dynamic_context(*symbol_table_);
     StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
     EXPECT_EQ(name, symbol_table_->toString(decoded)) << "input=" << input_descriptor;
     EXPECT_TRUE(stat_name == decoded) << "input=" << input_descriptor << ", name=" << name;
 
-    return dynamic_map[name].size();
+    return size;
   }
 
   SymbolTablePtr symbol_table_;
