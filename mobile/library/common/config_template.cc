@@ -68,8 +68,6 @@ static_resources:
         keepalive_interval: 10
         keepalive_probes: 1
         keepalive_time: 5
-    transport_socket: *base_transport_socket
-    upstream_connection_options: *upstream_opts
   - name: base_wlan
     connect_timeout: {{ connect_timeout_seconds }}s
     lb_policy: CLUSTER_PROVIDED
