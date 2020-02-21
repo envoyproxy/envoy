@@ -16,7 +16,10 @@ Deprecated items below are listed in chronological order.
   `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_ has
   been deprecated in favor of the new behavior described :ref:`here <arch_overview_circuit_break>`.
 * Access Logger, HTTP Filter, Network Filter, Stats Sink, and Tracer names have been deprecated in
-  favor of the extension name from the envoy build system.
+  favor of the extension name from the envoy build system. Disable the runtime feature
+  "envoy.deprecated_features.allow_deprecated_extension_names" to disallow the deprecated names.
+  Use of these extension names generates a log message and increments the "deprecated_feature_use"
+  metric in stats.
 
   .. csv-table::
     :header: Canonical Names, Deprecated Names

@@ -32,7 +32,7 @@ TEST(FilterNameUtilTest, DEPRECATED_FEATURE_TEST(TestDeprecatedName)) {
 
   EXPECT_CALL(
       runtime.snapshot_,
-      deprecatedFeatureEnabled("envoy.deprecated_features.allow_historic_http_filter_names", _))
+      deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_extension_names", _))
       .WillRepeatedly(Return(true));
 
   EXPECT_EQ(HttpFilterNames::get().Buffer,
@@ -47,7 +47,7 @@ TEST(FilterNameUtilTest, TestDeprecatedNameThrows) {
 
   EXPECT_CALL(
       runtime.snapshot_,
-      deprecatedFeatureEnabled("envoy.deprecated_features.allow_historic_http_filter_names", _))
+      deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_extension_names", _))
       .WillRepeatedly(Return(false));
 
   EXPECT_THROW_WITH_REGEX(FilterNameUtil::canonicalFilterName("envoy.buffer", &runtime),

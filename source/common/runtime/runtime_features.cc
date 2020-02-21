@@ -32,7 +32,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_method_validation",
     "envoy.reloadable_features.new_http1_connection_pool_behavior",
     "envoy.reloadable_features.new_http2_connection_pool_behavior",
-    "envoy.deprecated_features.allow_historic_http_filter_names",
+    "envoy.deprecated_features.allow_deprecated_extension_names",
 };
 
 // This is a section for officially sanctioned runtime features which are too
