@@ -19,8 +19,6 @@ struct Tag {
   };
 };
 
-using TagVector = std::vector<Tag>;
-
 using StatNameTag = std::pair<StatName, StatName>;
 using StatNameTagVector = std::vector<StatNameTag>;
 
