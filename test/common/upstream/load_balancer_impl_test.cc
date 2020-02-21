@@ -916,6 +916,23 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
 
+// Validate that low weight hosts still have the corresponding oppotunity to be picked first.
+TEST_P(RoundRobinLoadBalancerTest, WeightedBiasAvoiding) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 98),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  // Initiate current_time to 0.49999, and makes two hosts' initial deadlines both 0.5.
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(49999));
+  init(false);
+  // Initial weights respected.
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+}
+
 TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
