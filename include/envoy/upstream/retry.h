@@ -122,7 +122,9 @@ public:
   virtual ~RetryHeaderFactory() = default;
   virtual RetryHeaderSharedPtr
   createRetryHeader(const Protobuf::Message& config,
-                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                    ProtobufMessage::ValidationVisitor& validation_visitor, const uint32_t retry_on,
+                    const std::vector<uint32_t>& retriable_status_codes,
+                    const std::vector<Http::HeaderMatcherSharedPtr>& retriable_headers) PURE;
 
   std::string category() const override { return "envoy.retry_headers"; }
 };
