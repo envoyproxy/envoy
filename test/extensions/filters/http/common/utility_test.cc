@@ -51,9 +51,11 @@ TEST(FilterNameUtilTest, TestDeprecatedNameThrows) {
       .WillRepeatedly(Return(false));
 
   EXPECT_THROW_WITH_REGEX(FilterNameUtil::canonicalFilterName("envoy.buffer", &runtime),
-                          EnvoyException, "Using deprecated http filter name 'envoy.buffer' .*");
+                          EnvoyException,
+                          "Using deprecated http filter extension name 'envoy.buffer' .*");
   EXPECT_THROW_WITH_REGEX(FilterNameUtil::canonicalFilterName("envoy.squash", &runtime),
-                          EnvoyException, "Using deprecated http filter name 'envoy.squash' .*");
+                          EnvoyException,
+                          "Using deprecated http filter extension name 'envoy.squash' .*");
 }
 
 } // namespace

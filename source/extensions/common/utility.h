@@ -28,6 +28,7 @@ public:
       Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting()) {
 
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
+    UNREFERENCED_PARAMETER(runtime);
     return Status::Block;
 #else
     bool warn_only = true;
