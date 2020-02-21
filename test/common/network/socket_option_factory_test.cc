@@ -60,7 +60,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
   const int type = expected_option.level();
   const int option = expected_option.option();
   EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
-      .WillOnce(Invoke([type, option](int, int input_type, int input_option, const void* optval,
+      .WillOnce(Invoke([type, option](os_fd_t, int input_type, int input_option, const void* optval,
                                       socklen_t) -> int {
         EXPECT_EQ(100, *static_cast<const int*>(optval));
         EXPECT_EQ(type, input_type);
@@ -85,7 +85,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
   const int option = expected_option.option();
   EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
       .Times(2)
-      .WillRepeatedly(Invoke([type, option](int, int input_type, int input_option,
+      .WillRepeatedly(Invoke([type, option](os_fd_t, int input_type, int input_option,
                                             const void* optval, socklen_t) -> int {
         EXPECT_EQ(type, input_type);
         EXPECT_EQ(option, input_option);
@@ -112,7 +112,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
   const int option = expected_option.option();
   EXPECT_CALL(os_sys_calls_mock_, setsockopt_(_, _, _, _, sizeof(int)))
       .Times(2)
-      .WillRepeatedly(Invoke([type, option](int, int input_type, int input_option,
+      .WillRepeatedly(Invoke([type, option](os_fd_t, int input_type, int input_option,
                                             const void* optval, socklen_t) -> int {
         EXPECT_EQ(type, input_type);
         EXPECT_EQ(option, input_option);

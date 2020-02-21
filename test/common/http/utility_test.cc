@@ -167,7 +167,7 @@ TEST(HttpUtility, MethodNotPreserved) {
 TEST(HttpUtility, ContentLengthMangling) {
   // Content-Length of 0 is removed on the request path.
   {
-    TestHeaderMapImpl request_headers = {
+    TestRequestHeaderMapImpl request_headers = {
         {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "0"}};
     Utility::transformUpgradeRequestFromH1toH2(request_headers);
     EXPECT_TRUE(request_headers.ContentLength() == nullptr);
@@ -175,7 +175,7 @@ TEST(HttpUtility, ContentLengthMangling) {
 
   // Non-zero Content-Length is not removed on the request path.
   {
-    TestHeaderMapImpl request_headers = {
+    TestRequestHeaderMapImpl request_headers = {
         {":method", "GET"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}, {"content-length", "1"}};
     Utility::transformUpgradeRequestFromH1toH2(request_headers);
     EXPECT_FALSE(request_headers.ContentLength() == nullptr);
@@ -297,7 +297,8 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     const std::string first_address = "192.0.2.10";
     const std::string second_address = "192.0.2.1";
     const std::string third_address = "10.0.0.1";
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", "192.0.2.10, 192.0.2.1, 10.0.0.1"}};
+    TestRequestHeaderMapImpl request_headers{
+        {"x-forwarded-for", "192.0.2.10, 192.0.2.1, 10.0.0.1"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
     EXPECT_FALSE(ret.single_address_);
@@ -316,7 +317,7 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     const std::string second_address = "192.0.2.1";
     const std::string third_address = "10.0.0.1";
     const std::string fourth_address = "10.0.0.2";
-    TestHeaderMapImpl request_headers{
+    TestRequestHeaderMapImpl request_headers{
         {"x-forwarded-for", "192.0.2.10, 192.0.2.1 ,10.0.0.1,10.0.0.2"}};
 
     // No space on the left.
@@ -345,38 +346,38 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", ","}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ","}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", ", "}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ", "}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", ", bad"}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ", bad"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
-    TestHeaderMapImpl request_headers;
+    TestRequestHeaderMapImpl request_headers;
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
   {
     const std::string first_address = "34.0.0.1";
-    TestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
+    TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
     EXPECT_TRUE(ret.single_address_);
@@ -583,7 +584,7 @@ TEST(HttpUtility, TestPrepareHeaders) {
   envoy::config::core::v3::HttpUri http_uri;
   http_uri.set_uri("scheme://dns.name/x/y/z");
 
-  Http::MessagePtr message = Utility::prepareHeaders(http_uri);
+  Http::RequestMessagePtr message = Utility::prepareHeaders(http_uri);
 
   EXPECT_EQ("/x/y/z", message->headers().Path()->value().getStringView());
   EXPECT_EQ("dns.name", message->headers().Host()->value().getStringView());
@@ -790,7 +791,7 @@ TEST(HttpUtility, CheckIsIpAddress) {
 // Validates TE header is stripped if it contains an unsupported value
 // Also validate the behavior if a nominated header does not exist
 TEST(HttpUtility, TestTeHeaderGzipTrailersSanitized) {
-  TestHeaderMapImpl request_headers = {
+  TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -820,7 +821,7 @@ TEST(HttpUtility, TestTeHeaderGzipTrailersSanitized) {
 // Validates that if the connection header is nominated, the
 // true connection header is not removed
 TEST(HttpUtility, TestNominatedConnectionHeader) {
-  TestHeaderMapImpl request_headers = {
+  TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -848,7 +849,7 @@ TEST(HttpUtility, TestNominatedConnectionHeader) {
 // sanitize correctly preserving other nominated headers with
 // supported values
 TEST(HttpUtility, TestNominatedConnectionHeader2) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -877,7 +878,7 @@ TEST(HttpUtility, TestNominatedConnectionHeader2) {
 // This includes an extra comma to ensure that the resulting
 // header is still correct
 TEST(HttpUtility, TestNominatedPseudoHeader) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -897,7 +898,7 @@ TEST(HttpUtility, TestNominatedPseudoHeader) {
 // Validate that we can sanitize the headers when splitting
 // the Connection header results in empty tokens
 TEST(HttpUtility, TestSanitizeEmptyTokensFromHeaders) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -925,7 +926,7 @@ TEST(HttpUtility, TestSanitizeEmptyTokensFromHeaders) {
 // Validate that we fail the request if there are too many
 // nominated headers
 TEST(HttpUtility, TestTooManyNominatedHeaders) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -944,7 +945,7 @@ TEST(HttpUtility, TestTooManyNominatedHeaders) {
 }
 
 TEST(HttpUtility, TestRejectNominatedXForwardedFor) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -962,7 +963,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedFor) {
 }
 
 TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -980,7 +981,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
 }
 
 TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -1006,7 +1007,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
 }
 
 TEST(HttpUtility, TestRejectTrailersSubString) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -1029,7 +1030,7 @@ TEST(HttpUtility, TestRejectTrailersSubString) {
 }
 
 TEST(HttpUtility, TestRejectTeHeaderTooLong) {
-  Http::TestHeaderMapImpl request_headers = {
+  Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},

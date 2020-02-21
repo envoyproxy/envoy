@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
-Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::HeaderMap&, bool) {
+Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&, bool) {
   if (callbacks_->route() != nullptr ||
       !(callbacks_->routeConfig().has_value() && callbacks_->routeConfig().value()->usesVhds())) {
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
@@ -29,7 +29,7 @@ Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool) 
              : Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus OnDemandRouteUpdate::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus OnDemandRouteUpdate::decodeTrailers(Http::RequestTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 

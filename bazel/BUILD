@@ -212,6 +212,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_known_issue_asserts",
+    values = {"define": "disable_known_issue_asserts=true"},
+)
+
+config_setting(
     name = "enable_perf_annotation",
     values = {"define": "perf_annotation=enabled"},
 )
