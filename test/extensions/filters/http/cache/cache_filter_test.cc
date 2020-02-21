@@ -69,8 +69,8 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
                                                     {"date", formatter_.now(time_source_)},
                                                     {"cache-control", "public,max-age=3600"}};
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
 };
 
 TEST_F(CacheFilterTest, ImmediateHitNoBody) {
@@ -177,6 +177,25 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
     EXPECT_EQ(filter.decodeHeaders(request_headers_, true),
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    filter.onDestroy();
+  }
+}
+
+// Send two identical GET requests with bodies. The CacheFilter will just pass everything through.
+TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
+  request_headers_.setHost("GetRequestWithBodyAndTrailers");
+  const std::string body = "abc";
+  Buffer::OwnedImpl request_buffer(body);
+  Http::TestRequestTrailerMapImpl request_trailers;
+
+  for (int i = 0; i < 2; ++i) {
+    CacheFilter filter = makeFilter(simple_cache_);
+
+    EXPECT_EQ(filter.decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
+    EXPECT_EQ(filter.decodeData(request_buffer, false), Http::FilterDataStatus::Continue);
+    EXPECT_EQ(filter.decodeTrailers(request_trailers), Http::FilterTrailersStatus::Continue);
+
+    EXPECT_EQ(filter.encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
     filter.onDestroy();
   }
 }

@@ -42,8 +42,16 @@ void CacheFilter::onDestroy() {
   insert_ = nullptr;
 }
 
-Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                     bool end_stream) {
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
+  if (!end_stream) {
+    ENVOY_STREAM_LOG(
+        debug,
+        "CacheFilter::decodeHeaders ignoring request because it has body and/or trailers: {}",
+        *decoder_callbacks_, headers);
+    return Http::FilterHeadersStatus::Continue;
+  }
   if (!isCacheableRequest(headers)) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders ignoring uncacheable request: {}",
                      *decoder_callbacks_, headers);
