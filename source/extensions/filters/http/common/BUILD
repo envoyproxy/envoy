@@ -44,7 +44,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:macros",
-        "//source/common/common:minimal_logger_lib",
         "//source/extensions/common:utility_lib",
         "//source/extensions/filters/http:well_known_names",
     ],
