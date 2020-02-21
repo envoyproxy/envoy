@@ -104,7 +104,8 @@ public:
   Counter& counter(const std::string& name) override;
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags) override;
+  Counter& counterFromStatName(StatName name,
+                               const absl::optional<StatNameTagVector>& tags) override;
   Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
                            Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,

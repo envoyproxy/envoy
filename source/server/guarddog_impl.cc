@@ -172,7 +172,8 @@ GuardDogImpl::WatchedDog::WatchedDog(Stats::Scope& stats_scope, const std::strin
       megamiss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_mega_miss", thread_name),
                                         stats_scope.symbolTable())
-              .statName(), absl::nullopt)) {}
+              .statName(),
+          absl::nullopt)) {}
 
 } // namespace Server
 } // namespace Envoy
