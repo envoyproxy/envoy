@@ -3,6 +3,7 @@
 #include "common/shared_pool/shared_pool.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "gtest/gtest.h"
 
@@ -70,6 +71,32 @@ TEST(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
   auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
   pool->setThreadIdForTest(std::thread::id());
   EXPECT_DEBUG_DEATH(pool->poolSize(), ".*");
+}
+
+TEST(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
+  Event::MockDispatcher dispatcher;
+  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
+  auto o1 = pool->getObject(4);
+
+  // o1 object destructs on another thread
+  pool->setThreadIdForTest(std::thread::id());
+  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([pool](auto) {
+    // Overrides the default behavior, do nothing
+    // The deleteObject method has not started yet
+    pool->setThreadIdForTest(std::this_thread::get_id());
+    EXPECT_EQ(1, pool->poolSize());
+
+    // The deleteObject method has not been executed yet, when it is switched to the main thread and
+    // called getObject again to get an object with the same hash value.
+    auto o2 = pool->getObject(4);
+
+    // Start executing deleteObject to release older weak_ptr objects
+    // Because the storage is actually a new weak_ptr and the reference count is not zero, it is not
+    // deleted
+    pool->deleteObject(std::hash<int>{}(4));
+    EXPECT_EQ(1, pool->poolSize());
+  }));
+  o1.reset();
 }
 
 } // namespace SharedPool

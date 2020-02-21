@@ -19,8 +19,12 @@ namespace SharedPool {
 /**
  * Used to share objects that have the same content.
  * control the life cycle of shared objects by reference counting
- * Note: this class has only deleteObject for thread safety, and the other member methods are
- * non-thread safe
+ *
+ * Note:  ObjectSharedPool needs to be created in the main thread,
+ * all the member methods can only be called in the main thread,
+ * it does not have the ownership of object stored internally, the internal storage is weak_ptr,
+ * when the internal storage object destructor executes the custom deleter to remove its own
+ * weak_ptr from the ObjectSharedPool.
  */
 template <typename T, typename HashFunc = std::hash<T>,
           class = typename std::enable_if<std::is_copy_constructible<T>::value>::type>
@@ -34,8 +38,16 @@ public:
 
   void deleteObject(const size_t hash_key) {
     if (std::this_thread::get_id() == thread_id_) {
-      object_pool_.erase(hash_key);
+      // There may be new inserts with the same hash value before deleting the old element,
+      // so there is no need to delete it at this time.
+      if (object_pool_.find(hash_key) != object_pool_.end() &&
+          object_pool_[hash_key].use_count() == 0) {
+        object_pool_.erase(hash_key);
+      }
     } else {
+      // Most of the time, the object's destructor occurs in the main thread, but with some
+      // exceptions, it is destructed in the worker thread. In order to keep the object_pool_ thread
+      // safe, the deleteObject needs to be delivered to the main thread.
       auto this_shared_ptr = this->shared_from_this();
       dispatcher_.post([hash_key, this_shared_ptr] { this_shared_ptr->deleteObject(hash_key); });
     }
@@ -54,10 +66,17 @@ public:
 
     auto this_shared_ptr = this->shared_from_this();
     std::shared_ptr<T> obj_shared(new T(obj), [hashed_value, this_shared_ptr](T* ptr) {
-      this_shared_ptr->deleteObject(hashed_value);
       delete ptr;
+      this_shared_ptr->deleteObject(hashed_value);
     });
-    object_pool_.try_emplace(hashed_value, obj_shared);
+
+    // When inserted, it is possible that the old elements still exist before they can be deleted,
+    // and the insertion will fail and therefore need to be overwritten.
+    auto ret = object_pool_.try_emplace(hashed_value, obj_shared);
+    if (!ret.second) {
+      ASSERT(ret.first->second.use_count() == 0);
+      ret.first->second = obj_shared;
+    }
     return obj_shared;
   }
 
