@@ -916,7 +916,7 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
 
-// Validate that low weight hosts still have the corresponding oppotunity to be picked first.
+// Validate that low weight hosts still have the corresponding opportunity to be picked first.
 TEST_P(RoundRobinLoadBalancerTest, WeightedBiasAvoiding) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 98),
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
