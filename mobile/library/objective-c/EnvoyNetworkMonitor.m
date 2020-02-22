@@ -24,6 +24,7 @@ static void _reachability_callback(SCNetworkReachabilityRef target,
   }
 
   BOOL isUsingWWAN = flags & kSCNetworkReachabilityFlagsIsWWAN;
+  NSLog(@"[Envoy] setting preferred network to %@", isUsingWWAN ? @"WWAN" : @"WLAN");
   set_preferred_network(isUsingWWAN ? ENVOY_NET_WWAN : ENVOY_NET_WLAN);
 }
 
