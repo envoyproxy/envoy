@@ -224,7 +224,6 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(initialized, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
-  // Success but empty should leave us with empty host set.
   resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, {});
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -315,9 +314,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(
-      Network::DnsResolver::ResolutionStatus::Success TestUtility::makeDnsResponse(
-          {"127.0.0.1", "127.0.0.2"}));
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                          TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
@@ -370,7 +368,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   }
 
   // Empty response.
-  // TODO(junr03): update in subsequent change. Empty response is no longer implicit failure.
+  // TODO(junr03): Update in subsequent change. Empty is no longer implicit failure.
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   ON_CALL(random_, random()).WillByDefault(Return(8000));
@@ -986,7 +984,6 @@ TEST_F(StrictDnsClusterImplTest, RecordTtlAsDnsRefreshRate) {
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(5)));
 }
 
-// TODO(junr03): update in subsequent change. Empty response is no longer implicit failure.
 TEST_F(StrictDnsClusterImplTest, DefaultTtlAsDnsRefreshRateWhenResponseEmpty) {
   ResolverData resolver(*dns_resolver_, dispatcher_);
 
