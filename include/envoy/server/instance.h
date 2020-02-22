@@ -221,7 +221,7 @@ public:
 
   /**
    * Flush the stats sinks outside of a flushing interval.
-   * Note: stats flushing is not necessarily synchronous.
+   * Note: stats flushing is may not be synchronous.
    * Therefore, this function may return prior to flushing taking place.
    */
   virtual void flushStats() PURE;
