@@ -247,8 +247,6 @@ private:
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
-  static void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index);
-
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
     // Headers/body/trailers wrappers do not survive any yields. The user can request them
@@ -285,6 +283,20 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+};
+
+/**
+ * A class with shared code for building and making http calls
+ */
+class LuaFilterLibrary : public Filters::Common::Lua::BaseLuaObject<LuaFilterLibrary> {
+public:
+    LuaFilterLibrary(Filter& filter);
+
+    Http::AsyncClient::Request* makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& callbacksListener);
+
+    static void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index);
+private:
+    Filter& filter_;
 };
 
 /**
