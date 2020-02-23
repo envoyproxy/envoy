@@ -146,7 +146,7 @@ REGISTER_FACTORY(TestVersionedWithDeprecatedNamesFactory,
                                    {"testing.published.versioned.deprecated_name"}};
 
 // Test registration of versioned factory that also uses deprecated names
-TEST(RegistryTest, VersionedWithDeprecatednamesFactory) {
+TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactory)) {
   EXPECT_EQ("testing.published.versioned.instead_name",
             Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
                 "testing.published.versioned.deprecated_name")
