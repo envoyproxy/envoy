@@ -88,7 +88,7 @@ TEST(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
     callback(); // Blocks in thread synchronizer waiting on DeleteObjectOnMainThread
   }));
 
-  auto thread = thread_factory.createThread([&pool, &o1]() {
+  auto thread = thread_factory.createThread([&o1]() {
     // simulation of shared objects destructing in other threads
     o1.reset();
   });
