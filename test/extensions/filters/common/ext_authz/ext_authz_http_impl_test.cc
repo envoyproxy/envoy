@@ -178,7 +178,6 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
   )EOF";
 
   initialize(yaml);
-  const auto key = Http::LowerCaseString{"key"};
 
   // Check allowed request headers.
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));

@@ -111,17 +111,17 @@ public:
 private:
   static MatcherSharedPtr
   toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                    bool disable_lowercase_string_matcher_);
+                    bool enable_case_sensitive_string_matcher);
   static MatcherSharedPtr
   toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                   bool disable_lowercase_string_matcher_);
+                   bool enable_case_sensitive_string_matcher);
   static MatcherSharedPtr
   toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
-                     bool disable_lowercase_string_matcher_);
+                     bool enable_case_sensitive_string_matcher);
   static Http::LowerCaseStrPairVector
   toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>&);
 
-  const bool disable_lowercase_string_matcher_;
+  const bool enable_case_sensitive_string_matcher_;
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;

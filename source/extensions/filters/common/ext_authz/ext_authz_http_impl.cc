@@ -61,14 +61,16 @@ struct SuccessResponse {
 
 envoy::type::matcher::v3::StringMatcher
 ignoreCaseStringMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) {
+  const auto& match_pattern_case = matcher.match_pattern_case();
+  if (match_pattern_case == envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex ||
+      match_pattern_case ==
+          envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
+    return matcher;
+  }
+
   envoy::type::matcher::v3::StringMatcher ignore_case;
   ignore_case.set_ignore_case(true);
   switch (matcher.match_pattern_case()) {
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
-    return matcher;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    ignore_case.set_hidden_envoy_deprecated_regex(matcher.hidden_envoy_deprecated_regex());
-    break;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
     ignore_case.set_exact(matcher.exact());
     break;
@@ -114,17 +116,17 @@ bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            uint32_t timeout, absl::string_view path_prefix)
-    : disable_lowercase_string_matcher_(Runtime::runtimeFeatureEnabled(
+    : enable_case_sensitive_string_matcher_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher")),
       request_header_matchers_(
           toRequestMatchers(config.http_service().authorization_request().allowed_headers(),
-                            disable_lowercase_string_matcher_)),
+                            enable_case_sensitive_string_matcher_)),
       client_header_matchers_(
           toClientMatchers(config.http_service().authorization_response().allowed_client_headers(),
-                           disable_lowercase_string_matcher_)),
+                           enable_case_sensitive_string_matcher_)),
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers(),
-          disable_lowercase_string_matcher_)),
+          enable_case_sensitive_string_matcher_)),
       authorization_headers_to_add_(
           toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
