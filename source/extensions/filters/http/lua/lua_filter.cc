@@ -179,6 +179,22 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 }
 
+int StreamHandleWrapper::luaHttpCallAsync(lua_State* state) {
+  FireAndForgetWriter* ff = new FireAndForgetWriter(filter_);
+  return ff->luaHttpCallAsync(state);
+}
+
+FireAndForgetWriter::FireAndForgetWriter(Filter& filter) : filter_(filter) {}
+
+int FireAndForgetWriter::luaHttpCallAsync(lua_State* state) {
+  LuaFilterLibrary* luaFilterLibrary_ = new LuaFilterLibrary(filter_);
+  if(luaFilterLibrary_->makeHttpCall(state, *this)) {
+    return 0;
+  } else {
+    return 2;
+  }
+}
+
 LuaFilterLibrary::LuaFilterLibrary(Filter& filter) : filter_(filter) {}
 
 Http::AsyncClient::Request* LuaFilterLibrary::makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& callbacksListener) {
