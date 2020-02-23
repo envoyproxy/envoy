@@ -33,7 +33,7 @@ protected:
 
   void createObjectSharedPool(std::shared_ptr<ObjectSharedPool<int>>& pool) {
     absl::Notification go;
-    dispatcher_->post([&pool, this, &go]() {
+    dispatcher_->post([&pool, &go]() {
       pool = std::make_shared<ObjectSharedPool<int>>(*dispatcher_);
       go.Notify();
     });
@@ -133,12 +133,11 @@ TEST_F(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
   // deleteObject will to release older weak_ptr objects
   // Because the storage is actually a new weak_ptr and the reference count is not zero, it is not
   // deleted
-  absl::Notification go3;
-  dispatcher_->post([&pool, &go3]() {
+  dispatcher_->post([&pool, this]() {
     EXPECT_EQ(1, pool->poolSize());
-    go3.Notify();
+    go_.Notify();
   });
-  go3.WaitForNotification();
+  go_.WaitForNotification();
 }
 
 TEST_F(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
