@@ -33,7 +33,7 @@ protected:
 
   void createObjectSharedPool(std::shared_ptr<ObjectSharedPool<int>>& pool) {
     absl::Notification go;
-    dispatcher_->post([&pool, &go]() {
+    dispatcher_->post([&pool, &go, this]() {
       pool = std::make_shared<ObjectSharedPool<int>>(*dispatcher_);
       go.Notify();
     });
