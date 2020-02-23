@@ -118,7 +118,7 @@ TEST(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
   EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([pool](auto) {
     // Overrides the default behavior, do nothing
   }));
-  auto thread = thread_factory.createThread([&pool, &o1]() {
+  auto thread = thread_factory.createThread([&o1]() {
     // simulation of shared objects destructing in other threads
     o1.reset();
   });
