@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 
 namespace Envoy {
@@ -30,13 +31,13 @@ public:
  */
 class PrematureResponseException : public EnvoyException {
 public:
-  PrematureResponseException(HeaderMapPtr&& headers)
-      : EnvoyException(""), headers_(std::move(headers)) {}
+  PrematureResponseException(Http::Code response_code)
+      : EnvoyException(""), response_code_(response_code) {}
 
-  const HeaderMap& headers() { return *headers_; }
+  Http::Code responseCode() { return response_code_; }
 
 private:
-  HeaderMapPtr headers_;
+  const Http::Code response_code_;
 };
 
 /**

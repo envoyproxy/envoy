@@ -3508,7 +3508,7 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
   // route may be called early in some edge cases and "x-forwarded-proto" will not be set.
-  Http::TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
   EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
@@ -4183,7 +4183,7 @@ virtual_hosts:
     EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
 
-    Http::TestHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
     route_entry->finalizeResponseHeaders(response_headers, stream_info);
     EXPECT_EQ(response_headers, Http::TestHeaderMapImpl{});
@@ -4990,6 +4990,7 @@ virtual_hosts:
       cluster: foo
     decorator:
       operation: myFoo
+      propagate: false
   - match:
       prefix: "/bar"
     route:
@@ -5004,6 +5005,7 @@ virtual_hosts:
     Tracing::MockSpan span;
     EXPECT_CALL(span, setOperation(Eq("myFoo")));
     route->decorator()->apply(span);
+    EXPECT_EQ(false, route->decorator()->propagate());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");

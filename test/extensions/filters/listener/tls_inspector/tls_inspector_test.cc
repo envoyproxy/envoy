@@ -44,7 +44,7 @@ public:
     // Prepare the first recv attempt during
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
         .WillOnce(
-            Invoke([](int fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
+            Invoke([](os_fd_t fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
               ENVOY_LOG_MISC(error, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
               return Api::SysCallSizeResult{static_cast<ssize_t>(0), 0};
             }));
@@ -247,13 +247,13 @@ TEST_F(TlsInspectorTest, InlineReadSucceed) {
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername, "\x02h2");
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke(
-          [&client_hello](int fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
-            ENVOY_LOG_MISC(trace, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
-            ASSERT(length >= client_hello.size());
-            memcpy(buffer, client_hello.data(), client_hello.size());
-            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
-          }));
+      .WillOnce(Invoke([&client_hello](os_fd_t fd, void* buffer, size_t length,
+                                       int flag) -> Api::SysCallSizeResult {
+        ENVOY_LOG_MISC(trace, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
+        ASSERT(length >= client_hello.size());
+        memcpy(buffer, client_hello.data(), client_hello.size());
+        return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+      }));
 
   // No event is created if the inline recv parse the hello.
   EXPECT_CALL(dispatcher_,

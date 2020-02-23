@@ -38,10 +38,10 @@ public:
   std::vector<TapCommon::MatcherPtr> matchers_{1};
   TapCommon::MockMatcher matcher_{matchers_};
   TapCommon::Matcher::MatchStatusVector* statuses_;
-  const Http::TestHeaderMapImpl request_headers_{{"a", "b"}};
-  const Http::TestHeaderMapImpl request_trailers_{{"c", "d"}};
-  const Http::TestHeaderMapImpl response_headers_{{"e", "f"}};
-  const Http::TestHeaderMapImpl response_trailers_{{"g", "h"}};
+  const Http::TestRequestHeaderMapImpl request_headers_{{"a", "b"}};
+  const Http::TestRequestTrailerMapImpl request_trailers_{{"c", "d"}};
+  const Http::TestResponseHeaderMapImpl response_headers_{{"e", "f"}};
+  const Http::TestResponseTrailerMapImpl response_trailers_{{"g", "h"}};
 };
 
 // Buffered tap with no match.

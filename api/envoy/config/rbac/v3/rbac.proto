@@ -5,6 +5,7 @@ package envoy.config.rbac.v3;
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/metadata.proto";
+import "envoy/type/matcher/v3/path.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/api/expr/v1alpha1/syntax.proto";
@@ -50,7 +51,8 @@ option java_multiple_files = true;
 //           - and_rules:
 //               rules:
 //                 - header: { name: ":method", exact_match: "GET" }
-//                 - header: { name: ":path", regex_match: "/products(/.*)?" }
+//                 - url_path:
+//                     path: { prefix: "/products" }
 //                 - or_rules:
 //                     rules:
 //                       - destination_port: 80
@@ -105,7 +107,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
 
@@ -132,7 +134,12 @@ message Permission {
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
+    // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
+    // field if you want to match the URL path without the query and fragment string.
     route.v3.HeaderMatcher header = 4;
+
+    // A URL path on the incoming HTTP request. Only available for HTTP.
+    type.matcher.v3.PathMatcher url_path = 10;
 
     // A CIDR block that describes the destination IP.
     core.v3.CidrRange destination_ip = 5;
@@ -172,7 +179,7 @@ message Permission {
 }
 
 // Principal defines an identity or a group of identities for a downstream subject.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -218,7 +225,12 @@ message Principal {
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
+    // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
+    // field if you want to match the URL path without the query and fragment string.
     route.v3.HeaderMatcher header = 6;
+
+    // A URL path on the incoming HTTP request. Only available for HTTP.
+    type.matcher.v3.PathMatcher url_path = 9;
 
     // Metadata that describes additional information about the principal.
     type.matcher.v3.MetadataMatcher metadata = 7;

@@ -206,13 +206,13 @@ public:
   ~MockShadowWriter() override;
 
   // Router::ShadowWriter
-  void shadow(const std::string& cluster, Http::MessagePtr&& request,
+  void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
               std::chrono::milliseconds timeout) override {
     shadow_(cluster, request, timeout);
   }
 
   MOCK_METHOD(void, shadow_,
-              (const std::string& cluster, Http::MessagePtr& request,
+              (const std::string& cluster, Http::RequestMessagePtr& request,
                std::chrono::milliseconds timeout));
 };
 
@@ -371,6 +371,7 @@ public:
 
   // Router::Decorator
   MOCK_METHOD(const std::string&, getOperation, (), (const));
+  MOCK_METHOD(bool, propagate, (), (const));
   MOCK_METHOD(void, apply, (Tracing::Span & span), (const));
 
   std::string operation_{"fake_operation"};

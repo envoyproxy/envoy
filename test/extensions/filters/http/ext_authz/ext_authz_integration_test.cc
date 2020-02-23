@@ -53,7 +53,7 @@ public:
   void initiateClientConnection(uint64_t request_body_length) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestHeaderMapImpl headers{
+    Http::TestRequestHeaderMapImpl headers{
         {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
     TestUtility::feedBufferWithRandomCharacters(request_body_, request_body_length);
     response_ = codec_client_->makeRequestWithBody(headers, request_body_.toString());
@@ -109,7 +109,7 @@ public:
     result = upstream_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(response_size_, true);
     response_->waitForEndStream();
 

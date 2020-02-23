@@ -28,8 +28,8 @@ using CheckResponsePtr = std::unique_ptr<envoy::service::auth::v3::CheckResponse
 
 class TestCommon {
 public:
-  static Http::MessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
-                                              const std::string& body = std::string{});
+  static Http::ResponseMessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
+                                                      const std::string& body = std::string{});
 
   static CheckResponsePtr makeCheckResponse(
       Grpc::Status::GrpcStatus response_status = Grpc::Status::WellKnownGrpcStatus::Ok,

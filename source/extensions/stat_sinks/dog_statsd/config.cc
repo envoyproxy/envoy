@@ -37,7 +37,7 @@ std::string DogStatsdSinkFactory::name() const { return StatsSinkNames::get().Do
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory);
+REGISTER_FACTORY(DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory){"envoy.dog_statsd"};
 
 } // namespace DogStatsd
 } // namespace StatSinks

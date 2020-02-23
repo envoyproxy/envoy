@@ -29,7 +29,7 @@ public:
   HeaderToFilterStateFilter(const std::string& header, const std::string& state)
       : header_(header), state_(state) {}
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     const Http::HeaderEntry* entry = headers.get(header_);
     if (entry) {
       decoder_callbacks_->streamInfo().filterState()->setData(
@@ -97,7 +97,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -112,7 +112,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
   EXPECT_FALSE(upstream_request_->headers().Authorization());
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
@@ -125,7 +125,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -144,7 +144,7 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -162,7 +162,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "HEAD"},
       {":path", "/"},
       {":scheme", "http"},
@@ -184,7 +184,7 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/foo"},
       {":scheme", "http"},
@@ -192,7 +192,7 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   });
 
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -206,7 +206,7 @@ TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "OPTIONS"},
       {":path", "/"},
       {":scheme", "http"},
@@ -216,7 +216,7 @@ TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
   });
 
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
@@ -278,7 +278,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
   };
 
   for (const auto& test : test_cases) {
-    Http::TestHeaderMapImpl headers{
+    Http::TestRequestHeaderMapImpl headers{
         {":method", "GET"},
         {":path", "/foo"},
         {":scheme", "http"},
@@ -291,7 +291,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 
     if (test.expected_status == "200") {
       waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+      upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     }
 
     response->waitForEndStream();
@@ -335,7 +335,7 @@ public:
     result = jwks_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    Http::TestHeaderMapImpl response_headers{{":status", status}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", status}};
     jwks_request_->encodeHeaders(response_headers, false);
     Buffer::OwnedImpl response_data1(jwks_body);
     jwks_request_->encodeData(response_data1, true);
@@ -372,7 +372,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -391,7 +391,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
   // Verify the token is removed.
   EXPECT_FALSE(upstream_request_->headers().Authorization());
 
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -407,7 +407,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
@@ -430,7 +430,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
       {":scheme", "http"},
