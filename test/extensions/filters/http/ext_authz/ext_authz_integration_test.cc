@@ -215,12 +215,13 @@ public:
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestHeaderMapImpl headers{{":method", "PUT"},
-                                    {":path", "/test"},
-                                    {":scheme", "http"},
-                                    {":authority", "host"},
-                                    {"x-case-sensitive-header", "Case-Sensitive"}};
-    codec_client_->makeHeaderOnlyRequest(headers);
+    codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+        {":method", "GET"},
+        {":path", "/"},
+        {":scheme", "http"},
+        {":authority", "host"},
+        {"x-case-sensitive-header", case_sensitive_header_value_},
+    });
   }
 
   void waitForExtAuthzRequest() {
@@ -270,6 +271,7 @@ public:
   FakeHttpConnectionPtr fake_ext_authz_connection_;
   FakeStreamPtr ext_authz_request_;
   const Http::LowerCaseString case_sensitive_header_name_{"x-case-sensitive-header"};
+  const std::string case_sensitive_header_value_{"Case-Sensitive"};
   const std::string default_config_ = R"EOF(
   http_service:
     server_uri:
@@ -330,7 +332,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
   setupWithDisabledCaseSensitiveStringMatcher(true);
   const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_TRUE(header_entry != nullptr);
-  EXPECT_EQ("Case-Sensitive", header_entry->value().getStringView());
+  EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
   cleanup();
 }
 
