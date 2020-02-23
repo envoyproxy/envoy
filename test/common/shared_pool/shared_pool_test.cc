@@ -77,26 +77,61 @@ TEST(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
   Event::MockDispatcher dispatcher;
   auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
   auto o1 = pool->getObject(4);
-
-  // o1 object destructs on another thread
-  pool->setThreadIdForTest(std::thread::id());
-  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([pool](auto) {
-    // Overrides the default behavior, do nothing
-    // The deleteObject method has not started yet
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  pool->sync().enable();
+  pool->sync().waitOn(ObjectSharedPool<int>::DeleteObjectOnMainThread);
+  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([pool](auto callback) {
+    // Set the correct thread id, or we'll always call Dispatcher::post to deliver the task to the
+    // correct thread to execute.
     pool->setThreadIdForTest(std::this_thread::get_id());
     EXPECT_EQ(1, pool->poolSize());
-
-    // The deleteObject method has not been executed yet, when it is switched to the main thread and
-    // called getObject again to get an object with the same hash value.
-    auto o2 = pool->getObject(4);
-
-    // Start executing deleteObject to release older weak_ptr objects
-    // Because the storage is actually a new weak_ptr and the reference count is not zero, it is not
-    // deleted
-    pool->deleteObject(std::hash<int>{}(4));
-    EXPECT_EQ(1, pool->poolSize());
+    callback(); // Blocks in thread synchronizer waiting on DeleteObjectOnMainThread
   }));
-  o1.reset();
+
+  auto thread = thread_factory.createThread([&pool, &o1]() {
+    // simulation of shared objects destructing in other threads
+    o1.reset();
+  });
+  pool->sync().barrierOn(ObjectSharedPool<int>::DeleteObjectOnMainThread);
+
+  // The deleteObject method has not been executed yet, when it is switched to the main thread and
+  // called getObject again to get an object with the same hash value.
+  pool->setThreadIdForTest(std::this_thread::get_id());
+  auto o2 = pool->getObject(4);
+
+  pool->sync().signal(ObjectSharedPool<int>::DeleteObjectOnMainThread);
+  thread->join();
+  // deleteObject will to release older weak_ptr objects
+  // Because the storage is actually a new weak_ptr and the reference count is not zero, it is not
+  // deleted
+  EXPECT_EQ(1, pool->poolSize());
+}
+
+TEST(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
+  Event::MockDispatcher dispatcher;
+  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
+  auto o1 = pool->getObject(4);
+
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  pool->sync().enable();
+  pool->sync().waitOn(ObjectSharedPool<int>::ObjectDeleterEntry);
+  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([pool](auto) {
+    // Overrides the default behavior, do nothing
+  }));
+  auto thread = thread_factory.createThread([&pool, &o1]() {
+    // simulation of shared objects destructing in other threads
+    o1.reset();
+  });
+  pool->sync().barrierOn(ObjectSharedPool<int>::ObjectDeleterEntry);
+
+  pool->setThreadIdForTest(std::this_thread::get_id());
+  // Object is destructing, no memory has been released,
+  // at this time the object obtained through getObject is newly created, not the old object,
+  // so the object memory is released when the destruct is complete, and o2 is still valid.
+  auto o2 = pool->getObject(4);
+  pool->sync().signal(ObjectSharedPool<int>::ObjectDeleterEntry);
+  thread->join();
+  EXPECT_EQ(4, *o2);
 }
 
 } // namespace SharedPool

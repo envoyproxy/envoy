@@ -14,5 +14,6 @@ envoy_cc_test(
     deps = [
         "//source/common/shared_pool:shared_pool_lib",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )

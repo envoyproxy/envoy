@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/non_copyable.h"
+#include "common/common/thread_synchronizer.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -38,6 +39,8 @@ public:
 
   void deleteObject(const size_t hash_key) {
     if (std::this_thread::get_id() == thread_id_) {
+      // Used for testing to simulate some race condition scenarios
+      sync_.syncPoint(DeleteObjectOnMainThread);
       // There may be new inserts with the same hash value before deleting the old element,
       // so there is no need to delete it at this time.
       if (object_pool_.find(hash_key) != object_pool_.end() &&
@@ -66,6 +69,8 @@ public:
 
     auto this_shared_ptr = this->shared_from_this();
     std::shared_ptr<T> obj_shared(new T(obj), [hashed_value, this_shared_ptr](T* ptr) {
+      this_shared_ptr->sync().syncPoint(ObjectSharedPool<T>::ObjectDeleterEntry);
+      // release ptr as early as possible to avoid exposure of ptr, resulting in undefined behavior.
       delete ptr;
       this_shared_ptr->deleteObject(hashed_value);
     });
@@ -86,12 +91,25 @@ public:
   }
 
   void setThreadIdForTest(const std::thread::id& thread_id) { thread_id_ = thread_id; }
+  /**
+   * @return a thread synchronizer object used for reproducing a race-condition in tests.
+   */
+  Thread::ThreadSynchronizer& sync() { return sync_; }
+  static const char DeleteObjectOnMainThread[];
+  static const char ObjectDeleterEntry[];
 
 private:
   std::thread::id thread_id_;
   absl::flat_hash_map<size_t, std::weak_ptr<T>> object_pool_;
   Event::Dispatcher& dispatcher_;
+  Thread::ThreadSynchronizer sync_;
 };
+
+template <typename T, typename HashFunc, class V>
+const char ObjectSharedPool<T, HashFunc, V>::DeleteObjectOnMainThread[] = "delete-object-on-main";
+
+template <typename T, typename HashFunc, class V>
+const char ObjectSharedPool<T, HashFunc, V>::ObjectDeleterEntry[] = "deleter-entry";
 
 } // namespace SharedPool
 } // namespace Envoy
