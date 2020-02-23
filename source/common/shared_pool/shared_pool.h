@@ -90,7 +90,6 @@ public:
     return object_pool_.size();
   }
 
-  void setThreadIdForTest(const std::thread::id& thread_id) { thread_id_ = thread_id; }
   /**
    * @return a thread synchronizer object used for reproducing a race-condition in tests.
    */

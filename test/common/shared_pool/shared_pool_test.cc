@@ -1,16 +1,63 @@
 #include <thread>
 
+#include "common/event/timer_impl.h"
 #include "common/shared_pool/shared_pool.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"
+#include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace SharedPool {
 
-TEST(SharedPoolTest, Basic) {
+class SharedPoolTest : public testing::Test {
+protected:
+  SharedPoolTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {
+    dispatcher_thread_ = api_->threadFactory().createThread([this]() {
+      // Must create a keepalive timer to keep the dispatcher from exiting.
+      std::chrono::milliseconds time_interval(500);
+      keepalive_timer_ = dispatcher_->createTimer(
+          [this, time_interval]() { keepalive_timer_->enableTimer(time_interval); });
+      keepalive_timer_->enableTimer(time_interval);
+      dispatcher_->run(Event::Dispatcher::RunType::Block);
+    });
+  }
+
+  ~SharedPoolTest() override {
+    dispatcher_->exit();
+    dispatcher_thread_->join();
+  }
+
+  void createObjectSharedPool(std::shared_ptr<ObjectSharedPool<int>>& pool) {
+    absl::Notification go;
+    dispatcher_->post([&pool, this, &go]() {
+      pool = std::make_shared<ObjectSharedPool<int>>(*dispatcher_);
+      go.Notify();
+    });
+    go.WaitForNotification();
+  }
+
+  void getObjectFromObjectSharedPool(std::shared_ptr<ObjectSharedPool<int>>& pool,
+                                     std::shared_ptr<int>& o, int value) {
+    absl::Notification go;
+    dispatcher_->post([&pool, &o, &go, value]() {
+      o = pool->getObject(value);
+      go.Notify();
+    });
+    go.WaitForNotification();
+  }
+
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  Thread::ThreadPtr dispatcher_thread_;
+  Event::TimerPtr keepalive_timer_;
+  absl::Notification go_;
+};
+
+TEST_F(SharedPoolTest, Basic) {
   Event::MockDispatcher dispatcher;
   auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
   {
@@ -27,108 +74,92 @@ TEST(SharedPoolTest, Basic) {
   ASSERT_EQ(0, pool->poolSize());
 }
 
-TEST(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
-  Event::MockDispatcher dispatcher;
-  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
-  pool->setThreadIdForTest(std::thread::id());
-  // This section of code is executed only when release build, because getObject will trigger ASSERT
-  // call at debug build causing the entire program to end, and getObject can run normally and
-  // trigger object destruct to cause the deleteObject method to be executed at release build.
-#ifdef NDEBUG
-  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([&pool](auto callback) {
-    // Overrides the default behavior
-    // Restore thread ids so that objects can be destructed, avoiding memory leaks
-    pool->setThreadIdForTest(std::this_thread::get_id());
-    callback();
-  }));
-#endif
+TEST_F(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
+  std::shared_ptr<ObjectSharedPool<int>> pool;
+  createObjectSharedPool(pool);
   EXPECT_DEBUG_DEATH(pool->getObject(4), ".*");
 }
 
-TEST(SharedPoolTest, ThreadSafeForDeleteObject) {
-  Event::MockDispatcher dispatcher;
+TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
+  Event::MockDispatcher mock_dispatcher;
   std::shared_ptr<ObjectSharedPool<int>> pool;
   {
     // same thread
-    pool.reset(new ObjectSharedPool<int>(dispatcher));
-    EXPECT_CALL(dispatcher, post(_)).Times(0);
+    pool.reset(new ObjectSharedPool<int>(mock_dispatcher));
+    EXPECT_CALL(mock_dispatcher, post(_)).Times(0);
     pool->deleteObject(std::hash<int>{}(4));
   }
 
   {
     // different threads
-    pool.reset(new ObjectSharedPool<int>(dispatcher));
-    pool->setThreadIdForTest(std::thread::id());
-    EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([](auto) {
+    Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+    auto thread = thread_factory.createThread([&pool, &mock_dispatcher]() {
+      pool = std::make_shared<ObjectSharedPool<int>>(mock_dispatcher);
+    });
+    thread->join();
+    EXPECT_CALL(mock_dispatcher, post(_)).WillOnce(Invoke([](auto) {
       // Overrides the default behavior, do nothing
     }));
     pool->deleteObject(std::hash<int>{}(4));
   }
 }
 
-TEST(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
-  Event::MockDispatcher dispatcher;
-  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
-  pool->setThreadIdForTest(std::thread::id());
+TEST_F(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
+  std::shared_ptr<ObjectSharedPool<int>> pool;
+  createObjectSharedPool(pool);
   EXPECT_DEBUG_DEATH(pool->poolSize(), ".*");
 }
 
-TEST(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
-  Event::MockDispatcher dispatcher;
-  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
-  auto o1 = pool->getObject(4);
+TEST_F(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
+  std::shared_ptr<ObjectSharedPool<int>> pool;
+  std::shared_ptr<int> o1;
+  createObjectSharedPool(pool);
+  getObjectFromObjectSharedPool(pool, o1, 4);
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   pool->sync().enable();
   pool->sync().waitOn(ObjectSharedPool<int>::DeleteObjectOnMainThread);
-  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([pool](auto callback) {
-    // Set the correct thread id, or we'll always call Dispatcher::post to deliver the task to the
-    // correct thread to execute.
-    pool->setThreadIdForTest(std::this_thread::get_id());
-    EXPECT_EQ(1, pool->poolSize());
-    callback(); // Blocks in thread synchronizer waiting on DeleteObjectOnMainThread
-  }));
-
   auto thread = thread_factory.createThread([&o1]() {
     // simulation of shared objects destructing in other threads
-    o1.reset();
+    o1.reset(); // Blocks in thread synchronizer waiting on DeleteObjectOnMainThread
   });
   pool->sync().barrierOn(ObjectSharedPool<int>::DeleteObjectOnMainThread);
-
   // The deleteObject method has not been executed yet, when it is switched to the main thread and
   // called getObject again to get an object with the same hash value.
-  pool->setThreadIdForTest(std::this_thread::get_id());
-  auto o2 = pool->getObject(4);
-
   pool->sync().signal(ObjectSharedPool<int>::DeleteObjectOnMainThread);
+  std::shared_ptr<int> o2;
+  getObjectFromObjectSharedPool(pool, o2, 4);
   thread->join();
+
   // deleteObject will to release older weak_ptr objects
   // Because the storage is actually a new weak_ptr and the reference count is not zero, it is not
   // deleted
-  EXPECT_EQ(1, pool->poolSize());
+  absl::Notification go3;
+  dispatcher_->post([&pool, &go3]() {
+    EXPECT_EQ(1, pool->poolSize());
+    go3.Notify();
+  });
+  go3.WaitForNotification();
 }
 
-TEST(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
-  Event::MockDispatcher dispatcher;
-  auto pool = std::make_shared<ObjectSharedPool<int>>(dispatcher);
-  auto o1 = pool->getObject(4);
-
+TEST_F(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
+  std::shared_ptr<ObjectSharedPool<int>> pool;
+  std::shared_ptr<int> o1;
+  createObjectSharedPool(pool);
+  getObjectFromObjectSharedPool(pool, o1, 4);
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   pool->sync().enable();
   pool->sync().waitOn(ObjectSharedPool<int>::ObjectDeleterEntry);
-  EXPECT_CALL(dispatcher, post(_)).WillOnce(Invoke([pool](auto) {
-    // Overrides the default behavior, do nothing
-  }));
   auto thread = thread_factory.createThread([&o1]() {
     // simulation of shared objects destructing in other threads
     o1.reset();
   });
   pool->sync().barrierOn(ObjectSharedPool<int>::ObjectDeleterEntry);
 
-  pool->setThreadIdForTest(std::this_thread::get_id());
   // Object is destructing, no memory has been released,
   // at this time the object obtained through getObject is newly created, not the old object,
   // so the object memory is released when the destruct is complete, and o2 is still valid.
-  auto o2 = pool->getObject(4);
+  std::shared_ptr<int> o2;
+  getObjectFromObjectSharedPool(pool, o2, 4);
   pool->sync().signal(ObjectSharedPool<int>::ObjectDeleterEntry);
   thread->join();
   EXPECT_EQ(4, *o2);
