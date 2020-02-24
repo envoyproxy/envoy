@@ -4,7 +4,10 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stream_info/filter_state_impl.h"
+
+#include "extensions/request_id_utils/uuid/uuid_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 
@@ -18,6 +21,9 @@ public:
     // Use 1999-01-01 00:00:00 +0
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
+    Runtime::RandomGeneratorImpl random;
+    request_id_utils_ = std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
+        Envoy::Extensions::RequestIDUtils::UUIDUtils(random));
 
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;

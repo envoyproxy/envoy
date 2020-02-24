@@ -12,9 +12,6 @@
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/runtime/uuid_util.h"
-
-#include "extensions/request_id_utils/uuid/uuid_impl.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
@@ -281,9 +278,6 @@ typed_config:
   )EOF";
 
   Runtime::RandomGeneratorImpl random;
-  stream_info_.setRequestIDUtils(std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
-      Envoy::Extensions::RequestIDUtils::UUIDUtils(random)));
-
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   // Value is taken from random generator.
@@ -327,9 +321,6 @@ typed_config:
   )EOF";
 
   Runtime::RandomGeneratorImpl random;
-  stream_info_.setRequestIDUtils(std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
-      Envoy::Extensions::RequestIDUtils::UUIDUtils(random)));
-
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   // Value is taken from random generator.
@@ -448,16 +439,6 @@ typed_config:
 
 TEST_F(AccessLogImplTest, RequestTracing) {
   Runtime::RandomGeneratorImpl random;
-  stream_info_.setRequestIDUtils(std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
-      Envoy::Extensions::RequestIDUtils::UUIDUtils(random)));
-
-  std::string not_traceable_guid = random.uuid();
-
-  std::string force_tracing_guid = random.uuid();
-  UuidUtils::setTraceableUuid(force_tracing_guid, UuidTraceStatus::Forced);
-
-  std::string sample_tracing_guid = random.uuid();
-  UuidUtils::setTraceableUuid(sample_tracing_guid, UuidTraceStatus::Sampled);
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -471,19 +452,23 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   {
-    Http::TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
+    Http::TestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
+    stream_info_.getRequestIDUtils()->setTraceStatus(forced_header,
+                                                     RequestIDUtils::TraceStatus::Forced);
     EXPECT_CALL(*file_, write(_));
     log->log(&forced_header, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
+    Http::TestHeaderMapImpl not_traceable{{"x-request-id", random.uuid()}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestHeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
+    Http::TestHeaderMapImpl sampled_header{{"x-request-id", random.uuid()}};
+    stream_info_.getRequestIDUtils()->setTraceStatus(sampled_header,
+                                                     RequestIDUtils::TraceStatus::Sampled);
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
   }
