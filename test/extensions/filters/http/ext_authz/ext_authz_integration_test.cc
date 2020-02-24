@@ -328,7 +328,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
 TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
   setupWithDisabledCaseSensitiveStringMatcher(false);
   const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_TRUE(header_entry == nullptr);
+  ASSERT_EQ(header_entry, nullptr);
 }
 
 // Verifies that by setting "false" to
@@ -337,7 +337,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
 TEST_P(ExtAuthzHttpIntegrationTest, DisableCaseSensitiveStringMatcher) {
   setupWithDisabledCaseSensitiveStringMatcher(true);
   const auto* header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
-  ASSERT_TRUE(header_entry != nullptr);
+  ASSERT_NE(header_entry, nullptr);
   EXPECT_EQ(case_sensitive_header_value_, header_entry->value().getStringView());
 }
 
