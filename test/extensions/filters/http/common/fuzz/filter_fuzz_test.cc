@@ -40,6 +40,7 @@ public:
     // Ext-authz setup
     prepareExtAuthz();
     prepareCache();
+    prepareTap();
   }
 
   void prepareExtAuthz() {
@@ -57,6 +58,11 @@ public:
     // Prepare expectations for dynamic forward proxy.
     ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
         .WillByDefault(testing::Return(resolver_));
+  }
+
+  void prepareTap() {
+    ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _)).WillByDefault(testing::Return(true));
+    ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
   }
 
   // This executes the decode methods to be fuzzed.
