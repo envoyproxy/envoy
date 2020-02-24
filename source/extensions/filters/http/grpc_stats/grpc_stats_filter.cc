@@ -22,7 +22,7 @@ public:
   explicit GrpcStatsFilter(Grpc::Context& context, bool emit_filter_state)
       : context_(context), emit_filter_state_(emit_filter_state) {}
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
     if (grpc_request_) {
       cluster_ = decoder_callbacks_->clusterInfo();
@@ -44,7 +44,8 @@ public:
     }
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override {
     grpc_response_ = Grpc::Common::isGrpcResponseHeader(headers, end_stream);
     if (doStatTracking()) {
       context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
@@ -64,7 +65,7 @@ public:
     }
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
     if (doStatTracking()) {
       context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
                           trailers.GrpcStatus());

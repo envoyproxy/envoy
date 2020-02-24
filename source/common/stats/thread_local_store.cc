@@ -264,7 +264,7 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   prefix_.free(symbolTable());
 }
 
-// Helper for managing the potential truncation and extraction of tags from the metric names and
+// Helper for managing the potential truncation of tags from the metric names and
 // converting them to StatName. Making the tag extraction optional within this class simplifies the
 // RAII ergonomics (as opposed to making the construction of this object conditional).
 //
@@ -272,10 +272,6 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
 // and the provided stat_name_tags are valid.
 //
 // When tag extraction is not done, this class is just a passthrough for the provided name/tags.
-//
-// Optionally manages the truncation and tag-extraction of stat names. Tag extraction occurs
-// on the original, untruncated name so the extraction can complete properly,
-// even if the tag values are partially truncated.
 class StatNameTagHelper {
 public:
   StatNameTagHelper(ThreadLocalStoreImpl& tls, StatName name,
@@ -360,7 +356,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     central_ref = &(iter->second);
   } else if (parent_.checkAndRememberRejection(full_stat_name, central_rejected_stats,
                                                tls_rejected_stats)) {
-    // Note that again we do the name-rejection lookup on the untruncated name.
     return null_stat;
   } else {
     StatNameTagHelper tag_helper(parent_, name_no_tags, stat_name_tags);

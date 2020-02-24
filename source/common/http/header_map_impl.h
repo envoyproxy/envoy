@@ -50,9 +50,6 @@ public:                                                                         
 
 #define DEFINE_INLINE_HEADER_STRUCT(name) HeaderEntryImpl* name##_;
 
-class HeaderMapImpl;
-using HeaderMapImplPtr = std::unique_ptr<HeaderMapImpl>;
-
 /**
  * Implementation of Http::HeaderMap. This is heavily optimized for performance. Roughly, when
  * headers are added to the map, we do a hash lookup to see if it's one of the O(1) headers.
@@ -67,10 +64,10 @@ public:
   HeaderMapImpl();
   // The following "constructors" call virtual functions during construction and must use the
   // static factory pattern.
-  static HeaderMapImplPtr
-  create(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
-  static HeaderMapImplPtr create(const HeaderMap& rhs);
   static void copyFrom(HeaderMapImpl& lhs, const HeaderMap& rhs);
+  static void
+  initFromInitList(HeaderMapImpl& new_header_map,
+                   const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
 
   // Performs a manual byte size count for test verification.
   void verifyByteSizeInternalForTest() const;
@@ -219,9 +216,6 @@ protected:
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
   void subtractSize(uint64_t size);
-  static void
-  initFromInitList(HeaderMapImpl& new_header_map,
-                   const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
 
   AllInlineHeaders inline_headers_;
   HeaderList headers_;
@@ -248,6 +242,20 @@ protected:
 class RequestTrailerMapImpl : public HeaderMapImpl, public RequestTrailerMap {};
 class ResponseHeaderMapImpl : public HeaderMapImpl, public ResponseHeaderMap {};
 class ResponseTrailerMapImpl : public HeaderMapImpl, public ResponseTrailerMap {};
+
+template <class T>
+std::unique_ptr<T>
+createHeaderMap(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values) {
+  auto new_header_map = std::make_unique<T>();
+  HeaderMapImpl::initFromInitList(*new_header_map, values);
+  return new_header_map;
+}
+
+template <class T> std::unique_ptr<T> createHeaderMap(const HeaderMap& rhs) {
+  auto new_header_map = std::make_unique<T>();
+  HeaderMapImpl::copyFrom(*new_header_map, rhs);
+  return new_header_map;
+}
 
 } // namespace Http
 } // namespace Envoy

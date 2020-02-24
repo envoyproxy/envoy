@@ -358,10 +358,6 @@ private:
     findStatLockHeld(StatName name,
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
-    void extractTagsAndTruncate(StatName& name,
-                                std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
-                                TagVector& tags, std::string& tag_extracted_name);
-
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;

@@ -71,7 +71,7 @@ IpTaggingFilter::~IpTaggingFilter() = default;
 
 void IpTaggingFilter::onDestroy() {}
 
-Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const bool is_internal_request = headers.EnvoyInternalRequest() &&
                                    (headers.EnvoyInternalRequest()->value() ==
                                     Http::Headers::get().EnvoyInternalRequestValues.True.c_str());
@@ -109,7 +109,7 @@ Http::FilterDataStatus IpTaggingFilter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus IpTaggingFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus IpTaggingFilter::decodeTrailers(Http::RequestTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 

@@ -86,7 +86,7 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "flushing traces: {} traces", pendingTraces);
     driver_.tracerStats().traces_sent_.add(pendingTraces);
 
-    Http::MessagePtr message(new Http::RequestMessageImpl());
+    Http::RequestMessagePtr message(new Http::RequestMessageImpl());
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setReferencePath(encoder_->path());
     message->headers().setReferenceHost(driver_.cluster()->name());
@@ -114,7 +114,7 @@ void TraceReporter::onFailure(Http::AsyncClient::FailureReason) {
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void TraceReporter::onSuccess(Http::MessagePtr&& http_response) {
+void TraceReporter::onSuccess(Http::ResponseMessagePtr&& http_response) {
   uint64_t responseStatus = Http::Utility::getResponseStatus(http_response->headers());
   if (responseStatus != enumToInt(Http::Code::OK)) {
     // TODO: Consider adding retries for failed submissions.

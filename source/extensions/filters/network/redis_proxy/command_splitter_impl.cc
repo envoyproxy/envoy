@@ -432,8 +432,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     }
   }
 
-  std::string to_lower_string(request->asArray()[0].asString());
-  to_lower_table_.toLowerCase(to_lower_string);
+  std::string to_lower_string = absl::AsciiStrToLower(request->asArray()[0].asString());
 
   if (to_lower_string == Common::Redis::SupportedCommands::auth()) {
     if (request->asArray().size() < 2) {
@@ -486,8 +485,7 @@ void InstanceImpl::onInvalidRequest(SplitCallbacks& callbacks) {
 void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefix,
                               const std::string& name, bool latency_in_micros,
                               CommandHandler& handler) {
-  std::string to_lower_name(name);
-  to_lower_table_.toLowerCase(to_lower_name);
+  std::string to_lower_name = absl::AsciiStrToLower(name);
   const std::string command_stat_prefix = fmt::format("{}command.{}.", stat_prefix, to_lower_name);
   Stats::StatNameManagedStorage storage{command_stat_prefix + std::string("latency"),
                                         scope.symbolTable()};

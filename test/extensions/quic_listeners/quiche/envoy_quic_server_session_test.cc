@@ -85,6 +85,12 @@ public:
 
 class TestQuicCryptoServerStream : public quic::QuicCryptoServerStream {
 public:
+  explicit TestQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
+                                      quic::QuicCompressedCertsCache* compressed_certs_cache,
+                                      quic::QuicSession* session,
+                                      quic::QuicCryptoServerStream::Helper* helper)
+      : quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
+
   using quic::QuicCryptoServerStream::QuicCryptoServerStream;
 
   bool encryption_established() const override { return true; }
@@ -96,7 +102,7 @@ public:
       : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_q099, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_t099, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -428,8 +434,8 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   stream->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                              request_headers);
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {":content-length", "32770"}}; // 32KB + 2 bytes
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {":content-length", "32770"}}; // 32KB + 2 bytes
 
   stream->encodeHeaders(response_headers, false);
   std::string response(32 * 1024 + 1, 'a');
@@ -523,8 +529,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   stream->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                              request_headers);
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {":content-length", "32770"}}; // 32KB + 2 bytes
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {":content-length", "32770"}}; // 32KB + 2 bytes
 
   stream->encodeHeaders(response_headers, false);
   std::string response(32 * 1024 + 1, 'a');
@@ -820,8 +826,8 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   stream1->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {":content-length", "32770"}}; // 32KB + 2 bytes
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {":content-length", "32770"}}; // 32KB + 2 bytes
 
   stream1->encodeHeaders(response_headers, false);
   std::string response(32 * 1024 + 1, 'a');

@@ -16,13 +16,14 @@ Version history
 * router: added :ref:`auto_san_validation <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>` to support overrriding SAN validation to transport socket for new upstream connections based on the downstream HTTP host/authority header.
 * router: added the ability to match a route based on whether a downstream TLS connection certificate has been
   :ref:`validated <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>`.
+* router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
 * sds: added :ref:`GenericSecret <envoy_api_msg_auth.GenericSecret>` to support secret of generic type.
 * stat sinks: stat sink extensions use the "envoy.stat_sinks" name space. A mapping of extension
   names is available in the :ref:`deprecated <deprecated>` documentation.
 * thrift_proxy: add router filter stats to docs.
 * tracers: tracer extensions use the "envoy.tracers" name space. A mapping of extension names is
   available in the :ref:`deprecated <deprecated>` documentation.
-* tracing: added gRPC service configuration to the OpenCensus Stackdriver tracer.
+* tracing: added gRPC service configuration to the OpenCensus Stackdriver and OpenCensus Agent tracers.
 * upstream: combined HTTP/1 and HTTP/2 connection pool code. This means that circuit breaker
   limits for both requests and connections apply to both pool types. Also, HTTP/2 now has
   the option to limit concurrent requests on a connection, and allow multiple draining

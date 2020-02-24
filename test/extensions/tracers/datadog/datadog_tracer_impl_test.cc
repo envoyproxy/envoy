@@ -70,9 +70,9 @@ public:
   }
 
   const std::string operation_name_{"test"};
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
+  const Http::TestResponseHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -131,7 +131,7 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
   EXPECT_CALL(cm_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
@@ -154,8 +154,8 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.traces_sent").value());
 
-  Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   msg->body() = std::make_unique<Buffer::OwnedImpl>("");
 
   callback->onSuccess(std::move(msg));

@@ -6,7 +6,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/delta_subscription_impl.h"
+#include "common/config/grpc_subscription_impl.h"
+#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/common.h"
 
@@ -43,8 +44,8 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
         envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
         local_info_);
-    subscription_ = std::make_unique<DeltaSubscriptionImpl>(
-        xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
+    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
+        xds_context_, callbacks_, stats_, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_,
         init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
@@ -154,7 +155,7 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
-    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
@@ -196,7 +197,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
   std::shared_ptr<NewGrpcMuxImpl> xds_context_;
-  std::unique_ptr<DeltaSubscriptionImpl> subscription_;
+  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;

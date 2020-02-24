@@ -94,7 +94,7 @@ public:
   AdminImpl admin_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  Http::TestHeaderMapImpl request_headers_;
+  Http::TestRequestHeaderMapImpl request_headers_;
 };
 
 // Check default implementations the admin class picks up.
@@ -599,7 +599,8 @@ TEST_P(AdminFilterTest, Trailers) {
   EXPECT_CALL(callbacks_, decodingBuffer());
   filter_.getRequestBody();
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.decodeTrailers(request_headers_));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.decodeTrailers(request_trailers));
 }
 
 class AdminInstanceTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -650,7 +651,7 @@ public:
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
   AdminImpl admin_;
-  Http::TestHeaderMapImpl request_headers_;
+  Http::TestRequestHeaderMapImpl request_headers_;
   Server::AdminFilter admin_filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
 };
@@ -1406,6 +1407,11 @@ TEST_P(AdminInstanceTest, ClustersJson) {
      "priority": 6,
      "local_origin_success_rate": {
       "value": 93.2
+     },
+     "locality": {
+       "region": "test_region",
+       "zone": "test_zone",
+       "sub_zone": "test_sub_zone"
      }
     }
    ]

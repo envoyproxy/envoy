@@ -63,7 +63,7 @@ GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::s
   return stats;
 }
 
-void ClientSslAuthConfig::parseResponse(const Http::Message& message) {
+void ClientSslAuthConfig::parseResponse(const Http::ResponseMessage& message) {
   AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(message.bodyAsString());
   for (const Json::ObjectSharedPtr& certificate : loader->getObjectArray("certificates")) {
@@ -84,7 +84,7 @@ void ClientSslAuthConfig::onFetchFailure(Config::ConfigUpdateFailureReason, cons
 
 static const std::string Path = "/v1/certs/list/approved";
 
-void ClientSslAuthConfig::createRequest(Http::Message& request) {
+void ClientSslAuthConfig::createRequest(Http::RequestMessage& request) {
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   request.headers().setPath(Path);
 }
