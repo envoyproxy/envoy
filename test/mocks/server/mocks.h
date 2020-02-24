@@ -337,8 +337,9 @@ public:
   }
 
   // Server::Worker
-  MOCK_METHOD2(addListener,
-               void(Network::ListenerConfig& listener, AddListenerCompletion completion));
+  MOCK_METHOD3(addListener,
+               void(absl::optional<uint64_t> overrided_listener, Network::ListenerConfig& listener,
+                    AddListenerCompletion completion));
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD2(removeListener,
                void(Network::ListenerConfig& listener, std::function<void()> completion));
@@ -485,6 +486,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
+  MOCK_METHOD0(drainManager, Server::DrainManager&());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

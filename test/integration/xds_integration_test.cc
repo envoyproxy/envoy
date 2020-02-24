@@ -114,6 +114,62 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
 }
 
+// TODO(lambdai): skip the tests in ipv6 env since filter chain matches varies at ipv4 dst address.
+// TODO(lambdai): more functionality to achieve the test target:
+// 1. set clients dst address,
+// 2. keep alive client
+// 3. verify the connection alive after drain time out.
+// Confirm that a new listener config with new filter chain will keep all the existing connections.
+TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
+  autonomous_upstream_ = true;
+
+  // dst ip = all
+  initialize();
+  // Given we're using LDS in this test, initialize() will not complete until
+  // the initial LDS file has loaded.
+  EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
+
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  std::string response;
+  // sendRawHttpAndWaitForResponseOnFilterChain1(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n",
+  // &response1, false);
+  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+
+  ConfigHelper new_config_helper(version_, *api_,
+                                 MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+
+  // added filter chain: dst ip = 127.0.0.2
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        auto* standard_filter_chain = listener->mutable_filter_chains(0);
+        auto* add_filter_chain = listener->add_filter_chains();
+        add_filter_chain->CopyFrom(*standard_filter_chain);
+        add_filter_chain->set_name("127.0.0.2");
+        auto* dst_ip = add_filter_chain->mutable_filter_chain_match()->add_prefix_ranges();
+        dst_ip->set_address_prefix("127.0.0.2");
+        dst_ip->mutable_prefix_len()->set_value(32);
+      });
+
+  // Create an LDS response with the new config, and reload config.
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+
+  std::string response2;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, false);
+  EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
+
+  ASSERT("connection on filter chain 1 is alive after timeout");
+}
+
+// Confirm that a new listener config with one fewer filter chain will drain the connections on that
+// filter chain.
+TEST_P(LdsIntegrationTest, ReloadConfigDeleteFilterChain) {}
+
+// Confirm that a new listener config with updated filter chain will drain the connection on the
+// existing filter chain, and new connections will see the updated filter chain.
+TEST_P(LdsIntegrationTest, ReloadConfigUpdateFilterChain) {}
+
 // Sample test making sure our config framework informs on listener failure.
 TEST_P(LdsIntegrationTest, FailConfigLoad) {
   config_helper_.addConfigModifier(

@@ -53,10 +53,10 @@ public:
   virtual void removeListeners(uint64_t listener_tag) PURE;
 
   /**
-   * Remove the untracked filter chains and the connections in the listener. All connections owned
-   * by the removed listeners will be closed. Once all the connections are destroyed(connections
-   * could be defered deleted!), inovke the completion.
-   * @param listener_tag supplies the tag passed to addListener().
+   * Remove the filter chains and the connections in the listener. All connections owned
+   * by the filter chains will be closed. Once all the connections are destroyed(connections
+   * could be defered deleted!), invoke the completion.
+   * @param draining_filter_chains supplies the listener and the the filter chains.
    */
   virtual void removeFilterChains(DrainingFilterChains& draining_filter_chains,
                                   std::function<void()> completion) PURE;

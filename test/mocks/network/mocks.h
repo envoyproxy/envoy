@@ -345,7 +345,8 @@ public:
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD0(incNumConnections, void());
   MOCK_METHOD0(decNumConnections, void());
-  MOCK_METHOD1(addListener, void(ListenerConfig& config));
+  MOCK_METHOD2(addListener,
+               void(absl::optional<uint64_t> overrided_listener, ListenerConfig& config));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
   MOCK_METHOD1(stopListeners, void(uint64_t listener_tag));
   MOCK_METHOD0(stopListeners, void());

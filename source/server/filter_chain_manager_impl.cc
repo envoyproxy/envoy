@@ -366,14 +366,6 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 
 }; // namespace
 
-std::unordered_set<const Network::FilterChain*> FilterChainManagerImpl::allFilterChains() const {
-  std::unordered_set<const Network::FilterChain*> all_chains;
-  for (const auto& filter_chain_pair : fc_contexts_) {
-    all_chains.insert(filter_chain_pair.second.get());
-  }
-  return all_chains;
-}
-
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
   const auto& address = socket.localAddress();
