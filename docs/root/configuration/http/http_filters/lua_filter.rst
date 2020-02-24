@@ -244,6 +244,23 @@ data to send. *timeout* is an integer that specifies the call timeout in millise
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.
 
+httpCallAsync()
+^^^^^^^^^^
+
+.. code-block:: lua
+
+  headers, body = handle:httpCallAsync(cluster, headers, body, timeout)
+
+Makes an HTTP call to an upstream host. Same behavior as httpCall, except that Envoy will fire and forget.
+
+*cluster* is a string which maps to a configured cluster manager cluster. *headers*
+is a table of key/value pairs to send (the value can be a string or table of strings). Note that
+the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
+data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
+
+Returns *headers* which is a table of response headers. Returns *body* which is the string response
+body. May be nil if there is no body.
+
 respond()
 ^^^^^^^^^^
 
