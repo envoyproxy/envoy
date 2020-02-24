@@ -85,11 +85,20 @@ Envoy fetches all `Listener` and `Cluster` resources at startup. It then fetches
 configuration tree.
 
 A non-proxy client such as gRPC might start by fetching only the specific `Listener` resources
-that it is interested in. It then fetches the `RouteConfiguration` resources required by those
-`Listener` resources, followed by whichever `Cluster` resources are required by those
-`RouteConfiguration` resources, followed by the `ClusterLoadAssignment` resources required
-by the `Cluster` resources. In effect, the original `Listener` resources are the roots to
-the client's configuration tree.
+that it is interested in.
+
+If the client is making an outbound connection (i.e. is a downstream host or a
+`source <https://istio.io/docs/reference/glossary/#source>`_ as per Istio terminology), it then
+fetches the `RouteConfiguration` resources required by those `Listener` resources, followed by
+whichever `Cluster` resources are required by those `RouteConfiguration` resources, followed by
+the `ClusterLoadAssignment` resources required by the `Cluster` resources. In effect, the original
+`Listener` resources are the roots to the client's configuration tree containing information
+about upstream hosts.
+
+On the other hand, if the non-proxy client is receiving inbound connections (i.e. is an
+upstream host or a `destination <https://istio.io/docs/reference/glossary/#destination>`_ as per
+Istio terminology), it only needs a specific `Listener` resource to configure its server or
+listener properties.
 
 Variants of the xDS Transport Protocol
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -393,6 +402,12 @@ Envoy will always use wildcard mode for :ref:`Listener <envoy_api_msg_Listener>`
 :ref:`Cluster <envoy_api_msg_Cluster>` resources. However, other xDS clients (such as gRPC clients
 that use xDS) may specify explicit resource names for these resource types, for example if they
 only have a singleton listener and already know its name from some out-of-band configuration.
+For example, a proxyless gRPC client acting as a downstream host (or a
+`source <https://istio.io/docs/reference/glossary/#source>`_ in Istio parlance) may use
+``server:port`` as the resource name, whereas a proxyless gRPC client acting as an upstream host
+(or a `destination <https://istio.io/docs/reference/glossary/#destination>`_ in Istio parlance)
+may use ``:port`` as the resource name for fetching the respective
+:ref:`Listener <envoy_api_msg_Listener>` resources.
 
 Grouping Resources into Responses
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
