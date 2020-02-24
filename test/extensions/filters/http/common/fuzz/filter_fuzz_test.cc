@@ -61,7 +61,8 @@ public:
   }
 
   void prepareTap() {
-    ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _)).WillByDefault(testing::Return(true));
+    ON_CALL(factory_context_.admin_, addHandler(_, _, _, _, _))
+        .WillByDefault(testing::Return(true));
     ON_CALL(factory_context_.admin_, removeHandler(_)).WillByDefault(testing::Return(true));
   }
 
