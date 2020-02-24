@@ -95,7 +95,7 @@ message ClusterLoadAssignment {
     // graceful failover as :ref:`overprovisioning factor
     // <arch_overview_load_balancing_overprovisioning_factor>` suggests.
     // [#not-implemented-hide:]
-    bool disable_overprovisioning = 5 [deprecated=true];
+    bool disable_overprovisioning = 5 [deprecated = true];
   }
 
   // Name of the cluster. This will be the :ref:`service_name
