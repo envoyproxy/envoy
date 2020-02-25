@@ -199,8 +199,8 @@ static void ios_on_error(envoy_error error, void *context) {
   atomic_store(context->closed, NO);
 
   // Create native callbacks
-  envoy_http_callbacks native_callbacks = {ios_on_headers,  ios_on_data,  ios_on_trailers,
-                                           ios_on_metadata, ios_on_error, ios_on_complete,
+  envoy_http_callbacks native_callbacks = {ios_on_headers,  ios_on_data,  ios_on_metadata,
+                                           ios_on_trailers, ios_on_error, ios_on_complete,
                                            ios_on_cancel,   context};
   _nativeCallbacks = native_callbacks;
 
