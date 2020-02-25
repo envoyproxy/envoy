@@ -71,9 +71,7 @@ public:
 
   // Empty construction of a MetricImpl; used for null stats.
   explicit MetricImpl(SymbolTable& symbol_table)
-      : MetricImpl(StatNameManagedStorage("", symbol_table).statName(),
-                   StatNameManagedStorage("", symbol_table).statName(), std::vector<Tag>(),
-                   symbol_table) {}
+      : MetricImpl(StatName(), StatName(), std::vector<Tag>(), symbol_table) {}
   std::vector<Tag> tags() const override { return helper_.tags(constSymbolTable()); }
   StatName statName() const override { return helper_.statName(); }
   StatName tagExtractedStatName() const override { return helper_.tagExtractedStatName(); }

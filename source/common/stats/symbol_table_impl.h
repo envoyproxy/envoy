@@ -157,6 +157,8 @@ public:
      */
     static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
 
+    static void appendToMemBlock(StatName stat_name, MemBlockBuilder<uint8_t>& mem_block);
+
     /**
      * Decodes a byte-array containing a variable-length number.
      *
