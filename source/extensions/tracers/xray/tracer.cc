@@ -130,8 +130,8 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, Envoy::Sys
   span_ptr->setId(ticks);
   span_ptr->setName(segment_name_);
   span_ptr->setOperation(operation_name);
-  // even though we have a TimeSource member in the tracer, we
-  // assume the start_time argument has more precise value than
+  // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
+  // more precise value than calling the systemTime() at this point in time.
   span_ptr->setStartTime(start_time);
 
   if (xray_header) { // there's a previous span that this span should be based-on
