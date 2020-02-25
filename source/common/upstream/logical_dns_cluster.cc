@@ -100,14 +100,18 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address, dns_lookup_family_,
-      [this, dns_address](Network::DnsResolver::ResolutionStatus,
+      [this, dns_address](Network::DnsResolver::ResolutionStatus status,
                           std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
-        info_->stats().update_success_.inc();
+        if (status == Network::DnsResolver::ResolutionStatus::Success) {
+          info_->stats().update_success_.inc();
+        } else {
+          info_->stats().update_failure_.inc();
+        }
 
         std::chrono::milliseconds refresh_rate = dns_refresh_rate_ms_;
-        if (!response.empty()) {
+        if (status == Network::DnsResolver::ResolutionStatus::Success) {
           // TODO(mattklein123): Move port handling into the DNS interface.
           ASSERT(response.front().address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
