@@ -86,6 +86,8 @@ public:
 
 class Filter;
 
+class FireAndForgetWriter;
+
 /**
  * A wrapper for a currently running request/response. This is the primary handle passed to Lua.
  * The script interacts with Envoy entirely through this handle.
@@ -294,6 +296,7 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+  FireAndForgetWriter* fireAndForgetWriter_;
 };
 
 /**

@@ -23,7 +23,7 @@ StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& corout
         if (state_ == State::Running) {
           throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
         }
-      }) {}
+      }), fireAndForgetWriter_(new FireAndForgetWriter(filter)) {}
 
 Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
@@ -153,8 +153,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaHttpCallAsync(lua_State* state) {
-  FireAndForgetWriter* ff = new FireAndForgetWriter(filter_);
-  return ff->luaHttpCallAsync(state);
+  return fireAndForgetWriter_->luaHttpCallAsync(state);
 }
 
 void StreamHandleWrapper::onSuccess(Http::ResponseMessagePtr&& response) {
@@ -429,7 +428,7 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   return 1;
 }
 
-FireAndForgetWriter::FireAndForgetWriter(Filter& filter) : filter_(filter) {}
+FireAndForgetWriter::FireAndForgetWriter(Filter& filter) : filter_(filter), LuaFilterUtil {}
 
 int FireAndForgetWriter::luaHttpCallAsync(lua_State* state) {
   LuaFilterUtil* luaFilterUtil_ = new LuaFilterUtil(filter_);
@@ -483,7 +482,7 @@ LuaFilterUtil::makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& call
 }
 
 void LuaFilterUtil::buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state,
-                                             int table_index) {
+                                          int table_index) {
   // Build a header map to make the request. We iterate through the provided table to do this and
   // check that we are getting strings.
   lua_pushnil(state);
