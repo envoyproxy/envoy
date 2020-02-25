@@ -20,7 +20,7 @@ option java_multiple_files = true;
 option java_generic_services = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.service.endpoint.v3";
 
-// [#protodoc-title: EGDS]
+// [#protodoc-title: EG-DS]
 // Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
 
 service EndpointGroupDiscoveryService {
