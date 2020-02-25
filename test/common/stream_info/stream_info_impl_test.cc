@@ -184,19 +184,19 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ(0, stream_info.dynamicMetadata().filter_metadata_size());
   stream_info.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
+            Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
   ProtobufWkt::Struct struct_obj2;
   ProtobufWkt::Value val2;
   val2.set_string_value("another_value");
   (*struct_obj2.mutable_fields())["another_key"] = val2;
   stream_info.setDynamicMetadata("com.test", struct_obj2);
-  EXPECT_EQ("another_value", Config::Metadata::metadataValue(stream_info.dynamicMetadata(),
+  EXPECT_EQ("another_value", Config::Metadata::metadataValue(&stream_info.dynamicMetadata(),
                                                              "com.test", "another_key")
                                  .string_value());
   // make sure "test_key:test_value" still exists
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
+            Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
   std::string json;
   const auto test_struct = stream_info.dynamicMetadata().filter_metadata().at("com.test");

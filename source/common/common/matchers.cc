@@ -155,7 +155,7 @@ PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, b
 }
 
 bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) const {
-  const auto& value = Envoy::Config::Metadata::metadataValue(metadata, matcher_.filter(), path_);
+  const auto& value = Envoy::Config::Metadata::metadataValue(&metadata, matcher_.filter(), path_);
   return value_matcher_ && value_matcher_->match(value);
 }
 
