@@ -132,9 +132,9 @@ TEST_F(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
   pool->sync().barrierOn(ObjectSharedPool<int>::DeleteObjectOnMainThread);
   // The deleteObject method has not been executed yet, when it is switched to the main thread and
   // called getObject again to get an object with the same hash value.
-  pool->sync().signal(ObjectSharedPool<int>::DeleteObjectOnMainThread);
   std::shared_ptr<int> o2;
   getObjectFromObjectSharedPool(pool, o2, 4);
+  pool->sync().signal(ObjectSharedPool<int>::DeleteObjectOnMainThread);
   thread->join();
 
   // deleteObject will to release older weak_ptr objects
@@ -158,7 +158,7 @@ TEST_F(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
   pool->sync().waitOn(ObjectSharedPool<int>::ObjectDeleterEntry);
   auto thread = thread_factory.createThread([&o1]() {
     // simulation of shared objects destructing in other threads
-    o1.reset();
+    o1.reset(); // Blocks in thread synchronizer waiting on ObjectDeleterEntry
   });
   pool->sync().barrierOn(ObjectSharedPool<int>::ObjectDeleterEntry);
 

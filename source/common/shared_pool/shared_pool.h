@@ -41,8 +41,6 @@ public:
 
   void deleteObject(const size_t hash_key) {
     if (std::this_thread::get_id() == thread_id_) {
-      // Used for testing to simulate some race condition scenarios
-      sync_.syncPoint(DeleteObjectOnMainThread);
       // There may be new inserts with the same hash value before deleting the old element,
       // so there is no need to delete it at this time.
       if (object_pool_.find(hash_key) != object_pool_.end() &&
@@ -54,6 +52,8 @@ public:
       // exceptions, it is destructed in the worker thread. In order to keep the object_pool_ thread
       // safe, the deleteObject needs to be delivered to the main thread.
       auto this_shared_ptr = this->shared_from_this();
+      // Used for testing to simulate some race condition scenarios
+      sync_.syncPoint(DeleteObjectOnMainThread);
       dispatcher_.post([hash_key, this_shared_ptr] { this_shared_ptr->deleteObject(hash_key); });
     }
   }
