@@ -35,7 +35,6 @@ class ObjectSharedPool : public Singleton::Instance,
 public:
   ObjectSharedPool(Event::Dispatcher& dispatcher)
       : thread_id_(std::this_thread::get_id()), dispatcher_(dispatcher) {}
-  ~ObjectSharedPool() = default;
 
   void deleteObject(const size_t hash_key) {
     if (std::this_thread::get_id() == thread_id_) {
@@ -98,7 +97,7 @@ public:
   static const char ObjectDeleterEntry[];
 
 private:
-  std::thread::id thread_id_;
+  const std::thread::id thread_id_;
   absl::flat_hash_map<size_t, std::weak_ptr<T>> object_pool_;
   Event::Dispatcher& dispatcher_;
   Thread::ThreadSynchronizer sync_;

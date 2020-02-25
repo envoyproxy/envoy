@@ -81,26 +81,24 @@ TEST_F(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
 }
 
 TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
-  Event::MockDispatcher mock_dispatcher;
   std::shared_ptr<ObjectSharedPool<int>> pool;
   {
     // same thread
-    pool.reset(new ObjectSharedPool<int>(mock_dispatcher));
-    EXPECT_CALL(mock_dispatcher, post(_)).Times(0);
-    pool->deleteObject(std::hash<int>{}(4));
+    createObjectSharedPool(pool);
+    dispatcher_->post([&pool, this]() {
+      pool->deleteObject(std::hash<int>{}(4));
+      go_.Notify();
+    });
+    go_.WaitForNotification();
   }
 
   {
     // different threads
+    createObjectSharedPool(pool);
     Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-    auto thread = thread_factory.createThread([&pool, &mock_dispatcher]() {
-      pool = std::make_shared<ObjectSharedPool<int>>(mock_dispatcher);
-    });
+    auto thread =
+        thread_factory.createThread([&pool, this]() { pool->deleteObject(std::hash<int>{}(4)); });
     thread->join();
-    EXPECT_CALL(mock_dispatcher, post(_)).WillOnce(Invoke([](auto) {
-      // Overrides the default behavior, do nothing
-    }));
-    pool->deleteObject(std::hash<int>{}(4));
   }
 }
 
