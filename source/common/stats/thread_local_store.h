@@ -161,24 +161,25 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterFromStatName(const StatName& name, StatNameTagVectorOptRef tags) override {
-    return default_scope_->counterFromStatName(name, tags);
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptRef tags) override {
+    return default_scope_->counterFromStatNameWithTags(name, tags);
   }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
-                           Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromStatName(name, tags, import_mode);
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                   Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
-                                   Histogram::Unit unit) override {
-    return default_scope_->histogramFromStatName(name, tags, unit);
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                           Histogram::Unit unit) override {
+    return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     return default_scope_->histogram(name, unit);
@@ -283,12 +284,13 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatName(const StatName& name, StatNameTagVectorOptRef tags) override;
+    Counter& counterFromStatNameWithTags(const StatName& name,
+                                         StatNameTagVectorOptRef tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
-                             Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
-                                     Histogram::Unit unit) override;
+    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                     Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                             Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
@@ -298,15 +300,15 @@ private:
 
     Counter& counter(const std::string& name) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return counterFromStatName(storage.statName(), absl::nullopt);
+      return counterFromStatName(storage.statName());
     }
     Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return gaugeFromStatName(storage.statName(), absl::nullopt, import_mode);
+      return gaugeFromStatName(storage.statName(), import_mode);
     }
     Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return histogramFromStatName(storage.statName(), absl::nullopt, unit);
+      return histogramFromStatName(storage.statName(), unit);
     }
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }

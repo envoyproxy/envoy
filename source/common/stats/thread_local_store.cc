@@ -389,9 +389,8 @@ ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
   return std::cref(*iter->second);
 }
 
-Counter&
-ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(const StatName& name,
-                                                     StatNameTagVectorOptRef stat_name_tags) {
+Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
+    const StatName& name, StatNameTagVectorOptRef stat_name_tags) {
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -444,9 +443,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(const StatName& name,
-                                                          StatNameTagVectorOptRef stat_name_tags,
-                                                          Gauge::ImportMode import_mode) {
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
+    const StatName& name, StatNameTagVectorOptRef stat_name_tags, Gauge::ImportMode import_mode) {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -482,7 +480,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(const StatName& name,
   return gauge;
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptRef stat_name_tags, Histogram::Unit unit) {
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;

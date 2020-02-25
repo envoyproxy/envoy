@@ -101,14 +101,14 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counterFromStatName(const StatName& name, StatNameTagVectorOptRef tags) override {
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
     Counter& counter = counters_.get(joiner.nameWithTags());
     return counter;
   }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
                            Gauge::ImportMode import_mode) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
     Gauge& gauge = gauges_.get(joiner.nameWithTags(), import_mode);
@@ -117,7 +117,7 @@ public:
   }
   NullCounterImpl& nullCounter() { return *null_counter_; }
   NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
-  Histogram& histogramFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
                                    Histogram::Unit unit) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
     Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit);
@@ -145,15 +145,15 @@ public:
 
   Counter& counter(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return counterFromStatName(storage.statName(), absl::nullopt);
+    return counterFromStatName(storage.statName());
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName(), absl::nullopt, import_mode);
+    return gaugeFromStatName(storage.statName(), import_mode);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName(), absl::nullopt, unit);
+    return histogramFromStatName(storage.statName(), unit);
   }
 
 private:

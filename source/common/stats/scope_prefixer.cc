@@ -26,24 +26,26 @@ ScopePtr ScopePrefixer::createScope(const std::string& name) {
   return createScopeFromStatName(stat_name_storage.statName());
 }
 
-Counter& ScopePrefixer::counterFromStatName(const StatName& name, StatNameTagVectorOptRef tags) {
+Counter& ScopePrefixer::counterFromStatNameWithTags(const StatName& name,
+                                                    StatNameTagVectorOptRef tags) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.counterFromStatName(StatName(stat_name_storage.get()), tags);
+  return scope_.counterFromStatNameWithTags(StatName(stat_name_storage.get()), tags);
 }
 
-Gauge& ScopePrefixer::gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
-                                        Gauge::ImportMode import_mode) {
+Gauge& ScopePrefixer::gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                                Gauge::ImportMode import_mode) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.gaugeFromStatName(StatName(stat_name_storage.get()), tags, import_mode);
+  return scope_.gaugeFromStatNameWithTags(StatName(stat_name_storage.get()), tags, import_mode);
 }
 
-Histogram& ScopePrefixer::histogramFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
-                                                Histogram::Unit unit) {
+Histogram& ScopePrefixer::histogramFromStatNameWithTags(const StatName& name,
+                                                        StatNameTagVectorOptRef tags,
+                                                        Histogram::Unit unit) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
-  return scope_.histogramFromStatName(StatName(stat_name_storage.get()), tags, unit);
+  return scope_.histogramFromStatNameWithTags(StatName(stat_name_storage.get()), tags, unit);
 }
 
 CounterOptConstRef ScopePrefixer::findCounter(StatName name) const {

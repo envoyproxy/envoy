@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/symbol_table.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
 
@@ -15,8 +16,6 @@ namespace Envoy {
 namespace Stats {
 
 class Allocator;
-struct Tag;
-using TagVector = std::vector<Tag>;
 
 /**
  * General interface for all stats objects.

@@ -294,17 +294,17 @@ public:
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
   MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
 
-  Counter& counterFromStatName(const StatName& name, StatNameTagVectorOptRef) override {
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef) override {
     // We always just respond with the mocked counter, so the tags don't matter.
     return counter(symbol_table_->toString(name));
   }
-  Gauge& gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef,
-                           Gauge::ImportMode import_mode) override {
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef,
+                                   Gauge::ImportMode import_mode) override {
     // We always just respond with the mocked gauge, so the tags don't matter.
     return gauge(symbol_table_->toString(name), import_mode);
   }
-  Histogram& histogramFromStatName(const StatName& name, StatNameTagVectorOptRef,
-                                   Histogram::Unit unit) override {
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef,
+                                           Histogram::Unit unit) override {
     return histogram(symbol_table_->toString(name), unit);
   }
 

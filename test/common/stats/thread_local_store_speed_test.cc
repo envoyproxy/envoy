@@ -45,7 +45,7 @@ public:
 
   void accessCounters() {
     for (auto& stat_name_storage : stat_names_) {
-      store_.Stats::Store::counterFromStatName(stat_name_storage->statName());
+      store_.counterFromStatName(stat_name_storage->statName());
     }
   }
 

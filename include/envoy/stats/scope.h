@@ -53,7 +53,7 @@ public:
    * @return a counter within the scope's namespace.
    */
   Counter& counterFromStatName(const StatName& name) {
-    return counterFromStatName(name, absl::nullopt);
+    return counterFromStatNameWithTags(name, absl::nullopt);
   }
   /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
@@ -62,7 +62,7 @@ public:
    * @param tags optionally specified tags.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatName(const StatName& name, StatNameTagVectorOptRef tags) PURE;
+  virtual Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
@@ -78,7 +78,7 @@ public:
    * @return a gauge within the scope's namespace.
    */
   Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
-    return gaugeFromStatName(name, absl::nullopt, import_mode);
+    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode);
   }
 
   /**
@@ -89,7 +89,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
+  virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
                                    Gauge::ImportMode import_mode) PURE;
 
   /**
@@ -112,7 +112,7 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
-    return histogramFromStatName(name, absl::nullopt, unit);
+    return histogramFromStatNameWithTags(name, absl::nullopt, unit);
   }
 
   /**
@@ -123,7 +123,7 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
+  virtual Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
                                            Histogram::Unit unit) PURE;
 
   /**
