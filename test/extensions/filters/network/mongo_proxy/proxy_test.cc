@@ -18,6 +18,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -42,8 +43,10 @@ public:
   MOCK_METHOD(void, onData, (Buffer::Instance & data));
 };
 
-class TestStatStore : public Stats::IsolatedStoreImpl {
+class TestStatStore : public Stats::SymbolTableProvider, public Stats::IsolatedStoreImpl {
 public:
+  TestStatStore() : Stats::IsolatedStoreImpl(*global_symbol_table_) {}
+
   MOCK_METHOD(void, deliverHistogramToSinks, (const Stats::Histogram& histogram, uint64_t value));
 };
 
