@@ -120,7 +120,7 @@ message ClusterLoadAssignment {
   repeated Egds endpoint_groups = 6;
 }
 
-// New xDS payload. The size of endpoints is fully arbitrary.
+// The endpoint group configuration.
 message EndpointGroup {
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -134,7 +134,7 @@ message EndpointGroup {
 
 // The EndpointGroup request configuration.
 message Egds {
-  // Configuration for the source of EndpointGroup updates for this Cluster.
+  // Configuration for the source of EndpointGroup.
   core.ConfigSource config_source = 1;
 
   // the endpoint group resource name.

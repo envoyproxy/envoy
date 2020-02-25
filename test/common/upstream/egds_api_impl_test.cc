@@ -145,7 +145,7 @@ TEST_F(EgdsApiImplTest, onConfigUpdateSuccess) {
   EXPECT_CALL(eg_manager_, addOrUpdateEndpointGroup(_, _)).Times(0);
   EXPECT_CALL(eg_manager_, batchUpdateEndpointGroup(_, _, _))
       .WillOnce(Invoke([&](const std::vector<envoy::config::endpoint::v3::EndpointGroup>& added,
-                          const std::vector<std::string> removed, absl::string_view) -> bool {
+                           const std::vector<std::string> removed, absl::string_view) -> bool {
         EXPECT_EQ(1, added.size());
         EXPECT_EQ(0, removed.size());
         return true;
@@ -169,7 +169,7 @@ TEST_F(EgdsApiImplTest, onConfigUpdateReplace) {
   EXPECT_CALL(eg_manager_, addOrUpdateEndpointGroup(_, _)).Times(0);
   EXPECT_CALL(eg_manager_, batchUpdateEndpointGroup(_, _, _))
       .WillOnce(Invoke([&](const std::vector<envoy::config::endpoint::v3::EndpointGroup>& added,
-                          const std::vector<std::string> removed, absl::string_view) -> bool {
+                           const std::vector<std::string> removed, absl::string_view) -> bool {
         EXPECT_EQ(1, added.size());
         EXPECT_EQ(0, removed.size());
         return true;
@@ -198,7 +198,7 @@ TEST_F(EgdsApiImplTest, onConfigUpdateRemove) {
   EXPECT_CALL(eg_manager_, clearEndpointGroup(_, _)).Times(0);
   EXPECT_CALL(eg_manager_, batchUpdateEndpointGroup(_, _, _))
       .WillOnce(Invoke([&](const std::vector<envoy::config::endpoint::v3::EndpointGroup>& added,
-                          const std::vector<std::string> removed, absl::string_view) -> bool {
+                           const std::vector<std::string> removed, absl::string_view) -> bool {
         EXPECT_EQ(0, added.size());
         EXPECT_EQ(1, removed.size());
         return true;

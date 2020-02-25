@@ -128,7 +128,7 @@ message ClusterLoadAssignment {
   repeated Egds endpoint_groups = 6;
 }
 
-// New xDS payload. The size of endpoints is fully arbitrary.
+// The endpoint group configuration.
 message EndpointGroup {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.EndpointGroup";
 
@@ -147,7 +147,7 @@ message Egds {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.ClusterLoadAssignment.EgdsConfig";
 
-  // Configuration for the source of EndpointGroup updates for this Cluster.
+  // Configuration for the source of EndpointGroup.
   core.v3.ConfigSource config_source = 1;
 
   // the endpoint group resource name.

@@ -21,12 +21,12 @@ option java_generic_services = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.service.endpoint.v3";
 
 // [#protodoc-title: EGDS]
-// Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_egds>`
+// Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
 
 service EndpointGroupDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.api.v2.EndpointGroup";
 
-  // The resource_names field in DiscoveryRequest specifies a list of clusters
+  // The resource_names field in DiscoveryRequest specifies a list of endpoint groups
   // to subscribe to updates for.
   rpc StreamEndpointGroups(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }

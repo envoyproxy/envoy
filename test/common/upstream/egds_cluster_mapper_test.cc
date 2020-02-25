@@ -192,10 +192,8 @@ TEST_F(EgdsClusterMapperTest, Basic) {
     EXPECT_CALL(mock_delegate, initializeCluster(_)).Times(0);
     EXPECT_CALL(mock_delegate, updateHosts(_, _, _, _, _, _))
         .WillOnce(Invoke([&](uint32_t priority, const HostVector& hosts_added,
-                             const HostVector& hosts_removed,
-                             PriorityStateManager&,
-                             LocalityWeightsMap&,
-                             absl::optional<uint32_t>) -> void {
+                             const HostVector& hosts_removed, PriorityStateManager&,
+                             LocalityWeightsMap&, absl::optional<uint32_t>) -> void {
           EXPECT_EQ(0, priority);
           EXPECT_EQ("4.5.6.7:4567", hosts_added.at(0)->address()->asString());
           EXPECT_EQ("1.2.3.4:1234", hosts_removed.at(0)->address()->asString());
