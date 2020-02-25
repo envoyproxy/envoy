@@ -171,7 +171,7 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCallAsync);
 
-    /**
+  /**
    * Perform an inline response. This call is currently only valid on the request path. Further
    * filter iteration will stop. No further script code will run after this call.
    * @param 1 (table): A table of HTTP headers. :status must be defined.
@@ -303,17 +303,17 @@ private:
 class FireAndForgetWriter : public Filters::Common::Lua::BaseLuaObject<FireAndForgetWriter>,
                             public Http::AsyncClient::Callbacks {
 public:
-    FireAndForgetWriter(Filter &filter);
+  FireAndForgetWriter(Filter& filter);
 
-    int luaHttpCallAsync(lua_State *state);
+  int luaHttpCallAsync(lua_State* state);
 
-    // Http::AsyncClient::Callbacks
-    void onSuccess(Http::ResponseMessagePtr&&) override {}
+  // Http::AsyncClient::Callbacks
+  void onSuccess(Http::ResponseMessagePtr&&) override {}
 
-    void onFailure(Http::AsyncClient::FailureReason) override {}
+  void onFailure(Http::AsyncClient::FailureReason) override {}
 
 private:
-    Filter& filter_;
+  Filter& filter_;
 };
 
 /**
@@ -321,13 +321,15 @@ private:
  */
 class LuaFilterLibrary : public Filters::Common::Lua::BaseLuaObject<LuaFilterLibrary> {
 public:
-    LuaFilterLibrary(Filter& filter);
+  LuaFilterLibrary(Filter& filter);
 
-    Http::AsyncClient::Request* makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& callbacksListener);
+  Http::AsyncClient::Request* makeHttpCall(lua_State* state,
+                                           Http::AsyncClient::Callbacks& callbacksListener);
 
-    static void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index);
+  static void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index);
+
 private:
-    Filter& filter_;
+  Filter& filter_;
 };
 
 /**

@@ -433,7 +433,7 @@ FireAndForgetWriter::FireAndForgetWriter(Filter& filter) : filter_(filter) {}
 
 int FireAndForgetWriter::luaHttpCallAsync(lua_State* state) {
   LuaFilterLibrary* luaFilterLibrary_ = new LuaFilterLibrary(filter_);
-  if(luaFilterLibrary_->makeHttpCall(state, *this)) {
+  if (luaFilterLibrary_->makeHttpCall(state, *this)) {
     return 0;
   } else {
     return 2;
@@ -442,7 +442,8 @@ int FireAndForgetWriter::luaHttpCallAsync(lua_State* state) {
 
 LuaFilterLibrary::LuaFilterLibrary(Filter& filter) : filter_(filter) {}
 
-Http::AsyncClient::Request* LuaFilterLibrary::makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& callbacksListener) {
+Http::AsyncClient::Request*
+LuaFilterLibrary::makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& callbacksListener) {
   const std::string cluster = luaL_checkstring(state, 2);
   luaL_checktype(state, 3, LUA_TTABLE);
   size_t body_size;
@@ -477,7 +478,8 @@ Http::AsyncClient::Request* LuaFilterLibrary::makeHttpCall(lua_State* state, Htt
   }
 
   return filter_.clusterManager().httpAsyncClientForCluster(cluster).send(
-    std::move(message), callbacksListener, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+      std::move(message), callbacksListener,
+      Http::AsyncClient::RequestOptions().setTimeout(timeout));
 }
 
 void LuaFilterLibrary::buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state,

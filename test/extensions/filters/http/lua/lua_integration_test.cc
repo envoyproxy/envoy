@@ -357,8 +357,8 @@ typed_config:
 
 // Upstream fire and forget async call
 TEST_P(LuaIntegrationTest, UpstreamAsyncHttpCall) {
-const std::string FILTER_AND_CODE =
-  R"EOF(
+  const std::string FILTER_AND_CODE =
+      R"EOF(
 name: envoy.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
