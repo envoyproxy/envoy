@@ -26,6 +26,9 @@ namespace SharedPool {
  * it does not have the ownership of object stored internally, the internal storage is weak_ptr,
  * when the internal storage object destructor executes the custom deleter to remove its own
  * weak_ptr from the ObjectSharedPool.
+ *
+ * There is also a need to ensure that the thread where ObjectSharedPool's destructor is also in the
+ * main thread, or that ObjectSharedPool is empty at the time of destructor.
  */
 template <typename T, typename HashFunc = std::hash<T>,
           class = typename std::enable_if<std::is_copy_constructible<T>::value>::type>

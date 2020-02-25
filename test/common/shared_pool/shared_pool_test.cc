@@ -31,6 +31,15 @@ protected:
     dispatcher_thread_->join();
   }
 
+  void deferredDeleteSharedPoolOnMainThread(std::shared_ptr<ObjectSharedPool<int>>& pool) {
+    absl::Notification go;
+    dispatcher_->post([&pool, &go]() {
+      pool.reset();
+      go.Notify();
+    });
+    go.WaitForNotification();
+  }
+
   void createObjectSharedPool(std::shared_ptr<ObjectSharedPool<int>>& pool) {
     absl::Notification go;
     dispatcher_->post([&pool, &go, this]() {
@@ -136,6 +145,7 @@ TEST_F(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
     go_.Notify();
   });
   go_.WaitForNotification();
+  deferredDeleteSharedPoolOnMainThread(pool);
 }
 
 TEST_F(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
@@ -160,6 +170,7 @@ TEST_F(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
   pool->sync().signal(ObjectSharedPool<int>::ObjectDeleterEntry);
   thread->join();
   EXPECT_EQ(4, *o2);
+  deferredDeleteSharedPoolOnMainThread(pool);
 }
 
 } // namespace SharedPool
