@@ -319,9 +319,9 @@ private:
 /**
  * A class with shared code for building and making http calls
  */
-class LuaFilterLibrary : public Filters::Common::Lua::BaseLuaObject<LuaFilterLibrary> {
+class LuaFilterUtil : public Filters::Common::Lua::BaseLuaObject<LuaFilterUtil> {
 public:
-  LuaFilterLibrary(Filter& filter);
+  LuaFilterUtil(Filter& filter);
 
   Http::AsyncClient::Request* makeHttpCall(lua_State* state,
                                            Http::AsyncClient::Callbacks& callbacksListener);
