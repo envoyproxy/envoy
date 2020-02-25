@@ -8,8 +8,8 @@ Version history
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
-* lua: added `httpCallAsync` function. Same as `httpCall` but fire-and-forget.
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
+* lua: added `httpCallAsync` function. Same as `httpCall` but fire-and-forget.
 * network filters: network filter extensions use the "envoy.filters.network" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
