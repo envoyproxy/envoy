@@ -48,7 +48,7 @@ public:
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Runtime::MockRandomGenerator random_;
-  MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment> callbacks_;
+  MockSubscriptionCallbacks callbacks_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -256,7 +256,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks&,
+      .WillOnce(Invoke([this](Http::RequestMessagePtr& request, Http::AsyncClient::Callbacks&,
                               const Http::AsyncClient::RequestOptions&) {
         EXPECT_EQ("POST", std::string(request->headers().Method()->value().getStringView()));
         EXPECT_EQ("static_cluster",

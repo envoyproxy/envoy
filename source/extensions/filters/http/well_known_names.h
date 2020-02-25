@@ -14,6 +14,8 @@ class HttpFilterNameValues {
 public:
   // Buffer filter
   const std::string Buffer = "envoy.buffer";
+  // Cache filter
+  const std::string Cache = "envoy.filters.http.cache";
   // CORS filter
   const std::string Cors = "envoy.cors";
   // CSRF filter
@@ -64,6 +66,8 @@ public:
   const std::string OriginalSrc = "envoy.filters.http.original_src";
   // Dynamic forward proxy filter
   const std::string DynamicForwardProxy = "envoy.filters.http.dynamic_forward_proxy";
+  // AWS request signing filter
+  const std::string AwsRequestSigning = "envoy.filters.http.aws_request_signing";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

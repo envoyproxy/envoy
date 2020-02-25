@@ -31,7 +31,6 @@ envoy_cc_library(
         ":codec_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:stack_array",
         "//source/common/common:utility_lib",
     ],
 )
@@ -95,7 +94,6 @@ envoy_cc_library(
         ":supported_commands_lib",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:timespan_interface",
-        "//source/common/common:to_lower_table_lib",
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:timespan_lib",

@@ -11,7 +11,7 @@ namespace Upstream {
 StrictDnsClusterImpl::StrictDnsClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
@@ -119,9 +119,11 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_,
               Network::Utility::getAddressWithPort(*(resp.address_), port_),
-              lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
-              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
-              locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
+              // TODO(zyfjeff): Created through metadata shared pool
+              std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
+              lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
+              lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
+              lb_endpoint_.health_status()));
 
           ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
         }
@@ -172,7 +174,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 StrictDnsClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);
 

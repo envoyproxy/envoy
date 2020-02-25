@@ -58,7 +58,8 @@ protected:
   StrictMock<MockBuffer> buffer_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnectionSocket> socket_;
-  Http::TestHeaderMapImpl headers_;
+  Http::TestRequestHeaderMapImpl headers_;
+  Http::TestRequestTrailerMapImpl trailers_;
 
   absl::optional<Network::Socket::Option::Details>
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
@@ -206,7 +207,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataEndStreamDoNothing) {
 
   // No new expectations => no side effects from calling these.
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, true));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(trailers_));
 }
 
 TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
@@ -223,7 +224,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
 
   // No new expectations => no side effects from calling these.
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(trailers_));
 }
 } // namespace
 } // namespace OriginalSrc

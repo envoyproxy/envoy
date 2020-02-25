@@ -13,13 +13,13 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -61,6 +61,34 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
     return {Status::WellKnownGrpcStatus::InvalidCode};
   }
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};
+}
+
+absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers,
+                                                         const Http::HeaderMap& headers,
+                                                         const StreamInfo::StreamInfo& info,
+                                                         bool allow_user_defined) {
+  // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
+  // request. When it is returned, it will be in the response trailers. With that said, Envoy will
+  // treat a trailers-only response as a headers-only response, so we have to check the following
+  // in order:
+  //   1. trailers gRPC status, if it exists.
+  //   2. headers gRPC status, if it exists.
+  //   3. Inferred from info HTTP status, if it exists.
+  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
+      {Grpc::Common::getGrpcStatus(trailers, allow_user_defined)},
+      {Grpc::Common::getGrpcStatus(headers, allow_user_defined)},
+      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
+                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
+                           : absl::nullopt},
+  }};
+
+  for (const auto& optional_status : optional_statuses) {
+    if (optional_status.has_value()) {
+      return optional_status;
+    }
+  }
+
+  return absl::nullopt;
 }
 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
@@ -190,11 +218,11 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::Heade
   headers.setGrpcTimeout(absl::StrCat(time, absl::string_view(unit, 1)));
 }
 
-Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
-                                        const std::string& service_full_name,
-                                        const std::string& method_name,
-                                        const absl::optional<std::chrono::milliseconds>& timeout) {
-  Http::MessagePtr message(new Http::RequestMessageImpl());
+Http::RequestMessagePtr
+Common::prepareHeaders(const std::string& upstream_cluster, const std::string& service_full_name,
+                       const std::string& method_name,
+                       const absl::optional<std::chrono::milliseconds>& timeout) {
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl());
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   message->headers().setPath(absl::StrCat("/", service_full_name, "/", method_name));
   message->headers().setHost(upstream_cluster);
@@ -209,7 +237,7 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
   return message;
 }
 
-void Common::checkForHeaderOnlyError(Http::Message& http_response) {
+void Common::checkForHeaderOnlyError(Http::ResponseMessage& http_response) {
   // First check for grpc-status in headers. If it is here, we have an error.
   absl::optional<Status::GrpcStatus> grpc_status_code =
       Common::getGrpcStatus(http_response.headers());
@@ -224,7 +252,7 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
   throw Exception(grpc_status_code.value(), Common::getGrpcMessage(http_response.headers()));
 }
 
-void Common::validateResponse(Http::Message& http_response) {
+void Common::validateResponse(Http::ResponseMessage& http_response) {
   if (Http::Utility::getResponseStatus(http_response.headers()) != enumToInt(Http::Code::OK)) {
     throw Exception(absl::optional<uint64_t>(), "non-200 response code");
   }

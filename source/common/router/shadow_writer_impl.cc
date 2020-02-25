@@ -11,7 +11,7 @@
 namespace Envoy {
 namespace Router {
 
-void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& request,
+void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
                               std::chrono::milliseconds timeout) {
   // It's possible that the cluster specified in the route configuration no longer exists due
   // to a CDS removal. Check that it still exists before shadowing.

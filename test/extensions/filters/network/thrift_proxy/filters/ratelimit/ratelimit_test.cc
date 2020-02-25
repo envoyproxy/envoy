@@ -76,14 +76,14 @@ public:
   domain: foo
   )EOF";
 
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> filter_callbacks_;
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
   ThriftProxy::MessageMetadataSharedPtr request_metadata_;
-  Http::TestHeaderMapImpl response_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
   Buffer::OwnedImpl response_data_;
   NiceMock<Runtime::MockLoader> runtime_;

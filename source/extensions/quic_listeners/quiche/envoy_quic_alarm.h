@@ -6,8 +6,8 @@
 #include "common/common/assert.h"
 
 #include "quiche/quic/core/quic_alarm.h"
+#include "quiche/quic/core/quic_clock.h"
 #include "quiche/quic/core/quic_time.h"
-#include "quiche/quic/platform/api/quic_clock.h"
 
 namespace Envoy {
 namespace Quic {

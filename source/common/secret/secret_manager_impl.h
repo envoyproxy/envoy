@@ -31,6 +31,9 @@ public:
   TlsSessionTicketKeysConfigProviderSharedPtr
   findStaticTlsSessionTicketKeysContextProvider(const std::string& name) const override;
 
+  GenericSecretConfigProviderSharedPtr
+  findStaticGenericSecretProvider(const std::string& name) const override;
+
   TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
       const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate)
       override;
@@ -44,6 +47,9 @@ public:
       const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&
           tls_session_ticket_keys) override;
 
+  GenericSecretConfigProviderSharedPtr createInlineGenericSecretProvider(
+      const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret) override;
+
   TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
@@ -54,6 +60,10 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
   TlsSessionTicketKeysConfigProviderSharedPtr findOrCreateTlsSessionTicketKeysContextProvider(
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+
+  GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
@@ -120,10 +130,15 @@ private:
   std::unordered_map<std::string, TlsSessionTicketKeysConfigProviderSharedPtr>
       static_session_ticket_keys_providers_;
 
+  // Manages pairs of secret name and GenericSecretConfigProviderSharedPtr.
+  std::unordered_map<std::string, GenericSecretConfigProviderSharedPtr>
+      static_generic_secret_providers_;
+
   // map hash code of SDS config source and SdsApi object.
   DynamicSecretProviders<TlsCertificateSdsApi> certificate_providers_;
   DynamicSecretProviders<CertificateValidationContextSdsApi> validation_context_providers_;
   DynamicSecretProviders<TlsSessionTicketKeysSdsApi> session_ticket_keys_providers_;
+  DynamicSecretProviders<GenericSecretSdsApi> generic_secret_providers_;
 
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 };

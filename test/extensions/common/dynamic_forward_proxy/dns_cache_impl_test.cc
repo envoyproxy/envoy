@@ -354,6 +354,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
 
   MockLoadDnsCacheEntryCallbacks callbacks;
   Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
@@ -364,6 +365,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
 
   EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
   resolve_cb(TestUtility::makeDnsResponse({}));
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -371,6 +373,17 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
+
+  // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
+  // during this period but it's good enough for the test.
+  simTime().sleep(std::chrono::milliseconds(300001));
+  // Because resolution failed for the host, onDnsHostAddOrUpdate was not called.
+  // Therefore, onDnsHostRemove should not be called either.
+  EXPECT_CALL(update_callbacks_, onDnsHostRemove(_)).Times(0);
+  resolve_timer->invokeCallback();
+  // DnsCacheImpl state is updated accordingly: the host is removed.
+  checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
+             1 /* added */, 1 /* removed */, 0 /* num hosts */);
 }
 
 // Cancel a cache load before the resolve completes.

@@ -8,9 +8,13 @@ cc_library(
         "libwee8.a",
     ],
     hdrs = [
+        "wee8/include/v8-version.h",
         "wee8/third_party/wasm-api/wasm.hh",
     ],
-    includes = ["wee8/third_party"],
+    includes = [
+        "wee8/include",
+        "wee8/third_party",
+    ],
     visibility = ["//visibility:public"],
 )
 

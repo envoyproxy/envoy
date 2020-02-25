@@ -29,7 +29,7 @@ AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
     : config_(std::move(config)), controller_(std::move(controller)) {}
 
-Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
+Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // In addition to not sampling if the filter is disabled, health checks should also not be sampled
   // by the concurrency controller since they may potentially bias the sample aggregate to lower
   // latency measurements.

@@ -102,7 +102,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
  * Static registration for the redis filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(RedisProxyFilterConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory);
+                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.redis_proxy"};
 
 } // namespace RedisProxy
 } // namespace NetworkFilters

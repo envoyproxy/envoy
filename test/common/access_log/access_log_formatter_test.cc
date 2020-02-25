@@ -1027,16 +1027,16 @@ TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
 TEST(AccessLogFormatterTest, FilterStateFormatter) {
   Http::TestHeaderMapImpl header;
   StreamInfo::MockStreamInfo stream_info;
-  stream_info.filter_state_.setData("key",
-                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
-  stream_info.filter_state_.setData("key-struct",
-                                    std::make_unique<TestSerializedStructFilterState>(),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
-  stream_info.filter_state_.setData("key-no-serialization",
-                                    std::make_unique<StreamInfo::FilterState::Object>(),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
-  stream_info.filter_state_.setData(
+  stream_info.filter_state_->setData("key",
+                                     std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("key-struct",
+                                     std::make_unique<TestSerializedStructFilterState>(),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("key-no-serialization",
+                                     std::make_unique<StreamInfo::FilterState::Object>(),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData(
       "key-serialization-error",
       std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)),
       StreamInfo::FilterState::StateType::ReadOnly);
@@ -1299,11 +1299,12 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
 TEST(AccessLogFormatterTets, JsonFormatterFilterStateTest) {
   Http::TestHeaderMapImpl header;
   StreamInfo::MockStreamInfo stream_info;
-  stream_info.filter_state_.setData("test_key",
-                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
-  stream_info.filter_state_.setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("test_key",
+                                     std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("test_obj",
+                                     std::make_unique<TestSerializedStructFilterState>(),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   std::unordered_map<std::string, std::string> expected_json_map = {
@@ -1320,11 +1321,12 @@ TEST(AccessLogFormatterTets, JsonFormatterFilterStateTest) {
 TEST(AccessLogFormatterTets, JsonFormatterTypedFilterStateTest) {
   Http::TestHeaderMapImpl header;
   StreamInfo::MockStreamInfo stream_info;
-  stream_info.filter_state_.setData("test_key",
-                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
-  stream_info.filter_state_.setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("test_key",
+                                     std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("test_obj",
+                                     std::make_unique<TestSerializedStructFilterState>(),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   std::unordered_map<std::string, std::string> key_mapping = {
@@ -1414,9 +1416,9 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedTest) {
   ProtobufWkt::Struct s;
   (*s.mutable_fields())["list"] = list;
 
-  stream_info.filter_state_.setData("test_obj",
-                                    std::make_unique<TestSerializedStructFilterState>(s),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_->setData("test_obj",
+                                     std::make_unique<TestSerializedStructFilterState>(s),
+                                     StreamInfo::FilterState::StateType::ReadOnly);
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   std::unordered_map<std::string, std::string> key_mapping = {
@@ -1491,14 +1493,14 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
   {
     EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
-    stream_info.filter_state_.setData("testing",
-                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
-    stream_info.filter_state_.setData("serialized",
-                                      std::make_unique<TestSerializedUnknownFilterState>(),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("testing",
+                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("serialized",
+                                       std::make_unique<TestSerializedUnknownFilterState>(),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
     const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
     FormatterImpl formatter(format);

@@ -16,11 +16,11 @@
 #include "common/common/lock_guard.h"
 #include "common/common/mem_block_builder.h"
 #include "common/common/non_copyable.h"
-#include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/stats/recent_lookups.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -286,7 +286,7 @@ private:
 };
 
 // Base class for holding the backing-storing for a StatName. The two derived
-// classes, StatNameStorage and StatNameDynamicStore, share a need to hold an
+// classes, StatNameStorage and StatNameDynamicStorage, share a need to hold an
 // array of bytes, but use different representations.
 class StatNameStorageBase {
 public:
@@ -456,6 +456,11 @@ public:
   const uint8_t* dataIncludingSize() const { return size_and_data_; }
 
   /**
+   * @return A pointer to the buffer, including the size bytes.
+   */
+  const uint8_t* sizeAndData() const { return size_and_data_; }
+
+  /**
    * @return whether this is empty.
    */
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
@@ -581,6 +586,11 @@ private:
  *   StatNameDynamicPool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
+ *
+ * Note; StatNameDynamicPool::add("foo") != StatNamePool::add("foo"), even
+ * though their string representations are identical. They also will not match
+ * in map lookups. Tests for StatName with dynamic components must therefore
+ * be looked up by string, via Stats::TestUtil::TestStore.
  */
 class StatNameDynamicPool {
 public:

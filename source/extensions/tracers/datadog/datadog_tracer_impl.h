@@ -107,7 +107,7 @@ public:
   TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Event::Dispatcher& dispatcher);
 
   // Http::AsyncClient::Callbacks.
-  void onSuccess(Http::MessagePtr&&) override;
+  void onSuccess(Http::ResponseMessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
 private:

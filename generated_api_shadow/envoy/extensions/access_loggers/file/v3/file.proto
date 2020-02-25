@@ -16,7 +16,7 @@ option java_multiple_files = true;
 // [#extension: envoy.access_loggers.file]
 
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v3.AccessLog>`
-// that writes log entries directly to a file. Configures the built-in *envoy.file_access_log*
+// that writes log entries directly to a file. Configures the built-in *envoy.access_loggers.file*
 // AccessLog.
 message FileAccessLog {
   option (udpa.annotations.versioning).previous_message_type =

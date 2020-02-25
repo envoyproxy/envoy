@@ -14,7 +14,7 @@
 #include <memory>
 
 #include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
-#include "extensions/quic_listeners/quiche/envoy_quic_stream.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -52,13 +52,13 @@ public:
   void SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) override;
   void OnCanWrite() override;
   // quic::QuicSpdySession
-  void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
+  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
   using quic::QuicSession::stream_map;
 
 protected:
   // quic::QuicServerSessionBase
-  quic::QuicCryptoServerStreamBase*
+  std::unique_ptr<quic::QuicCryptoServerStreamBase>
   CreateQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                quic::QuicCompressedCertsCache* compressed_certs_cache) override;
 
@@ -73,7 +73,7 @@ protected:
   bool hasDataToWrite() override;
 
 private:
-  void setUpRequestDecoder(EnvoyQuicStream& stream);
+  void setUpRequestDecoder(EnvoyQuicServerStream& stream);
 
   std::unique_ptr<EnvoyQuicConnection> quic_connection_;
   // These callbacks are owned by network filters and quic session should out live

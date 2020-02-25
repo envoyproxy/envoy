@@ -180,7 +180,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
             udp_config.udp_listener_name());
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
-    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
+    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
   }
 
   if (!config.listener_filters().empty()) {
@@ -349,9 +349,13 @@ Api::Api& ListenerImpl::api() { return parent_.server_.api(); }
 ServerLifecycleNotifier& ListenerImpl::lifecycleNotifier() {
   return parent_.server_.lifecycleNotifier();
 }
-OptProcessContextRef ListenerImpl::processContext() { return parent_.server_.processContext(); }
+ProcessContextOptRef ListenerImpl::processContext() { return parent_.server_.processContext(); }
 Configuration::ServerFactoryContext& ListenerImpl::getServerFactoryContext() const {
   return parent_.server_.serverFactoryContext();
+}
+Configuration::TransportSocketFactoryContext&
+ListenerImpl::getTransportSocketFactoryContext() const {
+  return parent_.server_.transportSocketFactoryContext();
 }
 
 bool ListenerImpl::createNetworkFilterChain(

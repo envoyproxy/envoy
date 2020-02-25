@@ -246,10 +246,12 @@ This disallowed mode can be overridden in runtime configuration by setting
 envoy.deprecated_features:full_fieldname or envoy.deprecated_features:full_enum_value
 to true. For example, for a deprecated field
 ``Foo.Bar.Eep`` set ``envoy.deprecated_features:Foo.bar.Eep`` to
-``true``. Use of this override is **strongly discouraged**.
-Fatal-by-default configuration indicates that the removal of the old code paths is imminent. It is
-far better for both Envoy users and for Envoy contributors if any bugs or feature gaps with the new
-code paths are flushed out ahead of time, rather than after the code is removed!
+``true``. There is a production example using static runtime to allow both fail-by-default fields here:
+:repo:`configs/using_deprecated_config.v2.yaml`
+Use of these override is **strongly discouraged** so please use with caution and switch to the new fields
+as soon as possible. Fatal-by-default configuration indicates that the removal of the old code paths is
+imminent. It is far better for both Envoy users and for Envoy contributors if any bugs or feature gaps
+with the new code paths are flushed out ahead of time, rather than after the code is removed!
 
 .. _runtime_stats:
 
