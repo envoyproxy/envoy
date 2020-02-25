@@ -16,6 +16,7 @@ Version history
 * router: added :ref:`auto_san_validation <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>` to support overrriding SAN validation to transport socket for new upstream connections based on the downstream HTTP host/authority header.
 * router: added the ability to match a route based on whether a downstream TLS connection certificate has been
   :ref:`validated <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>`.
+* router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
 * sds: added :ref:`GenericSecret <envoy_api_msg_auth.GenericSecret>` to support secret of generic type.
 * stat sinks: stat sink extensions use the "envoy.stat_sinks" name space. A mapping of extension
   names is available in the :ref:`deprecated <deprecated>` documentation.

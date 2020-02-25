@@ -27,6 +27,7 @@ namespace Logger {
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
+  FUNCTION(cache_filter)                                                                           \
   FUNCTION(client)                                                                                 \
   FUNCTION(config)                                                                                 \
   FUNCTION(connection)                                                                             \

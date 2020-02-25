@@ -434,8 +434,8 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   stream->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                              request_headers);
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {":content-length", "32770"}}; // 32KB + 2 bytes
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {":content-length", "32770"}}; // 32KB + 2 bytes
 
   stream->encodeHeaders(response_headers, false);
   std::string response(32 * 1024 + 1, 'a');
@@ -529,8 +529,8 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   stream->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                              request_headers);
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {":content-length", "32770"}}; // 32KB + 2 bytes
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {":content-length", "32770"}}; // 32KB + 2 bytes
 
   stream->encodeHeaders(response_headers, false);
   std::string response(32 * 1024 + 1, 'a');
@@ -826,8 +826,8 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   stream1->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
                               request_headers);
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"},
-                                           {":content-length", "32770"}}; // 32KB + 2 bytes
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {":content-length", "32770"}}; // 32KB + 2 bytes
 
   stream1->encodeHeaders(response_headers, false);
   std::string response(32 * 1024 + 1, 'a');

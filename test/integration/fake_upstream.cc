@@ -73,14 +73,16 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   }
 }
 
-void FakeStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
-  std::shared_ptr<Http::HeaderMapImpl> headers_copy(Http::HeaderMapImpl::create(headers));
+void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
+  std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   parent_.connection().dispatcher().post(
       [this, headers_copy]() -> void { encoder_.encode100ContinueHeaders(*headers_copy); });
 }
 
 void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
-  std::shared_ptr<Http::HeaderMapImpl> headers_copy(Http::HeaderMapImpl::create(headers));
+  std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   if (add_served_by_header_) {
     headers_copy->addCopy(Http::LowerCaseString("x-served-by"),
                           parent_.connection().localAddress()->asString());
@@ -111,7 +113,8 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
-  std::shared_ptr<Http::HeaderMapImpl> trailers_copy(Http::HeaderMapImpl::create(trailers));
+  std::shared_ptr<Http::ResponseTrailerMap> trailers_copy(
+      Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers));
   parent_.connection().dispatcher().post(
       [this, trailers_copy]() -> void { encoder_.encodeTrailers(*trailers_copy); });
 }
@@ -204,7 +207,7 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
 }
 
 void FakeStream::startGrpcStream() {
-  encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 }
 
 void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {

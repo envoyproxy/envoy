@@ -17,17 +17,17 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-void SignerImpl::sign(Http::Message& message, bool sign_body) {
+void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
   sign(headers, content_hash);
 }
 
-void SignerImpl::sign(Http::HeaderMap& headers) {
+void SignerImpl::sign(Http::RequestHeaderMap& headers) {
   sign(headers, SignatureConstants::get().HashedEmptyString);
 }
 
-void SignerImpl::sign(Http::HeaderMap& headers, const std::string& content_hash) {
+void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash) {
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
@@ -68,7 +68,7 @@ void SignerImpl::sign(Http::HeaderMap& headers, const std::string& content_hash)
   headers.addCopy(Http::Headers::get().Authorization, authorization_header);
 }
 
-std::string SignerImpl::createContentHash(Http::Message& message, bool sign_body) const {
+std::string SignerImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {
   if (!sign_body) {
     return SignatureConstants::get().HashedEmptyString;
   }

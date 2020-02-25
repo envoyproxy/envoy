@@ -86,10 +86,10 @@ HeaderValueOptionVector TestCommon::makeHeaderValueOption(KeyValueOptionVector&&
   return header_option_vector;
 }
 
-Http::MessagePtr TestCommon::makeMessageResponse(const HeaderValueOptionVector& headers,
-                                                 const std::string& body) {
-  Http::MessagePtr response(
-      new Http::ResponseMessageImpl(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{}}));
+Http::ResponseMessagePtr TestCommon::makeMessageResponse(const HeaderValueOptionVector& headers,
+                                                         const std::string& body) {
+  Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{}}));
   for (auto& header : headers) {
     response->headers().addCopy(Http::LowerCaseString(header.header().key()),
                                 header.header().value());

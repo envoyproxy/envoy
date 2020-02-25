@@ -150,11 +150,11 @@ public:
              Tracing::Span&) override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& message) override;
+  void onSuccess(Http::ResponseMessagePtr&& message) override;
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
 private:
-  ResponsePtr toResponse(Http::MessagePtr message);
+  ResponsePtr toResponse(Http::ResponseMessagePtr message);
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};

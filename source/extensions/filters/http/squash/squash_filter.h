@@ -40,15 +40,15 @@ private:
   static std::string replaceEnv(const std::string& attachment_template);
 
   // The name of the squash server cluster.
-  std::string cluster_name_;
+  const std::string cluster_name_;
   // The attachment body sent to squash server on create attachment.
-  std::string attachment_json_;
+  const std::string attachment_json_;
   // The total amount of time for an attachment to reach a final state (attached or error).
-  std::chrono::milliseconds attachment_timeout_;
+  const std::chrono::milliseconds attachment_timeout_;
   // How frequently should we poll the attachment state with the squash server.
-  std::chrono::milliseconds attachment_poll_period_;
+  const std::chrono::milliseconds attachment_poll_period_;
   // The timeout for individual requests to the squash server.
-  std::chrono::milliseconds request_timeout_;
+  const std::chrono::milliseconds request_timeout_;
 
   // Defines the pattern for interpolating environment variables in to the attachment.
   const static std::regex ENV_REGEX;
@@ -58,16 +58,18 @@ using SquashFilterConfigSharedPtr = std::shared_ptr<SquashFilterConfig>;
 
 class AsyncClientCallbackShim : public Http::AsyncClient::Callbacks {
 public:
-  AsyncClientCallbackShim(std::function<void(Http::MessagePtr&&)>&& on_success,
+  AsyncClientCallbackShim(std::function<void(Http::ResponseMessagePtr&&)>&& on_success,
                           std::function<void(Http::AsyncClient::FailureReason)>&& on_fail)
       : on_success_(on_success), on_fail_(on_fail) {}
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& m) override { on_success_(std::forward<Http::MessagePtr>(m)); }
+  void onSuccess(Http::ResponseMessagePtr&& m) override {
+    on_success_(std::forward<Http::ResponseMessagePtr>(m));
+  }
   void onFailure(Http::AsyncClient::FailureReason f) override { on_fail_(f); }
 
 private:
-  std::function<void(Http::MessagePtr&&)> on_success_;
-  std::function<void(Http::AsyncClient::FailureReason)> on_fail_;
+  const std::function<void(Http::ResponseMessagePtr&&)> on_success_;
+  const std::function<void(Http::AsyncClient::FailureReason)> on_fail_;
 };
 
 class SquashFilter : public Http::StreamDecoderFilter,
@@ -80,17 +82,17 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   // AsyncClient callbacks for create attachment request
-  void onCreateAttachmentSuccess(Http::MessagePtr&&);
+  void onCreateAttachmentSuccess(Http::ResponseMessagePtr&&);
   void onCreateAttachmentFailure(Http::AsyncClient::FailureReason);
   // AsyncClient callbacks for get attachment request
-  void onGetAttachmentSuccess(Http::MessagePtr&&);
+  void onGetAttachmentSuccess(Http::ResponseMessagePtr&&);
   void onGetAttachmentFailure(Http::AsyncClient::FailureReason);
 
   // Schedules a pollForAttachment
@@ -101,7 +103,7 @@ private:
   void doneSquashing();
   void cleanup();
   // Creates a JSON from the message body.
-  Json::ObjectSharedPtr getJsonBody(Http::MessagePtr&& m);
+  Json::ObjectSharedPtr getJsonBody(Http::ResponseMessagePtr&& m);
 
   const SquashFilterConfigSharedPtr config_;
 

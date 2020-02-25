@@ -141,7 +141,7 @@ public:
             }));
     expectResponseTimerCreate();
 
-    Http::TestHeaderMapImpl headers(request_headers_init);
+    Http::TestRequestHeaderMapImpl headers(request_headers_init);
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
@@ -180,9 +180,9 @@ public:
     expectPerTryTimerCreate();
     expectResponseTimerCreate();
 
-    Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
-                                    {"x-envoy-internal", "true"},
-                                    {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+    Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
+                                           {"x-envoy-internal", "true"},
+                                           {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 

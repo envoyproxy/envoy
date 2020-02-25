@@ -16,13 +16,6 @@ namespace Http {
 
 class VerifiedHeaderMapImpl : public HeaderMapImpl {
 public:
-  static HeaderMapImplPtr
-  create(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values) {
-    auto new_header_map = std::make_unique<VerifiedHeaderMapImpl>();
-    new_header_map->initFromInitList(*new_header_map, values);
-    return new_header_map;
-  }
-
   void verifyByteSize() override { verifyByteSizeInternalForTest(); }
 };
 
@@ -861,7 +854,7 @@ TEST(HeaderMapImplTest, Lookup) {
 
 TEST(HeaderMapImplTest, Get) {
   {
-    auto headers = VerifiedHeaderMapImpl::create(
+    auto headers = createHeaderMap<VerifiedHeaderMapImpl>(
         {{Headers::get().Path, "/"}, {LowerCaseString("hello"), "world"}});
     EXPECT_EQ("/", headers->get(LowerCaseString(":path"))->value().getStringView());
     EXPECT_EQ("world", headers->get(LowerCaseString("hello"))->value().getStringView());
@@ -869,7 +862,7 @@ TEST(HeaderMapImplTest, Get) {
   }
 
   {
-    auto headers = VerifiedHeaderMapImpl::create(
+    auto headers = createHeaderMap<VerifiedHeaderMapImpl>(
         {{Headers::get().Path, "/"}, {LowerCaseString("hello"), "world"}});
     // There is not HeaderMap method to set a header and copy both the key and value.
     headers->setReferenceKey(LowerCaseString(":path"), "/new_path");
@@ -1105,11 +1098,12 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
 
   // Starting with a normal header
   {
-    auto headers = VerifiedHeaderMapImpl::create({{Headers::get().ContentType, "text/plain"},
-                                                  {Headers::get().Method, "GET"},
-                                                  {Headers::get().Path, "/"},
-                                                  {LowerCaseString("hello"), "world"},
-                                                  {Headers::get().Host, "host"}});
+    auto headers =
+        createHeaderMap<VerifiedHeaderMapImpl>({{Headers::get().ContentType, "text/plain"},
+                                                {Headers::get().Method, "GET"},
+                                                {Headers::get().Path, "/"},
+                                                {LowerCaseString("hello"), "world"},
+                                                {Headers::get().Host, "host"}});
 
     InSequence seq;
     EXPECT_CALL(cb, Call(":method", "GET"));
@@ -1129,11 +1123,12 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
 
   // Starting with a pseudo-header
   {
-    auto headers = VerifiedHeaderMapImpl::create({{Headers::get().Path, "/"},
-                                                  {Headers::get().ContentType, "text/plain"},
-                                                  {Headers::get().Method, "GET"},
-                                                  {LowerCaseString("hello"), "world"},
-                                                  {Headers::get().Host, "host"}});
+    auto headers =
+        createHeaderMap<VerifiedHeaderMapImpl>({{Headers::get().Path, "/"},
+                                                {Headers::get().ContentType, "text/plain"},
+                                                {Headers::get().Method, "GET"},
+                                                {LowerCaseString("hello"), "world"},
+                                                {Headers::get().Host, "host"}});
 
     InSequence seq;
     EXPECT_CALL(cb, Call(":path", "/"));

@@ -356,13 +356,6 @@ public:
   static std::string toUpper(absl::string_view s);
 
   /**
-   * Convert a string to lower case.
-   * @param s string.
-   * @return std::string s converted to lower case.
-   */
-  static std::string toLower(absl::string_view s);
-
-  /**
    * Removes all the character indices from str contained in the interval-set.
    * @param str the string containing the characters to be removed.
    * @param remove_characters the set of character-intervals.

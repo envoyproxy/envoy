@@ -89,7 +89,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
   initialize();
   auto client_connection = createConnectionFn()();
   codec_client_ = makeHttpConnection(std::move(client_connection));
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -104,7 +104,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
   EXPECT_EQ(credentials->gid, getgid());
 #endif
 
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
 }

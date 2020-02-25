@@ -93,6 +93,7 @@ public:
 
   CsrfFilter filter_;
   Http::TestRequestHeaderMapImpl request_headers_;
+  Http::TestRequestTrailerMapImpl request_trailers_;
 };
 
 TEST_F(CsrfFilterTest, RequestWithNonMutableMethod) {
@@ -102,7 +103,7 @@ TEST_F(CsrfFilterTest, RequestWithNonMutableMethod) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -115,7 +116,7 @@ TEST_F(CsrfFilterTest, RequestWithoutOrigin) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(1U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -128,7 +129,7 @@ TEST_F(CsrfFilterTest, RequestWithoutDestination) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
@@ -139,7 +140,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOrigin) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {":authority", "localhost"}};
 
-  Http::TestHeaderMapImpl response_headers{
+  Http::TestResponseHeaderMapImpl response_headers{
       {":status", "403"},
       {"content-length", "14"},
       {"content-type", "text/plain"},
@@ -149,7 +150,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOrigin) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
@@ -163,7 +164,7 @@ TEST_F(CsrfFilterTest, RequestWithValidOrigin) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -179,7 +180,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -195,7 +196,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowEnabled) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
@@ -211,7 +212,7 @@ TEST_F(CsrfFilterTest, RequestWithValidOriginCsrfDisabledShadowEnabled) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -224,7 +225,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfEnabledShadowEnabled) {
 
   setShadowEnabled(true);
 
-  Http::TestHeaderMapImpl response_headers{
+  Http::TestResponseHeaderMapImpl response_headers{
       {":status", "403"},
       {"content-length", "14"},
       {"content-type", "text/plain"},
@@ -234,7 +235,7 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfEnabledShadowEnabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
@@ -249,7 +250,7 @@ TEST_F(CsrfFilterTest, RequestWithValidOriginCsrfEnabledShadowEnabled) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -262,7 +263,7 @@ TEST_F(CsrfFilterTest, RedirectRoute) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -274,7 +275,7 @@ TEST_F(CsrfFilterTest, EmptyRoute) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -286,7 +287,7 @@ TEST_F(CsrfFilterTest, EmptyRouteEntry) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -303,7 +304,7 @@ TEST_F(CsrfFilterTest, NoCsrfEntry) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
   EXPECT_EQ(0U, config_->stats().request_valid_.value());
@@ -317,7 +318,7 @@ TEST_F(CsrfFilterTest, NoRouteCsrfEntry) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
@@ -332,7 +333,7 @@ TEST_F(CsrfFilterTest, NoVHostCsrfEntry) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
@@ -344,7 +345,7 @@ TEST_F(CsrfFilterTest, RequestFromAdditionalExactOrigin) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -356,7 +357,7 @@ TEST_F(CsrfFilterTest, RequestFromAdditionalRegexOrigin) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(0U, config_->stats().request_invalid_.value());
@@ -369,7 +370,7 @@ TEST_F(CsrfFilterTest, RequestFromInvalidAdditionalRegexOrigin) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 
   EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
   EXPECT_EQ(1U, config_->stats().request_invalid_.value());
