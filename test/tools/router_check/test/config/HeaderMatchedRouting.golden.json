@@ -11,10 +11,10 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [
+      "additional_request_headers": [
         {
-	  "field": "test_header",
-	  "value": "test"
+	        "field": "test_header",
+	        "value": "test"
         }
       ]
     },
@@ -25,14 +25,14 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [
+      "additional_request_headers": [
         {
-	  "field": "test_header_multiple1",
-	  "value": "test1"
+	        "field": "test_header_multiple1",
+	        "value": "test1"
         },
         {
-	  "field": "test_header_multiple2",
-	  "value": "test2"
+	        "field": "test_header_multiple2",
+	        "value": "test2"
         }
       ]
     },
@@ -43,10 +43,10 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [
+      "additional_request_headers": [
         {
-	  "field": "non_existent_header",
-	  "value": "foo"
+	        "field": "non_existent_header",
+	        "value": "foo"
         }
       ]
     },
@@ -57,10 +57,10 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [
+      "additional_request_headers": [
         {
-	  "field": "test_header_presence",
-	  "value": "test"
+	        "field": "test_header_presence",
+	        "value": "test"
         }
       ]
     },
@@ -71,10 +71,10 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [
+      "additional_request_headers": [
         {
-	  "field": "test_header_pattern",
-	  "value": "user=test-1223"
+	        "field": "test_header_pattern",
+	        "value": "user=test-1223"
         }
       ]
     },
@@ -85,7 +85,7 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [
+      "additional_request_headers": [
         {
           "field": "test_header_pattern",
           "value": "customer=test-1223"
@@ -99,7 +99,7 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [
+      "additional_request_headers": [
         {
           "field": "content-type",
           "value": "application/grpc+proto"
@@ -113,7 +113,7 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [
+      "additional_request_headers": [
         {
           "field": "content-type",
           "value": "application/grpc+proto"

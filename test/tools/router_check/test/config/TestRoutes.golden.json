@@ -261,7 +261,7 @@
     "validate": {"virtual_cluster_name": "other"}
   },
   {
-    "test_name": "Header_Fields",
+    "test_name": "RequestHeaderFields 1",
     "input": {
       ":authority": "api.lyft.com",
       ":path": "/host/rewrite/me",
@@ -269,7 +269,7 @@
     },
     "validate": {
       "host_rewrite": "new_host",
-      "header_fields": [
+      "request_header_fields": [
         {
           "field": ":authority",
           "value": "new_host"
@@ -290,14 +290,14 @@
     }
   },
   {
-    "test_name": "CustomHeaderFields",
+    "test_name": "RequestHeaderFields 2",
     "input": {
       ":authority": "api.lyft.com",
       ":path": "/customheaders",
       ":method": "GET"
     },
     "validate": {
-      "custom_header_fields": [
+      "request_header_fields": [
         {
           "field": "X-Client-IP",
           "value": "127.0.0.1"

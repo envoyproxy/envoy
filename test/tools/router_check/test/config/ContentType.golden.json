@@ -12,7 +12,7 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [{"field": "content-type", "value": "application/grpc"}]
+      "additional_request_headers": [{"field": "content-type", "value": "application/grpc"}]
     },
     "validate": {"cluster_name": "local_service_grpc"}
   },
@@ -21,7 +21,7 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/",
-      "additional_headers": [{"field": "content-type", "value": "foo"}]
+      "additional_request_headers": [{"field": "content-type", "value": "foo"}]
     },
     "validate": {"cluster_name": "local_service"}
   }
