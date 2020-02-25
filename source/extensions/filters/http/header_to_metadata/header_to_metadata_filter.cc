@@ -22,7 +22,7 @@ Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::C
 
   // don't allow an empty configuration
   if (!response_set_ && !request_set_) {
-    throw new EnvoyException("Must at least specify either response or request config");
+    throw EnvoyException("Must at least specify either response or request config");
   }
 }
 

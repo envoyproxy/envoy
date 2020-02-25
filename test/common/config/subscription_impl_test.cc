@@ -28,7 +28,7 @@ public:
       test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);
       break;
     case SubscriptionType::DeltaGrpc:
-      test_harness_ = std::make_unique<DeltaSubscriptionTestHarness>(init_fetch_timeout);
+      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);
       break;
     case SubscriptionType::Http:
       test_harness_ = std::make_unique<HttpSubscriptionTestHarness>(init_fetch_timeout);

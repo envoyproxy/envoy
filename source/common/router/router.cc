@@ -224,7 +224,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
   }
 
-  if (timeout.per_try_timeout_ >= timeout.global_timeout_) {
+  if (timeout.per_try_timeout_ >= timeout.global_timeout_ && timeout.global_timeout_.count() != 0) {
     timeout.per_try_timeout_ = std::chrono::milliseconds(0);
   }
 

@@ -36,14 +36,15 @@ protected:
   }
 
   // Inserts a value into the cache.
-  void insert(LookupContextPtr lookup, const Http::TestHeaderMapImpl& response_headers,
+  void insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& response_headers,
               const absl::string_view response_body) {
     InsertContextPtr inserter = cache_.makeInsertContext(move(lookup));
     inserter->insertHeaders(response_headers, false);
     inserter->insertBody(Buffer::OwnedImpl(response_body), nullptr, true);
   }
 
-  void insert(absl::string_view request_path, const Http::TestHeaderMapImpl& response_headers,
+  void insert(absl::string_view request_path,
+              const Http::TestResponseHeaderMapImpl& response_headers,
               const absl::string_view response_body) {
     insert(lookup(request_path), response_headers, response_body);
   }

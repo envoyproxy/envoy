@@ -22,9 +22,7 @@ namespace Config {
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, SubscriptionCallbacks& callbacks,
-                         const LocalInfo::LocalInfo& local_info,
-                         std::chrono::milliseconds init_fetch_timeout,
-                         Event::Dispatcher& dispatcher);
+                         const LocalInfo::LocalInfo& local_info);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const std::set<std::string>& cur_added,
@@ -52,7 +50,6 @@ public:
 private:
   void handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
-  void disableInitFetchTimeoutTimer();
 
   class ResourceVersion {
   public:
@@ -93,7 +90,6 @@ private:
   SubscriptionCallbacks& callbacks_;
   const LocalInfo::LocalInfo& local_info_;
   std::chrono::milliseconds init_fetch_timeout_;
-  Event::TimerPtr init_fetch_timeout_timer_;
 
   bool any_request_sent_yet_in_current_stream_{};
 

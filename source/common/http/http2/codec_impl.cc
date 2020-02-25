@@ -25,6 +25,32 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+class Http2ResponseCodeDetailValues {
+  // Invalid HTTP header field was received and stream is going to be
+  // closed.
+  const absl::string_view NgHttp2ErrHttpHeader = "http2.invalid.header.field";
+
+  // Violation in HTTP messaging rule.
+  const absl::string_view NgHttp2ErrHttpMessaging = "http2.violation.of.messaging.rule";
+
+  // none of the above
+  const absl::string_view NgHttp2ErrUnknown = "http2.unknown.nghttp2.error";
+
+public:
+  const absl::string_view strerror(int error_code) const {
+    switch (error_code) {
+    case NGHTTP2_ERR_HTTP_HEADER:
+      return NgHttp2ErrHttpHeader;
+    case NGHTTP2_ERR_HTTP_MESSAGING:
+      return NgHttp2ErrHttpMessaging;
+    default:
+      return NgHttp2ErrUnknown;
+    }
+  }
+};
+
+using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
+
 bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderString& value,
                                           HeaderString& cookies) {
   if (key != Headers::get().Cookie.get().c_str()) {
@@ -622,13 +648,18 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, nghttp2_strerror(error_code),
                  stream_id);
 
+  // Set details of error_code in the stream whenever we have one.
+  StreamImpl* stream = getStream(stream_id);
+  if (stream != nullptr) {
+    stream->setDetails(Http2ResponseCodeDetails::get().strerror(error_code));
+  }
+
   if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
     stats_.rx_messaging_error_.inc();
 
     if (stream_error_on_invalid_http_messaging_) {
       // The stream is about to be closed due to an invalid header or messaging. Don't kill the
       // entire connection if one stream has bad headers or messaging.
-      StreamImpl* stream = getStream(stream_id);
       if (stream != nullptr) {
         // See comment below in onStreamClose() for why we do this.
         stream->reset_due_to_messaging_error_ = true;
