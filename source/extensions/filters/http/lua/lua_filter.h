@@ -324,15 +324,10 @@ private:
  */
 class LuaFilterUtil : public Filters::Common::Lua::BaseLuaObject<LuaFilterUtil> {
 public:
-  LuaFilterUtil(Filter& filter);
-
-  Http::AsyncClient::Request* makeHttpCall(lua_State* state,
+  static Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
                                            Http::AsyncClient::Callbacks& callbacksListener);
 
   static void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index);
-
-private:
-  Filter& filter_;
 };
 
 /**

@@ -140,8 +140,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 
 int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
-  LuaFilterUtil luaFilterLibrary_ = LuaFilterUtil(filter_);
-  http_request_ = luaFilterLibrary_.makeHttpCall(state, *this);
+  http_request_ = LuaFilterUtil::makeHttpCall(state, filter_, *this);
   if (http_request_) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
@@ -428,21 +427,18 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   return 1;
 }
 
-FireAndForgetWriter::FireAndForgetWriter(Filter& filter) : filter_(filter), LuaFilterUtil {}
+FireAndForgetWriter::FireAndForgetWriter(Filter& filter) : filter_(filter) {}
 
 int FireAndForgetWriter::luaHttpCallAsync(lua_State* state) {
-  LuaFilterUtil* luaFilterUtil_ = new LuaFilterUtil(filter_);
-  if (luaFilterUtil_->makeHttpCall(state, *this)) {
+  if (LuaFilterUtil::makeHttpCall(state, filter_, *this)) {
     return 0;
   } else {
     return 2;
   }
 }
 
-LuaFilterUtil::LuaFilterUtil(Filter& filter) : filter_(filter) {}
-
 Http::AsyncClient::Request*
-LuaFilterUtil::makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& callbacksListener) {
+LuaFilterUtil::makeHttpCall(lua_State* state, Filter& filter, Http::AsyncClient::Callbacks& callbacksListener) {
   const std::string cluster = luaL_checkstring(state, 2);
   luaL_checktype(state, 3, LUA_TTABLE);
   size_t body_size;
@@ -452,7 +448,7 @@ LuaFilterUtil::makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& call
     luaL_error(state, "http call timeout must be >= 0");
   }
 
-  if (filter_.clusterManager().get(cluster) == nullptr) {
+  if (filter.clusterManager().get(cluster) == nullptr) {
     luaL_error(state, "http call cluster invalid. Must be configured");
   }
 
@@ -476,7 +472,7 @@ LuaFilterUtil::makeHttpCall(lua_State* state, Http::AsyncClient::Callbacks& call
     timeout = std::chrono::milliseconds(timeout_ms);
   }
 
-  return filter_.clusterManager().httpAsyncClientForCluster(cluster).send(
+  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(
       std::move(message), callbacksListener,
       Http::AsyncClient::RequestOptions().setTimeout(timeout));
 }
