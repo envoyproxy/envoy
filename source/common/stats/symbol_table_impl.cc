@@ -466,7 +466,7 @@ void StatNameStorage::free(SymbolTable& table) {
 
 void StatNamePool::clear() {
   for (StatNameStorage& storage : storage_vector_) {
-   storage.free(symbol_table_);
+    storage.free(symbol_table_);
   }
   storage_vector_.clear();
 }
@@ -529,8 +529,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   return mem_block.release();
 }
 
-void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names,
-                                   StatNameList& list) {
+void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names, StatNameList& list) {
   RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
   // First encode all the names.

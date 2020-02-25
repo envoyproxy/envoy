@@ -21,8 +21,8 @@ namespace Stats {
  */
 class MetricHelper {
 public:
-  MetricHelper(StatName name, StatName tag_extracted_name,
-               const std::vector<Tag>& tags, SymbolTable& symbol_table);
+  MetricHelper(StatName name, StatName tag_extracted_name, const std::vector<Tag>& tags,
+               SymbolTable& symbol_table);
   ~MetricHelper();
 
   StatName statName() const;
@@ -58,8 +58,8 @@ public:
   MetricImpl(absl::string_view name, absl::string_view tag_extracted_name,
              const std::vector<Tag>& tags, SymbolTable& symbol_table)
       : MetricImpl(StatNameManagedStorage(name, symbol_table).statName(),
-                   StatNameManagedStorage(tag_extracted_name, symbol_table).statName(),
-                   tags, symbol_table) {}
+                   StatNameManagedStorage(tag_extracted_name, symbol_table).statName(), tags,
+                   symbol_table) {}
 
   // Alternate API to take the name as a StatName, which is needed at most call-sites.
   // TODO(jmarantz): refactor impl to either be able to pass string_view at call-sites
@@ -71,7 +71,8 @@ public:
 
   // Empty construction of a MetricImpl; used for null stats.
   explicit MetricImpl(SymbolTable& symbol_table)
-      : MetricImpl(StatNameManagedStorage("", symbol_table).statName(), "", std::vector<Tag>(),
+      : MetricImpl(StatNameManagedStorage("", symbol_table).statName(),
+                   StatNameManagedStorage("", symbol_table).statName(), std::vector<Tag>(),
                    symbol_table) {}
   std::vector<Tag> tags() const override { return helper_.tags(constSymbolTable()); }
   StatName statName() const override { return helper_.statName(); }

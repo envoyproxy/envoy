@@ -50,8 +50,7 @@ namespace Stats {
 class FakeSymbolTableImpl : public SymbolTable {
 public:
   // SymbolTable
-  void populateList(const StatName* names, uint32_t num_names,
-                    StatNameList& list) override {
+  void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override {
     // This implementation of populateList is similar to
     // SymbolTableImpl::populateList. This variant is more efficient for
     // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
