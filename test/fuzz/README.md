@@ -4,7 +4,7 @@ Envoy is fuzz tested via [OSS-Fuzz](https://github.com/google/oss-fuzz). We foll
 practices described in the OSS-Fuzz [ideal integration
 page](https://github.com/google/oss-fuzz/blob/master/docs/ideal_integration.md).
 
-## Envoy's fuz targets
+## Envoy's fuzz targets
 
 Envoy has the following fuzz targets:
 
