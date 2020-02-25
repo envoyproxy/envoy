@@ -15,7 +15,7 @@ namespace Configuration {
  * Implemented for each RequestIDUtils::Utilities and registered via Registry::registerFactory or
  * the convenience class RegisterFactory.
  */
-class RequestIDUtilsFactory : public Envoy::Config::UntypedFactory {
+class RequestIDUtilsFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~RequestIDUtilsFactory() = default;
 
@@ -24,7 +24,8 @@ public:
    * @param config the custom configuration for this request id utilities type.
    * @param context general filter context through which persistent resources can be accessed.
    */
-  virtual RequestIDUtils::UtilitiesSharedPtr createUtilitiesInstance(FactoryContext& context) PURE;
+  virtual RequestIDUtils::UtilitiesSharedPtr
+  createUtilitiesInstance(const Protobuf::Message& config, FactoryContext& context) PURE;
 };
 
 } // namespace Configuration

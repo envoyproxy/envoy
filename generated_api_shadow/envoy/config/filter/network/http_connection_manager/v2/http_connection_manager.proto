@@ -485,9 +485,9 @@ message HttpConnectionManager {
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
 
-  // The Name of the extension to use for request ID utilities. This includes operations such as
+  // The configuration of the extension to use for request ID utilities. This includes operations such as
   // generation, validation, and associated tracing operations.
-  string request_id_utils_name = 36;
+  RequestIDUtils request_id_utils = 36;
 }
 
 message Rds {
@@ -631,6 +631,20 @@ message HttpFilter {
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
+  oneof config_type {
+    google.protobuf.Struct config = 2 [deprecated = true];
+
+    google.protobuf.Any typed_config = 4;
+  }
+}
+
+message RequestIDUtils {
+  reserved 3;
+
+  // The name of the request id utilities extension to create.
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Request ID utility specific configuration.
   oneof config_type {
     google.protobuf.Struct config = 2 [deprecated = true];
 
