@@ -65,7 +65,7 @@ message ValidationInput {
   // Additional headers to be added as input for route determination.
   // The “:authority”, “:path”, “:method”, “x-forwarded-proto”, and “x-envoy-internal” fields are
   // specified by the other config options and should not be set here.
-  repeated envoy.config.core.v3.HeaderValue additional_headers = 8 [deprecated=true];
+  repeated envoy.config.core.v3.HeaderValue additional_headers = 8 [deprecated = true];
   repeated envoy.config.core.v3.HeaderValue additional_request_headers = 10;
   repeated envoy.config.core.v3.HeaderValue additional_response_headers = 11;
 

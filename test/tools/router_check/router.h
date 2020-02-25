@@ -55,7 +55,8 @@ struct ToolConfig {
   int random_value_{0};
 
 private:
-  ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers, std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers, int random_value);
+  ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
+             std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers, int random_value);
   Stats::TestSymbolTable symbol_table_;
 };
 
@@ -144,13 +145,13 @@ private:
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   bool compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
-                          const std::string& expected);
+                                 const std::string& expected);
   bool compareRequestHeaderField(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+                                 const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   bool compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
-                                const std::string& expected);
+                                  const std::string& expected);
   bool compareResponseHeaderField(ToolConfig& tool_config,
-                                const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+                                  const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.

@@ -24,8 +24,10 @@ ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
   int random_value = input->getInteger("random_value", 0);
 
   // Add header field values
-  std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers(new Http::TestRequestHeaderMapImpl());
-  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(new Http::TestResponseHeaderMapImpl());
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers(
+      new Http::TestRequestHeaderMapImpl());
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
+      new Http::TestResponseHeaderMapImpl());
   request_headers->addCopy(":authority", input->getString(":authority", ""));
   request_headers->addCopy(":path", input->getString(":path", ""));
   request_headers->addCopy(":method", input->getString(":method", "GET"));
@@ -36,14 +38,18 @@ ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
   }
 
   if (input->hasObject("additional_request_headers")) {
-    for (const Json::ObjectSharedPtr& header_config : input->getObjectArray("additional_request_headers")) {
-      request_headers->addCopy(header_config->getString("field"), header_config->getString("value"));
+    for (const Json::ObjectSharedPtr& header_config :
+         input->getObjectArray("additional_request_headers")) {
+      request_headers->addCopy(header_config->getString("field"),
+                               header_config->getString("value"));
     }
   }
 
   if (input->hasObject("additional_response_headers")) {
-    for (const Json::ObjectSharedPtr& header_config : input->getObjectArray("additional_response_headers")) {
-      response_headers->addCopy(header_config->getString("field"), header_config->getString("value"));
+    for (const Json::ObjectSharedPtr& header_config :
+         input->getObjectArray("additional_response_headers")) {
+      response_headers->addCopy(header_config->getString("field"),
+                                header_config->getString("value"));
     }
   }
 
@@ -52,8 +58,10 @@ ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
 
 ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem& check_config) {
   // Add header field values
-  std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers(new Http::TestRequestHeaderMapImpl());
-  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(new Http::TestResponseHeaderMapImpl());
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers(
+      new Http::TestRequestHeaderMapImpl());
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
+      new Http::TestResponseHeaderMapImpl());
   request_headers->addCopy(":authority", check_config.input().authority());
   request_headers->addCopy(":path", check_config.input().path());
   request_headers->addCopy(":method", check_config.input().method());
@@ -77,14 +85,15 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
     }
   }
 
-  return ToolConfig(std::move(request_headers), std::move(response_headers), check_config.input().random_value());
+  return ToolConfig(std::move(request_headers), std::move(response_headers),
+                    check_config.input().random_value());
 }
 
 ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
                        std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers,
                        int random_value)
-    : request_headers_(std::move(request_headers)),
-      response_headers_(std::move(response_headers)), random_value_(random_value) {}
+    : request_headers_(std::move(request_headers)), response_headers_(std::move(response_headers)),
+      random_value_(random_value) {}
 
 // static
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
@@ -133,14 +142,19 @@ void RouterCheckTool::assignRuntimeFraction(
   }
 }
 
-void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config, Envoy::StreamInfo::StreamInfoImpl stream_info) {
+void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
+                                      Envoy::StreamInfo::StreamInfoImpl stream_info) {
   if (!headers_finalized_ && tool_config.route_ != nullptr) {
     if (tool_config.route_->directResponseEntry() != nullptr) {
-      tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_, true);
-      tool_config.route_->directResponseEntry()->finalizeResponseHeaders(*tool_config.response_headers_, stream_info);
+      tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
+                                                                   true);
+      tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
+          *tool_config.response_headers_, stream_info);
     } else if (tool_config.route_->routeEntry() != nullptr) {
-      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.request_headers_, stream_info, true);
-      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.response_headers_, stream_info);
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.request_headers_,
+                                                               stream_info, true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.response_headers_,
+                                                                stream_info);
     }
   }
 
@@ -213,9 +227,10 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
       }
     }
     if (validate->hasObject("request_header_fields")) {
-      for (const Json::ObjectSharedPtr& header_field : validate->getObjectArray("request_header_fields")) {
+      for (const Json::ObjectSharedPtr& header_field :
+           validate->getObjectArray("request_header_fields")) {
         if (!compareRequestHeaderField(tool_config, header_field->getString("field"),
-                                header_field->getString("value"))) {
+                                       header_field->getString("value"))) {
           no_failures = false;
         }
       }
@@ -224,7 +239,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
       for (const Json::ObjectSharedPtr& header_field :
            validate->getObjectArray("response_header_fields")) {
         if (!compareResponseHeaderField(tool_config, header_field->getString("field"),
-                                      header_field->getString("value"))) {
+                                        header_field->getString("value"))) {
           no_failures = false;
         }
       }
@@ -441,7 +456,7 @@ bool RouterCheckTool::compareRequestHeaderField(
 }
 
 bool RouterCheckTool::compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
-                                         const std::string& expected) {
+                                                const std::string& expected) {
   std::string actual = tool_config.request_headers_->get_(field);
   return compareResults(actual, expected, "request_header_fields");
 }
@@ -460,7 +475,7 @@ bool RouterCheckTool::compareResponseHeaderField(
 }
 
 bool RouterCheckTool::compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
-                                               const std::string& expected) {
+                                                 const std::string& expected) {
   std::string actual = tool_config.response_headers_->get_(field);
   return compareResults(actual, expected, "response_header_fields");
 }
