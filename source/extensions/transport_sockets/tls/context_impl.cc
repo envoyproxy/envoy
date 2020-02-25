@@ -1010,18 +1010,23 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           this);
     }
 
-    if (!session_ticket_keys_.empty()) {
-      SSL_CTX_set_tlsext_ticket_key_cb(
-          ctx.ssl_ctx_.get(),
-          [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
-             int encrypt) -> int {
-            ContextImpl* context_impl =
-                static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
-            ServerContextImpl* server_context_impl = dynamic_cast<ServerContextImpl*>(context_impl);
-            RELEASE_ASSERT(server_context_impl != nullptr, ""); // for Coverity
-            return server_context_impl->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
-                                                             encrypt);
-          });
+    if (config.disableSessionTickets()) {
+      SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_NO_TICKET);
+    } else {
+      if (!session_ticket_keys_.empty()) {
+        SSL_CTX_set_tlsext_ticket_key_cb(
+            ctx.ssl_ctx_.get(),
+            [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
+               int encrypt) -> int {
+              ContextImpl* context_impl =
+                  static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+              ServerContextImpl* server_context_impl =
+                  dynamic_cast<ServerContextImpl*>(context_impl);
+              RELEASE_ASSERT(server_context_impl != nullptr, ""); // for Coverity
+              return server_context_impl->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
+                                                               encrypt);
+            });
+      }
     }
 
     if (config.sessionTimeout()) {

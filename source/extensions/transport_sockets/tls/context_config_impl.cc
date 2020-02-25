@@ -373,8 +373,16 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
-      session_ticket_keys_provider_(
-          getTlsSessionTicketKeysConfigProvider(factory_context, config)) {
+      session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
+      disable_session_tickets_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, disable_session_tickets, false)) {
+
+  if (disable_session_tickets_ & session_ticket_keys_provider_ != nullptr) {
+    throw EnvoyException(
+        fmt::format("TLS session tickets have been disabled, but either session_ticket_keys or "
+                    "session_ticket_keys_sds_secret_config has been set"));
+  }
+
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
     stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(
