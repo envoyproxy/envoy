@@ -38,14 +38,14 @@ private:
 Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
   Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
                                           scope.symbolTable());
-  return scope.counterFromStatName(stat_name.statName(), absl::nullopt);
+  return scope.counterFromStatName(stat_name.statName());
 }
 
 Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_view b,
                         Stats::Gauge::ImportMode import_mode) {
   Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
                                           scope.symbolTable());
-  return scope.gaugeFromStatName(stat_name.statName(), absl::nullopt, import_mode);
+  return scope.gaugeFromStatName(stat_name.statName(), import_mode);
 }
 
 } // namespace

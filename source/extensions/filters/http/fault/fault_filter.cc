@@ -88,7 +88,7 @@ FaultFilterConfig::FaultFilterConfig(
 void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
   Stats::SymbolTable::StoragePtr storage =
       scope_.symbolTable().join({stats_prefix_, downstream_cluster, stat_name});
-  scope_.counterFromStatName(Stats::StatName(storage.get()), absl::nullopt).inc();
+  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}

@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
@@ -160,8 +161,7 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterFromStatName(StatName name,
-                               const absl::optional<StatNameTagVector>& tags) override {
+  Counter& counterFromStatName(const StatName& name, StatNameTagVectorOptRef tags) override {
     return default_scope_->counterFromStatName(name, tags);
   }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
@@ -169,14 +169,14 @@ public:
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
+  Gauge& gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
                            Gauge::ImportMode import_mode) override {
     return default_scope_->gaugeFromStatName(name, tags, import_mode);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
+  Histogram& histogramFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
                                    Histogram::Unit unit) override {
     return default_scope_->histogramFromStatName(name, tags, unit);
   }
@@ -283,12 +283,11 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatName(StatName name,
-                                 const absl::optional<StatNameTagVector>& tags) override;
+    Counter& counterFromStatName(const StatName& name, StatNameTagVectorOptRef tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
+    Gauge& gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
                              Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
+    Histogram& histogramFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
                                      Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {

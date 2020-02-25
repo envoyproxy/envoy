@@ -48,14 +48,21 @@ public:
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
+   * Creates a Counter from the stat name. Tag extraction will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a counter within the scope's namespace.
+   */
+  Counter& counterFromStatName(const StatName& name) {
+    return counterFromStatName(name, absl::nullopt);
+  }
+  /**
    * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
    * will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param tags optionally specified tags.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatName(StatName name,
-                                       const absl::optional<StatNameTagVector>& tags) PURE;
+  virtual Counter& counterFromStatName(const StatName& name, StatNameTagVectorOptRef tags) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
@@ -65,6 +72,16 @@ public:
   virtual Counter& counter(const std::string& name) PURE;
 
   /**
+   * Creates a Gauge from the stat name. Tag extraction will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @return a gauge within the scope's namespace.
+   */
+  Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
+    return gaugeFromStatName(name, absl::nullopt, import_mode);
+  }
+
+  /**
    * Creates a Gauge from the stat name and tags. If tags are not provided, tag extraction
    * will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
@@ -72,7 +89,7 @@ public:
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatName(StatName name, const absl::optional<StatNameTagVector>& tags,
+  virtual Gauge& gaugeFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
                                    Gauge::ImportMode import_mode) PURE;
 
   /**
@@ -89,6 +106,16 @@ public:
   virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
 
   /**
+   * Creates a Histogram from the stat name. Tag extraction will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param unit The unit of measurement.
+   * @return a histogram within the scope's namespace with a particular value type.
+   */
+  Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
+    return histogramFromStatName(name, absl::nullopt, unit);
+  }
+
+  /**
    * Creates a Histogram from the stat name and tags. If tags are not provided, tag extraction
    * will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
@@ -96,8 +123,7 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(StatName name,
-                                           const absl::optional<StatNameTagVector>& tags,
+  virtual Histogram& histogramFromStatName(const StatName& name, StatNameTagVectorOptRef tags,
                                            Histogram::Unit unit) PURE;
 
   /**

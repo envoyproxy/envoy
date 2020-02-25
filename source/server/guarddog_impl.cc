@@ -34,12 +34,10 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       }()),
       watchdog_miss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage("server.watchdog_miss", stats_scope.symbolTable())
-              .statName(),
-          absl::nullopt)),
+              .statName())),
       watchdog_megamiss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage("server.watchdog_mega_miss", stats_scope.symbolTable())
-              .statName(),
-          absl::nullopt)),
+              .statName())),
       dispatcher_(api.allocateDispatcher()),
       loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
   start(api);
@@ -167,13 +165,11 @@ GuardDogImpl::WatchedDog::WatchedDog(Stats::Scope& stats_scope, const std::strin
       miss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_miss", thread_name),
                                         stats_scope.symbolTable())
-              .statName(),
-          absl::nullopt)),
+              .statName())),
       megamiss_counter_(stats_scope.counterFromStatName(
           Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_mega_miss", thread_name),
                                         stats_scope.symbolTable())
-              .statName(),
-          absl::nullopt)) {}
+              .statName())) {}
 
 } // namespace Server
 } // namespace Envoy

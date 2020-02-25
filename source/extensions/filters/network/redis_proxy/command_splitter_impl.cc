@@ -493,7 +493,7 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
       to_lower_name.c_str(),
       std::make_shared<HandlerData>(HandlerData{
           CommandStats{ALL_COMMAND_STATS(POOL_COUNTER_PREFIX(scope, command_stat_prefix))
-                           scope.histogramFromStatName(storage.statName(), absl::nullopt,
+                           scope.histogramFromStatName(storage.statName(),
                                                        latency_in_micros
                                                            ? Stats::Histogram::Unit::Microseconds
                                                            : Stats::Histogram::Unit::Milliseconds)},

@@ -135,8 +135,8 @@ TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
 
 TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   ScopePtr scope1 = store_->createScope("scope1.");
-  Counter& c1 = store_->counterFromStatName(makeStatName("c1"), absl::nullopt);
-  Counter& c2 = scope1->counterFromStatName(makeStatName("c2"), absl::nullopt);
+  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
+  Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
   EXPECT_EQ("c1", c1.tagExtractedName());
@@ -144,10 +144,8 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 =
-      store_->gaugeFromStatName(makeStatName("g1"), absl::nullopt, Gauge::ImportMode::Accumulate);
-  Gauge& g2 =
-      scope1->gaugeFromStatName(makeStatName("g2"), absl::nullopt, Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
+  Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
   EXPECT_EQ("g1", g1.tagExtractedName());
@@ -155,10 +153,10 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g1.tags().size());
 
-  Histogram& h1 = store_->histogramFromStatName(makeStatName("h1"), absl::nullopt,
-                                                Stats::Histogram::Unit::Unspecified);
-  Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"), absl::nullopt,
-                                                Stats::Histogram::Unit::Unspecified);
+  Histogram& h1 =
+      store_->histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 =
+      scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
@@ -170,8 +168,7 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   h2.recordValue(200);
 
   ScopePtr scope2 = scope1->createScope("foo.");
-  EXPECT_EQ("scope1.foo.bar",
-            scope2->counterFromStatName(makeStatName("bar"), absl::nullopt).name());
+  EXPECT_EQ("scope1.foo.bar", scope2->counterFromStatName(makeStatName("bar")).name());
 
   // Validate that we sanitize away bad characters in the stats prefix.
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));

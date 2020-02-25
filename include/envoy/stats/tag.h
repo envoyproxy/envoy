@@ -4,6 +4,8 @@
 
 #include "envoy/stats/symbol_table.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -23,6 +25,7 @@ using TagVector = std::vector<Tag>;
 
 using StatNameTag = std::pair<StatName, StatName>;
 using StatNameTagVector = std::vector<StatNameTag>;
+using StatNameTagVectorOptRef = absl::optional<std::reference_wrapper<StatNameTagVector>>;
 
 } // namespace Stats
 } // namespace Envoy

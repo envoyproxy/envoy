@@ -71,10 +71,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    cluster_->statsScope().counterFromStatName(stat_names.ok_, absl::nullopt).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
-    cluster_->statsScope().counterFromStatName(stat_names.error_, absl::nullopt).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     if (!config_->failureModeAllow()) {
       state_ = State::Responded;
       decoder_callbacks_->sendLocalReply(
@@ -84,12 +84,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
           StreamInfo::ResponseFlag::RateLimitServiceError);
       return;
     }
-    cluster_->statsScope()
-        .counterFromStatName(stat_names.failure_mode_allowed_, absl::nullopt)
-        .inc();
+    cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    cluster_->statsScope().counterFromStatName(stat_names.over_limit_, absl::nullopt).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
     if (config_->runtime().snapshot().featureEnabled("ratelimit.thrift_filter_enforcing", 100)) {
       state_ = State::Responded;
       decoder_callbacks_->sendLocalReply(

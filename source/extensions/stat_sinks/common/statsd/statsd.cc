@@ -105,8 +105,7 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
     : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
       cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counterFromStatName(
-          Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName(),
-          absl::nullopt)) {
+          Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
   Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
                                             local_info);
   cluster_info_ = cluster_manager.get(cluster_name)->info();

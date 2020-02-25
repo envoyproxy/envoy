@@ -135,13 +135,13 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:
-    cluster_->statsScope().counterFromStatName(stat_names.ok_, absl::nullopt).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
-    cluster_->statsScope().counterFromStatName(stat_names.error_, absl::nullopt).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:
-    cluster_->statsScope().counterFromStatName(stat_names.over_limit_, absl::nullopt).inc();
+    cluster_->statsScope().counterFromStatName(stat_names.over_limit_).inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
                                            empty_stat_name,
@@ -171,9 +171,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
-      cluster_->statsScope()
-          .counterFromStatName(stat_names.failure_mode_allowed_, absl::nullopt)
-          .inc();
+      cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
       if (!initiating_call_) {
         appendRequestHeaders(req_headers_to_add);
         callbacks_->continueDecoding();

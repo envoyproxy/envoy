@@ -45,8 +45,8 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
       }
     }
 
-    // TODO(snowp): Will stat merging work properly for metrics with user provided tags?
-    auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, absl::nullopt, import_mode);
+    // TODO(snowp): Propagate tag values during hot restsarts.
+    auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, import_mode);
     if (gauge_ref.importMode() == Gauge::ImportMode::NeverImport) {
       // On the first iteration through the loop, the gauge will not be loaded into the scope
       // cache even though it might exist in another scope. Thus, we need to check again for

@@ -22,8 +22,7 @@ public:
    * @param name StaName the stat name to use.
    * @param stat_name_tags optionally StatNameTagVector the stat name tags to add to the stat name.
    */
-  TagStatNameJoiner(StatName prefix, StatName stat_name,
-                    const absl::optional<StatNameTagVector>& stat_name_tags,
+  TagStatNameJoiner(StatName prefix, StatName stat_name, StatNameTagVectorOptRef stat_name_tags,
                     SymbolTable& symbol_table);
 
   /**
@@ -31,7 +30,7 @@ public:
    * @param name StaName the stat name to use.
    * @param stat_name_tags StatNameTagVector the stat name tags to optionally add to the stat name.
    */
-  TagStatNameJoiner(StatName stat_name, const absl::optional<StatNameTagVector>& stat_name_tags,
+  TagStatNameJoiner(StatName stat_name, StatNameTagVectorOptRef stat_name_tags,
                     SymbolTable& symbol_table);
 
   /**

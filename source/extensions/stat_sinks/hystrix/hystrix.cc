@@ -97,17 +97,15 @@ void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_in
   // (alternative: each request including the retries counted as 1)
   // since timeouts are 504 (or 408), deduce them from here ("-" sign).
   // Timeout retries were not counted here anyway.
-  uint64_t errors =
-      cluster_stats_scope.counterFromStatName(upstream_rq_5xx_, absl::nullopt).value() +
-      cluster_stats_scope.counterFromStatName(retry_upstream_rq_5xx_, absl::nullopt).value() +
-      cluster_stats_scope.counterFromStatName(upstream_rq_4xx_, absl::nullopt).value() +
-      cluster_stats_scope.counterFromStatName(retry_upstream_rq_4xx_, absl::nullopt).value() -
-      cluster_stats.upstream_rq_timeout_.value();
+  uint64_t errors = cluster_stats_scope.counterFromStatName(upstream_rq_5xx_).value() +
+                    cluster_stats_scope.counterFromStatName(retry_upstream_rq_5xx_).value() +
+                    cluster_stats_scope.counterFromStatName(upstream_rq_4xx_).value() +
+                    cluster_stats_scope.counterFromStatName(retry_upstream_rq_4xx_).value() -
+                    cluster_stats.upstream_rq_timeout_.value();
 
   pushNewValue(cluster_stats_cache.errors_, errors);
 
-  uint64_t success =
-      cluster_stats_scope.counterFromStatName(upstream_rq_2xx_, absl::nullopt).value();
+  uint64_t success = cluster_stats_scope.counterFromStatName(upstream_rq_2xx_).value();
   pushNewValue(cluster_stats_cache.success_, success);
 
   uint64_t rejected = cluster_stats.upstream_rq_pending_overflow_.value();
@@ -382,8 +380,7 @@ void HystrixSink::flush(Stats::MetricSnapshot& snapshot) {
         *cluster_stats_cache_ptr, cluster_info->name(),
         cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
         cluster_info->statsScope()
-            .gaugeFromStatName(membership_total_, absl::nullopt,
-                               Stats::Gauge::ImportMode::Accumulate)
+            .gaugeFromStatName(membership_total_, Stats::Gauge::ImportMode::Accumulate)
             .value(),
         server_.statsFlushInterval(), time_histograms[cluster_info->name()], ss);
   }
