@@ -20,10 +20,10 @@
     "input": {
       ":authority": "www.lyft.com",
       ":path": "/bar",
-      "additional_headers": [
+      "additional_request_headers": [
         {
-	  "field": "some_header",
-	  "value": "some_cluster"
+	        "field": "some_header",
+	        "value": "some_cluster"
         }
       ]
     },

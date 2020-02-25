@@ -24,7 +24,20 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
               "random_value": {"type": "integer"},
               "ssl": {"type": "boolean"},
               "internal": {"type": "boolean"},
-              "additional_headers": {
+              "additional_request_headers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": {"type": "string"},
+                    "value": {"type": "string"}
+                  },
+                  "additionalProperties": false,
+                  "required": ["field", "value"],
+                  "maxProperties": 2
+                }
+              },
+              "additional_response_headers": {
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -50,7 +63,7 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
               "host_rewrite": {"type": "string"},
               "path_rewrite": {"type": "string"},
               "path_redirect": {"type": "string"},
-              "header_fields": {
+              "request_header_fields": {
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -63,7 +76,7 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
                  "maxProperties": 2
                 }
               },
-              "custom_header_fields": {
+              "response_header_fields": {
                 "type": "array",
                 "items": {
                   "type": "object",
