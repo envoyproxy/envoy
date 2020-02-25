@@ -23,7 +23,8 @@ StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& corout
         if (state_ == State::Running) {
           throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
         }
-      }), fireAndForgetWriter_(new FireAndForgetWriter(filter)) {}
+      }),
+      fireAndForgetWriter_(new FireAndForgetWriter(filter)) {}
 
 Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
@@ -438,7 +439,8 @@ int FireAndForgetWriter::luaHttpCallAsync(lua_State* state) {
 }
 
 Http::AsyncClient::Request*
-LuaFilterUtil::makeHttpCall(lua_State* state, Filter& filter, Http::AsyncClient::Callbacks& callbacksListener) {
+LuaFilterUtil::makeHttpCall(lua_State* state, Filter& filter,
+                            Http::AsyncClient::Callbacks& callbacksListener) {
   const std::string cluster = luaL_checkstring(state, 2);
   luaL_checktype(state, 3, LUA_TTABLE);
   size_t body_size;
