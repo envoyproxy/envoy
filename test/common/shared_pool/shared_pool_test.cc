@@ -97,7 +97,7 @@ TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
     createObjectSharedPool(pool);
     Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
     auto thread =
-        thread_factory.createThread([&pool, this]() { pool->deleteObject(std::hash<int>{}(4)); });
+        thread_factory.createThread([&pool]() { pool->deleteObject(std::hash<int>{}(4)); });
     thread->join();
   }
 }
