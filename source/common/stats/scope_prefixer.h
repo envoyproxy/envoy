@@ -26,15 +26,15 @@ public:
 
   Counter& counter(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return counterFromStatName(storage.statName());
+    return Scope::counterFromStatName(storage.statName());
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName(), import_mode);
+    return Scope::gaugeFromStatName(storage.statName(), import_mode);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName(), unit);
+    return Scope::histogramFromStatName(storage.statName(), unit);
   }
 
   CounterOptConstRef findCounter(StatName name) const override;

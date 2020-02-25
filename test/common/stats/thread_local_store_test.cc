@@ -509,7 +509,7 @@ class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase {};
 
 TEST_F(LookupWithStatNameTest, All) {
   ScopePtr scope1 = store_->createScope("scope1.");
-  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
+  Counter& c1 = store_->Store::counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -518,7 +518,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_->Store::gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -528,7 +528,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
 
   Histogram& h1 =
-      store_->histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+      store_->Store::histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
   Histogram& h2 =
       scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
