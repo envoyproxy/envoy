@@ -414,7 +414,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DownstreamTlsContext {
   // Common TLS context settings.
   CommonTlsContext common_tls_context = 1;
@@ -443,6 +443,11 @@ message DownstreamTlsContext {
     lt {seconds: 4294967296}
     gte {}
   }];
+
+  // If set to true, TLS session tickets are disabled. Setting this field to true and configuring either one of :ref:`session_ticket_keys
+  // <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys>` or :ref:`session_ticket_keys_sds_secret_config
+  // <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys_sds_secret_config>` will result in an error.
+  google.protobuf.BoolValue disable_session_tickets = 7;
 }
 
 message GenericSecret {
