@@ -10,30 +10,29 @@ Envoy has the following fuzz targets:
 
 | Fuzz Target                          | Component        | Data Type            |
 |--------------------------------------|------------------|----------------------|
-| codec_impl_fuzz_test                 | Codecs           | Untrusted Data       |
-| request_header_fuzz_test             | H/2 codec        | Downstream Untrusted |
-| response_header_fuzz_test            | H/2 codec        | Upstream Untrusted   |
-| h1_capture_direct_response_fuzz_test | H/1 codec        | Downstream Untrusted |
-| h1_capture_fuzz_test                 | H/1 codec        | Downstream Untrusted |
-| conn_manager_impl_fuzz_test          | HCM              | Untrusted Data       |
-| filter_fuzz_test                     | Filter           | Downstream Untrusted |
-| route_fuzz_test                      | Router           | Downstream Untrusted |
-| header_parser_fuzz_test              | Router           | Downstream Untrusted |
-| buffer_fuzz_test                     | Buffer           | Data Utility         |
-| new_buffer_fuzz_test                 | Buffer           | Data Utility         |
-| config_fuzz_test                     | Server           | Trusted / Configs    |
-| server_fuzz_test                     | Server           | Trusted / Configs    |
-| access_log_formatter_fuzz_test       | Access Logger    | Downstream Untrusted |
-| header_map_impl_fuzz_test            | HeaderMapImpl    | Data Utility         |
-| symbol_table_fuzz_test               | Stats            | Utility              |
-| stats_merger_fuzz_test               | Stats            | Utility              |
-| codec_fuzz_test                      | gRPC library     | Utility              |
-| evaluator_fuzz_test                  | CEL library      | Utility              |
-| utility_fuzz_test (string)           | string utility   | Utility              |
-| utility_fuzz_test                    | protobuf library | Utility              |
-| hash_fuzz_test                       | xxhash library   | Utility              |
-| json_fuzz_test                       | json library     | Utility              |
-| compressor_fuzz_test                 | zlib library     | Utility              |
+| [codec_impl_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/http/codec_impl_fuzz_test.cc)      | Codecs           | Untrusted Data       |
+| [request_header_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/http/http2/request_header_fuzz_test.cc)             | H/2 codec        | Downstream Untrusted |
+| [response_header_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/http/http2/response_header_fuzz_test.cc)            | H/2 codec        | Upstream Untrusted   |
+| [h1_capture_direct_response_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/integration/h1_capture_direct_response_fuzz_test.cc) | H/1 codec        | Downstream Untrusted |
+| [h1_capture_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/integration/h1_capture_fuzz_test.cc)                 | H/1 codec        | Downstream Untrusted |
+| [conn_manager_impl_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/http/conn_manager_impl_fuzz_test.cc)          | HCM              | Untrusted Data       |
+| [filter_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/extensions/filters/http/common/fuzz/filter_fuzz_test.cc)                     | Filter           | Downstream Untrusted |
+| [route_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/router/route_fuzz_test.cc)                      | Router           | Downstream Untrusted |
+| [header_parser_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/router/header_parser_fuzz_test.cc)              | Router           | Downstream Untrusted |
+| [buffer_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/buffer/buffer_fuzz_test.cc)                     | Buffer           | Data Utility         |
+| [config_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/server/config_validation/config_fuzz_test.cc)                     | Server           | Trusted / Configs    |
+| [server_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/server/server_fuzz_test.cc)                     | Server           | Trusted / Configs    |
+| [access_log_formatter_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/access_log/access_log_formatter_fuzz_test.cc)       | Access Logger    | Downstream Untrusted |
+| [header_map_impl_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/http/header_map_impl_fuzz_test.cc)            | HeaderMapImpl    | Data Utility         |
+| [symbol_table_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/stats/symbol_table_fuzz_test.cc)               | Stats            | Utility              |
+| [stats_merger_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/stats/stat_merger_fuzz_test.cc)               | Stats            | Utility              |
+| [codec_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/grpc/codec_fuzz_test.cc)                      | gRPC library     | Utility              |
+| [evaluator_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/extensions/filters/common/expr/evaluator_fuzz_test.cc)                  | CEL library      | Utility              |
+| [utility_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/common/utility_fuzz_test.cc)                    | string utility   | Utility              |
+| [utility_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/http/utility_fuzz_test.cc)                    | protobuf library | Utility              |
+| [hash_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/common/hash_fuzz_test.cc)                       | xxhash library   | Utility              |
+| [json_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/json/json_fuzz_test.cc)                       | json library     | Utility              |
+| [compressor_fuzz_test](https://github.com/envoyproxy/envoy/blob/master/test/common/compressor/compressor_fuzz_test.cc)                 | zlib library     | Utility              |
 
 ## Test environment
 
