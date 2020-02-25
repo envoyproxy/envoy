@@ -10,6 +10,8 @@ Version history
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * grpc-json: added support for building HTTP request into
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* ext_authz: disabled the use of lowercase string matcher for headers matching in HTTP-based `ext_authz`.
+  Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher` to false.
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * network filters: network filter extensions use the "envoy.filters.network" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
@@ -18,6 +20,7 @@ Version history
 * router: added :ref:`auto_san_validation <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>` to support overrriding SAN validation to transport socket for new upstream connections based on the downstream HTTP host/authority header.
 * router: added the ability to match a route based on whether a downstream TLS connection certificate has been
   :ref:`validated <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>`.
+* router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
 * sds: added :ref:`GenericSecret <envoy_api_msg_auth.GenericSecret>` to support secret of generic type.
 * stat sinks: stat sink extensions use the "envoy.stat_sinks" name space. A mapping of extension
   names is available in the :ref:`deprecated <deprecated>` documentation.

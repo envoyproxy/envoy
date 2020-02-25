@@ -80,7 +80,7 @@ if __name__ == "__main__":
     rununder = subprocess.Popen(sys.argv[1:],
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,
-                                text=True)
+                                universal_newlines=True)
     decode_stacktrace_log(sys.argv[1], rununder.stdout)
     rununder.wait()
     sys.exit(rununder.returncode)  # Pass back test pass/fail result

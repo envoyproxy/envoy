@@ -3125,7 +3125,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
   ASSERT_NE(nullptr, context);
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
+            Config::Metadata::metadataValue(&context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(envoy::config::core::v3::INBOUND, context->direction());
 }
