@@ -66,8 +66,8 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
 
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   Tracer tracer{expected_span_name, std::move(broker_), server_.timeSource()};
-  auto span = tracer.startSpan(expected_span_name, expected_operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
+                               absl::nullopt /*headers*/);
   span->setTag("http.method", expected_http_method);
   span->setTag("http.url", expected_http_url);
   span->setTag("user_agent", expected_user_agent);
@@ -88,8 +88,8 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
   constexpr auto expected_operation_name = "Create";
   const auto& broker = *broker_;
   Tracer tracer{expected_span_name, std::move(broker_), server_.timeSource()};
-  auto parent_span = tracer.startSpan(expected_span_name, expected_operation_name,
-                                      server_.timeSource().systemTime(), absl::nullopt /*headers*/);
+  auto parent_span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
+                                      absl::nullopt /*headers*/);
 
   const XRay::Span* xray_parent_span = static_cast<XRay::Span*>(parent_span.get());
   const std::string expected_parent_id = xray_parent_span->Id();
@@ -118,8 +118,7 @@ TEST_F(XRayTracerTest, UseExistingHeaderInformation) {
   constexpr auto operation_name = "my operation";
 
   Tracer tracer{span_name, std::move(broker_), server_.timeSource()};
-  auto span =
-      tracer.startSpan(span_name, operation_name, server_.timeSource().systemTime(), xray_header);
+  auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(), xray_header);
 
   const XRay::Span* xray_span = static_cast<XRay::Span*>(span.get());
   ASSERT_STREQ(xray_header.trace_id_.c_str(), xray_span->traceId().c_str());
@@ -131,7 +130,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
   constexpr auto operation_name = "my operation";
 
   Tracer tracer{span_name, std::move(broker_), server_.timeSource()};
-  auto span = tracer.startSpan(span_name, operation_name, server_.timeSource().systemTime(),
+  auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
   Http::HeaderMapImpl request_headers;
   span->injectContext(request_headers);
