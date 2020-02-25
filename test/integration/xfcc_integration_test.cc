@@ -46,7 +46,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_names: 
+    match_subject_alt_names:
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -57,7 +57,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_names: 
+    match_subject_alt_names:
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -737,6 +737,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"server.memory_allocated", "server.memory_allocated"},
       {"http.admin.downstream_cx_http2_active", "http.downstream_cx_http2_active"},
       {"server.memory_heap_size", "server.memory_heap_size"},
+      {"server.memory_physical_size", "server.memory_physical_size"},
       {"listener_manager.total_listeners_draining", "listener_manager.total_listeners_draining"},
       {"filesystem.write_total_buffered", "filesystem.write_total_buffered"},
       {"http.admin.downstream_cx_ssl_active", "http.downstream_cx_ssl_active"},
