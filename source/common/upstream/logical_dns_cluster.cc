@@ -111,7 +111,10 @@ void LogicalDnsCluster::startResolve() {
         }
 
         std::chrono::milliseconds refresh_rate = dns_refresh_rate_ms_;
-        if (status == Network::DnsResolver::ResolutionStatus::Success) {
+        // TODO(junr03): update in subsequent PR. The logical dns cluster could update is
+        // current_resolved_address_ to null if the cluster receives a successful, but empty DNS
+        // response.
+        if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
           // TODO(mattklein123): Move port handling into the DNS interface.
           ASSERT(response.front().address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
