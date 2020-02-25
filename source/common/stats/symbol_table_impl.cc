@@ -173,12 +173,13 @@ void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_blo
   mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
 }
 
-void SymbolTableImpl::Encoding::appendToMemBlock(StatName name, MemBlockBuilder<uint8_t>& mem_block) {
-  const uint8_t* data = name.dataIncludingSize();
+void SymbolTableImpl::Encoding::appendToMemBlock(StatName stat_name,
+                                                 MemBlockBuilder<uint8_t>& mem_block) {
+  const uint8_t* data = stat_name.dataIncludingSize();
   if (data == nullptr) {
     mem_block.appendOne(0);
   } else {
-    mem_block.appendData(absl::MakeSpan(data, name.size()));
+    mem_block.appendData(absl::MakeSpan(data, stat_name.size()));
   }
 }
 
