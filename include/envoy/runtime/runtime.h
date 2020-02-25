@@ -208,10 +208,10 @@ public:
   /**
    * Fetch raw runtime data based on key.
    * @param key supplies the key to fetch.
-   * @return const std::string& the value or empty string if the key does not exist.
+   * @param default_value supplies the default value if the key does not exist.
+   * @return std::string the value or empty string if the key does not exist.
    */
-  virtual const std::string& get(absl::string_view key,
-                                 const std::string& default_value) const PURE;
+  virtual std::string get(absl::string_view key, const std::string& default_value) const PURE;
 
   /**
    * Returns whether the key has any value set.
