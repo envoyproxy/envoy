@@ -39,6 +39,9 @@ Deprecated items below are listed in chronological order.
     envoy.tracers.dynamic_ot, envoy.dynamic.ot
     envoy.tracers.lightstep, envoy.lightstep
     envoy.tracers.zipkin, envoy.zipkin
+* The `header_fields`, `custom_header_fields`, and `additional_headers` fields for the route checker
+  tool have been deprecated in favor of `request_header_fields`, `response_header_fields`,
+  `additional_request_headers`, and `additional_response_headers`.
 
 1.13.0 (January 20, 2020)
 =========================
