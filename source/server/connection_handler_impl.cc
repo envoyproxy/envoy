@@ -88,7 +88,6 @@ void ConnectionHandlerImpl::removeFilterChains(
     if (listener.second.tcp_listener_.has_value()) {
       listener.second.tcp_listener_->get().removeFilterChains(
           draining_filter_chains.getDrainingFilterChains());
-      Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
     }
   }
   Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));

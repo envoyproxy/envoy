@@ -387,7 +387,10 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // TODO(lambdai): Optimize when ongoing update is equivalent to the new config
     /*case UpdateDecision::UpdateInFlight*/
     case UpdateDecision::Update:
-      new_listener = (*existing_active_listener)->newListenerWithFilterChain(config, hash);
+      ENVOY_LOG(debug, "use smart update path for listener name={} hash={}", name, hash);
+      new_listener =
+          (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
+      break;
     case UpdateDecision::NotSupported:
       // Fallback to traditional listener update. This is rare.
       new_listener = std::make_unique<ListenerImpl>(
@@ -395,7 +398,14 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
           added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
                         : server_.messageValidationContext().staticValidationVisitor(),
           server_.options().concurrency());
+      break;
     }
+  } else {
+    new_listener = std::make_unique<ListenerImpl>(
+        config, version_info, *this, name, added_via_api, workers_started_, hash,
+        added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
+                      : server_.messageValidationContext().staticValidationVisitor(),
+        server_.options().concurrency());
   }
   ListenerImpl& new_listener_ref = *new_listener;
 
@@ -612,6 +622,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
                                               absl::optional<uint64_t> overrided_listener,
                                               ListenerImpl& listener) {
   if (overrided_listener.has_value()) {
+    ENVOY_LOG(debug, "replacing existing listener {}", overrided_listener.value());
     worker.addListener(overrided_listener, listener, [this, &listener](bool success) -> void {
       server_.dispatcher().post([this, success, &listener]() -> void {
         // TODO: I don't have a concrete case to generate the failure.
@@ -676,9 +687,13 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
 void ListenerManagerImpl::onIntelligentListenerWarmed(ListenerImpl& listener) {
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
   auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+  ASSERT(existing_warming_listener != warming_listeners_.end());
+  ASSERT(*existing_warming_listener != nullptr);
 
-  (*existing_warming_listener)->debugLog("warm complete. updating active listener");
+  (*existing_warming_listener)
+      ->debugLog("intelligent listener warm complete. updating active listener");
   if (existing_active_listener != active_listeners_.end()) {
+    ASSERT(*existing_active_listener != nullptr);
     // The warmed listener should be added first so that the worker will accept new connections
     // when it stops listening on the old listener.
     for (const auto& worker : workers_) {
@@ -686,9 +701,9 @@ void ListenerManagerImpl::onIntelligentListenerWarmed(ListenerImpl& listener) {
     }
     // Finish active_listeners_ transformation before calling `drainListener` as it depends on their
     // state.
-    auto listener = std::move(*existing_active_listener);
+    auto previous_listener = std::move(*existing_active_listener);
     *existing_active_listener = std::move(*existing_warming_listener);
-    drainFilterChains(std::move(listener), **existing_active_listener);
+    drainFilterChains(std::move(previous_listener), **existing_active_listener);
   } else {
     for (const auto& worker : workers_) {
       addListenerToWorker(*worker, absl::nullopt, listener);
@@ -706,10 +721,11 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
   // First add the listener to the draining list.
   std::list<DrainingFilterChains>::iterator draining_group = draining_filter_groups_.emplace(
       draining_filter_groups_.begin(), std::move(listener), workers_.size());
-  listener->diffFilterChain(new_listener, [&draining_group](FilterChainImpl& filter_chain) mutable {
-    filter_chain.setDrainClose();
-    draining_group->draining_filter_chains_.push_back(&filter_chain);
-  });
+  draining_group->draining_listener_->diffFilterChain(
+      new_listener, [&draining_group](FilterChainImpl& filter_chain) mutable {
+        filter_chain.setDrainClose();
+        draining_group->draining_filter_chains_.push_back(&filter_chain);
+      });
   int filter_chain_size = draining_group->draining_filter_chains_.size();
   // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
   // restart. Same below inside the lambda.
@@ -717,8 +733,9 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
   // len(filter_chains). What we really need is accumulate(filter_chains, fc: len(fc))
   stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
 
-  draining_group->draining_listener_->debugLog(absl::StrCat(
-      "draining ", filter_chain_size, " filter chains in listener ", listener->name()));
+  draining_group->draining_listener_->debugLog(
+      absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
+                   draining_group->draining_listener_->name()));
 
   // In the intelligent path where filter chains are drained but listener is survived, the
   // connection is not impacted: the draining filter chains are not tracked by warmed up filter

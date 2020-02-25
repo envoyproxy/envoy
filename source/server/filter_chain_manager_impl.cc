@@ -144,6 +144,7 @@ void FilterChainManagerImpl::addFilterChain(
     FilterChainFactoryContextCreator& context_creator) {
   std::unordered_set<envoy::config::listener::v3alpha::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
+  int new_filter_chain_size = 0;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
@@ -192,6 +193,7 @@ void FilterChainManagerImpl::addFilterChain(
       // TODO(lambdai): remove static_pointer_cast
       filter_chain_impl = std::static_pointer_cast<FilterChainImpl>(
           filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator));
+      ++new_filter_chain_size;
     }
 
     addFilterChainForDestinationPorts(
@@ -200,8 +202,11 @@ void FilterChainManagerImpl::addFilterChain(
         filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
         filter_chain_match.source_ports(), filter_chain_impl);
+    fc_contexts_[*filter_chain] = filter_chain_impl;
   }
   convertIPsToTries();
+  ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
+            fc_contexts_.size(), new_filter_chain_size);
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(

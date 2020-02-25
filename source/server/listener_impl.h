@@ -218,7 +218,7 @@ public:
    */
   std::unique_ptr<ListenerImpl>
   newListenerWithFilterChain(const envoy::config::listener::v3alpha::Listener& config,
-                             uint64_t hash);
+                             bool workers_started, uint64_t hash);
 
   /**
    * Run the callback on each filter chain exists in this listener but not in another listener.
@@ -278,7 +278,7 @@ public:
   bool continueOnListenerFiltersTimeout() const override {
     return continue_on_listener_filters_timeout_;
   }
-  Stats::Scope& listenerScope() override { return *listener_scope_; }
+  Stats::Scope& listenerScope() override { return listener_factory_context_->listenerScope(); }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
   const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
@@ -322,8 +322,6 @@ private:
   Network::Address::InstanceConstSharedPtr address_;
 
   Network::ListenSocketFactorySharedPtr socket_factory_;
-  Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
-  Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   const bool bind_to_port_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;

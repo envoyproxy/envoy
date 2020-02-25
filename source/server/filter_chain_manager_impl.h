@@ -139,6 +139,11 @@ public:
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
   static bool isWildcardServerName(const std::string& name);
 
+  // TODO(lambdai): move to private
+  // Mapping from filter chain message to filter chain. This is used by LDS response handler to
+  // detect the filter chains in the intersection of existing listener and new listener.
+  FcContextMap fc_contexts_;
+
 private:
   void convertIPsToTries();
   using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
@@ -239,9 +244,7 @@ private:
   // This is the reference to a factory context where all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
-  // Mapping from filter chain message to filter chain. This is used by LDS response handler to
-  // detect the filter chains in the intersection of existing listener and new listener.
-  FcContextMap fc_contexts_;
+
   // Reference to the previous generation of filter chain manager. *this need to copy a subset from
   // the origin fc_contexts_ Caution: origin_ is not legit all the time.
   // TODO(lambdai): safer usage

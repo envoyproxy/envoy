@@ -185,10 +185,6 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
                            uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
                            uint32_t concurrency)
     : parent_(parent), address_(origin.address_),
-      global_scope_(parent_.server_.stats().createScope("")),
-      listener_scope_(
-          parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
-
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
@@ -198,7 +194,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       workers_started_(workers_started), hash_(hash), validation_visitor_(validation_visitor),
       dynamic_init_manager_(fmt::format("Listener {}", name)),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
-          "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
+          "ListenerImpl", [this] { parent_.onIntelligentListenerWarmed(*this); })),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
@@ -283,7 +279,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
   }
 
   Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
-      parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
+      parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
@@ -371,9 +367,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
                            uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
                            uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      global_scope_(parent_.server_.stats().createScope("")),
-      listener_scope_(
-          parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
@@ -467,7 +460,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
   }
 
   Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
-      parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
+      parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
@@ -683,28 +676,28 @@ ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3alpha::L
     return UpdateDecision::NotSupported;
   }
   UNREFERENCED_PARAMETER(config);
-  return UpdateDecision::NotSupported;
+  return UpdateDecision::Update;
 }
 
 ListenerImplPtr
 ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3alpha::Listener& config,
-                                         uint64_t hash) {
-  /*
-  const ListenerImpl& origin, const envoy::config::listener::v3alpha::Listener& config,
-               const std::string& version_info, ListenerManagerImpl& parent,
-               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency
-  */
-
+                                         bool workers_started, uint64_t hash) {
   return std::make_unique<ListenerImpl>(
-      *this, config, version_info_, parent_, name_, added_via_api_, workers_started_,
-      /* use new hash = */ hash, validation_visitor_, parent_.server_.options().concurrency());
+      *this, config, version_info_, parent_, name_, added_via_api_,
+      /* new new workers started state */ workers_started,
+      /* use new hash */ hash, validation_visitor_, parent_.server_.options().concurrency());
 }
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& listener,
                                    std::function<void(FilterChainImpl&)> callback) {
-  UNREFERENCED_PARAMETER(listener);
-  UNREFERENCED_PARAMETER(callback);
+  // consider compare FilterChainImpl ptr as in the second
+  for (const auto& filter_chain : filter_chain_manager_.fc_contexts_) {
+    if (listener.filter_chain_manager_.fc_contexts_.find(filter_chain.first) ==
+        listener.filter_chain_manager_.fc_contexts_.end()) {
+      // exists in this listener but not in other
+      callback(*filter_chain.second);
+    }
+  }
 }
 
 void ListenerImpl::cancelUpdate() {}
