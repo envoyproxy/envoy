@@ -4,6 +4,37 @@ Envoy is fuzz tested via [OSS-Fuzz](https://github.com/google/oss-fuzz). We foll
 practices described in the OSS-Fuzz [ideal integration
 page](https://github.com/google/oss-fuzz/blob/master/docs/ideal_integration.md).
 
+## Envoy's fuz targets
+
+Envoy has the following fuzz targets:
+
+| Fuzz Target                          | Component        | Data Type            |
+|--------------------------------------|------------------|----------------------|
+| codec_impl_fuzz_test                 | Codecs           | Untrusted Data       |
+| request_header_fuzz_test             | H/2 codec        | Downstream Untrusted |
+| response_header_fuzz_test            | H/2 codec        | Upstream Untrusted   |
+| h1_capture_direct_response_fuzz_test | H/1 codec        | Downstream Untrusted |
+| h1_capture_fuzz_test                 | H/1 codec        | Downstream Untrusted |
+| conn_manager_impl_fuzz_test          | HCM              | Untrusted Data       |
+| filter_fuzz_test                     | Filter           | Downstream Untrusted |
+| route_fuzz_test                      | Router           | Downstream Untrusted |
+| header_parser_fuzz_test              | Router           | Downstream Untrusted |
+| buffer_fuzz_test                     | Buffer           | Data Utility         |
+| new_buffer_fuzz_test                 | Buffer           | Data Utility         |
+| config_fuzz_test                     | Server           | Trusted / Configs    |
+| server_fuzz_test                     | Server           | Trusted / Configs    |
+| access_log_formatter_fuzz_test       | Access Logger    | Downstream Untrusted |
+| header_map_impl_fuzz_test            | HeaderMapImpl    | Data Utility         |
+| symbol_table_fuzz_test               | Stats            | Utility              |
+| stats_merger_fuzz_test               | Stats            | Utility              |
+| codec_fuzz_test                      | gRPC library     | Utility              |
+| evaluator_fuzz_test                  | CEL library      | Utility              |
+| utility_fuzz_test (string)           | string utility   | Utility              |
+| utility_fuzz_test                    | protobuf library | Utility              |
+| hash_fuzz_test                       | xxhash library   | Utility              |
+| json_fuzz_test                       | json library     | Utility              |
+| compressor_fuzz_test                 | zlib library     | Utility              |
+
 ## Test environment
 
 Tests should be unit test-like, fast and not require writable access to the filesystem (beyond
