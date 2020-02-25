@@ -245,7 +245,7 @@ Returns *headers* which is a table of response headers. Returns *body* which is 
 body. May be nil if there is no body.
 
 httpCallAsync()
-^^^^^^^^^^
+^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
