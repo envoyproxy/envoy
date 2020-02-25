@@ -289,7 +289,7 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
 
 JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : config_(config) {}
 
-Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& headers,
+Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   const auto status =
       config_.createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
@@ -373,7 +373,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::RequestTrailerMap&) {
   ASSERT(!error_);
 
   if (!transcoder_) {
@@ -396,7 +396,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
   decoder_callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
+Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
   if (!Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
     error_ = true;
@@ -409,7 +409,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
   response_headers_ = &headers;
 
   if (end_stream) {
-
     if (method_->server_streaming()) {
       // When there is no body in a streaming response, a empty JSON array is
       // returned by default. Set the content type correctly.
@@ -418,7 +417,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
 
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
     // The return value from encodeTrailers is ignored since it is always continue.
-    encodeTrailers(headers);
+    doTrailers(headers);
 
     return Http::FilterHeadersStatus::Continue;
   }
@@ -461,17 +460,19 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap& trailers) {
+// TODO(mattklein123): In future header refactor changes the HeaderMap interface will not have
+// all of the O(1) headers so we will have to refactor this further.
+void JsonTranscoderFilter::doTrailers(Http::HeaderMap& headers_or_trailers) {
   if (error_ || !transcoder_) {
-    return Http::FilterTrailersStatus::Continue;
+    return;
   }
 
   response_in_.finish();
 
   const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
-      Grpc::Common::getGrpcStatus(trailers, true);
-  if (grpc_status && maybeConvertGrpcStatus(*grpc_status, trailers)) {
-    return Http::FilterTrailersStatus::Continue;
+      Grpc::Common::getGrpcStatus(headers_or_trailers, true);
+  if (grpc_status && maybeConvertGrpcStatus(*grpc_status, headers_or_trailers)) {
+    return;
   }
 
   Buffer::OwnedImpl data;
@@ -483,12 +484,12 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   if (method_->server_streaming()) {
     // For streaming case, the headers are already sent, so just continue here.
-    return Http::FilterTrailersStatus::Continue;
+    return;
   }
 
   // If there was no previous headers frame, this |trailers| map is our |response_headers_|,
   // so there is no need to copy headers from one to the other.
-  bool is_trailers_only_response = response_headers_ == &trailers;
+  bool is_trailers_only_response = response_headers_ == &headers_or_trailers;
 
   if (!grpc_status || grpc_status.value() == Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
     response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
@@ -501,7 +502,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   if (!is_trailers_only_response) {
     // Copy the grpc-message header if it exists.
-    const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
+    const Http::HeaderEntry* grpc_message_header = headers_or_trailers.GrpcMessage();
     if (grpc_message_header) {
       response_headers_->setGrpcMessage(grpc_message_header->value().getStringView());
     }
@@ -514,7 +515,6 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
 
   response_headers_->setContentLength(
       encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
-  return Http::FilterTrailersStatus::Continue;
 }
 
 void JsonTranscoderFilter::setEncoderFilterCallbacks(

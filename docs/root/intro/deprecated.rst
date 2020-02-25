@@ -40,6 +40,13 @@ Deprecated items below are listed in chronological order.
     envoy.tracers.lightstep, envoy.lightstep
     envoy.tracers.zipkin, envoy.zipkin
 
+* The previous behavior of auto ignoring case in headers matching:
+  :ref:`allowed_headers <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationRequest.allowed_headers>`,
+  :ref:`allowed_upstream_headers <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>`,
+  and :ref:`allowed_client_headers <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>`
+  of HTTP-based `ext_authz` has been deprecated in favor of explicitly setting the
+  :ref:`ignore_case <envoy_api_field_type.matcher.StringMatcher.ignore_case>` field.
+
 1.13.0 (January 20, 2020)
 =========================
 * The `request_headers_for_tags` field in :ref:`HTTP connection manager

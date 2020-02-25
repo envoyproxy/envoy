@@ -31,8 +31,8 @@ public:
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;
 
   // Http::RequestEncoder
-  void encodeHeaders(const Http::HeaderMap& headers, bool end_stream) override;
-  void encodeTrailers(const Http::HeaderMap& trailers) override;
+  void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) override;
+  void encodeTrailers(const Http::RequestTrailerMap& trailers) override;
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;

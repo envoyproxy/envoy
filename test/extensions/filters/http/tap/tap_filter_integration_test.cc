@@ -42,12 +42,12 @@ public:
     return nullptr;
   }
 
-  void makeRequest(const Http::TestHeaderMapImpl& request_headers,
+  void makeRequest(const Http::TestRequestHeaderMapImpl& request_headers,
                    const std::vector<std::string>& request_body_chunks,
-                   const Http::TestHeaderMapImpl* request_trailers,
-                   const Http::TestHeaderMapImpl& response_headers,
+                   const Http::TestRequestTrailerMapImpl* request_trailers,
+                   const Http::TestResponseHeaderMapImpl& response_headers,
                    const std::vector<std::string>& response_body_chunks,
-                   const Http::TestHeaderMapImpl* response_trailers) {
+                   const Http::TestResponseTrailerMapImpl* response_trailers) {
     IntegrationStreamDecoderPtr decoder;
     if (request_trailers == nullptr && request_body_chunks.empty()) {
       decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -83,7 +83,7 @@ public:
 
   void startAdminRequest(const std::string& admin_request_yaml) {
     admin_client_ = makeHttpConnection(makeClientConnection(lookupPort("admin")));
-    const Http::TestHeaderMapImpl admin_request_headers{
+    const Http::TestRequestHeaderMapImpl admin_request_headers{
         {":method", "POST"}, {":path", "/tap"}, {":scheme", "http"}, {":authority", "host"}};
     admin_response_ = admin_client_->makeRequestWithBody(admin_request_headers, admin_request_yaml);
     admin_response_->waitForHeaders();
@@ -127,22 +127,22 @@ public:
     return traces;
   }
 
-  const Http::TestHeaderMapImpl request_headers_tap_{{":method", "GET"},
-                                                     {":path", "/"},
-                                                     {":scheme", "http"},
-                                                     {":authority", "host"},
-                                                     {"foo", "bar"}};
+  const Http::TestRequestHeaderMapImpl request_headers_tap_{{":method", "GET"},
+                                                            {":path", "/"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"},
+                                                            {"foo", "bar"}};
 
-  const Http::TestHeaderMapImpl request_headers_no_tap_{
+  const Http::TestRequestHeaderMapImpl request_headers_no_tap_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
-  const Http::TestHeaderMapImpl request_trailers_{{"foo_trailer", "bar"}};
+  const Http::TestRequestTrailerMapImpl request_trailers_{{"foo_trailer", "bar"}};
 
-  const Http::TestHeaderMapImpl response_headers_tap_{{":status", "200"}, {"bar", "baz"}};
+  const Http::TestResponseHeaderMapImpl response_headers_tap_{{":status", "200"}, {"bar", "baz"}};
 
-  const Http::TestHeaderMapImpl response_headers_no_tap_{{":status", "200"}};
+  const Http::TestResponseHeaderMapImpl response_headers_no_tap_{{":status", "200"}};
 
-  const Http::TestHeaderMapImpl response_trailers_{{"bar_trailer", "baz"}};
+  const Http::TestResponseTrailerMapImpl response_trailers_{{"bar_trailer", "baz"}};
 
   const std::string admin_filter_config_ =
       R"EOF(

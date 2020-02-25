@@ -145,13 +145,13 @@ public:
   // the given type ("a" or "b"). If is_hash_lb_, verifies that a single host is selected over n
   // iterations (e.g. for maglev/hash-ring policies). Otherwise, expected more than one host to be
   // selected over at least n iterations and at most m.
-  void runTest(Http::TestHeaderMapImpl& request_headers, const std::string expected_host_type,
-               const int n = 100, const int m = 1000) {
+  void runTest(Http::TestRequestHeaderMapImpl& request_headers,
+               const std::string expected_host_type, const int n = 100, const int m = 1000) {
     ASSERT_LT(n, m);
 
     std::set<std::string> hosts;
     for (int i = 0; i < m; i++) {
-      Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+      Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
       // Send header only request.
       IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -195,12 +195,12 @@ public:
   const std::string type_header_{"x-type"};
   const std::string type_key_{"type"};
 
-  Http::TestHeaderMapImpl type_a_request_headers_{{":method", "GET"},  {":path", "/test"},
-                                                  {":scheme", "http"}, {":authority", "host"},
-                                                  {"x-type", "a"},     {"x-hash", "hash-a"}};
-  Http::TestHeaderMapImpl type_b_request_headers_{{":method", "GET"},  {":path", "/test"},
-                                                  {":scheme", "http"}, {":authority", "host"},
-                                                  {"x-type", "b"},     {"x-hash", "hash-b"}};
+  Http::TestRequestHeaderMapImpl type_a_request_headers_{
+      {":method", "GET"},     {":path", "/test"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-type", "a"},    {"x-hash", "hash-a"}};
+  Http::TestRequestHeaderMapImpl type_b_request_headers_{
+      {":method", "GET"},     {":path", "/test"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-type", "b"},    {"x-hash", "hash-b"}};
 };
 
 INSTANTIATE_TEST_SUITE_P(SubsetCompatibleLoadBalancers, HttpSubsetLbIntegrationTest,

@@ -156,18 +156,18 @@ void XfccIntegrationTest::initialize() {
 void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previous_xfcc,
                                                                std::string expected_xfcc) {
   Network::ClientConnectionPtr conn = tls_ ? makeMtlsClientConnection() : makeTcpClientConnection();
-  Http::TestHeaderMapImpl header_map;
+  Http::TestRequestHeaderMapImpl header_map;
   if (previous_xfcc.empty()) {
-    header_map = Http::TestHeaderMapImpl{{":method", "GET"},
-                                         {":path", "/test/long/url"},
-                                         {":scheme", "http"},
-                                         {":authority", "host"}};
+    header_map = Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                {":path", "/test/long/url"},
+                                                {":scheme", "http"},
+                                                {":authority", "host"}};
   } else {
-    header_map = Http::TestHeaderMapImpl{{":method", "GET"},
-                                         {":path", "/test/long/url"},
-                                         {":scheme", "http"},
-                                         {":authority", "host"},
-                                         {"x-forwarded-client-cert", previous_xfcc.c_str()}};
+    header_map = Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                {":path", "/test/long/url"},
+                                                {":scheme", "http"},
+                                                {":authority", "host"},
+                                                {"x-forwarded-client-cert", previous_xfcc.c_str()}};
   }
 
   codec_client_ = makeHttpConnection(std::move(conn));
@@ -181,7 +181,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
     EXPECT_EQ(expected_xfcc,
               upstream_request_->headers().ForwardedClientCert()->value().getStringView());
   }
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());

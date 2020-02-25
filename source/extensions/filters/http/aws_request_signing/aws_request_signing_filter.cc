@@ -22,7 +22,7 @@ FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope
   return {ALL_AWS_REQUEST_SIGNING_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   try {
     config_->signer().sign(headers);
     config_->stats().signing_added_.inc();

@@ -116,15 +116,15 @@ public:
   /**
    * Prepare headers for protobuf service.
    */
-  static Http::MessagePtr prepareHeaders(const std::string& upstream_cluster,
-                                         const std::string& service_full_name,
-                                         const std::string& method_name,
-                                         const absl::optional<std::chrono::milliseconds>& timeout);
+  static Http::RequestMessagePtr
+  prepareHeaders(const std::string& upstream_cluster, const std::string& service_full_name,
+                 const std::string& method_name,
+                 const absl::optional<std::chrono::milliseconds>& timeout);
 
   /**
    * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.
    */
-  static void validateResponse(Http::Message& http_response);
+  static void validateResponse(Http::ResponseMessage& http_response);
 
   /**
    * @return const std::string& type URL prefix.
@@ -153,7 +153,7 @@ public:
   static bool parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message& proto);
 
 private:
-  static void checkForHeaderOnlyError(Http::Message& http_response);
+  static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);
 };
 
 } // namespace Grpc
