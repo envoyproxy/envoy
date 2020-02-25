@@ -28,7 +28,7 @@ namespace SharedPool {
  * weak_ptr from the ObjectSharedPool.
  *
  * There is also a need to ensure that the thread where ObjectSharedPool's destructor is also in the
- * main thread, or that ObjectSharedPool is empty at the time of destructor.
+ * main thread, or that ObjectSharedPool destruct befor the program exit
  */
 template <typename T, typename HashFunc = std::hash<T>,
           class = typename std::enable_if<std::is_copy_constructible<T>::value>::type>
