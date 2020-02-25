@@ -62,7 +62,8 @@ public:
    * @param tags optionally specified tags.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags) PURE;
+  virtual Counter& counterFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptRef tags) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
@@ -90,7 +91,7 @@ public:
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
-                                   Gauge::ImportMode import_mode) PURE;
+                                           Gauge::ImportMode import_mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
@@ -123,8 +124,9 @@ public:
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
-                                           Histogram::Unit unit) PURE;
+  virtual Histogram& histogramFromStatNameWithTags(const StatName& name,
+                                                   StatNameTagVectorOptRef tags,
+                                                   Histogram::Unit unit) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.

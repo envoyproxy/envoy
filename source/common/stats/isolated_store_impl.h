@@ -101,7 +101,8 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags) override {
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptRef tags) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
     Counter& counter = counters_.get(joiner.nameWithTags());
     return counter;
@@ -109,7 +110,7 @@ public:
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
-                           Gauge::ImportMode import_mode) override {
+                                   Gauge::ImportMode import_mode) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
     Gauge& gauge = gauges_.get(joiner.nameWithTags(), import_mode);
     gauge.mergeImportMode(import_mode);
@@ -118,7 +119,7 @@ public:
   NullCounterImpl& nullCounter() { return *null_counter_; }
   NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
-                                   Histogram::Unit unit) override {
+                                           Histogram::Unit unit) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
     Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit);
     return histogram;
