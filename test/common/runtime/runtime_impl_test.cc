@@ -591,7 +591,6 @@ TEST_F(StaticLoaderImplTest, All) {
       loader_->snapshot().get("foo", "1234567890123456789012345678901234567890");
   EXPECT_EQ("1234567890123456789012345678901234567890", asan_test);
   EXPECT_EQ("", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("", loader_->snapshot().get("foo", ""));
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("foo", 1));
   EXPECT_EQ(1.1, loader_->snapshot().getDouble("foo", 1.1));
   EXPECT_CALL(generator_, random()).WillOnce(Return(49));
