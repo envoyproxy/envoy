@@ -837,6 +837,11 @@ Envoy::Ssl::CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert,
         *certificate_details->add_subject_alt_names();
     subject_alt_name.set_uri(uri_san);
   }
+  for (auto& ip_san : Utility::getSubjectAltNames(*cert, GEN_IPADD)) {
+    envoy::admin::v3::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_ip_address(ip_san);
+  }
   return certificate_details;
 }
 
