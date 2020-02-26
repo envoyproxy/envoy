@@ -659,6 +659,12 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(false, snapshot->getBoolean("bool_as_int0", false));
   EXPECT_EQ(true, snapshot->getBoolean("bool_as_int1", false));
   EXPECT_EQ(true, snapshot->getBoolean("bool_as_int1", true));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", false));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", true));
+
+  // Test that a double value is not parsed as a boolean even though integers are fine.
+  EXPECT_EQ(true, snapshot->getBoolean("file_with_double", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file_with_double", false));
 
   // Not a boolean. Expect the default.
   EXPECT_EQ(true, snapshot->getBoolean("file1", true));
