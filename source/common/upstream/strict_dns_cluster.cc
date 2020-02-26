@@ -121,12 +121,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
             // potentially move port handling into the DNS interface itself, which would work better
             // for SRV.
             ASSERT(resp.address_ != nullptr);
-            new_hosts.emplace_back(new HostImpl(
-                parent_.info_, dns_address_,
-                Network::Utility::getAddressWithPort(*(resp.address_), port_),
-                lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
-                locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
-                locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
+          new_hosts.emplace_back(new HostImpl(
+              parent_.info_, dns_address_,
+              Network::Utility::getAddressWithPort(*(resp.address_), port_),
+              // TODO(zyfjeff): Created through metadata shared pool
+              std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
+              lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
+              lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
+              lb_endpoint_.health_status()));
 
             ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
           }

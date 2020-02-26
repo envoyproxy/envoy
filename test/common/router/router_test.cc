@@ -4221,6 +4221,20 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
+    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(10);
+    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
+    Http::TestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout =
+        FilterUtility::finalTimeout(route, headers, true, false, false, false);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(10), timeout.per_try_timeout_);
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+    EXPECT_EQ("10", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
     route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},

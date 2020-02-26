@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace Config {
 
+SINGLETON_MANAGER_REGISTRATION(const_metadata_shared_pool);
+
 MetadataKey::MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_key)
     : key_(metadata_key.key()) {
   for (const auto& seg : metadata_key.path()) {
@@ -15,16 +17,19 @@ MetadataKey::MetadataKey(const envoy::type::metadata::v3::MetadataKey& metadata_
   }
 }
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata& metadata,
+const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata* metadata,
                                                   const MetadataKey& metadata_key) {
   return metadataValue(metadata, metadata_key.key_, metadata_key.path_);
 }
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata& metadata,
+const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata* metadata,
                                                   const std::string& filter,
                                                   const std::vector<std::string>& path) {
-  const auto filter_it = metadata.filter_metadata().find(filter);
-  if (filter_it == metadata.filter_metadata().end()) {
+  if (!metadata) {
+    return ProtobufWkt::Value::default_instance();
+  }
+  const auto filter_it = metadata->filter_metadata().find(filter);
+  if (filter_it == metadata->filter_metadata().end()) {
     return ProtobufWkt::Value::default_instance();
   }
   const ProtobufWkt::Struct* data_struct = &(filter_it->second);
@@ -51,7 +56,7 @@ const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3:
   return *val;
 }
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata& metadata,
+const ProtobufWkt::Value& Metadata::metadataValue(const envoy::config::core::v3::Metadata* metadata,
                                                   const std::string& filter,
                                                   const std::string& key) {
   const std::vector<std::string> path{key};
@@ -65,10 +70,13 @@ ProtobufWkt::Value& Metadata::mutableMetadataValue(envoy::config::core::v3::Meta
 }
 
 bool Metadata::metadataLabelMatch(const LabelSet& label_set,
-                                  const envoy::config::core::v3::Metadata& host_metadata,
+                                  const envoy::config::core::v3::Metadata* host_metadata,
                                   const std::string& filter_key, bool list_as_any) {
-  const auto filter_it = host_metadata.filter_metadata().find(filter_key);
-  if (filter_it == host_metadata.filter_metadata().end()) {
+  if (!host_metadata) {
+    return label_set.empty();
+  }
+  const auto filter_it = host_metadata->filter_metadata().find(filter_key);
+  if (filter_it == host_metadata->filter_metadata().end()) {
     return label_set.empty();
   }
   const ProtobufWkt::Struct& data_struct = filter_it->second;
@@ -95,6 +103,17 @@ bool Metadata::metadataLabelMatch(const LabelSet& label_set,
     }
   }
   return true;
+}
+
+ConstMetadataSharedPoolSharedPtr
+Metadata::getConstMetadataSharedPool(Singleton::Manager& manager, Event::Dispatcher& dispatcher) {
+  return manager
+      .getTyped<SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, MessageUtil>>(
+          SINGLETON_MANAGER_REGISTERED_NAME(const_metadata_shared_pool), [&dispatcher] {
+            return std::make_shared<
+                SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, MessageUtil>>(
+                dispatcher);
+          });
 }
 
 } // namespace Config

@@ -73,7 +73,12 @@ message VirtualHost {
   //   The longest wildcards match first.
   //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
   //   must be unique across all virtual hosts or the config will fail to load.
-  repeated string domains = 2 [(validate.rules).repeated = {min_items: 1}];
+  //
+  // Domains cannot contain control characters. This is validated by the well_known_regex HTTP_HEADER_VALUE.
+  repeated string domains = 2 [(validate.rules).repeated = {
+    min_items: 1
+    items {string {well_known_regex: HTTP_HEADER_VALUE}}
+  }];
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
@@ -556,7 +561,8 @@ message RouteAction {
 
       // The name of the request header that will be used to obtain the hash
       // key. If the request header is not present, no hash will be produced.
-      string header_name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string header_name = 1
+          [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
     }
 
     // Envoy supports two types of cookie affinity:
@@ -661,7 +667,7 @@ message RouteAction {
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
-    string upgrade_type = 1;
+    string upgrade_type = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE}];
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
@@ -687,7 +693,8 @@ message RouteAction {
     //
     //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
     //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
-    string cluster_header = 2 [(validate.rules).string = {min_bytes: 1}];
+    string cluster_header = 2
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -1245,7 +1252,8 @@ message RateLimit {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
-      string header_name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string header_name = 1
+          [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
@@ -1378,7 +1386,7 @@ message HeaderMatcher {
   reserved "regex_match";
 
   // Specifies the name of the header in the request.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
