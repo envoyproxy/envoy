@@ -38,7 +38,6 @@ envoy_cc_test_library(
         "//test/mocks/server:server_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
-        "//test/tools/router_check/json:tool_config_schemas_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
