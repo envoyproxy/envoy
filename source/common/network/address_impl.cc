@@ -425,18 +425,16 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode) : Instance
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
 Api::SysCallIntResult PipeInstance::bind(os_fd_t fd) const {
-  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-  if (abstract_namespace_) {
-    return os_sys_calls.bind(fd, reinterpret_cast<const sockaddr*>(&address_),
-                             offsetof(struct sockaddr_un, sun_path) + address_length_);
+  if (!abstract_namespace_) {
+    // Try to unlink an existing filesystem object at the requested path. Ignore
+    // errors -- it's fine if the path doesn't exist, and if it exists but can't
+    // be unlinked then `::bind()` will generate a reasonable errno.
+    unlink(address_.sun_path);
   }
-  // Try to unlink an existing filesystem object at the requested path. Ignore
-  // errors -- it's fine if the path doesn't exist, and if it exists but can't
-  // be unlinked then `::bind()` will generate a reasonable errno.
-  unlink(address_.sun_path);
-  auto bind_result = os_sys_calls.bind(fd, sockAddr(), sockAddrLen());
-  if (mode != 0 && bind_result.rc_ == 0) {
-    auto set_permissions = os_sys_calls.chmod(address_.sun_path, mode);
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  auto bind_result = os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+  if (mode != 0 && !abstract_namespace_ && bind_result.rc_ == 0) {
+    auto set_permissions = os_syscalls.chmod(address_.sun_path, mode);
     if (set_permissions.rc_ != 0) {
       throw EnvoyException(absl::StrCat("Failed to create socket with mode ", mode));
     }
@@ -445,12 +443,7 @@ Api::SysCallIntResult PipeInstance::bind(os_fd_t fd) const {
 }
 
 Api::SysCallIntResult PipeInstance::connect(os_fd_t fd) const {
-  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-  if (abstract_namespace_) {
-    return os_sys_calls.connect(fd, reinterpret_cast<const sockaddr*>(&address_),
-                                offsetof(struct sockaddr_un, sun_path) + address_length_);
-  }
-  return os_sys_calls.connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
+  return Api::OsSysCallsSingleton::get().connect(fd, sockAddr(), sockAddrLen());
 }
 
 IoHandlePtr PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }

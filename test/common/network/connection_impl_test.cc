@@ -104,10 +104,8 @@ protected:
                                                          nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
     client_connection_ = dispatcher_->createClientConnection(
-        Utility::resolveUrl(fmt::format("tcp://{}:{}",
-                                        Network::Test::getLoopbackAddressUrlString(GetParam()),
-                                        socket_->localAddress()->ip()->port())),
-        source_address_, Network::Test::createRawBufferSocket(), socket_options_);
+        socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+        socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -1997,11 +1995,8 @@ public:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
-        Utility::resolveUrl(fmt::format("tcp://{}:{}",
-                                        Network::Test::getLoopbackAddressUrlString(GetParam()),
-                                        socket_->localAddress()->ip()->port())),
-        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
-        nullptr);
+        socket_->localAddress(), Network::Address::InstanceConstSharedPtr(),
+        Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 

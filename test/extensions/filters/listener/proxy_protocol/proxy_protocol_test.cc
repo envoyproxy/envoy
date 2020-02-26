@@ -289,6 +289,11 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, connect(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+        return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
+      }));
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
@@ -342,6 +347,11 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, connect(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+        return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
+      }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
@@ -561,13 +571,16 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
           return x;
         }
       }));
-
+  EXPECT_CALL(os_sys_calls, connect(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+        return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
+      }));
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
         return os_sys_calls_actual_.recv(fd, buf, len, flags);
       }));
-
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
@@ -705,7 +718,11 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
   EXPECT_CALL(os_sys_calls, recv(_, _, 1, _))
       .Times(AnyNumber())
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-
+  EXPECT_CALL(os_sys_calls, connect(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+        return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
+      }));
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
@@ -765,7 +782,11 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
   EXPECT_CALL(os_sys_calls, recv(_, _, 4, _))
       .Times(AnyNumber())
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-
+  EXPECT_CALL(os_sys_calls, connect(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+        return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
+      }));
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {

@@ -47,7 +47,7 @@ protected:
       auto addr_fd = Network::Test::bindFreeLoopbackPort(version_, Address::SocketType::Stream);
       auto addr = addr_fd.first;
       Network::IoHandlePtr& io_handle = addr_fd.second;
-      EXPECT_LE(0, io_handle->fd());
+      EXPECT_TRUE(SOCKET_VALID(io_handle->fd()));
 
       // Confirm that we got a reasonable address and port.
       ASSERT_EQ(Address::Type::Ip, addr->type());
@@ -80,8 +80,9 @@ protected:
 
       // TODO (conqerAtapple): This is unfortunate. We should be able to templatize this
       // instead of if block.
+      auto os_sys_calls = Api::OsSysCallsSingleton::get();
       if (NetworkSocketTrait<Type>::type == Address::SocketType::Stream) {
-        EXPECT_EQ(0, Api::OsSysCallsSingleton::get().listen(socket1->ioHandle().fd(), 0).rc_);
+        EXPECT_EQ(0, os_sys_calls.listen(socket1->ioHandle().fd(), 0).rc_);
       }
 
       EXPECT_EQ(addr->ip()->port(), socket1->localAddress()->ip()->port());
@@ -95,6 +96,17 @@ protected:
       options2->emplace_back(std::move(option2));
       // The address and port are bound already, should throw exception.
       EXPECT_THROW(createListenSocketPtr(addr, options2, true), SocketBindException);
+
+      // Release socket and re-bind it.
+      socket1->close();
+
+      // Test createListenSocketPtr from IoHandlePtr's os_fd_t constructor
+      int domain = version_ == Address::IpVersion::v4 ? AF_INET : AF_INET6;
+      auto socket_result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
+      EXPECT_TRUE(SOCKET_VALID(socket_result.rc_));
+      io_handle = std::make_unique<IoSocketHandleImpl>(socket_result.rc_);
+      auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
+      EXPECT_EQ(socket3->localAddress()->asString(), addr->asString());
 
       // Test successful.
       return;
