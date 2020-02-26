@@ -26,6 +26,8 @@ StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& corout
       }),
       fireAndForgetWriter_(new FireAndForgetWriter(filter)) {}
 
+StreamHandleWrapper::~StreamHandleWrapper() { delete fireAndForgetWriter_; }
+
 Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
   coroutine_.start(function_ref, 1, yield_callback_);
