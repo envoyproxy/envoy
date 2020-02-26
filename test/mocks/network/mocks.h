@@ -348,6 +348,8 @@ public:
   MOCK_METHOD2(addListener,
                void(absl::optional<uint64_t> overrided_listener, ListenerConfig& config));
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
+  MOCK_METHOD2(removeFilterChains, void(DrainingFilterChains& draining_filter_chains,
+                                        std::function<void()> completion));
   MOCK_METHOD1(stopListeners, void(uint64_t listener_tag));
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(disableListeners, void());

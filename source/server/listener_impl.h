@@ -21,6 +21,16 @@
 namespace Envoy {
 namespace Server {
 
+class ListenerMessageUtil {
+public:
+  // TODO(lambdai): move from ListenerImpl::ListenerImpl to here
+  static envoy::config::listener::v3alpha::Listener
+  normalize(const envoy::config::listener::v3alpha::Listener& config);
+
+  static bool equivalent(const envoy::config::listener::v3alpha::Listener& lhs,
+                         const envoy::config::listener::v3alpha::Listener& rhs);
+};
+
 class ListenerManagerImpl;
 
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,

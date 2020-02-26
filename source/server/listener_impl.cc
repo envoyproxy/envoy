@@ -675,7 +675,9 @@ ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3alpha::L
   if (!worker_started) {
     return UpdateDecision::NotSupported;
   }
-  UNREFERENCED_PARAMETER(config);
+  if (!ListenerMessageUtil::equivalent(config_, config)) {
+    return UpdateDecision::NotSupported;
+  }
   return UpdateDecision::Update;
 }
 
@@ -701,5 +703,22 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& listener,
 }
 
 void ListenerImpl::cancelUpdate() {}
+
+envoy::config::listener::v3alpha::Listener
+ListenerMessageUtil::normalize(const envoy::config::listener::v3alpha::Listener& config) {
+  return config;
+}
+
+bool ListenerMessageUtil::equivalent(const envoy::config::listener::v3alpha::Listener& lhs,
+                                     const envoy::config::listener::v3alpha::Listener& rhs) {
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  differencer.IgnoreField(
+      envoy::config::listener::v3alpha::Listener::GetDescriptor()->FindFieldByName(
+          "filter_chains"));
+  return differencer.Compare(lhs, rhs);
+}
+
 } // namespace Server
 } // namespace Envoy
