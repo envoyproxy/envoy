@@ -249,7 +249,7 @@ httpCallAsync()
 
 .. code-block:: lua
 
-  headers, body = handle:httpCallAsync(cluster, headers, body, timeout)
+  handle:httpCallAsync(cluster, headers, body, timeout)
 
 Makes an HTTP call to an upstream host. Same behavior as httpCall, except that Envoy will fire and forget.
 
