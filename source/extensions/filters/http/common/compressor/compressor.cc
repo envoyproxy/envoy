@@ -1,6 +1,6 @@
 #include "extensions/filters/http/common/compressor/compressor.h"
 
-#include "common/common/lock_guard.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {

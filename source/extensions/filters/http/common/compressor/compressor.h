@@ -3,15 +3,10 @@
 #include "envoy/compressor/compressor.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/macros.h"
-#include "common/common/thread.h"
-#include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -162,7 +157,6 @@ private:
   std::unique_ptr<EncodingDecision> chooseEncoding(const Http::ResponseHeaderMap& headers) const;
 
   bool skip_compression_;
-  Buffer::OwnedImpl compressed_data_;
   std::unique_ptr<Compressor::Compressor> compressor_;
   CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;

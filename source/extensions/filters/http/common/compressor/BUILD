@@ -15,12 +15,9 @@ envoy_cc_library(
     deps = [
         "//include/envoy/compressor:compressor_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/common/common:lock_guard_lib",
-        "//source/common/common:thread_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
