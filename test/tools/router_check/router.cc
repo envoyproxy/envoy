@@ -19,43 +19,6 @@
 
 namespace Envoy {
 // static
-ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
-  Json::ObjectSharedPtr input = check_config->getObject("input");
-  int random_value = input->getInteger("random_value", 0);
-
-  // Add header field values
-  std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers(
-      new Http::TestRequestHeaderMapImpl());
-  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
-      new Http::TestResponseHeaderMapImpl());
-  request_headers->addCopy(":authority", input->getString(":authority", ""));
-  request_headers->addCopy(":path", input->getString(":path", ""));
-  request_headers->addCopy(":method", input->getString(":method", "GET"));
-  request_headers->addCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
-
-  if (input->getBoolean("internal", false)) {
-    request_headers->addCopy("x-envoy-internal", "true");
-  }
-
-  if (input->hasObject("additional_request_headers")) {
-    for (const Json::ObjectSharedPtr& header_config :
-         input->getObjectArray("additional_request_headers")) {
-      request_headers->addCopy(header_config->getString("field"),
-                               header_config->getString("value"));
-    }
-  }
-
-  if (input->hasObject("additional_response_headers")) {
-    for (const Json::ObjectSharedPtr& header_config :
-         input->getObjectArray("additional_response_headers")) {
-      response_headers->addCopy(header_config->getString("field"),
-                                header_config->getString("value"));
-    }
-  }
-
-  return ToolConfig(std::move(request_headers), std::move(response_headers), random_value);
-}
-
 ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem& check_config) {
   // Add header field values
   std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers(
@@ -179,74 +142,6 @@ Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) 
     contents = MessageUtil::getJsonStringFromMessage(ValueUtil::loadFromYaml(contents));
   }
   return Json::Factory::loadFromString(contents);
-}
-
-// TODO(jyotima): Remove this code path once the json schema code path is deprecated.
-bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = loadFromFile(expected_route_json, *api_);
-  loader->validateSchema(Json::ToolSchema::routerCheckSchema());
-  bool no_failures = true;
-  for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
-    headers_finalized_ = false;
-    Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                  factory_context_->dispatcher().timeSource());
-    stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
-    ToolConfig tool_config = ToolConfig::create(check_config);
-    tool_config.route_ =
-        config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
-    std::string test_name = check_config->getString("test_name", "");
-    tests_.emplace_back(test_name, std::vector<std::string>{});
-    Json::ObjectSharedPtr validate = check_config->getObject("validate");
-    using CheckerFunc = std::function<bool(ToolConfig&, const std::string&)>;
-    const std::unordered_map<std::string, CheckerFunc> checkers = {
-        {"cluster_name",
-         [this](auto&... params) -> bool { return this->compareCluster(params...); }},
-        {"virtual_cluster_name",
-         [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); }},
-        {"virtual_host_name",
-         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); }},
-        {"path_rewrite",
-         [this](auto&... params) -> bool { return this->compareRewritePath(params...); }},
-        {"host_rewrite",
-         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); }},
-        {"path_redirect",
-         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); }},
-    };
-    finalizeHeaders(tool_config, stream_info);
-    // Call appropriate function for each match case.
-    for (const auto& test : checkers) {
-      if (validate->hasObject(test.first)) {
-        const std::string& expected = validate->getString(test.first);
-        if (tool_config.route_ == nullptr) {
-          compareResults("", expected, test.first);
-        } else {
-          if (!test.second(tool_config, expected)) {
-            no_failures = false;
-          }
-        }
-      }
-    }
-    if (validate->hasObject("request_header_fields")) {
-      for (const Json::ObjectSharedPtr& header_field :
-           validate->getObjectArray("request_header_fields")) {
-        if (!compareRequestHeaderField(tool_config, header_field->getString("field"),
-                                       header_field->getString("value"))) {
-          no_failures = false;
-        }
-      }
-    }
-    if (validate->hasObject("response_header_fields")) {
-      for (const Json::ObjectSharedPtr& header_field :
-           validate->getObjectArray("response_header_fields")) {
-        if (!compareResponseHeaderField(tool_config, header_field->getString("field"),
-                                        header_field->getString("value"))) {
-          no_failures = false;
-        }
-      }
-    }
-  }
-  printResults();
-  return no_failures;
 }
 
 bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
@@ -516,7 +411,6 @@ bool RouterCheckTool::runtimeMock(absl::string_view key,
 
 Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
-  TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,
                                       false);
@@ -540,27 +434,18 @@ Options::Options(int argc, char** argv) {
     exit(EXIT_FAILURE);
   }
 
-  is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
   only_show_failures_ = only_show_failures.getValue();
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
   disable_deprecation_check_ = disable_deprecation_check.getValue();
 
-  if (is_proto_) {
-    config_path_ = config_path.getValue();
-    test_path_ = test_path.getValue();
-    if (config_path_.empty() || test_path_.empty()) {
-      std::cerr << "error: "
-                << "Both --config-path/c and --test-path/t are mandatory with --useproto"
-                << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  } else {
-    if (!unlabelled_configs.getValue().empty()) {
-      unlabelled_config_path_ = unlabelled_configs.getValue()[0];
-      unlabelled_test_path_ = unlabelled_configs.getValue()[1];
-    }
+  config_path_ = config_path.getValue();
+  test_path_ = test_path.getValue();
+  if (config_path_.empty() || test_path_.empty()) {
+    std::cerr << "error: "
+              << "Both --config-path/c and --test-path/t are mandatory" << std::endl;
+    exit(EXIT_FAILURE);
   }
 }
 } // namespace Envoy
