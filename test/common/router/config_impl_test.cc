@@ -448,6 +448,34 @@ virtual_hosts:
       prefix_rewrite: "/api/new_endpoint"
       cluster: www2
   - match:
+      prefix: "/newforreg1_endpoint"
+    route:
+      regex_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "^/new(.*?)_endpoint(.*)$"
+        substitution: /\1_rewritten_endpoint\2
+      cluster: www2
+  - match:
+      prefix: "/newforreg2_endpoint"
+    route:
+      regex_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "e"
+        substitution: "X"
+      cluster: www2
+  - match:
+      path: "/exact/path/for/regex1"
+      case_sensitive: true
+    route:
+      cluster: www2
+      regex_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "[aeioe]"
+        substitution: "V"
+  - match:
       path: "/"
     route:
       cluster: root_www2
@@ -504,6 +532,17 @@ virtual_hosts:
     route:
       cluster: three_numbers
       prefix_rewrite: "/rewrote"
+  - match:
+      safe_regex:
+        google_re2: {}
+        regex: ".*/\\d{4}$"
+    route:
+      cluster: four_numbers
+      regex_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "(^.*)/(\\d{4})$"
+        substitution: /four/\2/endpoint\1
   - match:
       safe_regex:
         google_re2: {}
@@ -781,6 +820,56 @@ virtual_hosts:
     EXPECT_EQ("/bar", headers.get_(Http::Headers::get().Path));
   }
 
+  // Regular expression path rewrite after prefix match testing.
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/newforreg1_endpoint/foo", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2", route->clusterName());
+    EXPECT_EQ("www2", virtualHostName(route));
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/forreg1_rewritten_endpoint/foo", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("/newforreg1_endpoint/foo", headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
+  // Regular expression path rewrite after prefix match testing, replace every
+  // occurrence, excluding query parameters.
+  {
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/newforreg2_endpoint/tee?test=me", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2", route->clusterName());
+    EXPECT_EQ("www2", virtualHostName(route));
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/nXwforrXg2_Xndpoint/tXX?test=me", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("/newforreg2_endpoint/tee?test=me",
+              headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
+  // Regular expression path rewrite after exact path match testing.
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/exact/path/for/regex1", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2", route->clusterName());
+    EXPECT_EQ("www2", virtualHostName(route));
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/VxVct/pVth/fVr/rVgVx1", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("/exact/path/for/regex1", headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
+  // Regular expression path rewrite after exact path match testing,
+  // with query parameters.
+  {
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/exact/path/for/regex1?test=aeiou", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2", route->clusterName());
+    EXPECT_EQ("www2", virtualHostName(route));
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/VxVct/pVth/fVr/rVgVx1?test=aeiou", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("/exact/path/for/regex1?test=aeiou",
+              headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
   // Host rewrite testing.
   {
     Http::TestHeaderMapImpl headers = genHeaders("api.lyft.com", "/host/rewrite/me", "GET");
@@ -882,6 +971,24 @@ virtual_hosts:
     const RouteEntry* route = config.route(headers, 0)->routeEntry();
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("/rewrote?bar=true", headers.get_(Http::Headers::get().Path));
+  }
+
+  // Regular expression rewrite for regular expression matching
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/xx/yy/6472", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/four/6472/endpoint/xx/yy", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("/xx/yy/6472", headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
+  // Regular expression rewrite for regular expression matching, with query parameters.
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("bat.com", "/xx/yy/6472?test=foo", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("/four/6472/endpoint/xx/yy?test=foo", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("/xx/yy/6472?test=foo", headers.get_(Http::Headers::get().EnvoyOriginalPath));
   }
 
   // Virtual cluster testing.
@@ -3444,6 +3551,28 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
+}
+
+TEST_F(RouteMatcherTest, TestPrefixAndRegexRewrites) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["bar.*"]
+  routes:
+  - match: { prefix: "/foo" }
+    route:
+      prefix_rewrite: /
+      regex_rewrite:
+        pattern:
+          google_re2: {}
+          regex: foo
+        substitution: bar
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Cannot specify both prefix_rewrite and regex_rewrite");
 }
 
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {

@@ -535,7 +535,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 32]
+// [#next-free-field: 33]
 message RouteAction {
   enum ClusterNotFoundResponseCode {
     // HTTP status code - 503 Service Unavailable.
@@ -749,6 +749,10 @@ message RouteAction {
   // place the original path before rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
+  // Only one of *prefix_rewrite* or
+  // :ref:`regex_rewrite <envoy_api_field_route.RouteAction.regex_rewrite>`
+  // may be specified.
+  //
   // .. attention::
   //
   //   Pay careful attention to the use of trailing slashes in the
@@ -771,6 +775,36 @@ message RouteAction {
   //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
   //   requests to */prefix/etc* will be stripped to */etc*.
   string prefix_rewrite = 5;
+
+  // Indicates that during forwarding, portions of the path that match the
+  // pattern should be rewritten, even allowing the substitution of capture
+  // groups from the pattern into the new path as specified by the rewrite
+  // substitution string. This is useful to allow application paths to be
+  // rewritten in a way that is aware of segments with variable content like
+  // identifiers. The router filter will place the original path as it was
+  // before the rewrite into the :ref:`x-envoy-original-path
+  // <config_http_filters_router_x-envoy-original-path>` header.
+  //
+  // Only one of :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`
+  // or *regex_rewrite* may be specified.
+  //
+  // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
+  //
+  // * The path pattern ``^/service/([^/]+)(/.*)$`` paired with a substitution
+  //   string of ``\2/instance/\1`` would transform ``/service/foo/v1/api``
+  //   into ``/v1/api/instance/foo``.
+  //
+  // * The pattern ``one`` paired with a substitution string of ``two`` would
+  //   transform ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/two/zzz``.
+  //
+  // * The pattern ``^(.*?)one(.*)$`` paired with a substitution string of
+  //   ``\1two\2`` would replace only the first occurrence of ``one``,
+  //   transforming path ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/one/zzz``.
+  //
+  // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
+  //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
+  //   ``/aaa/yyy/bbb``.
+  type.matcher.RegexMatchAndSubstitute regex_rewrite = 32;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with

@@ -471,7 +471,8 @@ route, virtual host, and/or global route configuration level. See the
 
 No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
-:ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>` and
+:ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`,
+:ref:`regex_rewrite <envoy_api_field_route.RouteAction.regex_rewrite>`, and
 :ref:`host_rewrite <envoy_api_field_route.RouteAction.host_rewrite>`.
 
 Headers are appended to requests/responses in the following order: weighted cluster level headers,
