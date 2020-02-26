@@ -650,6 +650,25 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
                             "is insecure and not allowed");
 }
 
+TEST_F(SslServerContextImplTicketTest, SessionTicketsDisabledAndKeyIsConfigured) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  disable_session_tickets: true
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+)EOF";
+  EXPECT_THROW_WITH_MESSAGE(
+      loadConfigYaml(yaml), EnvoyException,
+      "TLS session tickets have been disabled, but either session_ticket_keys or "
+      "session_ticket_keys_sds_secret_config has been set");
+}
+
 class ClientContextConfigImplTest : public SslCertsTest {};
 
 // Validate that empty SNI (according to C string rules) fails config validation.
