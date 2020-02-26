@@ -233,11 +233,12 @@ bool SnapshotImpl::featureEnabled(absl::string_view key, uint64_t default_value,
   return featureEnabled(key, default_value, random_value, 100);
 }
 
-std::string SnapshotImpl::get(absl::string_view key, const std::string& default_value) const {
+absl::optional<std::reference_wrapper<const std::string>>
+SnapshotImpl::get(absl::string_view key) const {
   ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = key.empty() ? values_.end() : values_.find(key);
   if (entry == values_.end()) {
-    return default_value;
+    return absl::nullopt;
   } else {
     return entry->second.raw_string_value_;
   }

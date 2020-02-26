@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <string>
@@ -211,7 +212,8 @@ public:
    * @param default_value supplies the default value if the key does not exist.
    * @return std::string the value or empty string if the key does not exist.
    */
-  virtual std::string get(absl::string_view key, const std::string& default_value) const PURE;
+  virtual absl::optional<std::reference_wrapper<const std::string>>
+  get(absl::string_view key) const PURE;
 
   /**
    * Returns whether the key has any value set.
