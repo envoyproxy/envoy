@@ -214,7 +214,7 @@ message Route {
   // Decorator for the matched route.
   Decorator decorator = 5;
 
-  // The per_filter_config field can be used to provide route-specific
+  // The typed_per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
