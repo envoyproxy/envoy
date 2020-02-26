@@ -40,8 +40,8 @@ public:
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override;
 
-  Api::IoCallUint64Result recvmmsg(absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>& slices,
-                                   uint32_t self_port, RecvMsgOutput& output) override;
+  Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   RecvMsgOutput& output) override;
 
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.
@@ -64,6 +64,9 @@ private:
 
   os_fd_t fd_;
 
+  // The minimum cmsg buffer size to filled in destination address and packets dropped when
+  // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
+  // addresses.
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                            CMSG_SPACE(sizeof(struct in6_pktinfo))};
 };

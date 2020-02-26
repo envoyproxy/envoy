@@ -56,12 +56,12 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
   const int rc = ::recvmmsg(sockfd, msgvec, vlen, flags, timeout);
   return {rc, errno};
 #else
-  PANIC("revmmsg is not implemented on non-Linux platform.");
-  (void)sockfd;
-  (void)msgvec;
-  (void)vlen;
-  (void)flags;
-  (void)timeout;
+  UNREFERENCED_PARAMETER(sockfd);
+  UNREFERENCED_PARAMETER(msgvec);
+  UNREFERENCED_PARAMETER(vlen);
+  UNREFERENCED_PARAMETER(flags);
+  UNREFERENCED_PARAMETER(timeout);
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 #endif
 }
 

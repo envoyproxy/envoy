@@ -527,9 +527,8 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
 }
 
 void passPayloadToProcessor(uint64_t bytes_read, Buffer::RawSlice& slice,
-                            Buffer::InstancePtr buffer,
-                            std::shared_ptr<const Address::Instance> peer_addess,
-                            std::shared_ptr<const Address::Instance> local_address,
+                            Buffer::InstancePtr buffer, Address::InstanceConstSharedPtr peer_addess,
+                            Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time) {
   // Adjust used memory length.
   slice.len_ = std::min(slice.len_, static_cast<size_t>(bytes_read));

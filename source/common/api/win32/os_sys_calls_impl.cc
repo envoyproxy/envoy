@@ -162,7 +162,7 @@ SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags
 
 SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
                                           int flags, struct timespec* timeout) {
-  PANIC("revmmsg is not implemented on Windows.");
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {

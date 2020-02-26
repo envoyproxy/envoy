@@ -73,8 +73,8 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
 
   size_t num_packet_per_call = 1u;
   Network::IoHandle::RecvMsgOutput output2(num_packet_per_call, nullptr);
-  absl::FixedArray<absl::FixedArray<Buffer::RawSlice>> slices(
-      num_packet_per_call, absl::FixedArray<Buffer::RawSlice>({Buffer::RawSlice{data, 5}}));
+  RawSliceArrays slices(num_packet_per_call,
+                        absl::FixedArray<Buffer::RawSlice>({Buffer::RawSlice{data, 5}}));
   EXPECT_CALL(os_sys_calls_, recvmmsg(fd, _, num_packet_per_call, _, nullptr))
       .WillOnce(Invoke([](os_fd_t, struct mmsghdr*, unsigned int, int, struct timespec*) {
         return Api::SysCallIntResult{1u, 0};

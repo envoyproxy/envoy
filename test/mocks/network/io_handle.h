@@ -27,8 +27,7 @@ public:
               (Buffer::RawSlice * slices, const uint64_t num_slice, uint32_t self_port,
                RecvMsgOutput& output));
   MOCK_METHOD(Api::IoCallUint64Result, recvmmsg,
-              (absl::FixedArray<absl::FixedArray<Buffer::RawSlice>> & slices, uint32_t self_port,
-               RecvMsgOutput& output));
+              (RawSliceArrays & slices, uint32_t self_port, RecvMsgOutput& output));
 };
 
 } // namespace Network

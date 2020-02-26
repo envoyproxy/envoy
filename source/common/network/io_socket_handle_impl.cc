@@ -196,13 +196,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     RecvMsgOutput& output) {
   ASSERT(output.msg_.size() > 0);
 
-  // The minimum cmsg buffer size to filled in destination address and packets dropped when
-  // receiving a packet. It is possible for a received packet to contain both IPv4 and IPv6
-  // addresses.
-  const size_t cmsg_space = CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                            CMSG_SPACE(sizeof(struct in6_pktinfo));
-  absl::FixedArray<char> cbuf(cmsg_space);
-  memset(cbuf.begin(), 0, cmsg_space);
+  absl::FixedArray<char> cbuf(cmsg_space_);
+  memset(cbuf.begin(), 0, cmsg_space_);
 
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_for_read = 0;
@@ -223,9 +218,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_flags = 0;
 
   auto cmsg = reinterpret_cast<struct cmsghdr*>(cbuf.begin());
-  cmsg->cmsg_len = cmsg_space;
+  cmsg->cmsg_len = cmsg_space_;
   hdr.msg_control = cmsg;
-  hdr.msg_controllen = cmsg_space;
+  hdr.msg_controllen = cmsg_space_;
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result = os_sys_calls.recvmsg(fd_, &hdr, 0);
   if (result.rc_ < 0) {
@@ -278,9 +273,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   return sysCallResultToIoCallResult(result);
 }
 
-Api::IoCallUint64Result
-IoSocketHandleImpl::recvmmsg(absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>& slices,
-                             uint32_t self_port, RecvMsgOutput& output) {
+Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                                     RecvMsgOutput& output) {
   ASSERT(output.msg_.size() == slices.size());
   if (slices.size() == 0) {
     return sysCallResultToIoCallResult(Api::SysCallIntResult{0, EAGAIN});
@@ -328,19 +322,18 @@ IoSocketHandleImpl::recvmmsg(absl::FixedArray<absl::FixedArray<Buffer::RawSlice>
     if (mmsg_hdr[i].msg_len == 0) {
       continue;
     }
-    RELEASE_ASSERT((mmsg_hdr[i].msg_hdr.msg_flags & MSG_CTRUNC) == 0,
-                   fmt::format("Incorrectly set control message length: {}",
-                               mmsg_hdr[i].msg_hdr.msg_controllen));
-    RELEASE_ASSERT(mmsg_hdr[i].msg_hdr.msg_namelen > 0,
+    msghdr& hdr = mmsg_hdr[i].msg_hdr;
+    RELEASE_ASSERT((hdr.msg_flags & MSG_CTRUNC) == 0,
+                   fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
+    RELEASE_ASSERT(hdr.msg_namelen > 0,
                    fmt::format("Unable to get remote address from recvmmsg() for fd: {}", fd_));
-    if ((mmsg_hdr[i].msg_hdr.msg_flags & MSG_TRUNC) != 0) {
+    if ((hdr.msg_flags & MSG_TRUNC) != 0) {
       ENVOY_LOG_MISC(warn, "Dropping truncated QUIC packet with size: {}.", mmsg_hdr[i].msg_len);
       continue;
     }
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
-    msghdr& hdr = mmsg_hdr[i].msg_hdr;
     try {
       // Set v6only to false so that mapped-v6 address can be normalize to v4
       // address. Though dual stack may be disabled, it's still okay to assume the

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/io_error.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
@@ -11,10 +13,14 @@ namespace Buffer {
 struct RawSlice;
 } // namespace Buffer
 
+using RawSliceArrays = absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>;
+
 namespace Network {
 namespace Address {
 class Instance;
 class Ip;
+
+using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
 } // namespace Address
 
 /**
@@ -78,9 +84,9 @@ public:
 
   struct RecvMsgPerPacketInfo {
     // The destination address from transport header.
-    std::shared_ptr<const Address::Instance> local_address_;
+    Address::InstanceConstSharedPtr local_address_;
     // The the source address from transport header.
-    std::shared_ptr<const Address::Instance> peer_address_;
+    Address::InstanceConstSharedPtr peer_address_;
     // The payload length of this packet.
     unsigned int msg_len_{0};
   };
@@ -131,9 +137,8 @@ public:
    * @param self_port is the same as the one in recvmsg().
    * @param output is modified upon each call and each message received.
    */
-  virtual Api::IoCallUint64Result
-  recvmmsg(absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>& slices, uint32_t self_port,
-           RecvMsgOutput& output) PURE;
+  virtual Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                           RecvMsgOutput& output) PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

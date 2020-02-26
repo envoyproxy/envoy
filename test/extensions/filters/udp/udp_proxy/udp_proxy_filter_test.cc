@@ -69,20 +69,19 @@ public:
       // Return the datagram.
 #if ENVOY_MMSG_MORE
       EXPECT_CALL(*io_handle_, recvmmsg(_, _, _))
-          .WillOnce(
-              Invoke([this, data, recv_sys_errno](
-                         absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>& slices, uint32_t,
-                         Network::IoHandle::RecvMsgOutput& output) -> Api::IoCallUint64Result {
-                if (recv_sys_errno != 0) {
-                  return makeError(recv_sys_errno);
-                } else {
-                  ASSERT(data.size() <= slices[0][0].len_);
-                  memcpy(slices[0][0].mem_, data.data(), data.size());
-                  output.msg_[0].peer_address_ = upstream_address_;
-                  output.msg_[0].msg_len_ = data.size();
-                  return makeNoError(1u);
-                }
-              }));
+          .WillOnce(Invoke([this, data, recv_sys_errno](RawSliceArrays& slices, uint32_t,
+                                                        Network::IoHandle::RecvMsgOutput& output)
+                               -> Api::IoCallUint64Result {
+            if (recv_sys_errno != 0) {
+              return makeError(recv_sys_errno);
+            } else {
+              ASSERT(data.size() <= slices[0][0].len_);
+              memcpy(slices[0][0].mem_, data.data(), data.size());
+              output.msg_[0].peer_address_ = upstream_address_;
+              output.msg_[0].msg_len_ = data.size();
+              return makeNoError(1u);
+            }
+          }));
 #else
       EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(

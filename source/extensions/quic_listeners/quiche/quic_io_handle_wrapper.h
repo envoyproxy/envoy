@@ -50,8 +50,8 @@ public:
     }
     return io_handle_.recvmsg(slices, num_slice, self_port, output);
   }
-  Api::IoCallUint64Result recvmmsg(absl::FixedArray<absl::FixedArray<Buffer::RawSlice>>& slices,
-                                   uint32_t self_port, RecvMsgOutput& output) override {
+  Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   RecvMsgOutput& output) override {
     if (closed_) {
       return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
                                                         Network::IoSocketError::deleteIoError));
