@@ -77,7 +77,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message));
   }
   // The server gives us our first version of resource name2.
@@ -91,7 +91,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message));
   }
   // The server gives us an updated version of resource name1.
@@ -105,7 +105,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().
@@ -146,8 +146,8 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
       envoy::config::core::v3::ApiVersion::AUTO, random, stats_store, rate_limit_settings,
       local_info);
 
-  std::unique_ptr<DeltaSubscriptionImpl> subscription = std::make_unique<DeltaSubscriptionImpl>(
-      xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, stats,
+  std::unique_ptr<GrpcSubscriptionImpl> subscription = std::make_unique<GrpcSubscriptionImpl>(
+      xds_context, callbacks, stats, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher,
       std::chrono::milliseconds(12345), false);
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));

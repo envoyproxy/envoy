@@ -45,18 +45,20 @@ inline std::string replaceInvalidCharacters(absl::string_view string) {
   return filtered;
 }
 
-// Return a new RepeatedPtrField of HeaderValueOptions with invalid characters removed.
-inline Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> replaceInvalidHeaders(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add) {
-  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> processed;
-  for (const auto& header : headers_to_add) {
-    auto* header_value_option = processed.Add();
-    auto* mutable_header = header_value_option->mutable_header();
-    mutable_header->set_key(replaceInvalidCharacters(header.header().key()));
-    mutable_header->set_value(replaceInvalidCharacters(header.header().value()));
-    header_value_option->mutable_append()->CopyFrom(header.append());
+// Replace invalid host characters.
+inline std::string replaceInvalidHostCharacters(absl::string_view string) {
+  std::string filtered;
+  filtered.reserve(string.length());
+  for (const char& c : string) {
+    switch (c) {
+    case ' ':
+      filtered.push_back('0');
+      break;
+    default:
+      filtered.push_back(c);
+    }
   }
-  return processed;
+  return filtered;
 }
 
 inline envoy::config::core::v3::Metadata
@@ -76,22 +78,16 @@ replaceInvalidStringValues(const envoy::config::core::v3::Metadata& upstream_met
   return processed;
 }
 
-// Convert from test proto Headers to a variant of TestHeaderMapImpl.
+// Convert from test proto Headers to a variant of TestHeaderMapImpl. Validate proto if you intend
+// to sanitize for invalid header characters.
 template <class T>
 inline T fromHeaders(
     const test::fuzz::Headers& headers,
     const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
   T header_map;
   for (const auto& header : headers.headers()) {
-    // HeaderMapImpl and places such as the route lookup should never see strings with embedded
-    // {NULL, CR, LF} values, the HTTP codecs should reject them. So, don't inject any such strings
-    // into the fuzz tests and replace these invalid characters with spaces.
-    // When we are injecting headers, we don't allow the key to ever be empty, since calling code is
-    // not supposed to do this.
-    const std::string key =
-        header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
-    if (ignore_headers.find(StringUtil::toLower(key)) == ignore_headers.end()) {
-      header_map.addCopy(key, replaceInvalidCharacters(header.value()));
+    if (ignore_headers.find(absl::AsciiStrToLower(header.key())) == ignore_headers.end()) {
+      header_map.addCopy(header.key(), header.value());
     }
   }
   return header_map;

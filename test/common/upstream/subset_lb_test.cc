@@ -416,8 +416,7 @@ public:
     EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
   }
 
-  envoy::config::core::v3::Metadata buildMetadata(const std::string& version,
-                                                  bool is_default = false) const {
+  MetadataConstSharedPtr buildMetadata(const std::string& version, bool is_default = false) const {
     envoy::config::core::v3::Metadata metadata;
 
     if (!version.empty()) {
@@ -432,7 +431,7 @@ public:
           .set_string_value("true");
     }
 
-    return metadata;
+    return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
   }
 
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};

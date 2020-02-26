@@ -485,6 +485,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
         host_status.set_hostname(host->hostname());
+        host_status.mutable_locality()->MergeFrom(host->locality());
 
         for (const auto& named_counter : host->counters()) {
           auto& metric = *host_status.add_stats();

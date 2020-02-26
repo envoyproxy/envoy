@@ -70,12 +70,13 @@ public:
    */
   virtual void resume(const std::string& type_url) PURE;
 
-  // TODO(fredlas) PR #8478 will remove this.
   /**
-   * Whether this GrpcMux is delta.
-   * @return bool whether this GrpcMux is delta.
+   * Retrieves the current pause state as set by pause()/resume().
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster
+   * @return bool whether the API is paused.
    */
-  virtual bool isDelta() const PURE;
+  virtual bool paused(const std::string& type_url) const PURE;
 
   /**
    * Start a configuration subscription asynchronously for some API type and resources.
@@ -90,16 +91,7 @@ public:
    */
   virtual GrpcMuxWatchPtr addWatch(const std::string& type_url,
                                    const std::set<std::string>& resources,
-                                   SubscriptionCallbacks& callbacks,
-                                   std::chrono::milliseconds init_fetch_timeout) PURE;
-
-  /**
-   * Retrieves the current pause state as set by pause()/resume().
-   * @param type_url type URL corresponding to xDS API, e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster
-   * @return bool whether the API is paused.
-   */
-  virtual bool paused(const std::string& type_url) const PURE;
+                                   SubscriptionCallbacks& callbacks) PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

@@ -58,6 +58,7 @@ namespace Server {
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
+  /* hot_restart_generation is an Accumulate gauge; we omit it here for testing dynamics. */       \
   GAUGE(live, NeverImport)                                                                         \
   GAUGE(memory_allocated, Accumulate)                                                              \
   GAUGE(memory_heap_size, Accumulate)                                                              \
@@ -245,6 +246,7 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
+  void flushStats() override;
 
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
 
@@ -267,7 +269,6 @@ public:
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
-  void flushStats();
   void flushStatsInternal();
   void updateServerStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,

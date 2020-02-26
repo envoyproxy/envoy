@@ -4,6 +4,7 @@ package envoy.admin.v2alpha;
 
 import "envoy/admin/v2alpha/metrics.proto";
 import "envoy/api/v2/core/address.proto";
+import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/health_check.proto";
 import "envoy/type/percent.proto";
 
@@ -70,7 +71,7 @@ message ClusterStatus {
 }
 
 // Current state of a particular host.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HostStatus {
   // Address of this host.
   api.v2.core.Address address = 1;
@@ -118,6 +119,9 @@ message HostStatus {
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
   type.Percent local_origin_success_rate = 8;
+
+  // locality of the host.
+  api.v2.core.Locality locality = 9;
 }
 
 // Health status for a host.

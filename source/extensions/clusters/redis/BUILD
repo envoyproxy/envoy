@@ -27,7 +27,6 @@ envoy_cc_library(
         ":crc16_lib",
         "//include/envoy/upstream:thread_local_cluster_interface",
         "//include/envoy/upstream:upstream_interface",
-        "//source/common/common:to_lower_table_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters:well_known_names",

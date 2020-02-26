@@ -875,7 +875,7 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
     return output;
   }
 
-  const ProtobufWkt::Value& val = Metadata::metadataValue(metadata, filter_namespace_, path_);
+  const ProtobufWkt::Value& val = Metadata::metadataValue(&metadata, filter_namespace_, path_);
   if (val.kind_case() == ProtobufWkt::Value::KindCase::KIND_NOT_SET) {
     return unspecifiedValue();
   }
