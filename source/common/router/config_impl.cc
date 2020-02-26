@@ -75,7 +75,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
           Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_headers())),
       retriable_request_headers_(
           Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_request_headers())),
-      validation_visitor_(&validation_visitor), name_(retry_policy.name()) {
+      validation_visitor_(&validation_visitor) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
@@ -129,9 +129,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
     }
   }
 
-  if (!retry_policy.name().empty()) {
-    auto& factory =
-        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPolicyFactory>(retry_policy);
+  if (!retry_policy.has_typed_config()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<RetryPolicyFactory>(retry_policy);
     retry_policy_config_ =
         std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
                                      retry_policy, validation_visitor, factory));
@@ -157,8 +156,8 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
                                                            *validation_visitor_, num_retries_);
 }
 
-Upstream::RetryPolicySharedPtr
-RetryPolicyImpl::retryPolicy(const Http::HeaderMap& request_header) const {
+RetryPolicyExtensionSharedPtr
+RetryPolicyImpl::retryPolicyExtension(const Http::HeaderMap& request_header) const {
   if (retry_policy_config_.first == nullptr) {
     return nullptr;
   }

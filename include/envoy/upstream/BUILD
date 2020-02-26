@@ -112,16 +112,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "retry_policy_interface",
-    hdrs = ["retry_policy.h"],
-    deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/upstream:types_interface",
-        "//include/envoy/upstream:upstream_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "resource_manager_interface",
     hdrs = ["resource_manager.h"],
 )

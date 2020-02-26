@@ -49,7 +49,7 @@ public:
   static std::pair<uint32_t, bool> parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
   // Router::RetryState
-  bool enabled() override { return retry_on_ != 0 || pluggable_retry_policy_ != nullptr; }
+  bool enabled() override { return retry_on_ != 0 || retry_policy_extension_ != nullptr; }
   RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
                                  DoRetryCallback callback) override;
   // Returns true if the retry policy would retry the passed headers. Does not
@@ -110,7 +110,7 @@ private:
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
-  Upstream::RetryPolicySharedPtr pluggable_retry_policy_;
+  RetryPolicyExtensionSharedPtr retry_policy_extension_;
 };
 
 } // namespace Router

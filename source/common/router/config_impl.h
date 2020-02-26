@@ -258,8 +258,8 @@ public:
   }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
-  const std::string name() const override { return name_; }
-  Upstream::RetryPolicySharedPtr retryPolicy(const Http::HeaderMap& request_header) const override;
+  RetryPolicyExtensionSharedPtr
+  retryPolicyExtension(const Http::HeaderMap& request_header) const override;
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
@@ -276,7 +276,7 @@ private:
   // Name and config proto to use to create the RetryPriority to use with this policy. Default
   // initialized when no RetryPriority should be used.
   std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
-  std::pair<Upstream::RetryPolicyFactory*, ProtobufTypes::MessagePtr> retry_policy_config_;
+  std::pair<RetryPolicyFactory*, ProtobufTypes::MessagePtr> retry_policy_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
@@ -284,7 +284,6 @@ private:
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
-  std::string name_;
 };
 
 /**

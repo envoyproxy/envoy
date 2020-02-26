@@ -41,7 +41,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
 
   // We short circuit here and do not bother with an allocation if there is no chance we will retry.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
-      route_policy.retryOn() || !route_policy.name().empty()) {
+      route_policy.retryOn() || route_policy.retryPolicyExtension(request_headers) != nullptr) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
                                  dispatcher, priority));
   }
@@ -62,7 +62,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
-      pluggable_retry_policy_(route_policy.retryPolicy(request_headers)) {
+      retry_policy_extension_(route_policy.retryPolicyExtension(request_headers)) {
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
   if (route_policy.baseInterval()) {
@@ -245,24 +245,22 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
 RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_headers,
                                                DoRetryCallback callback) {
-  bool shouldRetryFromPluggableRetryPolicy = false;
-  if (pluggable_retry_policy_) {
-    pluggable_retry_policy_->recordResponseHeaders(response_headers);
-    shouldRetryFromPluggableRetryPolicy = pluggable_retry_policy_->shouldRetry();
+  bool wouldRetry = false;
+  if (retry_policy_extension_) {
+    retry_policy_extension_->recordResponseHeaders(response_headers);
+    wouldRetry = retry_policy_extension_->shouldRetry();
   }
-  return shouldRetry(shouldRetryFromPluggableRetryPolicy || wouldRetryFromHeaders(response_headers),
-                     callback);
+  return shouldRetry(wouldRetry || wouldRetryFromHeaders(response_headers), callback);
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
                                              DoRetryCallback callback) {
-  bool shouldRetryFromPluggableRetryPolicy = false;
-  if (pluggable_retry_policy_) {
-    pluggable_retry_policy_->recordReset(reset_reason);
-    shouldRetryFromPluggableRetryPolicy = pluggable_retry_policy_->shouldRetry();
+  bool wouldRetry = false;
+  if (retry_policy_extension_) {
+    retry_policy_extension_->recordReset(reset_reason);
+    wouldRetry = retry_policy_extension_->shouldRetry();
   }
-  return shouldRetry(shouldRetryFromPluggableRetryPolicy || wouldRetryFromReset(reset_reason),
-                     callback);
+  return shouldRetry(wouldRetry || wouldRetryFromReset(reset_reason), callback);
 }
 
 RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) {
