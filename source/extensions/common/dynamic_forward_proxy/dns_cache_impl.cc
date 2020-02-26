@@ -159,6 +159,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   const bool first_resolve = !primary_host_info.host_info_->first_resolve_complete_;
   primary_host_info.host_info_->first_resolve_complete_ = true;
 
+  // If the DNS resolver successfully resolved with an empty response list, the dns cache does not
+  // update. This ensures that a potentially previously resolved address does not stabilize back to
+  // 0 hosts.
   const auto new_address = !response.empty()
                                ? Network::Utility::getAddressWithPort(*(response.front().address_),
                                                                       primary_host_info.port_)

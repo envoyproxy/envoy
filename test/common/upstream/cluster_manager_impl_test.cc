@@ -2186,7 +2186,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
   dns_timer_->invokeCallback();
-  // TODO(junr03): Successful resolution with no hosts. Distinguish in subsequent change.
   dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
@@ -2263,7 +2262,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
   dns_timer_->invokeCallback();
-  // TODO(junr03): Successful resolution with no hosts. Distinguish in subsequent change.
   dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.

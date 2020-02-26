@@ -146,12 +146,13 @@ protected:
 
   void expectResolveDiscovery(Network::DnsLookupFamily dns_lookup_family,
                               const std::string& expected_address,
-                              const std::list<std::string>& resolved_addresses) {
+                              const std::list<std::string>& resolved_addresses,
+                              Network::DnsResolver::ResolutionStatus status =
+                                  Network::DnsResolver::ResolutionStatus::Success) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, dns_lookup_family, _))
         .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                              Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-          cb(Network::DnsResolver::ResolutionStatus::Success,
-             TestUtility::makeDnsResponse(resolved_addresses));
+          cb(status, TestUtility::makeDnsResponse(resolved_addresses));
           return nullptr;
         }));
   }
@@ -653,6 +654,31 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
   const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1U, cluster_->info()->stats().update_empty_.value());
+
+  // Does not recreate the timer on subsequent DNS resolve calls.
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  dns_timer->invokeCallback();
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2U, cluster_->info()->stats().update_empty_.value());
+}
+
+TEST_F(RedisClusterTest, FailedDnsResponse) {
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  setupFromV2Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{};
+  EXPECT_CALL(*dns_timer, enableTimer(_, _));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses,
+                         Network::DnsResolver::ResolutionStatus::Failure);
 
   EXPECT_CALL(initialized_, ready());
   cluster_->initialize([&]() -> void { initialized_.ready(); });

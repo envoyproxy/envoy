@@ -645,9 +645,6 @@ message Cluster {
   // other than :ref:`STRICT_DNS<envoy_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
   // :ref:`LOGICAL_DNS<envoy_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>` this setting is
   // ignored.
-  //
-  // Note: Currently, DNS failures and empty DNS responses are not treated differently and this
-  // configuration is applied in both situations.
   RefreshRate dns_failure_refresh_rate = 44;
 
   // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
