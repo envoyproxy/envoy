@@ -15,6 +15,11 @@ option java_multiple_files = true;
 option java_generic_services = true;
 
 // [#protodoc-title: Load reporting service]
+// [#not-implemented-hide:] LRS is an Envoy API to emit load report.
+// Envoy will initiate a bidi stream with a management server. Upon connecting,
+// the management server can send a LoadStatsResponse to a cluster it is interested in getting the load report.
+// Envoys in this cluster will aggregate the stats and will send the report in LoadStatsRequests.
+// This is done periodically based on the frequency mentioned in the LoadStatsResponse.
 
 service LoadReportingService {
   // Advanced API to allow for multi-dimensional load balancing by remote
@@ -50,7 +55,6 @@ service LoadReportingService {
 }
 
 // A load report Envoy sends to the management server.
-// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsRequest {
   // Node identifier for Envoy instance.
   api.v2.core.Node node = 1;
@@ -61,7 +65,6 @@ message LoadStatsRequest {
 
 // The management server sends envoy a LoadStatsResponse with all clusters it
 // is interested in learning load stats about.
-// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsResponse {
   // Clusters to report stats for.
   repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
