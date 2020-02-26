@@ -1,6 +1,6 @@
 #include "common/config/filesystem_subscription_impl.h"
 
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/macros.h"
 #include "common/config/utility.h"
@@ -30,7 +30,7 @@ void FilesystemSubscriptionImpl::start(const std::set<std::string>&) {
 }
 
 void FilesystemSubscriptionImpl::updateResourceInterest(const std::set<std::string>&) {
-  // Bump stats for consistence behavior with other xDS.
+  // Bump stats for consistent behavior with other xDS.
   stats_.update_attempt_.inc();
 }
 
@@ -46,7 +46,7 @@ void FilesystemSubscriptionImpl::refresh() {
   ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
   stats_.update_attempt_.inc();
   bool config_update_available = false;
-  envoy::service::discovery::v3alpha::DiscoveryResponse message;
+  envoy::service::discovery::v3::DiscoveryResponse message;
   try {
     MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
     config_update_available = true;

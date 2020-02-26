@@ -51,12 +51,12 @@ std::string friendlyNameFromAbstractPath(absl::string_view path) {
 // Check if an IP family is supported on this machine.
 bool ipFamilySupported(int domain) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallIntResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
-  if (result.rc_ >= 0) {
+  const Api::SysCallSocketResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
+  if (SOCKET_VALID(result.rc_)) {
     RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0,
                    absl::StrCat("Fail to close fd: response code ", result.rc_));
   }
-  return result.rc_ != -1;
+  return SOCKET_VALID(result.rc_);
 }
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
@@ -99,7 +99,7 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-InstanceConstSharedPtr addressFromFd(int fd) {
+InstanceConstSharedPtr addressFromFd(os_fd_t fd) {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
   int rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
@@ -115,7 +115,7 @@ InstanceConstSharedPtr addressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len, rc == 0 && socket_v6only);
 }
 
-InstanceConstSharedPtr peerAddressFromFd(int fd) {
+InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd) {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof ss;
   const int rc = ::getpeername(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
@@ -166,8 +166,8 @@ IoHandlePtr InstanceBase::socketFromSocketType(SocketType socket_type) const {
     domain = AF_UNIX;
   }
 
-  const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
-  RELEASE_ASSERT(result.rc_ != -1,
+  const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
+  RELEASE_ASSERT(SOCKET_VALID(result.rc_),
                  fmt::format("socket(2) failed, got error: {}", strerror(result.errno_)));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_);
 
@@ -203,7 +203,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port) : Instance
     throw EnvoyException(fmt::format("invalid ipv4 address '{}'", address));
   }
 
-  friendly_name_ = fmt::format("{}:{}", address, port);
+  friendly_name_ = absl::StrCat(address, ":", port);
   validateIpv4Supported(friendly_name_);
   ip_.friendly_address_ = address;
 }
@@ -213,7 +213,7 @@ Ipv4Instance::Ipv4Instance(uint32_t port) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
   ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
-  friendly_name_ = fmt::format("0.0.0.0:{}", port);
+  friendly_name_ = absl::StrCat("0.0.0.0:", port);
   validateIpv4Supported(friendly_name_);
   ip_.friendly_address_ = "0.0.0.0";
 }
@@ -224,12 +224,12 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-Api::SysCallIntResult Ipv4Instance::bind(int fd) const {
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+Api::SysCallIntResult Ipv4Instance::bind(os_fd_t fd) const {
+  return Api::OsSysCallsSingleton::get().bind(
+      fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_), sizeof(ip_.ipv4_.address_));
 }
 
-Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
+Api::SysCallIntResult Ipv4Instance::connect(os_fd_t fd) const {
   const int rc = ::connect(fd, sockAddr(), sockAddrLen());
   return {rc, errno};
 }
@@ -313,12 +313,12 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-Api::SysCallIntResult Ipv6Instance::bind(int fd) const {
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+Api::SysCallIntResult Ipv6Instance::bind(os_fd_t fd) const {
+  return Api::OsSysCallsSingleton::get().bind(
+      fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_), sizeof(ip_.ipv6_.address_));
 }
 
-Api::SysCallIntResult Ipv6Instance::connect(int fd) const {
+Api::SysCallIntResult Ipv6Instance::connect(os_fd_t fd) const {
   const int rc = ::connect(fd, sockAddr(), sockAddrLen());
   return {rc, errno};
 }
@@ -397,7 +397,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode) : Instance
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
-Api::SysCallIntResult PipeInstance::bind(int fd) const {
+Api::SysCallIntResult PipeInstance::bind(os_fd_t fd) const {
   if (!abstract_namespace_) {
     // Try to unlink an existing filesystem object at the requested path. Ignore
     // errors -- it's fine if the path doesn't exist, and if it exists but can't
@@ -409,13 +409,13 @@ Api::SysCallIntResult PipeInstance::bind(int fd) const {
   if (mode != 0 && !abstract_namespace_ && bind_result.rc_ == 0) {
     auto set_permissions = os_syscalls.chmod(address_.sun_path, mode);
     if (set_permissions.rc_ != 0) {
-      throw EnvoyException(fmt::format("Failed to create socket with mode {}", mode));
+      throw EnvoyException(absl::StrCat("Failed to create socket with mode ", mode));
     }
   }
   return bind_result;
 }
 
-Api::SysCallIntResult PipeInstance::connect(int fd) const {
+Api::SysCallIntResult PipeInstance::connect(os_fd_t fd) const {
   const int rc = ::connect(fd, sockAddr(), sockAddrLen());
   return {rc, errno};
 }

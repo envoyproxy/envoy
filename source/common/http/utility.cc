@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/http_uri.pb.h"
-#include "envoy/config/core/v3alpha/protocol.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -241,7 +241,7 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
 }
 
 Http2Settings
-Utility::parseHttp2Settings(const envoy::config::core::v3alpha::Http2ProtocolOptions& config) {
+Utility::parseHttp2Settings(const envoy::config::core::v3::Http2ProtocolOptions& config) {
   Http2Settings ret;
   ret.hpack_table_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       config, hpack_table_size, Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE);
@@ -273,7 +273,7 @@ Utility::parseHttp2Settings(const envoy::config::core::v3alpha::Http2ProtocolOpt
 }
 
 Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3alpha::Http1ProtocolOptions& config) {
+Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config) {
   Http1Settings ret;
   ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
   ret.accept_http_10_ = config.accept_http_10();
@@ -295,7 +295,7 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                              bool is_head_request) {
   sendLocalReply(
       is_grpc,
-      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+      [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
         callbacks.encodeHeaders(std::move(headers), end_stream);
       },
       [&](Buffer::Instance& data, bool end_stream) -> void {
@@ -305,7 +305,8 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
 }
 
 void Utility::sendLocalReply(
-    bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    bool is_grpc,
+    std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
     Code response_code, absl::string_view body_text,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
@@ -313,13 +314,13 @@ void Utility::sendLocalReply(
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (is_grpc) {
-    HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
-        {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
-        {Headers::get().GrpcStatus,
-         std::to_string(
-             enumToInt(grpc_status ? grpc_status.value()
-                                   : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
+    ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
+        {{Headers::get().Status, std::to_string(enumToInt(Code::OK))},
+         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
+         {Headers::get().GrpcStatus,
+          std::to_string(enumToInt(
+              grpc_status ? grpc_status.value()
+                          : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}})};
     if (!body_text.empty() && !is_head_request) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
@@ -329,8 +330,8 @@ void Utility::sendLocalReply(
     return;
   }
 
-  HeaderMapPtr response_headers{
-      new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
+  ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
+      {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Text);
@@ -360,7 +361,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   static const std::string separator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
-    std::string::size_type last_comma = xff_string.rfind(separator);
+    const std::string::size_type last_comma = xff_string.rfind(separator);
     if (last_comma == std::string::npos) {
       return {nullptr, false};
     }
@@ -368,7 +369,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
   // The text after the last remaining comma, or the entirety of the string if there
   // is no comma, is the requested IP address.
-  std::string::size_type last_comma = xff_string.rfind(separator);
+  const std::string::size_type last_comma = xff_string.rfind(separator);
   if (last_comma != std::string::npos && last_comma + separator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + separator.size());
   }
@@ -555,11 +556,11 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
-MessagePtr Utility::prepareHeaders(const envoy::config::core::v3alpha::HttpUri& http_uri) {
+RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
   absl::string_view host, path;
   extractHostPathFromUri(http_uri.uri(), host, path);
 
-  MessagePtr message(new RequestMessageImpl());
+  RequestMessagePtr message(new RequestMessageImpl());
   message->headers().setPath(path);
   message->headers().setHost(host);
 

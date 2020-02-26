@@ -1,7 +1,7 @@
 #include "extensions/filters/listener/original_src/original_src_config_factory.h"
 
-#include "envoy/extensions/filters/listener/original_src/v3alpha/original_src.pb.h"
-#include "envoy/extensions/filters/listener/original_src/v3alpha/original_src.pb.validate.h"
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/listener/original_src/config.h"
@@ -16,7 +16,7 @@ namespace OriginalSrc {
 Network::ListenerFilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& message, Server::Configuration::ListenerFactoryContext& context) {
   auto proto_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::filters::listener::original_src::v3alpha::OriginalSrc&>(
+      const envoy::extensions::filters::listener::original_src::v3::OriginalSrc&>(
       message, context.messageValidationVisitor());
   Config config(proto_config);
   return [config](Network::ListenerFilterManager& filter_manager) -> void {
@@ -25,8 +25,7 @@ Network::ListenerFilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFr
 }
 
 ProtobufTypes::MessagePtr OriginalSrcConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<
-      envoy::extensions::filters::listener::original_src::v3alpha::OriginalSrc>();
+  return std::make_unique<envoy::extensions::filters::listener::original_src::v3::OriginalSrc>();
 }
 /**
  * Static registration for the original_src filter. @see RegisterFactory.

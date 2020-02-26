@@ -2,7 +2,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
-#include "envoy/extensions/filters/http/grpc_json_transcoder/v3alpha/transcoder.pb.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
@@ -50,7 +50,7 @@ public:
    * and construct a path matcher for HTTP path bindings.
    */
   JsonTranscoderConfig(
-      const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder&
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
           proto_config,
       Api::Api& api);
 
@@ -119,18 +119,23 @@ public:
   JsonTranscoderFilter(JsonTranscoderConfig& config);
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
+    doTrailers(trailers);
+    return Http::FilterTrailersStatus::Continue;
+  }
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }
@@ -144,6 +149,7 @@ private:
   void buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers, Buffer::Instance& data);
   bool maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status, Http::HeaderMap& trailers);
   bool hasHttpBodyAsOutputType();
+  void doTrailers(Http::HeaderMap& headers_or_trailers);
 
   JsonTranscoderConfig& config_;
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;

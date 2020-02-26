@@ -22,13 +22,13 @@ class KafkaResponseParserTest : public testing::Test, public BufferBasedTest {};
 class MockResponseParserResolver : public ResponseParserResolver {
 public:
   MockResponseParserResolver() = default;
-  MOCK_CONST_METHOD1(createParser, ResponseParserSharedPtr(ResponseContextSharedPtr));
+  MOCK_METHOD(ResponseParserSharedPtr, createParser, (ResponseContextSharedPtr), (const));
 };
 
 class MockParser : public ResponseParser {
 public:
   ResponseParseResponse parse(absl::string_view&) override {
-    throw new EnvoyException("should not be invoked");
+    throw EnvoyException("should not be invoked");
   }
 };
 

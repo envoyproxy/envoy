@@ -6,7 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
@@ -45,7 +45,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
                                TransportSocketPtr&& transport_socket, bool connected)
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      filter_manager_(*this), stream_info_(dispatcher.timeSource()),
+      stream_info_(dispatcher.timeSource()), filter_manager_(*this),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
@@ -195,6 +195,13 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
   updateWriteBufferStats(0, 0);
+
+  // As the socket closes, drain any remaining data.
+  // The data won't be written out at this point, and where there are reference
+  // counted buffer fragments, it helps avoid lifetime issues with the
+  // connection outlasting the subscriber.
+  write_buffer_->drain(write_buffer_->length());
+
   connection_stats_.reset();
 
   file_event_.reset();
@@ -346,9 +353,8 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   // where no check of the write buffer is made. Provide an opportunity to flush
   // here. If connection write is not ready, this is harmless. We should only do
   // this if we're still open (the above callbacks may have closed).
-  if (state() == State::Open && event == ConnectionEvent::Connected &&
-      write_buffer_->length() > 0) {
-    onWriteReady();
+  if (event == ConnectionEvent::Connected) {
+    flushWriteBuffer();
   }
 }
 
@@ -645,6 +651,12 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
 
+void ConnectionImpl::flushWriteBuffer() {
+  if (state() == State::Open && write_buffer_->length() > 0) {
+    onWriteReady();
+  }
+}
+
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceConstSharedPtr& source_address,
@@ -656,7 +668,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
     if (!Network::Socket::applyOptions(options, *socket_,
-                                       envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)) {
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;

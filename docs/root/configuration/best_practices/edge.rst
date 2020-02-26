@@ -76,7 +76,7 @@ The following is a YAML example of the above recommendation.
         # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
         # use_proxy_proto: true
         filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http

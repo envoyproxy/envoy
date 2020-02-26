@@ -150,5 +150,7 @@ protected:
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 };
 
+using FilterStateSharedPtr = std::shared_ptr<FilterState>;
+
 } // namespace StreamInfo
 } // namespace Envoy

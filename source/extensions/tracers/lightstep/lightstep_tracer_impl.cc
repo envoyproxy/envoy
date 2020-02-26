@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
@@ -63,7 +63,7 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
 
   const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
-  Http::MessagePtr message = Grpc::Common::prepareHeaders(
+  Http::RequestMessagePtr message = Grpc::Common::prepareHeaders(
       driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
       lightstep::CollectorMethodName(), absl::optional<std::chrono::milliseconds>(timeout));
   message->body() = Grpc::Common::serializeToGrpcFrame(request);
@@ -75,7 +75,7 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
                 Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
 }
 
-void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& response) {
+void LightStepDriver::LightStepTransporter::onSuccess(Http::ResponseMessagePtr&& response) {
   try {
     active_request_ = nullptr;
     Grpc::Common::validateResponse(*response);
@@ -132,11 +132,11 @@ void LightStepDriver::TlsLightStepTracer::enableTimer() {
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
-LightStepDriver::LightStepDriver(
-    const envoy::config::trace::v3alpha::LightstepConfig& lightstep_config,
-    Upstream::ClusterManager& cluster_manager, Stats::Store& stats, ThreadLocal::SlotAllocator& tls,
-    Runtime::Loader& runtime, std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
-    PropagationMode propagation_mode, Grpc::Context& grpc_context)
+LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig& lightstep_config,
+                                 Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+                                 ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
+                                 std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
+                                 PropagationMode propagation_mode, Grpc::Context& grpc_context)
     : OpenTracingDriver{stats}, cm_{cluster_manager},
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},

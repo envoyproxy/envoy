@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -45,7 +45,7 @@ class ZipkinDriverTest : public testing::Test {
 public:
   ZipkinDriverTest() : time_source_(test_time_.timeSystem()) {}
 
-  void setup(envoy::config::trace::v3alpha::ZipkinConfig& zipkin_config, bool init_timer) {
+  void setup(envoy::config::trace::v3::ZipkinConfig& zipkin_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -67,7 +67,7 @@ public:
     collector_endpoint_version: {}
     )EOF",
                                                 version);
-    envoy::config::trace::v3alpha::ZipkinConfig zipkin_config;
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
@@ -83,7 +83,7 @@ public:
     EXPECT_CALL(cm_.async_client_,
                 send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
         .WillOnce(
-            Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+            Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               callback = &callbacks;
 
@@ -108,8 +108,8 @@ public:
         config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
     second_span->finishSpan();
 
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "202"}}}));
+    Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "202"}}}));
 
     callback->onSuccess(std::move(msg));
 
@@ -130,7 +130,7 @@ public:
   uint64_t generateRandom64() { return Util::generateRandom64(time_source_); }
 
   const std::string operation_name_{"test"};
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":authority", "api.lyft.com"}, {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
@@ -138,21 +138,21 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Runtime::MockRandomGenerator> random_;
 
   NiceMock<Tracing::MockConfig> config_;
-  DangerousDeprecatedTestTime test_time_;
+  Event::SimulatedTimeSystem test_time_;
   TimeSource& time_source_;
 };
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {
   {
     // Empty config
-    envoy::config::trace::v3alpha::ZipkinConfig zipkin_config;
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
 
     EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
   }
@@ -164,7 +164,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
     )EOF";
-    envoy::config::trace::v3alpha::ZipkinConfig zipkin_config;
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
@@ -179,7 +179,7 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     collector_cluster: fake_cluster
     collector_endpoint: /api/v1/spans
     )EOF";
-    envoy::config::trace::v3alpha::ZipkinConfig zipkin_config;
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
@@ -212,7 +212,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
   EXPECT_CALL(cm_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
@@ -232,8 +232,8 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
-  Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "404"}}}));
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "404"}}}));
 
   // AsyncClient can fail with valid HTTP headers
   callback->onSuccess(std::move(msg));

@@ -4,9 +4,10 @@
 #include <cstdint>
 #include <memory>
 
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -25,13 +26,12 @@ namespace Server {
 class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
-
   /**
    * @return Shared filter chain where builder is allowed to determine and reuse duplicated filter
    * chain. Throw exception if failed.
    */
   virtual std::shared_ptr<Network::FilterChain>
-  buildFilterChain(const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const PURE;
 };
 
@@ -65,14 +65,15 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
   Admin& admin() override;
-  const envoy::config::core::v3alpha::Metadata& listenerMetadata() const override;
-  envoy::config::core::v3alpha::TrafficDirection direction() const override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
+  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
   void setDraining() { is_draining_.store(true, std::memory_order_release); }
@@ -109,6 +110,52 @@ private:
 };
 
 /**
+ * Implementation of FactoryContext wrapping a Server::Instance and some listener components.
+ */
+class FactoryContextImpl : public Configuration::FactoryContext {
+public:
+  FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
+                     Network::DrainDecision& drain_decision, Stats::Scope& global_scope,
+                     Stats::Scope& listener_scope);
+
+  // Configuration::FactoryContext
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::SlotAllocator& threadLocal() override;
+  Admin& admin() override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  ProcessContextOptRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  Network::DrainDecision& drainDecision() override;
+  Stats::Scope& listenerScope() override;
+
+private:
+  Server::Instance& server_;
+  const envoy::config::listener::v3::Listener& config_;
+  Network::DrainDecision& drain_decision_;
+  Stats::Scope& global_scope_;
+  Stats::Scope& listener_scope_;
+};
+
+/**
  * Implementation of FilterChainManager.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
@@ -116,8 +163,8 @@ class FilterChainManagerImpl : public Network::FilterChainManager,
                                Logger::Loggable<Logger::Id::config> {
 public:
   using FcContextMap =
-      std::unordered_map<envoy::config::listener::v3alpha::FilterChain,
-                         std::shared_ptr<FilterChainImpl>, MessageUtil, MessageUtil>;
+      std::unordered_map<envoy::config::listener::v3::FilterChain, std::shared_ptr<FilterChainImpl>,
+                         MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context)
       : address_(address), parent_context_(factory_context) {}
@@ -128,14 +175,14 @@ public:
 
   // FilterChainFactoryContextCreator
   std::unique_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
-      const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) override;
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
 
   void addFilterChain(
-      absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
   static bool isWildcardServerName(const std::string& name);
 
@@ -171,7 +218,7 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
@@ -180,7 +227,7 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
@@ -189,20 +236,20 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForSourceTypes(
       SourceTypesArray& source_types_array,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
@@ -234,8 +281,8 @@ private:
                                     const Network::ConnectionSocket& socket) const;
 
   // Duplicate the inheritent factory context if any.
-  std::shared_ptr<FilterChainImpl> findExistingFilterChain(
-      const envoy::config::listener::v3alpha::FilterChain& filter_chain_message);
+  std::shared_ptr<FilterChainImpl>
+  findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);
 
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.

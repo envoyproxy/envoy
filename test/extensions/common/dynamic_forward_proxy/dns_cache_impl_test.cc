@@ -1,5 +1,5 @@
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
@@ -24,7 +24,7 @@ class DnsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedT
 public:
   void initialize() {
     config_.set_name("foo");
-    config_.set_dns_lookup_family(envoy::config::cluster::v3alpha::Cluster::V4_ONLY);
+    config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
 
     EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
     dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, store_, config_);
@@ -51,7 +51,7 @@ public:
     EXPECT_EQ(num_hosts, TestUtility::findGauge(store_, "dns_cache.foo.num_hosts")->value());
   }
 
-  envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig config_;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -354,6 +354,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
 
   MockLoadDnsCacheEntryCallbacks callbacks;
   Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
   auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
@@ -364,6 +365,7 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
 
   EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete());
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
   resolve_cb(TestUtility::makeDnsResponse({}));
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -371,6 +373,17 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
   result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
+
+  // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
+  // during this period but it's good enough for the test.
+  simTime().sleep(std::chrono::milliseconds(300001));
+  // Because resolution failed for the host, onDnsHostAddOrUpdate was not called.
+  // Therefore, onDnsHostRemove should not be called either.
+  EXPECT_CALL(update_callbacks_, onDnsHostRemove(_)).Times(0);
+  resolve_timer->invokeCallback();
+  // DnsCacheImpl state is updated accordingly: the host is removed.
+  checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
+             1 /* added */, 1 /* removed */, 0 /* num hosts */);
 }
 
 // Cancel a cache load before the resolve completes.
@@ -533,25 +546,25 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   Stats::IsolatedStoreImpl store;
   DnsCacheManagerImpl cache_manager(dispatcher, tls, store);
 
-  envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig config1;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
   config1.set_name("foo");
 
   auto cache1 = cache_manager.getCache(config1);
   EXPECT_NE(cache1, nullptr);
 
-  envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig config2;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config2;
   config2.set_name("foo");
   EXPECT_EQ(cache1, cache_manager.getCache(config2));
 
-  envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig config3;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config3;
   config3.set_name("bar");
   auto cache2 = cache_manager.getCache(config3);
   EXPECT_NE(cache2, nullptr);
   EXPECT_NE(cache1, cache2);
 
-  envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig config4;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config4;
   config4.set_name("foo");
-  config4.set_dns_lookup_family(envoy::config::cluster::v3alpha::Cluster::V6_ONLY);
+  config4.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V6_ONLY);
   EXPECT_THROW_WITH_MESSAGE(cache_manager.getCache(config4), EnvoyException,
                             "config specified DNS cache 'foo' with different settings");
 }

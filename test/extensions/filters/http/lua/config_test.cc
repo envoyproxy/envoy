@@ -1,7 +1,7 @@
 #include <string>
 
-#include "envoy/extensions/filters/http/lua/v3alpha/lua.pb.h"
-#include "envoy/extensions/filters/http/lua/v3alpha/lua.pb.validate.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.validate.h"
 
 #include "extensions/filters/http/lua/config.h"
 
@@ -22,7 +22,7 @@ namespace {
 TEST(LuaFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(LuaFilterConfig().createFilterFactoryFromProto(
-                   envoy::extensions::filters::http::lua::v3alpha::Lua(), "stats", context),
+                   envoy::extensions::filters::http::lua::v3::Lua(), "stats", context),
                ProtoValidationException);
 }
 
@@ -31,7 +31,7 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   inline_code : "print(5)"
   )EOF";
 
-  envoy::extensions::filters::http::lua::v3alpha::Lua proto_config;
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;

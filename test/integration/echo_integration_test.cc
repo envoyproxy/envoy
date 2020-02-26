@@ -17,13 +17,13 @@ public:
     echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-        name: envoy.ratelimit
+        name: envoy.filters.network.ratelimit
         config:
           domain: foo
           stats_prefix: name
           descriptors: [{"key": "foo", "value": "bar"}]
       filters:
-        name: envoy.echo
+        name: envoy.filters.network.echo
         config:
       )EOF";
   }
@@ -70,7 +70,7 @@ address:
     port_value: 0
 filter_chains:
 - filters:
-  - name: envoy.echo
+  - name: envoy.filters.network.echo
   )EOF",
                                                        GetParam());
 

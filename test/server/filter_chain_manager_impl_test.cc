@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -46,7 +46,7 @@ namespace Server {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::shared_ptr<Network::FilterChain>
-  buildFilterChain(const envoy::config::listener::v3alpha::FilterChain&,
+  buildFilterChain(const envoy::config::listener::v3::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // Won't dereference but requires not nullptr.
     return std::make_shared<Network::MockFilterChain>();
@@ -95,10 +95,9 @@ public:
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 
-  void
-  addSingleFilterChainHelper(const envoy::config::listener::v3alpha::FilterChain& filter_chain) {
+  void addSingleFilterChainHelper(const envoy::config::listener::v3::FilterChain& filter_chain) {
     filter_chain_manager_.addFilterChain(
-        std::vector<const envoy::config::listener::v3alpha::FilterChain*>{&filter_chain},
+        std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
         filter_chain_factory_builder_, filter_chain_manager_);
   }
 
@@ -123,7 +122,7 @@ public:
             keys:
             - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
-  envoy::config::listener::v3alpha::FilterChain filter_chain_template_;
+  envoy::config::listener::v3::FilterChain filter_chain_template_;
   MockFilterChainFactoryBuilder filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
 
@@ -149,7 +148,7 @@ TEST_F(FilterChainManagerImplTest, FilterChainContextsAreUnique) {
   {
     for (int i = 0; i < 2; i++) {
       contexts.insert(
-          &filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_template_));
+          filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_template_).get());
     }
   }
   EXPECT_EQ(contexts.size(), 2);

@@ -20,11 +20,13 @@ public:
 
   /**
    * Create an ActiveUdpListenerFactory object according to given message.
+   * @param message specifies QUIC protocol options in a protobuf.
+   * @param concurrency is the number of listeners instances to be created.
    */
   virtual Network::ActiveUdpListenerFactoryPtr
-  createActiveUdpListenerFactory(const Protobuf::Message& message) PURE;
+  createActiveUdpListenerFactory(const Protobuf::Message& message, uint32_t concurrency) PURE;
 
-  std::string category() const override { return "udp_listeners"; }
+  std::string category() const override { return "envoy.udp_listeners"; }
 };
 
 } // namespace Server

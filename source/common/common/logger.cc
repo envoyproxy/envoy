@@ -16,20 +16,10 @@
 namespace Envoy {
 namespace Logger {
 
-#define GENERATE_LOGGER(X) Logger(#X),
+StandardLogger::StandardLogger(const std::string& name)
+    : Logger(std::make_shared<spdlog::logger>(name, Registry::getSink())) {}
 
-const char* Logger::DEFAULT_LOG_FORMAT = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
-
-Logger::Logger(const std::string& name) {
-  logger_ = std::make_shared<spdlog::logger>(name, Registry::getSink());
-  logger_->set_pattern(DEFAULT_LOG_FORMAT);
-  logger_->set_level(spdlog::level::trace);
-
-  // Ensure that critical errors, especially ASSERT/PANIC, get flushed
-  logger_->flush_on(spdlog::level::critical);
-}
-
-SinkDelegate::SinkDelegate(DelegatingLogSinkPtr log_sink)
+SinkDelegate::SinkDelegate(DelegatingLogSinkSharedPtr log_sink)
     : previous_delegate_(log_sink->delegate()), log_sink_(log_sink) {
   log_sink->setDelegate(this);
 }
@@ -39,7 +29,8 @@ SinkDelegate::~SinkDelegate() {
   log_sink_->setDelegate(previous_delegate_);
 }
 
-StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkPtr log_sink) : SinkDelegate(log_sink) {}
+StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink)
+    : SinkDelegate(log_sink) {}
 
 void StderrSinkDelegate::log(absl::string_view msg) {
   Thread::OptionalLockGuard guard(lock_);
@@ -87,8 +78,8 @@ std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
   return absl::StrCat(absl::CEscape(msg_leading), msg_trailing_whitespace);
 }
 
-DelegatingLogSinkPtr DelegatingLogSink::init() {
-  DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
+DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
+  DelegatingLogSinkSharedPtr delegating_sink(new DelegatingLogSink);
   delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
   return delegating_sink;
 }

@@ -6,7 +6,7 @@
 #include <unordered_set>
 
 #include "envoy/config/subscription.h"
-#include "envoy/extensions/filters/network/client_ssl_auth/v3alpha/client_ssl_auth.pb.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -75,7 +75,7 @@ using ClientSslAuthConfigSharedPtr = std::shared_ptr<ClientSslAuthConfig>;
 class ClientSslAuthConfig : public Http::RestApiFetcher {
 public:
   static ClientSslAuthConfigSharedPtr
-  create(const envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth& config,
+  create(const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
          ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
 
@@ -85,15 +85,15 @@ public:
 
 private:
   ClientSslAuthConfig(
-      const envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth& config,
+      const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
       ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
       Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   static GlobalStats generateStats(Stats::Scope& scope, const std::string& prefix);
 
   // Http::RestApiFetcher
-  void createRequest(Http::Message& request) override;
-  void parseResponse(const Http::Message& response) override;
+  void createRequest(Http::RequestMessage& request) override;
+  void parseResponse(const Http::ResponseMessage& response) override;
   void onFetchComplete() override {}
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 

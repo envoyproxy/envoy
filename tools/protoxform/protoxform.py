@@ -13,6 +13,7 @@ from collections import deque
 import functools
 import io
 import os
+import pathlib
 import re
 import subprocess
 
@@ -33,17 +34,48 @@ from google.protobuf import text_format
 # this also serves as whitelist of extended options.
 from google.api import annotations_pb2 as _
 from validate import validate_pb2 as _
+from envoy.annotations import deprecation_pb2 as _
 from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
-
-CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
-                      'AllowShortFunctionsOnASingleLine: false}')
+from udpa.annotations import sensitive_pb2 as _
+from udpa.annotations import status_pb2
 
 NEXT_FREE_FIELD_MIN = 5
 
 
 class ProtoXformError(Exception):
   """Base error class for the protoxform module."""
+
+
+def ExtractClangProtoStyle(clang_format_text):
+  """Extract a key:value dictionary for proto formatting.
+
+  Args:
+    clang_format_text: text from a .clang-format file.
+
+  Returns:
+    key:value dictionary suitable for passing to clang-format --style.
+  """
+  lang = None
+  format_dict = {}
+  for line in clang_format_text.split('\n'):
+    if lang is None or lang != 'Proto':
+      match = re.match('Language:\s+(\w+)', line)
+      if match:
+        lang = match.group(1)
+      continue
+    match = re.match('(\w+):\s+(\w+)', line)
+    if match:
+      key, value = match.groups()
+      format_dict[key] = value
+    else:
+      break
+  return str(format_dict)
+
+
+# Ensure we are using the canonical clang-format proto style.
+CLANG_FORMAT_STYLE = ExtractClangProtoStyle(
+    pathlib.Path(os.getenv('RUNFILES_DIR'), 'envoy/.clang-format').read_text())
 
 
 def ClangFormat(contents):
@@ -192,6 +224,11 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options.Extensions[migrate_pb2.file_migrate].CopyFrom(
         file_proto.options.Extensions[migrate_pb2.file_migrate])
 
+  if file_proto.options.HasExtension(
+      status_pb2.file_status) and file_proto.package.endswith('alpha'):
+    options.Extensions[status_pb2.file_status].CopyFrom(
+        file_proto.options.Extensions[status_pb2.file_status])
+
   options_block = FormatOptions(options)
 
   requires_versioning_import = any(
@@ -207,7 +244,11 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     if idx in file_proto.public_dependency:
       public_imports.append(d)
       continue
-    elif d in ['envoy/annotations/resource.proto', 'udpa/annotations/migrate.proto']:
+    elif d in [
+        'envoy/annotations/resource.proto',
+        'envoy/annotations/deprecation.proto',
+        'udpa/annotations/migrate.proto',
+    ]:
       infra_imports.append(d)
     elif d.startswith('envoy/'):
       # We ignore existing envoy/ imports, since these are computed explicitly
@@ -217,11 +258,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       google_imports.append(d)
     elif d.startswith('validate/'):
       infra_imports.append(d)
-    elif d in ['udpa/annotations/versioning.proto']:
-      # Skip, we decide to add this based on requires_versioning_import
+    elif d in ['udpa/annotations/versioning.proto', 'udpa/annotations/status.proto']:
+      # Skip, we decide to add this based on requires_versioning_import and options.
       pass
     else:
       misc_imports.append(d)
+
+  if options.HasExtension(status_pb2.file_status):
+    misc_imports.append('udpa/annotations/status.proto')
 
   if requires_versioning_import:
     misc_imports.append('udpa/annotations/versioning.proto')
@@ -556,9 +600,9 @@ def ParameterCallback(parameter):
 def Main():
   plugin.Plugin([
       plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
-      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor,
+      plugin.OutputDescriptor('.v3.proto', ProtoFormatVisitor,
                               functools.partial(migrate.V3MigrationXform, False)),
-      plugin.OutputDescriptor('.v3alpha.envoy_internal.proto', ProtoFormatVisitor,
+      plugin.OutputDescriptor('.v3.envoy_internal.proto', ProtoFormatVisitor,
                               functools.partial(migrate.V3MigrationXform, True))
   ], ParameterCallback)
 

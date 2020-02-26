@@ -4,8 +4,8 @@
 #include <string>
 
 #include "envoy/common/time.h"
-#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
-#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.validate.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.h"
+#include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
@@ -29,9 +29,8 @@
 namespace Envoy {
 namespace AccessLog {
 
-ComparisonFilter::ComparisonFilter(
-    const envoy::config::filter::accesslog::v3alpha::ComparisonFilter& config,
-    Runtime::Loader& runtime)
+ComparisonFilter::ComparisonFilter(const envoy::config::accesslog::v3::ComparisonFilter& config,
+                                   Runtime::Loader& runtime)
     : config_(config), runtime_(runtime) {}
 
 bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
@@ -42,54 +41,44 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
   }
 
   switch (config_.op()) {
-  case envoy::config::filter::accesslog::v3alpha::ComparisonFilter::GE:
+  case envoy::config::accesslog::v3::ComparisonFilter::GE:
     return lhs >= value;
-  case envoy::config::filter::accesslog::v3alpha::ComparisonFilter::EQ:
+  case envoy::config::accesslog::v3::ComparisonFilter::EQ:
     return lhs == value;
-  case envoy::config::filter::accesslog::v3alpha::ComparisonFilter::LE:
+  case envoy::config::accesslog::v3::ComparisonFilter::LE:
     return lhs <= value;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-FilterPtr
-FilterFactory::fromProto(const envoy::config::filter::accesslog::v3alpha::AccessLogFilter& config,
-                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                         ProtobufMessage::ValidationVisitor& validation_visitor) {
+FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
+                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor) {
   switch (config.filter_specifier_case()) {
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kStatusCodeFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kStatusCodeFilter:
     return FilterPtr{new StatusCodeFilter(config.status_code_filter(), runtime)};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kDurationFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kDurationFilter:
     return FilterPtr{new DurationFilter(config.duration_filter(), runtime)};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kNotHealthCheckFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kNotHealthCheckFilter:
     return FilterPtr{new NotHealthCheckFilter()};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kTraceableFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kTraceableFilter:
     return FilterPtr{new TraceableRequestFilter()};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kRuntimeFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kRuntimeFilter:
     return FilterPtr{new RuntimeFilter(config.runtime_filter(), runtime, random)};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::kAndFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kAndFilter:
     return FilterPtr{new AndFilter(config.and_filter(), runtime, random, validation_visitor)};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::kOrFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kOrFilter:
     return FilterPtr{new OrFilter(config.or_filter(), runtime, random, validation_visitor)};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kHeaderFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kHeaderFilter:
     return FilterPtr{new HeaderFilter(config.header_filter())};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kResponseFlagFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kResponseFlagFilter:
     MessageUtil::validate(config, validation_visitor);
     return FilterPtr{new ResponseFlagFilter(config.response_flag_filter())};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kGrpcStatusFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kGrpcStatusFilter:
     MessageUtil::validate(config, validation_visitor);
     return FilterPtr{new GrpcStatusFilter(config.grpc_status_filter())};
-  case envoy::config::filter::accesslog::v3alpha::AccessLogFilter::FilterSpecifierCase::
-      kExtensionFilter:
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
     MessageUtil::validate(config, validation_visitor);
     {
       auto& factory =
@@ -127,7 +116,7 @@ bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::He
       std::chrono::duration_cast<std::chrono::milliseconds>(final.value()).count());
 }
 
-RuntimeFilter::RuntimeFilter(const envoy::config::filter::accesslog::v3alpha::RuntimeFilter& config,
+RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& config,
                              Runtime::Loader& runtime, Runtime::RandomGenerator& random)
     : runtime_(runtime), random_(random), runtime_key_(config.runtime_key()),
       percent_(config.percent_sampled()),
@@ -151,8 +140,7 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMa
 }
 
 OperatorFilter::OperatorFilter(
-    const Protobuf::RepeatedPtrField<envoy::config::filter::accesslog::v3alpha::AccessLogFilter>&
-        configs,
+    const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& config : configs) {
@@ -160,12 +148,12 @@ OperatorFilter::OperatorFilter(
   }
 }
 
-OrFilter::OrFilter(const envoy::config::filter::accesslog::v3alpha::OrFilter& config,
-                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+OrFilter::OrFilter(const envoy::config::accesslog::v3::OrFilter& config, Runtime::Loader& runtime,
+                   Runtime::RandomGenerator& random,
                    ProtobufMessage::ValidationVisitor& validation_visitor)
     : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
 
-AndFilter::AndFilter(const envoy::config::filter::accesslog::v3alpha::AndFilter& config,
+AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
                      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                      ProtobufMessage::ValidationVisitor& validation_visitor)
     : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
@@ -205,7 +193,7 @@ bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Ht
   return !info.healthCheck();
 }
 
-HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v3alpha::HeaderFilter& config)
+HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config)
     : header_data_(std::make_unique<Http::HeaderUtility::HeaderData>(config.header())) {}
 
 bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,
@@ -214,7 +202,7 @@ bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
-    const envoy::config::filter::accesslog::v3alpha::ResponseFlagFilter& config) {
+    const envoy::config::accesslog::v3::ResponseFlagFilter& config) {
   for (int i = 0; i < config.flags_size(); i++) {
     absl::optional<StreamInfo::ResponseFlag> response_flag =
         StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
@@ -232,8 +220,7 @@ bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http
   return info.hasAnyResponseFlag();
 }
 
-GrpcStatusFilter::GrpcStatusFilter(
-    const envoy::config::filter::accesslog::v3alpha::GrpcStatusFilter& config) {
+GrpcStatusFilter::GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatusFilter& config) {
   for (int i = 0; i < config.statuses_size(); i++) {
     statuses_.insert(protoToGrpcStatus(config.statuses(i)));
   }
@@ -244,29 +231,12 @@ GrpcStatusFilter::GrpcStatusFilter(
 bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
                                 const Http::HeaderMap& response_headers,
                                 const Http::HeaderMap& response_trailers) {
-  // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
-  // request. When it is returned, it will be in the response trailers. With that said, Envoy will
-  // treat a trailers-only response as a headers-only response, so we have to check the following
-  // in order:
-  //   1. response_trailers gRPC status, if it exists.
-  //   2. response_headers gRPC status, if it exists.
-  //   3. Inferred from info HTTP status, if it exists.
-  //
-  // If none of those options exist, it will default to Grpc::Status::WellKnownGrpcStatus::Unknown.
-  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
-      {Grpc::Common::getGrpcStatus(response_trailers)},
-      {Grpc::Common::getGrpcStatus(response_headers)},
-      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
-                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
-                           : absl::nullopt},
-  }};
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
-  for (const auto& optional_status : optional_statuses) {
-    if (optional_status.has_value()) {
-      status = optional_status.value();
-      break;
-    }
+  const auto& optional_status =
+      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info);
+  if (optional_status.has_value()) {
+    status = optional_status.value();
   }
 
   const bool found = statuses_.find(status) != statuses_.end();
@@ -274,13 +244,12 @@ bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
 }
 
 Grpc::Status::GrpcStatus GrpcStatusFilter::protoToGrpcStatus(
-    envoy::config::filter::accesslog::v3alpha::GrpcStatusFilter::Status status) const {
+    envoy::config::accesslog::v3::GrpcStatusFilter::Status status) const {
   return static_cast<Grpc::Status::GrpcStatus>(status);
 }
 
-InstanceSharedPtr
-AccessLogFactory::fromProto(const envoy::config::filter::accesslog::v3alpha::AccessLog& config,
-                            Server::Configuration::FactoryContext& context) {
+InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                                              Server::Configuration::FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context.runtime(), context.random(),

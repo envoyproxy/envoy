@@ -1,8 +1,8 @@
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/data/accesslog/v3alpha/accesslog.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "common/common/assert.h"
 #include "common/network/utility.h"
@@ -21,7 +21,7 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
 
 HttpGrpcAccessLog::HttpGrpcAccessLog(
     AccessLog::FilterPtr&& filter,
-    envoy::extensions::access_loggers::grpc::v3alpha::HttpGrpcAccessLogConfig config,
+    envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
     ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
     : Common::ImplBase(std::move(filter)), config_(std::move(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
@@ -49,23 +49,23 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
                                 const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
-  envoy::data::accesslog::v3alpha::HTTPAccessLogEntry log_entry;
+  envoy::data::accesslog::v3::HTTPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
                                                         stream_info, config_.common_config());
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {
     case Http::Protocol::Http10:
-      log_entry.set_protocol_version(envoy::data::accesslog::v3alpha::HTTPAccessLogEntry::HTTP10);
+      log_entry.set_protocol_version(envoy::data::accesslog::v3::HTTPAccessLogEntry::HTTP10);
       break;
     case Http::Protocol::Http11:
-      log_entry.set_protocol_version(envoy::data::accesslog::v3alpha::HTTPAccessLogEntry::HTTP11);
+      log_entry.set_protocol_version(envoy::data::accesslog::v3::HTTPAccessLogEntry::HTTP11);
       break;
     case Http::Protocol::Http2:
-      log_entry.set_protocol_version(envoy::data::accesslog::v3alpha::HTTPAccessLogEntry::HTTP2);
+      log_entry.set_protocol_version(envoy::data::accesslog::v3::HTTPAccessLogEntry::HTTP2);
       break;
     case Http::Protocol::Http3:
-      log_entry.set_protocol_version(envoy::data::accesslog::v3alpha::HTTPAccessLogEntry::HTTP3);
+      log_entry.set_protocol_version(envoy::data::accesslog::v3::HTTPAccessLogEntry::HTTP3);
       break;
     }
   }
@@ -105,9 +105,8 @@ void HttpGrpcAccessLog::emitLog(const Http::HeaderMap& request_headers,
   request_properties->set_request_headers_bytes(request_headers.byteSize());
   request_properties->set_request_body_bytes(stream_info.bytesReceived());
   if (request_headers.Method() != nullptr) {
-    envoy::config::core::v3alpha::RequestMethod method =
-        envoy::config::core::v3alpha::METHOD_UNSPECIFIED;
-    envoy::config::core::v3alpha::RequestMethod_Parse(
+    envoy::config::core::v3::RequestMethod method = envoy::config::core::v3::METHOD_UNSPECIFIED;
+    envoy::config::core::v3::RequestMethod_Parse(
         std::string(request_headers.Method()->value().getStringView()), &method);
     request_properties->set_request_method(method);
   }

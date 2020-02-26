@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/filters/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -31,9 +31,9 @@ enum class FilterRequestType { INTERNAL, EXTERNAL, BOTH };
  */
 class IpTaggingFilterConfig {
 public:
-  IpTaggingFilterConfig(
-      const envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging& config,
-      const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+  IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+                        const std::string& stat_prefix, Stats::Scope& scope,
+                        Runtime::Loader& runtime);
 
   Runtime::Loader& runtime() { return runtime_; }
   Stats::Scope& scope() { return scope_; }
@@ -46,13 +46,13 @@ public:
 
 private:
   static FilterRequestType requestTypeEnum(
-      envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging::RequestType request_type) {
+      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::RequestType request_type) {
     switch (request_type) {
-    case envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging::BOTH:
+    case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::BOTH:
       return FilterRequestType::BOTH;
-    case envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging::INTERNAL:
+    case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::INTERNAL:
       return FilterRequestType::INTERNAL;
-    case envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging::EXTERNAL:
+    case envoy::extensions::filters::http::ip_tagging::v3::IPTagging::EXTERNAL:
       return FilterRequestType::EXTERNAL;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -87,9 +87,10 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:

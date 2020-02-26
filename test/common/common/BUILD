@@ -137,8 +137,9 @@ envoy_cc_test(
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -171,7 +172,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:regex_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -189,20 +190,6 @@ envoy_cc_test(
     deps = [
         "//source/common/common:perf_annotation_lib",
     ],
-)
-
-envoy_cc_test(
-    name = "stack_array_test",
-    srcs = ["stack_array_test.cc"],
-    deps = [
-        "//source/common/common:stack_array",
-    ],
-)
-
-envoy_cc_test(
-    name = "to_lower_table_test",
-    srcs = ["to_lower_table_test.cc"],
-    deps = ["//source/common/common:to_lower_table_lib"],
 )
 
 envoy_cc_test(
@@ -258,5 +245,16 @@ envoy_cc_test(
     srcs = ["stl_helpers_test.cc"],
     deps = [
         "//source/common/common:stl_helpers",
+    ],
+)
+
+envoy_cc_test(
+    name = "version_test",
+    srcs = ["version_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//source/common/common:version_lib",
     ],
 )

@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -32,7 +32,7 @@ public:
     cm_.thread_local_cluster_.cluster_.info_->transport_socket_matcher_.reset(
         transport_socket_match_);
 
-    envoy::extensions::filters::http::dynamic_forward_proxy::v3alpha::FilterConfig proto_config;
+    envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
@@ -64,7 +64,7 @@ public:
   ProxyFilterConfigSharedPtr filter_config_;
   std::unique_ptr<ProxyFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks callbacks_;
-  Http::TestHeaderMapImpl request_headers_{{":authority", "foo"}};
+  Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
 };
 
 // Default port 80 if upstream TLS not configured.
@@ -176,7 +176,7 @@ TEST_F(ProxyFilterTest, NoCluster) {
 TEST_F(ProxyFilterTest, HostRewrite) {
   InSequence s;
 
-  envoy::extensions::filters::http::dynamic_forward_proxy::v3alpha::PerRouteConfig proto_config;
+  envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig proto_config;
   proto_config.set_host_rewrite_literal("bar");
   ProxyPerRouteConfig config(proto_config);
 
@@ -200,7 +200,7 @@ TEST_F(ProxyFilterTest, HostRewrite) {
 TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   InSequence s;
 
-  envoy::extensions::filters::http::dynamic_forward_proxy::v3alpha::PerRouteConfig proto_config;
+  envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig proto_config;
   proto_config.set_host_rewrite_header("x-set-header");
   ProxyPerRouteConfig config(proto_config);
 
@@ -215,7 +215,7 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar:82"), 80, _))
       .WillOnce(Return(MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle}));
 
-  Http::TestHeaderMapImpl headers{{":authority", "foo"}, {"x-set-header", "bar:82"}};
+  Http::TestRequestHeaderMapImpl headers{{":authority", "foo"}, {"x-set-header", "bar:82"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(headers, false));
 

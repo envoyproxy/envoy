@@ -1,8 +1,8 @@
 #include "server/listener_impl.h"
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -80,7 +80,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
             local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
     const bool ok = Network::Socket::applyOptions(
-        options_, *socket, envoy::config::core::v3alpha::SocketOption::STATE_BOUND);
+        options_, *socket, envoy::config::core::v3::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -125,7 +125,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 
 XXFactoryContextImpl::XXFactoryContextImpl(Envoy::Server::Instance& server,
                                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           const envoy::config::listener::v3alpha::Listener& config)
+                                           const envoy::config::listener::v3::Listener& config)
     : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
       global_scope_(server.stats().createScope("")),
       // Not ideal
@@ -153,10 +153,10 @@ OverloadManager& XXFactoryContextImpl::overloadManager() { return server_.overlo
 ThreadLocal::Instance& XXFactoryContextImpl::threadLocal() { return server_.threadLocal(); }
 Admin& XXFactoryContextImpl::admin() { return server_.admin(); }
 // TODO(lambdai): consider moving away from factory context
-const envoy::config::core::v3alpha::Metadata& XXFactoryContextImpl::listenerMetadata() const {
+const envoy::config::core::v3::Metadata& XXFactoryContextImpl::listenerMetadata() const {
   return metadata_;
 };
-envoy::config::core::v3alpha::TrafficDirection XXFactoryContextImpl::direction() const {
+envoy::config::core::v3::TrafficDirection XXFactoryContextImpl::direction() const {
   return direction_;
 };
 TimeSource& XXFactoryContextImpl::timeSource() { return api().timeSource(); }
@@ -167,9 +167,13 @@ Api::Api& XXFactoryContextImpl::api() { return server_.api(); }
 ServerLifecycleNotifier& XXFactoryContextImpl::lifecycleNotifier() {
   return server_.lifecycleNotifier();
 }
-OptProcessContextRef XXFactoryContextImpl::processContext() { return server_.processContext(); }
+ProcessContextOptRef XXFactoryContextImpl::processContext() { return server_.processContext(); }
 Configuration::ServerFactoryContext& XXFactoryContextImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
+}
+Configuration::TransportSocketFactoryContext&
+XXFactoryContextImpl::getTransportSocketFactoryContext() const {
+  return server_.transportSocketFactoryContext();
 }
 Stats::Scope& XXFactoryContextImpl::listenerScope() { return *listener_scope_; }
 // Must be overrided
@@ -179,7 +183,7 @@ Init::Manager& XXFactoryContextImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_
 filter_chain_manager_, watcher_ vary from plain constructor
 */
 ListenerImpl::ListenerImpl(const ListenerImpl& origin,
-                           const envoy::config::listener::v3alpha::Listener& config,
+                           const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -236,7 +240,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
             udp_config.udp_listener_name());
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
-    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
+    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
   }
 
   if (!config.listener_filters().empty()) {
@@ -361,7 +365,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
   }
 }
 
-ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
+ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -417,7 +421,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
             udp_config.udp_listener_name());
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
-    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
+    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
   }
 
   if (!config.listener_filters().empty()) {
@@ -587,10 +591,10 @@ ThreadLocal::Instance& ListenerFactoryContextImpl::threadLocal() {
   return xx_factory_context_->threadLocal();
 }
 Admin& ListenerFactoryContextImpl::admin() { return xx_factory_context_->admin(); }
-const envoy::config::core::v3alpha::Metadata& ListenerFactoryContextImpl::listenerMetadata() const {
+const envoy::config::core::v3::Metadata& ListenerFactoryContextImpl::listenerMetadata() const {
   return xx_factory_context_->listenerMetadata();
 };
-envoy::config::core::v3alpha::TrafficDirection ListenerFactoryContextImpl::direction() const {
+envoy::config::core::v3::TrafficDirection ListenerFactoryContextImpl::direction() const {
   return xx_factory_context_->direction();
 };
 TimeSource& ListenerFactoryContextImpl::timeSource() { return api().timeSource(); }
@@ -605,11 +609,15 @@ Api::Api& ListenerFactoryContextImpl::api() { return xx_factory_context_->api();
 ServerLifecycleNotifier& ListenerFactoryContextImpl::lifecycleNotifier() {
   return xx_factory_context_->lifecycleNotifier();
 }
-OptProcessContextRef ListenerFactoryContextImpl::processContext() {
+ProcessContextOptRef ListenerFactoryContextImpl::processContext() {
   return xx_factory_context_->processContext();
 }
 Configuration::ServerFactoryContext& ListenerFactoryContextImpl::getServerFactoryContext() const {
   return xx_factory_context_->getServerFactoryContext();
+}
+Configuration::TransportSocketFactoryContext&
+ListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
+  return xx_factory_context_->getTransportSocketFactoryContext();
 }
 Stats::Scope& ListenerFactoryContextImpl::listenerScope() {
   return xx_factory_context_->listenerScope();
@@ -669,7 +677,7 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
 }
 
 UpdateDecision
-ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3alpha::Listener& config,
+ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
                                        bool worker_started) {
   // It's adding very little value to support filter chain only update at start phase.
   if (!worker_started) {
@@ -682,7 +690,7 @@ ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3alpha::L
 }
 
 ListenerImplPtr
-ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3alpha::Listener& config,
+ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                                          bool workers_started, uint64_t hash) {
   return std::make_unique<ListenerImpl>(
       *this, config, version_info_, parent_, name_, added_via_api_,
@@ -704,19 +712,18 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& listener,
 
 void ListenerImpl::cancelUpdate() {}
 
-envoy::config::listener::v3alpha::Listener
-ListenerMessageUtil::normalize(const envoy::config::listener::v3alpha::Listener& config) {
+envoy::config::listener::v3::Listener
+ListenerMessageUtil::normalize(const envoy::config::listener::v3::Listener& config) {
   return config;
 }
 
-bool ListenerMessageUtil::equivalent(const envoy::config::listener::v3alpha::Listener& lhs,
-                                     const envoy::config::listener::v3alpha::Listener& rhs) {
+bool ListenerMessageUtil::equivalent(const envoy::config::listener::v3::Listener& lhs,
+                                     const envoy::config::listener::v3::Listener& rhs) {
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
   differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
   differencer.IgnoreField(
-      envoy::config::listener::v3alpha::Listener::GetDescriptor()->FindFieldByName(
-          "filter_chains"));
+      envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("filter_chains"));
   return differencer.Compare(lhs, rhs);
 }
 

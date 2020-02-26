@@ -1,8 +1,8 @@
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.validate.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 
@@ -20,9 +20,9 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::config::bootstrap::v3alpha::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(yaml, bootstrap);
+envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(yaml, bootstrap, true);
   return bootstrap;
 }
 
@@ -35,7 +35,7 @@ public:
   ClusterManagerImplTest()
       : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()) {}
 
-  void create(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
@@ -95,15 +95,15 @@ public:
   void checkConfigDump(const std::string& expected_dump_yaml) {
     auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"]();
     const auto& clusters_config_dump =
-        dynamic_cast<const envoy::admin::v3alpha::ClustersConfigDump&>(*message_ptr);
+        dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
 
-    envoy::admin::v3alpha::ClustersConfigDump expected_clusters_config_dump;
+    envoy::admin::v3::ClustersConfigDump expected_clusters_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
-  envoy::config::core::v3alpha::Metadata buildMetadata(const std::string& version) const {
-    envoy::config::core::v3alpha::Metadata metadata;
+  MetadataConstSharedPtr buildMetadata(const std::string& version) const {
+    envoy::config::core::v3::Metadata metadata;
 
     if (!version.empty()) {
       Envoy::Config::Metadata::mutableMetadataValue(
@@ -111,7 +111,7 @@ public:
           .set_string_value(version);
     }
 
-    return metadata;
+    return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -126,7 +126,7 @@ public:
   Http::ContextImpl http_context_;
 };
 
-envoy::config::bootstrap::v3alpha::Bootstrap defaultConfig() {
+envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
   const std::string yaml = R"EOF(
 static_resources:
   clusters: []
@@ -189,6 +189,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -389,20 +390,20 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
 
 class ClusterManagerSubsetInitializationTest
     : public ClusterManagerImplTest,
-      public testing::WithParamInterface<envoy::config::cluster::v3alpha::Cluster::LbPolicy> {
+      public testing::WithParamInterface<envoy::config::cluster::v3::Cluster::LbPolicy> {
 public:
   ClusterManagerSubsetInitializationTest() = default;
 
-  static std::vector<envoy::config::cluster::v3alpha::Cluster::LbPolicy> lbPolicies() {
-    int first = static_cast<int>(envoy::config::cluster::v3alpha::Cluster::LbPolicy_MIN);
-    int last = static_cast<int>(envoy::config::cluster::v3alpha::Cluster::LbPolicy_MAX);
+  static std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> lbPolicies() {
+    int first = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MIN);
+    int last = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MAX);
     ASSERT(first < last);
 
-    std::vector<envoy::config::cluster::v3alpha::Cluster::LbPolicy> policies;
+    std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> policies;
     for (int i = first; i <= last; i++) {
-      if (envoy::config::cluster::v3alpha::Cluster::LbPolicy_IsValid(i)) {
-        auto policy = static_cast<envoy::config::cluster::v3alpha::Cluster::LbPolicy>(i);
-        if (policy != envoy::config::cluster::v3alpha::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
+      if (envoy::config::cluster::v3::Cluster::LbPolicy_IsValid(i)) {
+        auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
+        if (policy != envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
           policies.push_back(policy);
         }
       }
@@ -411,7 +412,7 @@ public:
   }
 
   static std::string paramName(const testing::TestParamInfo<ParamType>& info) {
-    const std::string& name = envoy::config::cluster::v3alpha::Cluster::LbPolicy_Name(info.param);
+    const std::string& name = envoy::config::cluster::v3::Cluster::LbPolicy_Name(info.param);
     return absl::StrReplaceAll(name, {{"_", ""}});
   }
 };
@@ -444,26 +445,23 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
                   port_value: 8001
   )EOF";
 
-  const std::string& policy_name =
-      envoy::config::cluster::v3alpha::Cluster::LbPolicy_Name(GetParam());
+  const std::string& policy_name = envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
 
   std::string cluster_type = "type: STATIC";
-  if (GetParam() ==
-      envoy::config::cluster::v3alpha::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB) {
+  if (GetParam() == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB) {
     cluster_type = "type: ORIGINAL_DST";
-  } else if (GetParam() == envoy::config::cluster::v3alpha::Cluster::CLUSTER_PROVIDED) {
+  } else if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     // This custom cluster type is registered by linking test/integration/custom/static_cluster.cc.
     cluster_type = "cluster_type: { name: envoy.clusters.custom_static_with_lb }";
   }
   const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
-  if (GetParam() ==
-          envoy::config::cluster::v3alpha::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
-      GetParam() == envoy::config::cluster::v3alpha::Cluster::CLUSTER_PROVIDED) {
+  if (GetParam() == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
+      GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     EXPECT_THROW_WITH_MESSAGE(
         create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                    envoy::config::cluster::v3alpha::Cluster::LbPolicy_Name(GetParam())));
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam())));
 
   } else {
     create(parseBootstrapFromV2Yaml(yaml));
@@ -934,6 +932,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  version_info: version3
  static_clusters:
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -945,6 +944,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -956,6 +956,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster2"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -969,6 +970,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  dynamic_active_clusters:
   - version_info: "version1"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster3"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -981,6 +983,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       nanos: 234000000
   - version_info: "version2"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster4"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -993,6 +996,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       nanos: 234000000
   - version_info: "version3"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster5"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -1106,6 +1110,7 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
 dynamic_warming_clusters:
   - version_info: "version1"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: STATIC
       connect_timeout: 0.25s
@@ -1148,6 +1153,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version1"
      cluster:
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
@@ -1180,6 +1186,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version2"
      cluster:
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
@@ -1826,6 +1833,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   ON_CALL(example_com_context, upstreamTransportSocketOptions())
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>("example.com")));
 
+  NiceMock<MockLoadBalancerContext> example_com_context_with_san;
+  ON_CALL(example_com_context_with_san, upstreamTransportSocketOptions())
+      .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
+          "example.com", std::vector<std::string>{"example.com"})));
+
+  NiceMock<MockLoadBalancerContext> example_com_context_with_san2;
+  ON_CALL(example_com_context_with_san2, upstreamTransportSocketOptions())
+      .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
+          "example.com", std::vector<std::string>{"example.net"})));
+
   NiceMock<MockLoadBalancerContext> ibm_com_context;
   ON_CALL(ibm_com_context, upstreamTransportSocketOptions())
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>("ibm.com")));
@@ -1889,7 +1906,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .Times(8)
+      .Times(10)
       .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
 
   // This should provide us a CP for each of the above hosts, and for different SNIs
@@ -1993,6 +2010,12 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   Tcp::ConnectionPool::MockInstance* tcp3_example_com =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, &example_com_context));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, &example_com_context_with_san));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san2 =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, &example_com_context_with_san2));
   Tcp::ConnectionPool::MockInstance* tcp3_ibm_com =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, &ibm_com_context));
@@ -2002,6 +2025,10 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   EXPECT_EQ(tcp2_example_com, tcp3_example_com);
   EXPECT_EQ(tcp2_ibm_com, tcp3_ibm_com);
+
+  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san);
+  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san2);
+  EXPECT_NE(tcp3_example_com_with_san, tcp3_example_com_with_san2);
 
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
@@ -2161,14 +2188,14 @@ class MockConnPoolWithDestroy : public Http::ConnectionPool::MockInstance {
 public:
   ~MockConnPoolWithDestroy() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 class MockTcpConnPoolWithDestroy : public Tcp::ConnectionPool::MockInstance {
 public:
   ~MockTcpConnPoolWithDestroy() override { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 };
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3518. Make sure we handle a
@@ -2775,7 +2802,7 @@ TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
 
 class ClusterManagerInitHelperTest : public testing::Test {
 public:
-  MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
+  MOCK_METHOD(void, onClusterInit, (Cluster & cluster));
 
   NiceMock<MockClusterManager> cm_;
   ClusterManagerInitHelper init_helper_{cm_, [this](Cluster& cluster) { onClusterInit(cluster); }};
@@ -2971,7 +2998,7 @@ public:
       }
       EXPECT_CALL(os_sys_calls,
                   setsockopt_(_, name_val.first.level(), name_val.first.option(), _, sizeof(int)))
-          .WillOnce(Invoke([&name_val](int, int, int, const void* optval, socklen_t) -> int {
+          .WillOnce(Invoke([&name_val](os_fd_t, int, int, const void* optval, socklen_t) -> int {
             EXPECT_EQ(name_val.second, *static_cast<const int*>(optval));
             return 0;
           }));
@@ -2989,10 +3016,10 @@ public:
           NiceMock<Network::MockConnectionSocket> socket;
           if (expect_success) {
             EXPECT_TRUE((Network::Socket::applyOptions(
-                options, socket, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)));
+                options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           } else {
             EXPECT_FALSE((Network::Socket::applyOptions(
-                options, socket, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)));
+                options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
           }
           return connection_;
         }));
@@ -3227,7 +3254,7 @@ public:
                 EXPECT_EQ(1, options->size());
                 NiceMock<Network::MockConnectionSocket> socket;
                 EXPECT_FALSE((Network::Socket::applyOptions(
-                    options, socket, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)));
+                    options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
                 return connection_;
               }));
       cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
@@ -3244,12 +3271,12 @@ public:
               EXPECT_NE(nullptr, options.get());
               NiceMock<Network::MockConnectionSocket> socket;
               EXPECT_TRUE((Network::Socket::applyOptions(
-                  options, socket, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)));
+                  options, socket, envoy::config::core::v3::SocketOption::STATE_PREBIND)));
               return connection_;
             }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.level(),
                                           ENVOY_SOCKET_SO_KEEPALIVE.option(), _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+        .WillOnce(Invoke([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
         }));
@@ -3257,7 +3284,7 @@ public:
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPCNT.level(),
                                             ENVOY_SOCKET_TCP_KEEPCNT.option(), _, sizeof(int)))
           .WillOnce(
-              Invoke([&keepalive_probes](int, int, int, const void* optval, socklen_t) -> int {
+              Invoke([&keepalive_probes](os_fd_t, int, int, const void* optval, socklen_t) -> int {
                 EXPECT_EQ(keepalive_probes.value(), *static_cast<const int*>(optval));
                 return 0;
               }));
@@ -3265,16 +3292,17 @@ public:
     if (keepalive_time.has_value()) {
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPIDLE.level(),
                                             ENVOY_SOCKET_TCP_KEEPIDLE.option(), _, sizeof(int)))
-          .WillOnce(Invoke([&keepalive_time](int, int, int, const void* optval, socklen_t) -> int {
-            EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
-            return 0;
-          }));
+          .WillOnce(
+              Invoke([&keepalive_time](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+                EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
+                return 0;
+              }));
     }
     if (keepalive_interval.has_value()) {
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPINTVL.level(),
                                             ENVOY_SOCKET_TCP_KEEPINTVL.option(), _, sizeof(int)))
-          .WillOnce(
-              Invoke([&keepalive_interval](int, int, int, const void* optval, socklen_t) -> int {
+          .WillOnce(Invoke(
+              [&keepalive_interval](os_fd_t, int, int, const void* optval, socklen_t) -> int {
                 EXPECT_EQ(keepalive_interval.value(), *static_cast<const int*>(optval));
                 return 0;
               }));

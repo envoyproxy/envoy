@@ -1,6 +1,6 @@
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
-#include "envoy/extensions/filters/http/gzip/v3alpha/gzip.pb.h"
+#include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/macros.h"
@@ -40,9 +40,9 @@ const std::vector<std::string>& defaultContentEncoding() {
 
 } // namespace
 
-GzipFilterConfig::GzipFilterConfig(
-    const envoy::extensions::filters::http::gzip::v3alpha::Gzip& gzip,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip,
+                                   const std::string& stats_prefix, Stats::Scope& scope,
+                                   Runtime::Loader& runtime)
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       content_length_(contentLengthUint(gzip.content_length().value())),
@@ -54,12 +54,11 @@ GzipFilterConfig::GzipFilterConfig(
       stats_(generateStats(stats_prefix + "gzip.", scope)), runtime_(runtime) {}
 
 Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
-    envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionLevel::Enum
-        compression_level) {
+    envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::Enum compression_level) {
   switch (compression_level) {
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionLevel::BEST:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::BEST:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Best;
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionLevel::SPEED:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::SPEED:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
   default:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
@@ -67,14 +66,13 @@ Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLe
 }
 
 Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressionStrategyEnum(
-    envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionStrategy
-        compression_strategy) {
+    envoy::extensions::filters::http::gzip::v3::Gzip::CompressionStrategy compression_strategy) {
   switch (compression_strategy) {
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::RLE:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::RLE:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::FILTERED:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::FILTERED:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
-  case envoy::extensions::filters::http::gzip::v3alpha::Gzip::HUFFMAN:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::HUFFMAN:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
   default:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
@@ -103,7 +101,7 @@ uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
 GzipFilter::GzipFilter(const GzipFilterConfigSharedPtr& config)
     : skip_compression_{true}, config_(config) {}
 
-Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (config_->runtime().snapshot().featureEnabled("gzip.filter_enabled", 100) &&
       isAcceptEncodingAllowed(headers)) {
     skip_compression_ = false;
@@ -117,7 +115,8 @@ Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bo
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                    bool end_stream) {
   if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
       isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
       isEtagAllowed(headers) && isTransferEncodingAllowed(headers) && !headers.ContentEncoding()) {
@@ -144,7 +143,7 @@ Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_s
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus GzipFilter::encodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus GzipFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (!skip_compression_) {
     Buffer::OwnedImpl empty_buffer;
     compressor_.compress(empty_buffer, Compressor::State::Finish);
@@ -180,7 +179,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
       // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        const bool is_gzip = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        const bool is_gzip = !absl::EqualsIgnoreCase(q_value, ZeroQvalueString);
         if (is_gzip) {
           config_->stats().header_gzip_.inc();
           return true;
@@ -200,7 +199,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
       // identity is weighted higher. Note that this filter disregards
       // order/priority at this time.
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-        is_wildcard = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        is_wildcard = !absl::EqualsIgnoreCase(q_value, ZeroQvalueString);
       }
     }
     // If neither identity nor gzip codings are present, return the result of the wildcard.
@@ -262,10 +261,9 @@ bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
          // computed twice. Find all other sites where this can be improved.
          StringUtil::splitToken(transfer_encoding->value().getStringView(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
-      if (StringUtil::caseCompare(trimmed_value,
-                                  Http::Headers::get().TransferEncodingValues.Gzip) ||
-          StringUtil::caseCompare(trimmed_value,
-                                  Http::Headers::get().TransferEncodingValues.Deflate)) {
+      if (absl::EqualsIgnoreCase(trimmed_value, Http::Headers::get().TransferEncodingValues.Gzip) ||
+          absl::EqualsIgnoreCase(trimmed_value,
+                                 Http::Headers::get().TransferEncodingValues.Deflate)) {
         return false;
       }
     }

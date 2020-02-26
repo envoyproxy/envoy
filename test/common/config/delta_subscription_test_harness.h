@@ -2,11 +2,12 @@
 
 #include <queue>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/delta_subscription_impl.h"
+#include "common/config/grpc_subscription_impl.h"
+#include "common/config/new_grpc_mux_impl.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/common.h"
 
@@ -41,9 +42,10 @@ public:
     EXPECT_CALL(dispatcher_, createTimer_(_));
     xds_context_ = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-        random_, stats_store_, rate_limit_settings_, local_info_);
-    subscription_ = std::make_unique<DeltaSubscriptionImpl>(
-        xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
+        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
+        local_info_);
+    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
+        xds_context_, callbacks_, stats_, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_,
         init_fetch_timeout, false);
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   }
@@ -126,19 +128,17 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    auto response = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_system_version_info(version);
     response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-    Protobuf::RepeatedPtrField<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>
-        typed_resources;
+    Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
       if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
           last_cluster_names_.end()) {
-        envoy::config::endpoint::v3alpha::ClusterLoadAssignment* load_assignment =
-            typed_resources.Add();
+        envoy::config::endpoint::v3::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
         auto* resource = response->add_resources();
         resource->set_name(cluster);
@@ -155,7 +155,7 @@ public:
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
       expectSendMessage({}, {}, Grpc::Status::WellKnownGrpcStatus::Internal, "bad config", {});
     }
-    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+    static_cast<NewGrpcMuxImpl*>(subscription_->grpcMux().get())
         ->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
@@ -197,15 +197,13 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
   std::shared_ptr<NewGrpcMuxImpl> xds_context_;
-  std::unique_ptr<DeltaSubscriptionImpl> subscription_;
+  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
-  envoy::config::core::v3alpha::Node node_;
-  NiceMock<
-      Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>>
-      callbacks_;
+  envoy::config::core::v3::Node node_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};

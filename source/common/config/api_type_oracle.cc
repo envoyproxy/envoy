@@ -1,20 +1,15 @@
 #include "common/config/api_type_oracle.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
 #include "udpa/annotations/versioning.pb.h"
 
 namespace Envoy {
 namespace Config {
 
 const Protobuf::Descriptor*
-ApiTypeOracle::getEarlierVersionDescriptor(const Protobuf::Message& message) {
-  const std::string target_type = message.GetDescriptor()->full_name();
-
-  // Determine if there is an earlier API version for target_type.
+ApiTypeOracle::getEarlierVersionDescriptor(const std::string& message_type) {
+  // Determine if there is an earlier API version for message_type.
   const Protobuf::Descriptor* desc =
-      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(std::string{target_type});
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(std::string{message_type});
   if (desc == nullptr) {
     return nullptr;
   }
@@ -22,7 +17,6 @@ ApiTypeOracle::getEarlierVersionDescriptor(const Protobuf::Message& message) {
     const Protobuf::Descriptor* earlier_desc =
         Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
             desc->options().GetExtension(udpa::annotations::versioning).previous_message_type());
-    ASSERT(earlier_desc != nullptr);
     return earlier_desc;
   }
 

@@ -170,12 +170,6 @@ TEST_F(QuicPlatformTest, QuicQueue) {
   EXPECT_EQ(10, queue.back());
 }
 
-TEST_F(QuicPlatformTest, QuicDeque) {
-  QuicDeque<int> deque;
-  deque.push_back(10);
-  EXPECT_EQ(10, deque.back());
-}
-
 TEST_F(QuicPlatformTest, QuicInlinedVector) {
   QuicInlinedVector<int, 5> vec;
   vec.push_back(3);
@@ -614,7 +608,7 @@ public:
   }
 
 protected:
-  void SetUp() override { Envoy::TestUtility::createDirectory(dir_path_); }
+  void SetUp() override { Envoy::TestEnvironment::createPath(dir_path_); }
 
   void TearDown() override {
     while (!files_to_remove_.empty()) {
@@ -627,7 +621,7 @@ protected:
   void addSubDirs(std::list<std::string> sub_dirs) {
     for (const std::string& dir_name : sub_dirs) {
       const std::string full_path = dir_path_ + "/" + dir_name;
-      Envoy::TestUtility::createDirectory(full_path);
+      Envoy::TestEnvironment::createPath(full_path);
       files_to_remove_.push(full_path);
     }
   }
@@ -684,8 +678,8 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   // Actually create sockets.
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillRepeatedly([](int domain, int type, int protocol) {
-    int fd = ::socket(domain, type, protocol);
-    return Envoy::Api::SysCallIntResult{fd, errno};
+    os_fd_t fd = ::socket(domain, type, protocol);
+    return Envoy::Api::SysCallSocketResult{fd, errno};
   });
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
@@ -780,7 +774,7 @@ TEST(EnvoyQuicMemSliceTest, ConstructQuicMemSliceSpan) {
 
 TEST(EnvoyQuicMemSliceTest, QuicMemSliceStorage) {
   std::string str(512, 'a');
-  struct iovec iov = {const_cast<char*>(str.data()), str.length()};
+  iovec iov = {const_cast<char*>(str.data()), str.length()};
   SimpleBufferAllocator allocator;
   QuicMemSliceStorage storage(&iov, 1, &allocator, 1024);
   // Test copy constructor.

@@ -18,6 +18,10 @@ namespace Router {
 MockDirectResponseEntry::MockDirectResponseEntry() = default;
 MockDirectResponseEntry::~MockDirectResponseEntry() = default;
 
+TestRetryPolicy::TestRetryPolicy() { num_retries_ = 1; }
+
+TestRetryPolicy::~TestRetryPolicy() = default;
+
 MockRetryState::MockRetryState() = default;
 
 void MockRetryState::expectHeadersRetry() {
@@ -108,6 +112,7 @@ MockConfig::~MockConfig() = default;
 
 MockDecorator::MockDecorator() {
   ON_CALL(*this, getOperation()).WillByDefault(ReturnRef(operation_));
+  ON_CALL(*this, propagate()).WillByDefault(Return(true));
 }
 MockDecorator::~MockDecorator() = default;
 

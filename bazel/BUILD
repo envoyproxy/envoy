@@ -18,8 +18,8 @@ genrule(
     outs = ["gnu_build_id.ldscript"],
     cmd = """
       echo --build-id=0x$$(
-          grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-        | sed 's/^BUILD_SCM_REVISION //') \\
+          grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \
+        | sed 's/^BUILD_SCM_REVISION //') \
         > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -32,9 +32,9 @@ genrule(
     name = "raw_build_id",
     outs = ["raw_build_id.ldscript"],
     cmd = """
-      grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
-    | sed 's/^BUILD_SCM_REVISION //' \\
-    | tr -d '\\n' \\
+      grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \
+    | sed 's/^BUILD_SCM_REVISION //' \
+    | tr -d '\n' \
     > $@
     """,
     # Undocumented attr to depend on workspace status files.
@@ -212,6 +212,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_known_issue_asserts",
+    values = {"define": "disable_known_issue_asserts=true"},
+)
+
+config_setting(
     name = "enable_perf_annotation",
     values = {"define": "perf_annotation=enabled"},
 )
@@ -321,6 +326,11 @@ config_setting(
 config_setting(
     name = "manual_stamp",
     values = {"define": "manual_stamp=manual_stamp"},
+)
+
+config_setting(
+    name = "android_logger",
+    values = {"define": "logger=android"},
 )
 
 alias(

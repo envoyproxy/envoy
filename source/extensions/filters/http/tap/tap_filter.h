@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/extensions/filters/http/tap/v3alpha/tap.pb.h"
+#include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -56,7 +56,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigImpl : public FilterConfig, public Extensions::Common::Tap::ExtensionConfigBase {
 public:
-  FilterConfigImpl(const envoy::extensions::filters::http::tap::v3alpha::Tap& proto_config,
+  FilterConfigImpl(const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
                    const std::string& stats_prefix,
                    Extensions::Common::Tap::TapConfigFactoryPtr&& config_factory,
                    Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
@@ -83,21 +83,23 @@ public:
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     HttpTapConfigSharedPtr config = config_->currentConfig();
     tapper_ = config ? config->createPerRequestTapper(callbacks.streamId()) : nullptr;
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }

@@ -1,22 +1,22 @@
 #include "envoy/api/v2/route/route_components.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/overload/v2alpha/overload.pb.h"
-#include "envoy/config/overload/v3alpha/overload.pb.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 
 #define API_NO_BOOST(x) x
 #define BAR(x) x
 #define ASSERT(x) static_cast<void>(x)
 
-using envoy::config::overload::v3alpha::Trigger;
+using envoy::config::overload::v3::Trigger;
 
-using envoy::config::cluster::v3alpha::Cluster;
+using envoy::config::cluster::v3::Cluster;
 using MutableStringClusterAccessor = std::string* (Cluster::*)();
 
 class ThresholdTriggerImpl {
 public:
-  ThresholdTriggerImpl(const envoy::config::overload::v3alpha::Trigger& config) {
+  ThresholdTriggerImpl(const envoy::config::overload::v3::Trigger& config) {
     switch (config.trigger_oneof_case()) {
-    case envoy::config::overload::v3alpha::Trigger::TriggerOneofCase::kThreshold:
+    case envoy::config::overload::v3::Trigger::TriggerOneofCase::kThreshold:
       break;
     default:
       break;
@@ -31,15 +31,15 @@ public:
     route_action.host_rewrite();
     API_NO_BOOST(envoy::config::overload::v2alpha::Trigger) foo;
     BAR(API_NO_BOOST(envoy::config::overload::v2alpha::Trigger)) bar;
-    BAR(envoy::config::overload::v3alpha::Trigger) baz;
-    envoy::config::overload::v3alpha::ThresholdTrigger::default_instance();
-    ASSERT(envoy::config::overload::v3alpha::Trigger::TriggerOneofCase::kThreshold == Trigger::kThreshold);
+    BAR(envoy::config::overload::v3::Trigger) baz;
+    envoy::config::overload::v3::ThresholdTrigger::default_instance();
+    ASSERT(envoy::config::overload::v3::Trigger::TriggerOneofCase::kThreshold == Trigger::kThreshold);
     ASSERT(Foo::kThreshold == Trigger::kThreshold);
-    envoy::config::cluster::v3alpha::Cluster::LbPolicy_Name(0);
-    static_cast<void>(envoy::config::cluster::v3alpha::Cluster::MAGLEV);
-    MutableStringClusterAccessor foo2 = &envoy::config::cluster::v3alpha::Cluster::mutable_name;
+    envoy::config::cluster::v3::Cluster::LbPolicy_Name(0);
+    static_cast<void>(envoy::config::cluster::v3::Cluster::MAGLEV);
+    MutableStringClusterAccessor foo2 = &envoy::config::cluster::v3::Cluster::mutable_name;
     static_cast<void>(foo2);
   }
 
-  using Foo = envoy::config::overload::v3alpha::Trigger;
+  using Foo = envoy::config::overload::v3::Trigger;
 };

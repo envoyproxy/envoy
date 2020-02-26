@@ -2,8 +2,8 @@
 
 #include <typeinfo>
 
-#include "envoy/config/route/v3alpha/scoped_route.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/config/route/v3/scoped_route.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/router.h"
 #include "envoy/router/scopes.h"
@@ -19,7 +19,7 @@
 namespace Envoy {
 namespace Router {
 
-using envoy::extensions::filters::network::http_connection_manager::v3alpha::ScopedRoutes;
+using envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes;
 
 /**
  * Scope key fragment base class.
@@ -149,18 +149,18 @@ private:
 // ScopedRouteConfiguration and corresponding RouteConfigProvider.
 class ScopedRouteInfo {
 public:
-  ScopedRouteInfo(envoy::config::route::v3alpha::ScopedRouteConfiguration&& config_proto,
+  ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration&& config_proto,
                   ConfigConstSharedPtr&& route_config);
 
   const ConfigConstSharedPtr& routeConfig() const { return route_config_; }
   const ScopeKey& scopeKey() const { return scope_key_; }
-  const envoy::config::route::v3alpha::ScopedRouteConfiguration& configProto() const {
+  const envoy::config::route::v3::ScopedRouteConfiguration& configProto() const {
     return config_proto_;
   }
   const std::string& scopeName() const { return config_proto_.name(); }
 
 private:
-  envoy::config::route::v3alpha::ScopedRouteConfiguration config_proto_;
+  envoy::config::route::v3::ScopedRouteConfiguration config_proto_;
   ScopeKey scope_key_;
   ConfigConstSharedPtr route_config_;
 };

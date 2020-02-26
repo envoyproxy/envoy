@@ -1,5 +1,5 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
@@ -98,8 +98,8 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
         hcm.mutable_http_protocol_options()->set_accept_http_10(true);
         hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
       });
@@ -139,7 +139,7 @@ TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
   // added filter chain: dst ip = 127.0.0.2
   new_config_helper.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
         auto* standard_filter_chain = listener->mutable_filter_chains(0);
         auto* add_filter_chain = listener->add_filter_chains();
@@ -168,17 +168,16 @@ TEST_P(LdsIntegrationTest, ReloadConfigDeletingFilterChain) {
   autonomous_upstream_ = true;
 
   // 2 filter chains in initial listener
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        auto* standard_filter_chain = listener->mutable_filter_chains(0);
-        auto* add_filter_chain = listener->add_filter_chains();
-        add_filter_chain->CopyFrom(*standard_filter_chain);
-        add_filter_chain->set_name("127.0.0.2");
-        auto* dst_ip = add_filter_chain->mutable_filter_chain_match()->add_prefix_ranges();
-        dst_ip->set_address_prefix("127.0.0.2");
-        dst_ip->mutable_prefix_len()->set_value(32);
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* standard_filter_chain = listener->mutable_filter_chains(0);
+    auto* add_filter_chain = listener->add_filter_chains();
+    add_filter_chain->CopyFrom(*standard_filter_chain);
+    add_filter_chain->set_name("127.0.0.2");
+    auto* dst_ip = add_filter_chain->mutable_filter_chain_match()->add_prefix_ranges();
+    dst_ip->set_address_prefix("127.0.0.2");
+    dst_ip->mutable_prefix_len()->set_value(32);
+  });
 
   initialize();
   // Given we're using LDS in this test, initialize() will not complete until
@@ -195,7 +194,7 @@ TEST_P(LdsIntegrationTest, ReloadConfigDeletingFilterChain) {
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
   // delete the filter chain matching dst ip = 127.0.0.2
   new_config_helper.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
         listener->mutable_filter_chains()->RemoveLast();
       });
@@ -216,12 +215,12 @@ TEST_P(LdsIntegrationTest, ReloadConfigUpdatingFilterChain) {}
 
 // Sample test making sure our config framework informs on listener failure.
 TEST_P(LdsIntegrationTest, FailConfigLoad) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        auto* filter_chain = listener->mutable_filter_chains(0);
-        filter_chain->mutable_filters(0)->set_name("grewgragra");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    filter_chain->mutable_filters(0)->clear_typed_config();
+    filter_chain->mutable_filters(0)->set_name("grewgragra");
+  });
   EXPECT_DEATH_LOG_TO_STDERR(initialize(),
                              "Didn't find a registered implementation for name: 'grewgragra'");
 }

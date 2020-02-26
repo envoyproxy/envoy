@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
@@ -32,7 +32,7 @@ struct LocalRateLimitStats {
 class Config : Logger::Loggable<Logger::Id::filter> {
 public:
   Config(
-      const envoy::config::filter::network::local_rate_limit::v3alpha::LocalRateLimit& proto_config,
+      const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime);
 
   bool canCreateConnection();

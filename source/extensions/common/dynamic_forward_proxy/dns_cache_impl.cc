@@ -1,6 +1,6 @@
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
-#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -16,7 +16,7 @@ namespace DynamicForwardProxy {
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
     Stats::Scope& root_scope,
-    const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config)
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
@@ -120,7 +120,12 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
             primary_host_it->second->host_info_->last_used_time_.load().count());
   if (now_duration - primary_host_it->second->host_info_->last_used_time_.load() > host_ttl_) {
     ENVOY_LOG(debug, "host='{}' TTL expired, removing", host);
-    runRemoveCallbacks(host);
+    // If the host has no address then that means that the DnsCacheImpl has never
+    // runAddUpdateCallbacks for this host, and thus the callback targets are not aware of it.
+    // Therefore, runRemoveCallbacks should only be ran if the host's address != nullptr.
+    if (primary_host_it->second->host_info_->address_) {
+      runRemoveCallbacks(host);
+    }
     primary_hosts_.erase(primary_host_it);
     updateTlsHostsMap();
   } else {

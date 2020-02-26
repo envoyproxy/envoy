@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
@@ -14,8 +14,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/service/auth/v3alpha/attribute_context.pb.h"
-#include "envoy/service/auth/v3alpha/external_auth.pb.h"
+#include "envoy/service/auth/v3/attribute_context.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -51,8 +51,8 @@ public:
   static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                               const Envoy::Http::HeaderMap& headers,
                               Protobuf::Map<std::string, std::string>&& context_extensions,
-                              envoy::config::core::v3alpha::Metadata&& metadata_context,
-                              envoy::service::auth::v3alpha::CheckRequest& request,
+                              envoy::config::core::v3::Metadata&& metadata_context,
+                              envoy::service::auth::v3::CheckRequest& request,
                               uint64_t max_request_bytes, bool include_peer_certificate);
 
   /**
@@ -63,18 +63,23 @@ public:
    * @param include_peer_certificate whether to include the peer certificate in the check request.
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                             envoy::service::auth::v3alpha::CheckRequest& request,
+                             envoy::service::auth::v3::CheckRequest& request,
                              bool include_peer_certificate);
 
 private:
-  static void setAttrContextPeer(envoy::service::auth::v3alpha::AttributeContext::Peer& peer,
+  static void setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
                                  const Network::Connection& connection, const std::string& service,
                                  const bool local, bool include_certificate);
-  static void setHttpRequest(envoy::service::auth::v3alpha::AttributeContext::HttpRequest& httpreq,
-                             const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+  static void setRequestTime(envoy::service::auth::v3::AttributeContext::Request& req,
+                             const StreamInfo::StreamInfo& stream_info);
+  static void setHttpRequest(envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq,
+                             const uint64_t stream_id, const StreamInfo::StreamInfo& stream_info,
+                             const Buffer::Instance* decoding_buffer,
                              const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes);
-  static void setAttrContextRequest(envoy::service::auth::v3alpha::AttributeContext::Request& req,
-                                    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+  static void setAttrContextRequest(envoy::service::auth::v3::AttributeContext::Request& req,
+                                    const uint64_t stream_id,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    const Buffer::Instance* decoding_buffer,
                                     const Envoy::Http::HeaderMap& headers,
                                     uint64_t max_request_bytes);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);

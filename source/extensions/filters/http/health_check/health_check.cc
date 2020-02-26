@@ -50,7 +50,7 @@ void HealthCheckCacheManager::onTimer() {
   clear_cache_timer_->enableTimer(timeout_);
 }
 
-Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& headers,
+Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                            bool end_stream) {
   if (Http::HeaderUtility::matchHeaders(headers, *header_match_data_)) {
     health_check_request_ = true;
@@ -86,7 +86,7 @@ Http::FilterDataStatus HealthCheckFilter::decodeData(Buffer::Instance&, bool end
                    : Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus HealthCheckFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus HealthCheckFilter::decodeTrailers(Http::RequestTrailerMap&) {
   if (handling_) {
     onComplete();
   }
@@ -95,7 +95,7 @@ Http::FilterTrailersStatus HealthCheckFilter::decodeTrailers(Http::HeaderMap&) {
                    : Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (health_check_request_) {
     if (cache_manager_) {
       cache_manager_->setCachedResponse(

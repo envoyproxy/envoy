@@ -2,8 +2,8 @@
 
 #include <fstream>
 
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/utility.h"
@@ -32,11 +32,7 @@ public:
         api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         subscription_(*dispatcher_, path_, callbacks_, stats_, validation_visitor_, *api_) {}
 
-  ~FilesystemSubscriptionTestHarness() override {
-    if (::access(path_.c_str(), F_OK) != -1) {
-      EXPECT_EQ(0, ::unlink(path_.c_str()));
-    }
-  }
+  ~FilesystemSubscriptionTestHarness() override { TestEnvironment::removePath(path_); }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
     std::ifstream config_file(path_);
@@ -52,7 +48,7 @@ public:
     // Write JSON contents to file, rename to path_ and run dispatcher to catch
     // inotify.
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
-    TestUtility::renameFile(temp_path, path_);
+    TestEnvironment::renameFile(temp_path, path_);
     if (run_dispatcher) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
@@ -75,7 +71,7 @@ public:
     }
     file_json.pop_back();
     file_json += "]}";
-    envoy::service::discovery::v3alpha::DiscoveryResponse response_pb;
+    envoy::service::discovery::v3::DiscoveryResponse response_pb;
     TestUtility::loadFromJson(file_json, response_pb);
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
@@ -115,9 +111,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  NiceMock<
-      Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>>
-      callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   FilesystemSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };

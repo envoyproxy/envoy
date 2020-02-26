@@ -5,9 +5,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -19,30 +19,6 @@
 
 namespace Envoy {
 // static
-ToolConfig ToolConfig::create(const Json::ObjectSharedPtr check_config) {
-  Json::ObjectSharedPtr input = check_config->getObject("input");
-  int random_value = input->getInteger("random_value", 0);
-
-  // Add header field values
-  std::unique_ptr<Http::TestHeaderMapImpl> headers(new Http::TestHeaderMapImpl());
-  headers->addCopy(":authority", input->getString(":authority", ""));
-  headers->addCopy(":path", input->getString(":path", ""));
-  headers->addCopy(":method", input->getString(":method", "GET"));
-  headers->addCopy("x-forwarded-proto", input->getBoolean("ssl", false) ? "https" : "http");
-
-  if (input->getBoolean("internal", false)) {
-    headers->addCopy("x-envoy-internal", "true");
-  }
-
-  if (input->hasObject("additional_headers")) {
-    for (const Json::ObjectSharedPtr& header_config : input->getObjectArray("additional_headers")) {
-      headers->addCopy(header_config->getString("field"), header_config->getString("value"));
-    }
-  }
-
-  return ToolConfig(std::move(headers), random_value);
-}
-
 ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem& check_config) {
   // Add header field values
   std::unique_ptr<Http::TestHeaderMapImpl> headers(new Http::TestHeaderMapImpl());
@@ -56,7 +32,7 @@ ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem
   }
 
   if (check_config.input().additional_headers().data()) {
-    for (const envoy::config::core::v3alpha::HeaderValue& header_config :
+    for (const envoy::config::core::v3::HeaderValue& header_config :
          check_config.input().additional_headers()) {
       headers->addCopy(header_config.key(), header_config.value());
     }
@@ -72,7 +48,7 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
                                         const bool disable_deprecation_check) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
-  envoy::config::route::v3alpha::RouteConfiguration route_config;
+  envoy::config::route::v3::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
   TestUtility::loadFromFile(router_config_file, route_config, *api);
@@ -93,7 +69,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
 }
 
 void RouterCheckTool::assignUniqueRouteNames(
-    envoy::config::route::v3alpha::RouteConfiguration& route_config) {
+    envoy::config::route::v3::RouteConfiguration& route_config) {
   Runtime::RandomGeneratorImpl random;
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
@@ -103,7 +79,7 @@ void RouterCheckTool::assignUniqueRouteNames(
 }
 
 void RouterCheckTool::assignRuntimeFraction(
-    envoy::config::route::v3alpha::RouteConfiguration& route_config) {
+    envoy::config::route::v3::RouteConfiguration& route_config) {
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
       if (route.match().has_runtime_fraction() &&
@@ -122,7 +98,7 @@ RouterCheckTool::RouterCheckTool(
     : factory_context_(std::move(factory_context)), config_(std::move(config)),
       stats_(std::move(stats)), api_(std::move(api)), coverage_(std::move(coverage)) {
   ON_CALL(factory_context_->runtime_loader_.snapshot_,
-          featureEnabled(_, testing::An<const envoy::type::v3alpha::FractionalPercent&>(),
+          featureEnabled(_, testing::An<const envoy::type::v3::FractionalPercent&>(),
                          testing::An<uint64_t>()))
       .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
 }
@@ -133,71 +109,6 @@ Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) 
     contents = MessageUtil::getJsonStringFromMessage(ValueUtil::loadFromYaml(contents));
   }
   return Json::Factory::loadFromString(contents);
-}
-
-// TODO(jyotima): Remove this code path once the json schema code path is deprecated.
-bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = loadFromFile(expected_route_json, *api_);
-  loader->validateSchema(Json::ToolSchema::routerCheckSchema());
-  bool no_failures = true;
-  for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
-    headers_finalized_ = false;
-    Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                  factory_context_->dispatcher().timeSource());
-    ToolConfig tool_config = ToolConfig::create(check_config);
-    tool_config.route_ =
-        config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
-    std::string test_name = check_config->getString("test_name", "");
-    tests_.emplace_back(test_name, std::vector<std::string>{});
-    Json::ObjectSharedPtr validate = check_config->getObject("validate");
-    using CheckerFunc = std::function<bool(ToolConfig&, const std::string&)>;
-    const std::unordered_map<std::string, CheckerFunc> checkers = {
-        {"cluster_name",
-         [this](auto&... params) -> bool { return this->compareCluster(params...); }},
-        {"virtual_cluster_name",
-         [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); }},
-        {"virtual_host_name",
-         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); }},
-        {"path_rewrite",
-         [this](auto&... params) -> bool { return this->compareRewritePath(params...); }},
-        {"host_rewrite",
-         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); }},
-        {"path_redirect",
-         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); }},
-    };
-    // Call appropriate function for each match case.
-    for (const auto& test : checkers) {
-      if (validate->hasObject(test.first)) {
-        const std::string& expected = validate->getString(test.first);
-        if (tool_config.route_ == nullptr) {
-          compareResults("", expected, test.first);
-        } else {
-          if (!test.second(tool_config, expected)) {
-            no_failures = false;
-          }
-        }
-      }
-    }
-    if (validate->hasObject("header_fields")) {
-      for (const Json::ObjectSharedPtr& header_field : validate->getObjectArray("header_fields")) {
-        if (!compareHeaderField(tool_config, header_field->getString("field"),
-                                header_field->getString("value"))) {
-          no_failures = false;
-        }
-      }
-    }
-    if (validate->hasObject("custom_header_fields")) {
-      for (const Json::ObjectSharedPtr& header_field :
-           validate->getObjectArray("custom_header_fields")) {
-        if (!compareCustomHeaderField(tool_config, header_field->getString("field"),
-                                      header_field->getString("value"))) {
-          no_failures = false;
-        }
-      }
-    }
-  }
-  printResults();
-  return no_failures;
 }
 
 bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
@@ -331,6 +242,7 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
     if (!headers_finalized_) {
       tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                                true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
       headers_finalized_ = true;
     }
 
@@ -362,6 +274,7 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
     if (!headers_finalized_) {
       tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                                true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
       headers_finalized_ = true;
     }
 
@@ -387,7 +300,16 @@ bool RouterCheckTool::compareRewriteHost(
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->directResponseEntry() != nullptr) {
+    if (!headers_finalized_) {
+      tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.headers_, true);
+      tool_config.route_->directResponseEntry()->finalizeResponseHeaders(*tool_config.headers_,
+                                                                         stream_info);
+      headers_finalized_ = true;
+    }
+
     actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
 
@@ -413,7 +335,7 @@ bool RouterCheckTool::compareHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.header_fields().data()) {
-    for (const envoy::config::core::v3alpha::HeaderValue& header : expected.header_fields()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.header_fields()) {
       if (!compareHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
@@ -435,8 +357,13 @@ bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const st
                                                 factory_context_->dispatcher().timeSource());
   stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                             true);
+    if (!headers_finalized_) {
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
+                                                               true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
+      headers_finalized_ = true;
+    }
+
     actual = tool_config.headers_->get_(field);
   }
   return compareResults(actual, expected, "custom_header");
@@ -446,8 +373,7 @@ bool RouterCheckTool::compareCustomHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
   if (expected.custom_header_fields().data()) {
-    for (const envoy::config::core::v3alpha::HeaderValue& header :
-         expected.custom_header_fields()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.custom_header_fields()) {
       if (!compareCustomHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
@@ -483,16 +409,15 @@ void RouterCheckTool::printResults() {
 
 // The Mock for runtime value checks.
 // This is a simple implementation to mimic the actual runtime checks in Snapshot.featureEnabled
-bool RouterCheckTool::runtimeMock(const std::string& key,
-                                  const envoy::type::v3alpha::FractionalPercent& default_value,
+bool RouterCheckTool::runtimeMock(absl::string_view key,
+                                  const envoy::type::v3::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  return !active_runtime_.empty() && active_runtime_.compare(key) == 0 &&
+  return !active_runtime_.empty() && key.compare(active_runtime_) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 
 Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("router_check_tool", ' ', "none", true);
-  TCLAP::SwitchArg is_proto("p", "useproto", "Use Proto test file schema", cmd, false);
   TCLAP::SwitchArg is_detailed("d", "details", "Show detailed test execution results", cmd, false);
   TCLAP::SwitchArg only_show_failures("", "only-show-failures", "Only display failing tests", cmd,
                                       false);
@@ -516,27 +441,18 @@ Options::Options(int argc, char** argv) {
     exit(EXIT_FAILURE);
   }
 
-  is_proto_ = is_proto.getValue();
   is_detailed_ = is_detailed.getValue();
   only_show_failures_ = only_show_failures.getValue();
   fail_under_ = fail_under.getValue();
   comprehensive_coverage_ = comprehensive_coverage.getValue();
   disable_deprecation_check_ = disable_deprecation_check.getValue();
 
-  if (is_proto_) {
-    config_path_ = config_path.getValue();
-    test_path_ = test_path.getValue();
-    if (config_path_.empty() || test_path_.empty()) {
-      std::cerr << "error: "
-                << "Both --config-path/c and --test-path/t are mandatory with --useproto"
-                << std::endl;
-      exit(EXIT_FAILURE);
-    }
-  } else {
-    if (!unlabelled_configs.getValue().empty()) {
-      unlabelled_config_path_ = unlabelled_configs.getValue()[0];
-      unlabelled_test_path_ = unlabelled_configs.getValue()[1];
-    }
+  config_path_ = config_path.getValue();
+  test_path_ = test_path.getValue();
+  if (config_path_.empty() || test_path_.empty()) {
+    std::cerr << "error: "
+              << "Both --config-path/c and --test-path/t are mandatory" << std::endl;
+    exit(EXIT_FAILURE);
   }
 }
 } // namespace Envoy

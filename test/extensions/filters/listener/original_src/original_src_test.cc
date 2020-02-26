@@ -1,5 +1,5 @@
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/extensions/filters/listener/original_src/v3alpha/original_src.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
 
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
@@ -31,7 +31,7 @@ public:
   }
 
   std::unique_ptr<OriginalSrcFilter> makeMarkingFilter(uint32_t mark) {
-    envoy::extensions::filters::listener::original_src::v3alpha::OriginalSrc proto_config;
+    envoy::extensions::filters::listener::original_src::v3::OriginalSrc proto_config;
     proto_config.set_mark(mark);
 
     Config config(proto_config);
@@ -48,7 +48,7 @@ protected:
 
   absl::optional<Network::Socket::Option::Details>
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
-                    envoy::config::core::v3alpha::SocketOption::SocketState state) {
+                    envoy::config::core::v3::SocketOption::SocketState state) {
     for (const auto& option : options) {
       auto details = option->getOptionDetails(callbacks_.socket_, state);
       if (details.has_value() && details->name_ == name) {
@@ -82,7 +82,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressAddsOption) {
 
   NiceMock<Network::MockConnectionSocket> socket;
   EXPECT_CALL(socket, setLocalAddress(PointeesEq(callbacks_.socket_.remote_address_)));
-  options->at(0)->setOption(socket, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND);
+  options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 }
 
 TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
@@ -115,7 +115,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressBleachesPort) {
 
   // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
-  options->at(0)->setOption(socket, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND);
+  options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 }
 
 TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
@@ -131,9 +131,8 @@ TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
 
   filter->onAccept(callbacks_);
 
-  auto transparent_option =
-      findOptionDetails(*options, ENVOY_SOCKET_IP_TRANSPARENT,
-                        envoy::config::core::v3alpha::SocketOption::STATE_PREBIND);
+  auto transparent_option = findOptionDetails(*options, ENVOY_SOCKET_IP_TRANSPARENT,
+                                              envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   EXPECT_TRUE(transparent_option.has_value());
 }
@@ -152,7 +151,7 @@ TEST_F(OriginalSrcTest, filterAddsMarkOption) {
   filter->onAccept(callbacks_);
 
   auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                       envoy::config::core::v3alpha::SocketOption::STATE_PREBIND);
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   ASSERT_TRUE(mark_option.has_value());
   uint32_t value = 1234;
@@ -174,7 +173,7 @@ TEST_F(OriginalSrcTest, Mark0NotAdded) {
   filter->onAccept(callbacks_);
 
   auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                       envoy::config::core::v3alpha::SocketOption::STATE_PREBIND);
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   ASSERT_FALSE(mark_option.has_value());
 }

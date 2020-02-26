@@ -22,7 +22,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -31,4 +31,12 @@ envoy_cc_library(
     hdrs = ["filter_state.h"],
     external_deps = ["abseil_optional"],
     deps = ["//source/common/protobuf"],
+)
+
+envoy_cc_library(
+    name = "uint32_accessor_interface",
+    hdrs = ["uint32_accessor.h"],
+    deps = [
+        ":filter_state_interface",
+    ],
 )

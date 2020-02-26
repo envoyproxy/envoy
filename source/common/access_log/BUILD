@@ -32,8 +32,8 @@ envoy_cc_library(
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/filter/accesslog/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -51,7 +51,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

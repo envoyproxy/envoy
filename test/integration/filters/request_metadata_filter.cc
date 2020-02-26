@@ -14,7 +14,7 @@ namespace Envoy {
 // "consume", the metadata will be consumed and not forwarded to the next hop.
 class RequestMetadataStreamFilter : public Http::PassThroughFilter {
 public:
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     Http::MetadataMap metadata_map = {{"headers", "headers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     decoder_callbacks_->addDecodedMetadata().emplace_back(std::move(metadata_map_ptr));
@@ -28,7 +28,7 @@ public:
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     Http::MetadataMap metadata_map = {{"trailers", "trailers"}};
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     decoder_callbacks_->addDecodedMetadata().emplace_back(std::move(metadata_map_ptr));

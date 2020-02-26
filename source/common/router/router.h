@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/router/v3alpha/router.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -20,6 +20,7 @@
 
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/cleanup.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/linked_object.h"
@@ -188,7 +189,7 @@ public:
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
-               const envoy::extensions::filters::http::router::v3alpha::Router& config)
+               const envoy::extensions::filters::http::router::v3::Router& config)
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
@@ -249,9 +250,10 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
@@ -365,7 +367,7 @@ protected:
   RetryStatePtr retry_state_;
 
 private:
-  struct UpstreamRequest : public Http::StreamDecoder,
+  struct UpstreamRequest : public Http::ResponseDecoder,
                            public Http::StreamCallbacks,
                            public Http::ConnectionPool::Callbacks,
                            public LinkedObject<UpstreamRequest> {
@@ -374,7 +376,7 @@ private:
 
     void encodeHeaders(bool end_stream);
     void encodeData(Buffer::Instance& data, bool end_stream);
-    void encodeTrailers(const Http::HeaderMap& trailers);
+    void encodeTrailers(const Http::RequestTrailerMap& trailers);
     void encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr);
 
     void resetStream();
@@ -392,11 +394,13 @@ private:
     }
 
     // Http::StreamDecoder
-    void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
-    void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
-    void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
     void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
+
+    // Http::ResponseDecoder
+    void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+    void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -438,11 +442,11 @@ private:
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
                        absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
-    void onPoolReady(Http::StreamEncoder& request_encoder,
+    void onPoolReady(Http::RequestEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host,
                      const StreamInfo::StreamInfo& info) override;
 
-    void setRequestEncoder(Http::StreamEncoder& request_encoder);
+    void setRequestEncoder(Http::RequestEncoder& request_encoder);
     void clearRequestEncoder();
 
     struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
@@ -462,7 +466,7 @@ private:
     bool grpc_rq_success_deferred_;
     Event::TimerPtr per_try_timeout_;
     Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
-    Http::StreamEncoder* request_encoder_{};
+    Http::RequestEncoder* request_encoder_{};
     absl::optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::WatermarkBufferPtr buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
@@ -470,6 +474,7 @@ private:
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
     StreamInfo::UpstreamTiming upstream_timing_;
+    const MonotonicTime start_time_;
     // Copies of upstream headers/trailers. These are only set if upstream
     // access logging is configured.
     Http::HeaderMapPtr upstream_headers_;
@@ -487,6 +492,10 @@ private:
     // Tracks whether we deferred a per try timeout because the downstream request
     // had not been completed yet.
     bool create_per_try_timeout_on_request_complete_ : 1;
+
+    // Sentinel to indicate if timeout budget tracking is configured for the cluster,
+    // and if so, if the per-try histogram should record a value.
+    bool record_timeout_budget_ : 1;
   };
 
   using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
@@ -514,7 +523,7 @@ private:
   void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
-  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+  void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
                                     UpstreamRequest& upstream_request);
   // Handle an upstream request aborted due to a local timeout.
   void onSoftPerTryTimeout();
@@ -525,10 +534,11 @@ private:
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
                        absl::string_view body, bool dropped, absl::string_view details);
-  void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
+  void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request, bool end_stream);
-  void onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest& upstream_request);
+  void onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                          UpstreamRequest& upstream_request);
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete(UpstreamRequest& upstream_request);
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
@@ -559,7 +569,7 @@ private:
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  std::unique_ptr<Stats::StatNameManagedStorage> alt_stat_prefix_;
+  std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
@@ -570,8 +580,8 @@ private:
   // response forwarded downstream
   UpstreamRequest* final_upstream_request_;
   bool grpc_request_{};
-  Http::HeaderMap* downstream_headers_{};
-  Http::HeaderMap* downstream_trailers_{};
+  Http::RequestHeaderMap* downstream_headers_{};
+  Http::RequestTrailerMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   MetadataMatchCriteriaConstPtr metadata_match_;

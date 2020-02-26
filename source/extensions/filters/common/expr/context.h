@@ -1,8 +1,9 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/grpc/status.h"
 #include "common/http/headers.h"
 
 #include "eval/public/cel_value.h"
@@ -38,6 +39,7 @@ constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
+constexpr absl::string_view GrpcStatus = "grpc_status";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
@@ -79,6 +81,7 @@ public:
 
 private:
   friend class RequestWrapper;
+  friend class ResponseWrapper;
   const Http::HeaderMap* value_;
 };
 
@@ -147,13 +150,13 @@ private:
 
 class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
 public:
-  MetadataProducer(const envoy::config::core::v3alpha::Metadata& metadata) : metadata_(metadata) {}
+  MetadataProducer(const envoy::config::core::v3::Metadata& metadata) : metadata_(metadata) {}
   CelValue Produce(ProtobufWkt::Arena* arena) override {
     return CelValue::CreateMessage(&metadata_, arena);
   }
 
 private:
-  const envoy::config::core::v3alpha::Metadata& metadata_;
+  const envoy::config::core::v3::Metadata& metadata_;
 };
 
 } // namespace Expr
