@@ -68,7 +68,7 @@ LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   }
 }
 
-void LightStepDriver::LightStepTransporter::onSuccess(Http::MessagePtr&& /*response*/) {
+void LightStepDriver::LightStepTransporter::onSuccess(Http::ResponseMessagePtr&& /*response*/) {
   driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_names_, true);
   active_callback_->OnSuccess(*active_report_);
   reset();
@@ -99,7 +99,7 @@ void LightStepDriver::LightStepTransporter::Send(std::unique_ptr<lightstep::Buff
 
   const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
-  Http::MessagePtr message = Grpc::Common::prepareHeaders(
+  Http::RequestMessagePtr message = Grpc::Common::prepareHeaders(
       driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
       lightstep::CollectorMethodName(), absl::optional<std::chrono::milliseconds>(timeout));
   message->body() = serializeGrpcMessage(*active_report_);

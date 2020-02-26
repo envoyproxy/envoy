@@ -38,7 +38,7 @@ namespace {
 absl::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string yaml = R"EOF(
-name: envoy.access_loggers.file
+name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
@@ -141,7 +141,7 @@ public:
             }));
     expectResponseTimerCreate();
 
-    Http::TestHeaderMapImpl headers(request_headers_init);
+    Http::TestRequestHeaderMapImpl headers(request_headers_init);
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
@@ -180,9 +180,9 @@ public:
     expectPerTryTimerCreate();
     expectResponseTimerCreate();
 
-    Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
-                                    {"x-envoy-internal", "true"},
-                                    {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+    Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
+                                           {"x-envoy-internal", "true"},
+                                           {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
@@ -283,7 +283,7 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
 // Test timestamps and durations are emitted.
 TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
   const std::string yaml = R"EOF(
-name: envoy.access_loggers.file
+name: accesslog
 typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%

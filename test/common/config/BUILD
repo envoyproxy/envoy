@@ -32,7 +32,8 @@ envoy_cc_test(
     deps = [
         ":delta_subscription_test_harness",
         "//source/common/config:api_version_lib",
-        "//source/common/config:delta_subscription_lib",
+        "//source/common/config:grpc_subscription_lib",
+        "//source/common/config:new_grpc_mux_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
@@ -52,7 +53,9 @@ envoy_cc_test(
     name = "delta_subscription_state_test",
     srcs = ["delta_subscription_state_test.cc"],
     deps = [
-        "//source/common/config:delta_subscription_lib",
+        "//source/common/config:delta_subscription_state_lib",
+        "//source/common/config:grpc_subscription_lib",
+        "//source/common/config:new_grpc_mux_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
@@ -197,7 +200,7 @@ envoy_cc_test_library(
     hdrs = ["delta_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
-        "//source/common/config:delta_subscription_lib",
+        "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/grpc:common_lib",
         "//test/mocks/config:config_mocks",

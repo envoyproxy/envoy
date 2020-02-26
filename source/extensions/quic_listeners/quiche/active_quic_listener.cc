@@ -117,8 +117,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   quic_config_.set_max_time_before_crypto_handshake(
       quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
   int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
-  quic_config_.SetMaxIncomingBidirectionalStreamsToSend(max_streams);
-  quic_config_.SetMaxIncomingUnidirectionalStreamsToSend(max_streams);
+  quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
+  quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
 }
 
 Network::ConnectionHandler::ActiveListenerPtr

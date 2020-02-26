@@ -94,9 +94,8 @@ message ClusterLoadAssignment {
     // localities as endpoints become unhealthy. Otherwise Envoy will perform
     // graceful failover as :ref:`overprovisioning factor
     // <arch_overview_load_balancing_overprovisioning_factor>` suggests.
-    // [#next-major-version: Unify with overprovisioning config as a single message.]
     // [#not-implemented-hide:]
-    bool disable_overprovisioning = 5;
+    bool disable_overprovisioning = 5 [deprecated = true];
   }
 
   // Name of the cluster. This will be the :ref:`service_name

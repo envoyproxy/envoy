@@ -15,8 +15,8 @@ Deprecated items below are listed in chronological order.
 * The previous behavior for upstream connection pool circuit breaking described
   `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_ has
   been deprecated in favor of the new behavior described :ref:`here <arch_overview_circuit_break>`.
-* Access Logger, Stats Sink, and Tracer names have been deprecated in favor of the extension name
-  from the envoy build system.
+* Access Logger, Network Filter, Stats Sink, and Tracer names have been deprecated in favor of the
+  extension name from the envoy build system.
 
   .. csv-table::
     :header: Canonical Names, Deprecated Names
@@ -25,12 +25,27 @@ Deprecated items below are listed in chronological order.
     envoy.access_loggers.file, envoy.file_access_log
     envoy.access_loggers.http_grpc, envoy.http_grpc_access_log
     envoy.access_loggers.tcp_grpc, envoy.tcp_grpc_access_log
+    envoy.filters.network.client_ssl_auth, envoy.client_ssl_auth
+    envoy.filters.network.echo, envoy.echo
+    envoy.filters.network.ext_authz, envoy.ext_authz
+    envoy.filters.network.http_connection_manager, envoy.http_connection_manager
+    envoy.filters.network.mongo_proxy, envoy.mongo_proxy
+    envoy.filters.network.ratelimit, envoy.ratelimit
+    envoy.filters.network.redis_proxy, envoy.redis_proxy
+    envoy.filters.network.tcp_proxy, envoy.tcp_proxy
     envoy.stat_sinks.dog_statsd, envoy.dog_statsd
     envoy.stat_sinks.metrics_service, envoy.metrics_service
     envoy.stat_sinks.statsd, envoy.statsd
     envoy.tracers.dynamic_ot, envoy.dynamic.ot
     envoy.tracers.lightstep, envoy.lightstep
     envoy.tracers.zipkin, envoy.zipkin
+
+* The previous behavior of auto ignoring case in headers matching:
+  :ref:`allowed_headers <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationRequest.allowed_headers>`,
+  :ref:`allowed_upstream_headers <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>`,
+  and :ref:`allowed_client_headers <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>`
+  of HTTP-based `ext_authz` has been deprecated in favor of explicitly setting the
+  :ref:`ignore_case <envoy_api_field_type.matcher.StringMatcher.ignore_case>` field.
 
 1.13.0 (January 20, 2020)
 =========================

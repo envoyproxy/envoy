@@ -70,20 +70,20 @@ TEST_F(TapFilterTest, NoConfig) {
   InSequence s;
   setup(false);
 
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   Buffer::OwnedImpl request_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
-  Http::TestHeaderMapImpl request_trailers;
+  Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(response_headers));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   Buffer::OwnedImpl response_body;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   Http::MetadataMap metadata;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata));
@@ -96,17 +96,17 @@ TEST_F(TapFilterTest, Config) {
   InSequence s;
   setup(true);
 
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(*http_per_request_tapper_, onRequestHeaders(_));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   Buffer::OwnedImpl request_body;
   EXPECT_CALL(*http_per_request_tapper_, onRequestBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
-  Http::TestHeaderMapImpl request_trailers;
+  Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_CALL(*http_per_request_tapper_, onRequestTrailers(_));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(response_headers));
   EXPECT_CALL(*http_per_request_tapper_, onResponseHeaders(_));
@@ -114,7 +114,7 @@ TEST_F(TapFilterTest, Config) {
   Buffer::OwnedImpl response_body;
   EXPECT_CALL(*http_per_request_tapper_, onResponseBody(_));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_CALL(*http_per_request_tapper_, onResponseTrailers(_));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 

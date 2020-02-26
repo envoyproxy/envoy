@@ -93,6 +93,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "header_map_interface",
     hdrs = ["header_map.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",

@@ -128,8 +128,8 @@ protected:
 
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
-  FilterManagerImpl filter_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
+  FilterManagerImpl filter_manager_;
 
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has

@@ -6,7 +6,6 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/to_lower_table.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/network/common/redis/codec.h"
@@ -52,7 +51,6 @@ private:
   const Stats::StatName unused_metric_;
   const Stats::StatName null_metric_;
   const Stats::StatName unknown_metric_;
-  const ToLowerTable to_lower_table_;
 };
 using RedisCommandStatsSharedPtr = std::shared_ptr<RedisCommandStats>;
 

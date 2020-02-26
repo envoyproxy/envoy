@@ -87,7 +87,7 @@ private:
               Callback& callback) noexcept override;
 
     // Http::AsyncClient::Callbacks
-    void onSuccess(Http::MessagePtr&& response) override;
+    void onSuccess(Http::ResponseMessagePtr&& response) override;
     void onFailure(Http::AsyncClient::FailureReason failure_reason) override;
 
   private:

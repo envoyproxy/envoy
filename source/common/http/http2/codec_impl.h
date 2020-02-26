@@ -161,7 +161,7 @@ protected:
     void submitTrailers(const HeaderMap& trailers);
     void submitMetadata();
     virtual StreamDecoder& decoder() PURE;
-    virtual HeaderMapImpl& headers() PURE;
+    virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
 
     // Http::StreamEncoder
@@ -177,6 +177,17 @@ protected:
     uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.localAddress();
+    }
+    absl::string_view responseDetails() override { return details_; }
+
+    // This code assumes that details is a static string, so that we
+    // can avoid copying it.
+    void setDetails(absl::string_view details) {
+      // It is probably a mistake to call setDetails() twice, so
+      // assert that details_ is empty.
+      ASSERT(details_.empty());
+
+      details_ = details;
     }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
@@ -231,6 +242,7 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
+    absl::string_view details_;
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -254,33 +266,35 @@ protected:
     StreamDecoder& decoder() override { return response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
-    HeaderMapImpl& headers() override {
-      if (absl::holds_alternative<ResponseHeaderMapImplPtr>(headers_or_trailers_)) {
-        return *absl::get<ResponseHeaderMapImplPtr>(headers_or_trailers_);
+    HeaderMap& headers() override {
+      if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
+        return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
       } else {
-        return *absl::get<ResponseTrailerMapImplPtr>(headers_or_trailers_);
+        return *absl::get<ResponseTrailerMapPtr>(headers_or_trailers_);
       }
     }
     void allocTrailers() override {
       // If we are waiting for informational headers, make a new response header map, otherwise
       // we are about to receive trailers. The codec makes sure this is the only valid sequence.
       if (waiting_for_non_informational_headers_) {
-        headers_or_trailers_.emplace<ResponseHeaderMapImplPtr>(
+        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(
             std::make_unique<ResponseHeaderMapImpl>());
       } else {
-        headers_or_trailers_.emplace<ResponseTrailerMapImplPtr>(
+        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(
             std::make_unique<ResponseTrailerMapImpl>());
       }
     }
 
     // RequestEncoder
-    void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
+    void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
       encodeHeadersBase(headers, end_stream);
     }
-    void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+    void encodeTrailers(const RequestTrailerMap& trailers) override {
+      encodeTrailersBase(trailers);
+    }
 
     ResponseDecoder& response_decoder_;
-    absl::variant<ResponseHeaderMapImplPtr, ResponseTrailerMapImplPtr> headers_or_trailers_;
+    absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
   };
 
@@ -303,29 +317,30 @@ protected:
     StreamDecoder& decoder() override { return *request_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
-    HeaderMapImpl& headers() override {
-      if (absl::holds_alternative<RequestHeaderMapImplPtr>(headers_or_trailers_)) {
-        return *absl::get<RequestHeaderMapImplPtr>(headers_or_trailers_);
+    HeaderMap& headers() override {
+      if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
+        return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
       } else {
-        return *absl::get<RequestTrailerMapImplPtr>(headers_or_trailers_);
+        return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
       }
     }
     void allocTrailers() override {
-      headers_or_trailers_.emplace<RequestTrailerMapImplPtr>(
-          std::make_unique<RequestTrailerMapImpl>());
+      headers_or_trailers_.emplace<RequestTrailerMapPtr>(std::make_unique<RequestTrailerMapImpl>());
     }
 
     // ResponseEncoder
-    void encode100ContinueHeaders(const HeaderMap& headers) override;
-    void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
+    void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+    void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override {
       // The contract is that client codecs must ensure that :status is present.
       ASSERT(headers.Status() != nullptr);
       encodeHeadersBase(headers, end_stream);
     }
-    void encodeTrailers(const HeaderMap& trailers) override { encodeTrailersBase(trailers); }
+    void encodeTrailers(const ResponseTrailerMap& trailers) override {
+      encodeTrailersBase(trailers);
+    }
 
     RequestDecoder* request_decoder_{};
-    absl::variant<RequestHeaderMapImplPtr, RequestTrailerMapImplPtr> headers_or_trailers_;
+    absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
   };
 
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;

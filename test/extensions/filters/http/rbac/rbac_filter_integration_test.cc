@@ -77,7 +77,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
@@ -86,7 +86,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
       },
       1024);
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -100,7 +100,7 @@ TEST_P(RBACIntegrationTest, Denied) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
@@ -123,7 +123,7 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
@@ -132,7 +132,7 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
       },
       1024);
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -149,7 +149,7 @@ TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
@@ -170,7 +170,7 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "HEAD"},
           {":path", "/"},
           {":scheme", "http"},
@@ -206,7 +206,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
@@ -216,7 +216,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
       1024);
 
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -233,7 +233,7 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragment) {
 
   for (const auto& path : paths) {
     auto response = codec_client_->makeRequestWithBody(
-        Http::TestHeaderMapImpl{
+        Http::TestRequestHeaderMapImpl{
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
@@ -242,7 +242,7 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragment) {
         },
         1024);
     waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
@@ -260,7 +260,7 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
 
   for (const auto& path : paths) {
     auto response = codec_client_->makeRequestWithBody(
-        Http::TestHeaderMapImpl{
+        Http::TestRequestHeaderMapImpl{
             {":method", "POST"},
             {":path", path},
             {":scheme", "http"},
@@ -269,7 +269,7 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
         },
         1024);
     waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());

@@ -277,7 +277,17 @@ Driver::Driver(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
   }
   if (oc_config.ocagent_exporter_enabled()) {
     ::opencensus::exporters::trace::OcAgentOptions opts;
-    opts.address = oc_config.ocagent_address();
+    if (!oc_config.ocagent_address().empty()) {
+      opts.address = oc_config.ocagent_address();
+    } else if (oc_config.has_ocagent_grpc_service()) {
+      if (!oc_config.ocagent_grpc_service().has_google_grpc()) {
+        throw EnvoyException("Opencensus ocagent tracer only supports GoogleGrpc.");
+      }
+      envoy::config::core::v3::GrpcService ocagent_service = oc_config.ocagent_grpc_service();
+      auto channel = Envoy::Grpc::GoogleGrpcUtils::createChannel(ocagent_service, api);
+      opts.trace_service_stub =
+          ::opencensus::proto::agent::trace::v1::TraceService::NewStub(channel);
+    }
     opts.service_name = local_info_.clusterName();
     ::opencensus::exporters::trace::OcAgentExporter::Register(std::move(opts));
   }

@@ -17,8 +17,8 @@ public:
   void initialize() override;
 
 protected:
-  void performUpgrade(const Http::TestHeaderMapImpl& upgrade_request_headers,
-                      const Http::TestHeaderMapImpl& upgrade_response_headers);
+  void performUpgrade(const Http::TestRequestHeaderMapImpl& upgrade_request_headers,
+                      const Http::TestResponseHeaderMapImpl& upgrade_response_headers);
   void sendBidirectionalData();
 
   void validateUpgradeRequestHeaders(const Http::HeaderMap& proxied_request_headers,

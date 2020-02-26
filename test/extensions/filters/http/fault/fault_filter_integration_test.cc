@@ -96,12 +96,12 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
 TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
   initializeFilter(header_fault_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-envoy-fault-delay-request", "200"},
-                                          {"x-envoy-fault-throughput-response", "1"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-envoy-fault-delay-request", "200"},
+                                                 {"x-envoy-fault-throughput-response", "1"}};
   const auto current_time = simTime().monotonicTime();
   IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();

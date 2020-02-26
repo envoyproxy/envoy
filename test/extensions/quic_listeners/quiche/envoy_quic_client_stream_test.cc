@@ -26,7 +26,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_q099, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_t099, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -99,7 +99,7 @@ protected:
   Http::MockResponseDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
   std::string host_{"www.abc.com"};
-  Http::TestHeaderMapImpl request_headers_;
+  Http::TestRequestHeaderMapImpl request_headers_;
   quic::QuicHeaderList response_headers_;
   quic::QuicHeaderList trailers_;
   Buffer::OwnedImpl request_body_{"Hello world"};

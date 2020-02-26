@@ -83,28 +83,12 @@ public:
   bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
+  const envoy::type::matcher::v3::StringMatcher& matcher() const { return matcher_; }
+
 private:
   const envoy::type::matcher::v3::StringMatcher matcher_;
   Regex::CompiledMatcherPtr regex_;
 };
-
-class LowerCaseStringMatcher : public ValueMatcher {
-public:
-  LowerCaseStringMatcher(const envoy::type::matcher::v3::StringMatcher& matcher)
-      : matcher_(toLowerCase(matcher)) {}
-
-  bool match(const absl::string_view value) const;
-
-  bool match(const ProtobufWkt::Value& value) const override;
-
-private:
-  envoy::type::matcher::v3::StringMatcher
-  toLowerCase(const envoy::type::matcher::v3::StringMatcher& matcher);
-
-  const StringMatcherImpl matcher_;
-};
-
-using LowerCaseStringMatcherPtr = std::unique_ptr<LowerCaseStringMatcher>;
 
 class ListMatcher : public ValueMatcher {
 public:

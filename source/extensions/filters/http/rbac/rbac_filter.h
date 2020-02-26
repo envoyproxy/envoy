@@ -74,13 +74,14 @@ public:
       : config_(config) {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
 
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
 
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
 

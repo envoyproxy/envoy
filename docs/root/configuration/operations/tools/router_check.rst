@@ -161,7 +161,7 @@ The router check tool will report route coverage at the end of a successful test
 
 .. code:: bash
 
-  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ...
   Current route coverage: 0.0744863
 
 This reporting can be leveraged to enforce a minimum coverage percentage by using
@@ -170,7 +170,7 @@ run will fail.
 
 .. code:: bash
 
-  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --fail-under 8
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --fail-under 8
   Current route coverage: 7.44863%
   Failed to meet coverage requirement: 8%
 
@@ -183,6 +183,6 @@ fields that could be tested.
 
 .. code:: bash
 
-  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --f 7 --covall
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --f 7 --covall
   Current route coverage: 6.2948%
   Failed to meet coverage requirement: 7%

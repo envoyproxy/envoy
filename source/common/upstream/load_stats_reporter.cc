@@ -112,11 +112,11 @@ void LoadStatsReporter::handleFailure() {
   setRetryTimer();
 }
 
-void LoadStatsReporter::onCreateInitialMetadata(Http::HeaderMap& metadata) {
+void LoadStatsReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
-void LoadStatsReporter::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
+void LoadStatsReporter::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
@@ -170,7 +170,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
       DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));
 }
 
-void LoadStatsReporter::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
+void LoadStatsReporter::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
