@@ -3553,6 +3553,28 @@ virtual_hosts:
       "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
 }
 
+TEST_F(RouteMatcherTest, TestPrefixAndRegexRewrites) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["bar.*"]
+  routes:
+  - match: { prefix: "/foo" }
+    route:
+      prefix_rewrite: /
+      regex_rewrite:
+        pattern:
+          google_re2: {}
+          regex: foo
+        substitution: bar
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Cannot specify both prefix_rewrite and regex_rewrite");
+}
+
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:

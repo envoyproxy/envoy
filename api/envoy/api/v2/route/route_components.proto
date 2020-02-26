@@ -4,7 +4,6 @@ package envoy.api.v2.route;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/matcher/regex.proto";
-import "envoy/type/matcher/regex_match_and_subst.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/percent.proto";
 import "envoy/type/range.proto";

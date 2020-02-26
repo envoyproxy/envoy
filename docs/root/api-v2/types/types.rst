@@ -17,7 +17,6 @@ Types
   ../type/matcher/number.proto
   ../type/matcher/path.proto
   ../type/matcher/regex.proto
-  ../type/matcher/regex_match_and_subst.proto
   ../type/matcher/string.proto
   ../type/matcher/struct.proto
   ../type/matcher/value.proto

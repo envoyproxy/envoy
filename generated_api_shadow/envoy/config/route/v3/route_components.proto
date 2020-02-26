@@ -4,7 +4,6 @@ package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/regex.proto";
-import "envoy/type/matcher/v3/regex_match_and_subst.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
