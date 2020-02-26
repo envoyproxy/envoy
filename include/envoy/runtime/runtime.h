@@ -209,8 +209,7 @@ public:
   /**
    * Fetch raw runtime data based on key.
    * @param key supplies the key to fetch.
-   * @param default_value supplies the default value if the key does not exist.
-   * @return std::string the value or empty string if the key does not exist.
+   * @return absl::nullopt if the key does not exist or reference to the value std::string.
    */
   virtual absl::optional<std::reference_wrapper<const std::string>>
   get(absl::string_view key) const PURE;
