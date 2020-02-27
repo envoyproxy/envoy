@@ -59,6 +59,7 @@ public:
     }
     dispatcher_ = api_->allocateDispatcher();
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
+    tls_->registerThread(*dispatcher_, true);
     store_.initializeThreading(*dispatcher_, *tls_);
   }
 
