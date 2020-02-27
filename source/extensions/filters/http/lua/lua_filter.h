@@ -86,7 +86,7 @@ public:
 
 class Filter;
 
-class FireAndForgetWriter;
+class FireAndForgetHttpWriter;
 
 /**
  * A wrapper for a currently running request/response. This is the primary handle passed to Lua.
@@ -297,17 +297,17 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
-  FireAndForgetWriter* fireAndForgetWriter_;
+  FireAndForgetHttpWriter* fireAndForgetHttpWriter_;
 };
 
 /**
  * Implementation that takes incoming requests and implements
  * "fire and forget" behavior using an async client.
  */
-class FireAndForgetWriter : public Filters::Common::Lua::BaseLuaObject<FireAndForgetWriter>,
+class FireAndForgetHttpWriter : public Filters::Common::Lua::BaseLuaObject<FireAndForgetHttpWriter>,
                             public Http::AsyncClient::Callbacks {
 public:
-  FireAndForgetWriter(Filter& filter);
+  FireAndForgetHttpWriter(Filter& filter);
 
   int luaHttpCallNonblocking(lua_State* state);
 

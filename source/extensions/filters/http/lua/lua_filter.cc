@@ -24,9 +24,9 @@ StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& corout
           throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
         }
       }),
-      fireAndForgetWriter_(new FireAndForgetWriter(filter)) {}
+      fireAndForgetHttpWriter_(new FireAndForgetHttpWriter(filter)) {}
 
-StreamHandleWrapper::~StreamHandleWrapper() { delete fireAndForgetWriter_; }
+StreamHandleWrapper::~StreamHandleWrapper() { delete fireAndForgetHttpWriter_; }
 
 Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
@@ -155,7 +155,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaHttpCallNonblocking(lua_State* state) {
-  return fireAndForgetWriter_->luaHttpCallNonblocking(state);
+  return fireAndForgetHttpWriter_->luaHttpCallNonblocking(state);
 }
 
 void StreamHandleWrapper::onSuccess(Http::ResponseMessagePtr&& response) {
@@ -430,9 +430,9 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   return 1;
 }
 
-FireAndForgetWriter::FireAndForgetWriter(Filter& filter) : filter_(filter) {}
+FireAndForgetHttpWriter::FireAndForgetHttpWriter(Filter& filter) : filter_(filter) {}
 
-int FireAndForgetWriter::luaHttpCallNonblocking(lua_State* state) {
+int FireAndForgetHttpWriter::luaHttpCallNonblocking(lua_State* state) {
   if (LuaFilterUtil::makeHttpCall(state, filter_, *this)) {
     return 0;
   } else {
