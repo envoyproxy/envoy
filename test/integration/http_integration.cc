@@ -811,7 +811,7 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
                                                        bool with_encoder_filter) {
   if (with_encoder_filter) {
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
-    config_helper_.addFilter("name: envoy.cors");
+    config_helper_.addFilter("name: envoy.filters.http.cors");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {

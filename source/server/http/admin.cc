@@ -853,6 +853,7 @@ Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response
   memory.set_total_thread_cache(Memory::Stats::totalThreadCacheBytes());
   memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
   memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
+  memory.set_total_physical_bytes(Memory::Stats::totalPhysicalBytes());
   response.add(MessageUtil::getJsonStringFromMessage(memory, true, true)); // pretty-print
   return Http::Code::OK;
 }
