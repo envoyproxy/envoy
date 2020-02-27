@@ -244,12 +244,12 @@ data to send. *timeout* is an integer that specifies the call timeout in millise
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.
 
-httpCallAsync()
-^^^^^^^^^^^^^^^
+httpCallNonblocking()
+^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-  handle:httpCallAsync(cluster, headers, body, timeout)
+  handle:httpCallNonblocking(cluster, headers, body, timeout)
 
 Makes an HTTP call to an upstream host. Same behavior as httpCall, except that Envoy will fire and forget.
 

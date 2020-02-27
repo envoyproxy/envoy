@@ -145,7 +145,7 @@ public:
             {"logErr", static_luaLogErr},
             {"logCritical", static_luaLogCritical},
             {"httpCall", static_luaHttpCall},
-            {"httpCallAsync", static_luaHttpCallAsync},
+            {"httpCallNonblocking", static_luaHttpCallNonblocking},
             {"respond", static_luaRespond},
             {"streamInfo", static_luaStreamInfo},
             {"connection", static_luaConnection},
@@ -165,14 +165,14 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCall);
 
   /**
-   * Perform an asynchronous HTTP call to an upstream host. Fires and forgets.
+   * Perform a non-blocking HTTP call to an upstream host. Fires and forgets.
    * @param 1 (string): The name of the upstream cluster to call. This cluster must be configured.
    * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
    * @param 3 (string): Body. Can be nil.
    * @param 4 (int): Timeout in milliseconds for the call.
    * @return headers (table), body (string/nil)
    */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCallAsync);
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCallNonblocking);
 
   /**
    * Perform an inline response. This call is currently only valid on the request path. Further
@@ -309,7 +309,7 @@ class FireAndForgetWriter : public Filters::Common::Lua::BaseLuaObject<FireAndFo
 public:
   FireAndForgetWriter(Filter& filter);
 
-  int luaHttpCallAsync(lua_State* state);
+  int luaHttpCallNonblocking(lua_State* state);
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::ResponseMessagePtr&&) override {}

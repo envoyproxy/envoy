@@ -364,7 +364,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
     function envoy_on_request(request_handle)
-      local headers, body = request_handle:httpCallAsync(
+      local headers, body = request_handle:httpCallNonblocking(
       "lua_cluster",
       {
         [":method"] = "POST",

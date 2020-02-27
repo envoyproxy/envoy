@@ -800,10 +800,10 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
 }
 
 // Basic Asynchronous, Fire and Forget HTTP request flow.
-TEST_F(LuaHttpFilterTest, HttpCallAsync) {
+TEST_F(LuaHttpFilterTest, HttpCallNonblocking) {
   const std::string SCRIPT{R"EOF(
         function envoy_on_request(request_handle)
-          local headers, body = request_handle:httpCallAsync(
+          local headers, body = request_handle:httpCallNonblocking(
             "cluster",
             {
               [":method"] = "POST",

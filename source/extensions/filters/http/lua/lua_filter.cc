@@ -154,8 +154,8 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 }
 
-int StreamHandleWrapper::luaHttpCallAsync(lua_State* state) {
-  return fireAndForgetWriter_->luaHttpCallAsync(state);
+int StreamHandleWrapper::luaHttpCallNonblocking(lua_State* state) {
+  return fireAndForgetWriter_->luaHttpCallNonblocking(state);
 }
 
 void StreamHandleWrapper::onSuccess(Http::ResponseMessagePtr&& response) {
@@ -432,7 +432,7 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 
 FireAndForgetWriter::FireAndForgetWriter(Filter& filter) : filter_(filter) {}
 
-int FireAndForgetWriter::luaHttpCallAsync(lua_State* state) {
+int FireAndForgetWriter::luaHttpCallNonblocking(lua_State* state) {
   if (LuaFilterUtil::makeHttpCall(state, filter_, *this)) {
     return 0;
   } else {
