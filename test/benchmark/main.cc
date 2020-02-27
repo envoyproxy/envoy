@@ -1,12 +1,11 @@
 // NOLINT(namespace-envoy)
 // This is an Envoy driver for benchmarks.
 
+#include "benchmark/benchmark.h"
+
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
-
 #endif
-
-#include "benchmark/benchmark.h"
 
 #include "absl/debugging/symbolize.h"
 
