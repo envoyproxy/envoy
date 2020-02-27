@@ -24,7 +24,7 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
 
   // TODO(jmarantz): use stat-names properly here. This usage takes the symbol
   // table lock on every request if real symbol tables are enabled, and we need
-  // to pre-alllocate the strings, including the ones that go into the prefix
+  // to pre-allocate the strings, including the ones that go into the prefix
   // calculation below, so they can be joined without taking a lock.
   Stats::StatNameManagedStorage storage(prefix_ + "downstream_cx_length_ms", scope_->symbolTable());
   scope_->histogramFromStatName(storage.statName(), Stats::Histogram::Unit::Milliseconds)
