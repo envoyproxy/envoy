@@ -799,7 +799,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   callbacks->onSuccess(std::move(response_message));
 }
 
-// Basic Asynchronous, fire-and-forget HTTP request flow.
+// Basic nonblocking, fire-and-forget HTTP request flow.
 TEST_F(LuaHttpFilterTest, HttpCallNonblocking) {
   const std::string SCRIPT{R"EOF(
         function envoy_on_request(request_handle)

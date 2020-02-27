@@ -301,8 +301,7 @@ private:
 };
 
 /**
- * Implementation that takes incoming requests and implements
- * "fire and forget" behavior using an async client.
+ * HTTP client that performs non-blocking HTTP calls and ignores the response.
  */
 class FireAndForgetHttpWriter : public Filters::Common::Lua::BaseLuaObject<FireAndForgetHttpWriter>,
                             public Http::AsyncClient::Callbacks {
