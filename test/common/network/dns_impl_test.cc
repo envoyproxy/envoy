@@ -531,8 +531,12 @@ TEST_P(DnsImplTest, LocalLookup) {
                                           [&](std::list<DnsResponse>&& results) -> void {
                                             address_list = getAddressList(results);
                                           }));
+    for (auto address : address_list) {
+      ENVOY_LOG_MISC(error, "Address: {}", address->ip()->addressAsString());
+    }
     EXPECT_TRUE(hasAddress(address_list, "127.0.0.1"));
     EXPECT_FALSE(hasAddress(address_list, "::1"));
+    ASSERT_TRUE(false);
   }
 
   if (GetParam() == Address::IpVersion::v6) {
