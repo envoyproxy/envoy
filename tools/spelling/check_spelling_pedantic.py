@@ -83,22 +83,22 @@ FLAG = re.compile(r'\W([-%][A-Za-z]+)')
 USER = re.compile(r'\W(@[A-Za-z0-9-]+)')
 
 # RST Links (e.g. `text <https://example.com>`_, :ref:`text <internal_ref>`)
-RST_LINK=re.compile(r'`([^`<]|\\[`<])+<([^ ]+)>`')
+RST_LINK = re.compile(r'`([^`<]|\\[`<])+<([^ ]+)>`')
 
 # RST inline literals.
-RST_LITERAL=re.compile(r'``.*``')
+RST_LITERAL = re.compile(r'``.*``')
 
 # RST code block marker.
-RST_CODE_BLOCK='.. code-block::'
+RST_CODE_BLOCK = '.. code-block::'
 
 # Start of string indent.
-INDENT=re.compile(r'^( *)')
+INDENT = re.compile(r'^( *)')
 
-SMART_QUOTES={
-  "\u2018": "'",
-  "\u2019": "'",
-  "\u201c": '"',
-  "\u201d": '"',
+SMART_QUOTES = {
+    "\u2018": "'",
+    "\u2019": "'",
+    "\u201c": '"',
+    "\u201d": '"',
 }
 
 # Valid dictionary words. Anything else crashes aspell.
