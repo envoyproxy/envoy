@@ -255,8 +255,7 @@ Api::SysCallIntResult Ipv4Instance::bind(os_fd_t fd) const {
 }
 
 Api::SysCallIntResult Ipv4Instance::connect(os_fd_t fd) const {
-  return Api::OsSysCallsSingleton::get().connect(
-      fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_), sizeof(ip_.ipv4_.address_));
+  return Api::OsSysCallsSingleton::get().connect(fd, sockAddr(), sockAddrLen());
 }
 
 IoHandlePtr Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
@@ -344,8 +343,7 @@ Api::SysCallIntResult Ipv6Instance::bind(os_fd_t fd) const {
 }
 
 Api::SysCallIntResult Ipv6Instance::connect(os_fd_t fd) const {
-  return Api::OsSysCallsSingleton::get().connect(
-      fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_), sizeof(ip_.ipv6_.address_));
+  return Api::OsSysCallsSingleton::get().connect(fd, sockAddr(), sockAddrLen());
 }
 
 IoHandlePtr Ipv6Instance::socket(SocketType type) const {
