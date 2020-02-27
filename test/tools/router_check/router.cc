@@ -316,7 +316,18 @@ bool RouterCheckTool::compareRewriteHost(
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
   if (tool_config.route_->directResponseEntry() != nullptr) {
-    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.request_headers_);
+    if (!headers_finalized_) {
+      tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.headers_, true);
+
+      // The real router makes use of sendLocalReply, which automatically sets the content-type header to text/plain.
+      // Imitate that behavior here.
+      tool_config.headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
+      tool_config.route_->directResponseEntry()->finalizeResponseHeaders(*tool_config.headers_,
+                                                                         stream_info);
+      headers_finalized_ = true;
+    }
+
+    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
 
   const bool matches = compareResults(actual, expected, "path_redirect");
