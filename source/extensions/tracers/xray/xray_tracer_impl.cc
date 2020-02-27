@@ -102,7 +102,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
-    return tracer->startSpan(xray_config_.segment_name_, operation_name, start_time,
+    return tracer->startSpan(operation_name, start_time,
                              header ? absl::optional<XRayHeader>(xray_header) : absl::nullopt);
   }
 

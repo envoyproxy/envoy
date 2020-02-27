@@ -1021,7 +1021,7 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-                metadata, 1, locality,
+                std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
                 envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
                 envoy::config::core::v3::UNKNOWN);
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
@@ -1075,8 +1075,7 @@ TEST(HostImplTest, HealthPipeAddress) {
         std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
         config.set_port_value(8000);
-        HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("unix://foo"),
-                                  envoy::config::core::v3::Metadata::default_instance(),
+        HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("unix://foo"), nullptr,
                                   envoy::config::core::v3::Locality().default_instance(), config,
                                   1);
       },
@@ -1907,7 +1906,7 @@ TEST_F(ClusterInfoImplTest, Metadata) {
   EXPECT_EQ("meh", cluster->info()->typedMetadata().get<Baz>(baz_factory.name())->name);
   EXPECT_EQ(nullptr, cluster->info()->typedMetadata().get<Foo>(baz_factory.name()));
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(cluster->info()->metadata(), "com.bar.foo", "baz")
+            Config::Metadata::metadataValue(&cluster->info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
   EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());

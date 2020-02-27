@@ -131,6 +131,14 @@ public:
     reinterpret_cast<uint8_t*>(data.linearize(data.length()))[index % data.length()] = new_value;
   }
 
+  void expectDetailsRequest(const absl::string_view details) {
+    EXPECT_EQ(details, request_encoder_->getStream().responseDetails());
+  }
+
+  void expectDetailsResponse(const absl::string_view details) {
+    EXPECT_EQ(details, response_encoder_->getStream().responseDetails());
+  }
+
   const Http2SettingsTuple client_settings_;
   const Http2SettingsTuple server_settings_;
   bool allow_metadata_ = false;
@@ -308,6 +316,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+  expectDetailsRequest("http2.violation.of.messaging.rule");
 }
 
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
@@ -355,6 +364,7 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+  expectDetailsRequest("http2.violation.of.messaging.rule");
 };
 
 TEST_P(Http2CodecImplTest, Invalid103) {
@@ -434,6 +444,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+  expectDetailsRequest("http2.invalid.header.field");
 };
 
 TEST_P(Http2CodecImplTest, RefusedStreamReset) {
@@ -475,6 +486,7 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+  expectDetailsResponse("http2.violation.of.messaging.rule");
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeaders) {

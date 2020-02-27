@@ -338,7 +338,7 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
     }
     return;
   }
-  const ProtobufWkt::Value& value = Envoy::Config::Metadata::metadataValue(*meta, metadata_key_);
+  const ProtobufWkt::Value& value = Envoy::Config::Metadata::metadataValue(meta, metadata_key_);
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kBoolValue:
     span.setTag(tag(), value.bool_value() ? "true" : "false");

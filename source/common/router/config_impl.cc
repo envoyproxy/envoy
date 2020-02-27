@@ -379,6 +379,15 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
   }
+
+  if (route.route().has_regex_rewrite()) {
+    if (!prefix_rewrite_.empty()) {
+      throw EnvoyException("Cannot specify both prefix_rewrite and regex_rewrite");
+    }
+    auto rewrite_spec = route.route().regex_rewrite();
+    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_substitution_ = rewrite_spec.substitution();
+  }
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -476,7 +485,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 
   // Handle path rewrite
-  if (!getPathRewrite().empty()) {
+  if (!getPathRewrite().empty() || regex_rewrite_ != nullptr) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
@@ -511,11 +520,19 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
   return runtime;
 }
 
+// finalizePathHeaders does the "standard" path rewriting, meaning that it
+// handles the "prefix_rewrite" and "regex_rewrite" route actions, only one of
+// which can be specified. The "matched_path" argument applies only to the
+// prefix rewriting, and describes the portion of the path (excluding query
+// parameters) that should be replaced by the rewrite. A "regex_rewrite"
+// applies to the entire path (excluding query parameters), regardless of what
+// portion was matched.
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
   const auto& rewrite = getPathRewrite();
-  if (rewrite.empty()) {
+  if (rewrite.empty() && regex_rewrite_ == nullptr) {
+    // There are no rewrites configured. Just return.
     return;
   }
 
@@ -523,9 +540,21 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   if (insert_envoy_original_path) {
     headers.setEnvoyOriginalPath(path);
   }
-  ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
-                         : absl::StartsWithIgnoreCase(path, matched_path));
-  headers.setPath(path.replace(0, matched_path.size(), rewrite));
+
+  if (!rewrite.empty()) {
+    ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                           : absl::StartsWithIgnoreCase(path, matched_path));
+    headers.setPath(path.replace(0, matched_path.size(), rewrite));
+    return;
+  }
+
+  if (regex_rewrite_ != nullptr) {
+    // Replace the entire path, but preserve the query parameters
+    auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+    headers.setPath(path.replace(
+        0, just_path.size(), regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_)));
+    return;
+  }
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,

@@ -443,9 +443,9 @@ class Array(TypeSpecification):
     return self.underlying.compute_declaration_chain()
 
   def deserializer_name_in_version(self, version, compact):
-    return '%sArrayDeserializer<%s, %s>' % ("Compact" if compact else "", self.underlying.name,
-                                            self.underlying.deserializer_name_in_version(
-                                                version, compact))
+    # For arrays, deserializer name is (Compact)(Nullable)ArrayDeserializer<ElementDeserializer>.
+    element_deserializer_name = self.underlying.deserializer_name_in_version(version, compact)
+    return '%sArrayDeserializer<%s>' % ("Compact" if compact else "", element_deserializer_name)
 
   def default_value(self):
     return 'std::vector<%s>{}' % (self.underlying.name)

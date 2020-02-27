@@ -28,7 +28,7 @@ public:
 class MockParser : public ResponseParser {
 public:
   ResponseParseResponse parse(absl::string_view&) override {
-    throw new EnvoyException("should not be invoked");
+    throw EnvoyException("should not be invoked");
   }
 };
 
