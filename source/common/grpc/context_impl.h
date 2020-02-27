@@ -50,12 +50,21 @@ public:
     return protocol == Context::Protocol::Grpc ? grpc_ : grpc_web_;
   }
 
-  GoogleGrpcStatNames& googleGrpcStatNames() override;
+  GoogleGrpcStatNames& googleGrpcStatNames() override { return google_grpc_stat_names_; }
 
 private:
+  // Makes a stat name from a string, if we don't already have one for it.
+  // This always takes a lock on mutex_, and if we haven't seen the name
+  // before, it also takes a lock on the symbol table.
+  //
+  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/7008 for
+  // a lock-free approach to creating dynamic stat-names based on requests.
+  Stats::StatName makeDynamicStatName(absl::string_view name);
+
   Stats::SymbolTable& symbol_table_;
-  Stats::StatNamePool stat_name_pool_;
-  Stats::StatNameDynamicPool stat_name_dynamic_pool_;
+  mutable Thread::MutexBasicLockable mutex_;
+  Stats::StatNamePool stat_name_pool_ ABSL_GUARDED_BY(mutex_);
+  StringMap<Stats::StatName> stat_name_map_ ABSL_GUARDED_BY(mutex_);
 
   const Stats::StatName grpc_;
   const Stats::StatName grpc_web_;
@@ -66,8 +75,7 @@ private:
   const Stats::StatName request_message_count_;
   const Stats::StatName response_message_count_;
 
-  mutable Thread::MutexBasicLockable mutex_;
-  std::unique_ptr<GoogleGrpcStatNames> google_grpc_stat_names_;
+  GoogleGrpcStatNames google_grpc_stat_names_;
 };
 
 } // namespace Grpc

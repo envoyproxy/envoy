@@ -9,6 +9,7 @@
 #include "envoy/stats/timespan.h"
 
 #include "common/http/headers.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -22,9 +23,8 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
   }
 
   // TODO(jmarantz): use stat-names properly here.
-  Stats::StatName name = Stats::StatNameManagedStorage storage(prefix_ + "downstream_cx_length_ms",
-                                                               scope_.symbolTable());
-  scope_->histogramFromStatName(name, Stats::Histogram::Unit::Milliseconds)
+  Stats::StatNameManagedStorage storage(prefix_ + "downstream_cx_length_ms", scope_->symbolTable());
+  scope_->histogramFromStatName(storage.statName(), Stats::Histogram::Unit::Milliseconds)
           .recordValue(span.elapsed().count());
 }
 
