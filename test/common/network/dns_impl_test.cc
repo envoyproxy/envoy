@@ -481,6 +481,32 @@ public:
         });
   }
 
+  ActiveDnsQuery* resolveWithUnreferencedParameters(const std::string& address,
+                                                    const DnsLookupFamily lookup_family,
+                                                    bool expected_to_execute) {
+    return resolver_->resolve(address, lookup_family,
+                              [expected_to_execute](DnsResolver::ResolutionStatus status,
+                                                    std::list<DnsResponse>&& results) -> void {
+                                if (!expected_to_execute) {
+                                  FAIL();
+                                }
+                                UNREFERENCED_PARAMETER(status);
+                                UNREFERENCED_PARAMETER(results);
+                              });
+  }
+
+  template <typename T>
+  ActiveDnsQuery* resolveWithException(const std::string& address,
+                                       const DnsLookupFamily lookup_family, T exception_object) {
+    return resolver_->resolve(address, lookup_family,
+                              [exception_object](DnsResolver::ResolutionStatus status,
+                                                 std::list<DnsResponse>&& results) -> void {
+                                UNREFERENCED_PARAMETER(status);
+                                UNREFERENCED_PARAMETER(results);
+                                throw exception_object;
+                              });
+  }
+
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
   virtual bool zero_timeout() const { return false; }
@@ -506,13 +532,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
 // development, where segfaults were encountered due to callback invocations on
 // destruction.
 TEST_P(DnsImplTest, DestructPending) {
-  ActiveDnsQuery* query = resolver_->resolve(
-      "", DnsLookupFamily::V4Only,
-      [&](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
-        FAIL();
-        UNREFERENCED_PARAMETER(status);
-        UNREFERENCED_PARAMETER(results);
-      });
+  ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::V4Only, false);
   ASSERT_NE(nullptr, query);
   query->cancel();
   // Also validate that pending events are around to exercise the resource
@@ -607,24 +627,16 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
 TEST_P(DnsImplTest, CallbackException) {
   // Force immediate resolution, which will trigger a c-ares exception unsafe
   // state providing regression coverage for #4307.
-  EXPECT_EQ(nullptr,
-            resolver_->resolve(
-                "1.2.3.4", DnsLookupFamily::V4Only,
-                [&](DnsResolver::ResolutionStatus /*status*/, const std::list<DnsResponse> &
-                    /*results*/) -> void { throw EnvoyException("Envoy exception"); }));
+  EXPECT_EQ(nullptr, resolveWithException<EnvoyException>("1.2.3.4", DnsLookupFamily::V4Only,
+                                                          EnvoyException("Envoy exception")));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "Envoy exception");
-  EXPECT_EQ(nullptr,
-            resolver_->resolve(
-                "1.2.3.4", DnsLookupFamily::V4Only,
-                [&](DnsResolver::ResolutionStatus /*status*/, const std::list<DnsResponse> &
-                    /*results*/) -> void { throw std::runtime_error("runtime error"); }));
+  EXPECT_EQ(nullptr, resolveWithException<std::runtime_error>("1.2.3.4", DnsLookupFamily::V4Only,
+                                                              std::runtime_error("runtime error")));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "runtime error");
-  EXPECT_EQ(nullptr, resolver_->resolve("1.2.3.4", DnsLookupFamily::V4Only,
-                                        [&](DnsResolver::ResolutionStatus /*status*/,
-                                            const std::list<DnsResponse> &
-                                            /*results*/) -> void { throw std::string(); }));
+  EXPECT_EQ(nullptr,
+            resolveWithException<std::string>("1.2.3.4", DnsLookupFamily::V4Only, std::string()));
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->run(Event::Dispatcher::RunType::Block), EnvoyException,
                             "unknown");
 }
@@ -746,9 +758,8 @@ TEST_P(DnsImplTest, MultiARecordLookupWithV6) {
 TEST_P(DnsImplTest, Cancel) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
 
-  ActiveDnsQuery* query = resolver_->resolve(
-      "some.domain", DnsLookupFamily::Auto,
-      [](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void { FAIL(); });
+  ActiveDnsQuery* query =
+      resolveWithUnreferencedParameters("some.domain", DnsLookupFamily::Auto, false);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success,
@@ -819,6 +830,22 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+// Validate that the resolution timeout timer is enabled if we don't resolve
+// immediately.
+TEST_P(DnsImplTest, PendingTimerEnable) {
+  InSequence s;
+  std::vector<Network::Address::InstanceConstSharedPtr> vec{};
+  Event::MockDispatcher dispatcher;
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
+  resolver_ = std::make_shared<DnsResolverImpl>(dispatcher, vec, false);
+  Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
+  EXPECT_CALL(*timer, enableTimer(_, _));
+  EXPECT_NE(nullptr, resolveWithUnreferencedParameters("some.bad.domain.invalid",
+                                                       DnsLookupFamily::V4Only, true));
+}
+
 class DnsImplZeroTimeoutTest : public DnsImplTest {
 protected:
   bool zero_timeout() const override { return true; }
@@ -837,25 +864,6 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-}
-
-// Validate that the resolution timeout timer is enabled if we don't resolve
-// immediately.
-TEST(DnsImplUnitTest, PendingTimerEnable) {
-  InSequence s;
-  Event::MockDispatcher dispatcher;
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
-  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  DnsResolverImpl resolver(dispatcher, {}, false);
-  Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
-  EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
-  EXPECT_CALL(*timer, enableTimer(_, _));
-  EXPECT_NE(nullptr, resolver.resolve("some.bad.domain.invalid", DnsLookupFamily::V4Only,
-                                      [&](DnsResolver::ResolutionStatus status,
-                                          std::list<DnsResponse>&& results) {
-                                        UNREFERENCED_PARAMETER(status);
-                                        UNREFERENCED_PARAMETER(results);
-                                      }));
 }
 
 class DnsImplAresFlagsForTcpTest : public DnsImplTest {
@@ -878,9 +886,8 @@ TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   EXPECT_TRUE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
-  EXPECT_NE(nullptr, resolver_->resolve(
-                         "root.cnam.domain", DnsLookupFamily::Auto,
-                         [&](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void {}));
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cnam.domain", DnsLookupFamily::Auto, true));
   ares_destroy_options(&opts);
 }
 
@@ -903,9 +910,8 @@ TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   EXPECT_FALSE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
-  EXPECT_NE(nullptr, resolver_->resolve(
-                         "root.cnam.domain", DnsLookupFamily::Auto,
-                         [&](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void {}));
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cnam.domain", DnsLookupFamily::Auto, true));
   ares_destroy_options(&opts);
 }
 
