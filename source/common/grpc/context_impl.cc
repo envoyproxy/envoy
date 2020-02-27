@@ -41,8 +41,9 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 
   absl::string_view status_str = grpc_status->value().getStringView();
   auto iter = google_grpc_stat_names_.status_names_.find(status_str);
-  const Stats::StatName status_stat_name = (iter != google_grpc_stat_names_.status_names_.end()) ?
-                                           iter->second : makeDynamicStatName(status_str);
+  const Stats::StatName status_stat_name = (iter != google_grpc_stat_names_.status_names_.end())
+                                               ? iter->second
+                                               : makeDynamicStatName(status_str);
   const Stats::SymbolTable::StoragePtr stat_name_storage =
       symbol_table_.join({protocolStatName(protocol), request_names.service_, request_names.method_,
                           status_stat_name});
