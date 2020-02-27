@@ -47,10 +47,10 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   AccessLog::MockAccessLogManager log_manager;
   Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
 
-  ValidationClusterManagerFactory factory(admin, runtime, stats_store, tls, random, dns_resolver,
-                                          ssl_context_manager, dispatcher, local_info,
-                                          secret_manager, validation_context, *api, http_context,
-                                          grpc_context, log_manager, singleton_manager, time_system);
+  ValidationClusterManagerFactory factory(
+      admin, runtime, stats_store, tls, random, dns_resolver, ssl_context_manager, dispatcher,
+      local_info, secret_manager, validation_context, *api, http_context, grpc_context, log_manager,
+      singleton_manager, time_system);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);

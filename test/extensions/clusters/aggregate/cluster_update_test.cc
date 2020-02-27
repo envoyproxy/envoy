@@ -31,8 +31,8 @@ envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class AggregateClusterUpdateTest : public testing::Test {
 public:
-  AggregateClusterUpdateTest() : http_context_(stats_store_.symbolTable()),
-                                 grpc_context_(stats_store_.symbolTable()) {}
+  AggregateClusterUpdateTest()
+      : http_context_(stats_store_.symbolTable()), grpc_context_(stats_store_.symbolTable()) {}
 
   void initialize(const std::string& yaml_config) {
     cluster_manager_ = std::make_unique<Upstream::TestClusterManagerImpl>(
