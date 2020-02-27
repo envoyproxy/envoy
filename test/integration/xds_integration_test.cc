@@ -122,7 +122,12 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
 // Confirm that a new listener config with new filter chain will keep all the existing connections.
 TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
   autonomous_upstream_ = true;
-
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_http_protocol_options()->set_accept_http_10(true);
+        hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
+      });
   // dst ip = all
   initialize();
   // Given we're using LDS in this test, initialize() will not complete until
@@ -131,9 +136,10 @@ TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
 
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response,
-                                /*disconnect_after_headers_complete=*/true);
-  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+  auto conn1 = sendRawHttpAndWaitForHeader(1, lookupPort("http"),
+                                           "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n", &response,
+                                           /*disconnect_after_headers_complete=*/false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
 
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
@@ -156,10 +162,15 @@ TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
 
   std::string response2;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, false);
-  EXPECT_TRUE(response2.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
-
-  ASSERT("connection on filter chain 0 is alive after timeout");
+  auto conn2 = sendRawHttpAndWaitForHeader(
+      2, lookupPort("http"), "GET / HTTP/1.1\r\nHost: 127.0.0.2\r\n\r\n", &response2, false);
+  EXPECT_THAT(response2, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  ENVOY_LOG(debug, "lambdai: reach here");
+  conn1->clearShouldExist();
+  response.clear();
+  conn1->write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+  conn1->runUntil();
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
 }
 
 // Confirm that a new listener config with one fewer filter chain will drain the connections on that

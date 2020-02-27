@@ -781,8 +781,9 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
   // 2. the completion callback is used to execute the resouce clean up.
   draining_group->draining_listener_->localDrainManager().startDrainSequence(
       [this, draining_group]() -> void {
-        draining_group->draining_listener_->debugLog(absl::StrCat(
-            "removing draining listener ", draining_group->draining_listener_->name()));
+        draining_group->draining_listener_->debugLog(
+            absl::StrCat("removing draining filter chains from listener ",
+                         draining_group->draining_listener_->name()));
         for (const auto& worker : workers_) {
           // Once the drain time has completed via the drain manager's timer, we tell the workers
           // to remove the filter chains.
@@ -794,8 +795,8 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
             server_.dispatcher().post([this, draining_group]() -> void {
               if (--draining_group->workers_pending_removal_ == 0) {
                 draining_group->draining_listener_->debugLog(
-                    absl::StrCat("draining listener ", draining_group->draining_listener_->name(),
-                                 " removal complete"));
+                    absl::StrCat("draining filter chains from listener ",
+                                 draining_group->draining_listener_->name(), " complete"));
                 draining_filter_groups_.erase(draining_group);
                 stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
               }

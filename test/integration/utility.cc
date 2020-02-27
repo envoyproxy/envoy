@@ -114,14 +114,25 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback,
+                                         Network::Address::IpVersion version)
+    : RawConnectionDriver(
+          1, port, initial_data,
+          [data_callback](Network::ClientConnection& conn, const Buffer::Instance& buf) {
+            data_callback(conn, buf);
+            return false;
+          },
+          version) {}
+RawConnectionDriver::RawConnectionDriver(uint8_t host_id, uint32_t port,
+                                         Buffer::Instance& initial_data,
+                                         ExitableReadCallback data_callback,
                                          Network::Address::IpVersion version) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
   dispatcher_ = api_->allocateDispatcher();
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(
-      Network::Utility::resolveUrl(
-          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
+      Network::Utility::resolveUrl(fmt::format(
+          "tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version, host_id), port)),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
   client_->addConnectionCallbacks(*callbacks_);
   client_->addReadFilter(Network::ReadFilterSharedPtr{new ForwardingFilter(*this, data_callback)});
@@ -132,6 +143,15 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
 RawConnectionDriver::~RawConnectionDriver() = default;
 
 void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
+void RawConnectionDriver::write(absl::string_view payload) {
+  Buffer::OwnedImpl buffer(payload);
+  client_->write(buffer, false);
+}
+void RawConnectionDriver::runUntil() {
+  while (!should_exit_) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
 
