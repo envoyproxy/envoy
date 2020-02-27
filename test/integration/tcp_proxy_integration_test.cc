@@ -2,11 +2,12 @@
 
 #include <memory>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/accesslog/v2/file.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/network/utility.h"
@@ -236,7 +237,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 TEST_P(TcpProxyIntegrationTest, AccessLog) {
   std::string access_log_path = TestEnvironment::temporaryPath(
       fmt::format("access_log{}.txt", GetParam() == Network::Address::IpVersion::v4 ? "v4" : "v6"));
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap)
+                                       -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
@@ -248,7 +250,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
-    envoy::config::accesslog::v2::FileAccessLog access_log_config;
+    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.set_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
@@ -300,13 +302,14 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
 // Test that the server shuts down without crashing when connections are open.
 TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    for (int i = 0; i < static_resources->clusters_size(); ++i) {
-      auto* cluster = static_resources->mutable_clusters(i);
-      cluster->set_close_connections_on_host_health_failure(true);
-    }
-  });
+  config_helper_.addConfigModifier(
+      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
+        auto* static_resources = bootstrap.mutable_static_resources();
+        for (int i = 0; i < static_resources->clusters_size(); ++i) {
+          auto* cluster = static_resources->mutable_clusters(i);
+          cluster->set_close_connections_on_host_health_failure(true);
+        }
+      });
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
@@ -331,7 +334,8 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
   autonomous_upstream_ = true;
 
   enable_half_close_ = false;
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap)
+                                       -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
@@ -354,7 +358,8 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   config_helper_.setBufferLimits(1024, 1024);
   enable_half_close_ = false;
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap)
+                                       -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
@@ -389,13 +394,13 @@ public:
   void expectEndpointToMatchRoute();
   void expectEndpointNotToMatchRoute();
 
-  envoy::api::v2::core::Metadata lbMetadata(std::map<std::string, std::string> values);
+  envoy::config::core::v3alpha::Metadata lbMetadata(std::map<std::string, std::string> values);
 
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_;
-  envoy::api::v2::core::Metadata endpoint_metadata_;
+  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy tcp_proxy_;
+  envoy::config::core::v3alpha::Metadata endpoint_metadata_;
 };
 
-envoy::api::v2::core::Metadata
+envoy::config::core::v3alpha::Metadata
 TcpProxyMetadataMatchIntegrationTest::lbMetadata(std::map<std::string, std::string> values) {
 
   ProtobufWkt::Struct map;
@@ -408,14 +413,14 @@ TcpProxyMetadataMatchIntegrationTest::lbMetadata(std::map<std::string, std::stri
     mutable_fields->insert({it->first, value});
   }
 
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata metadata;
   (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] = map;
   return metadata;
 }
 
 void TcpProxyMetadataMatchIntegrationTest::initialize() {
 
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
 
     ASSERT(static_resources->listeners_size() == 1);
@@ -429,10 +434,11 @@ void TcpProxyMetadataMatchIntegrationTest::initialize() {
     auto* cluster_0 = static_resources->mutable_clusters(0);
     cluster_0->Clear();
     cluster_0->set_name("cluster_0");
-    cluster_0->set_type(envoy::api::v2::Cluster::STATIC);
-    cluster_0->set_lb_policy(envoy::api::v2::Cluster::ROUND_ROBIN);
+    cluster_0->set_type(envoy::config::cluster::v3alpha::Cluster::STATIC);
+    cluster_0->set_lb_policy(envoy::config::cluster::v3alpha::Cluster::ROUND_ROBIN);
     auto* lb_subset_config = cluster_0->mutable_lb_subset_config();
-    lb_subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK);
+    lb_subset_config->set_fallback_policy(
+        envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::NO_FALLBACK);
     auto* subset_selector = lb_subset_config->add_subset_selectors();
     subset_selector->add_keys("role");
     subset_selector->add_keys("version");
@@ -509,7 +515,8 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
        DEPRECATED_FEATURE_TEST(EndpointShouldMatchRouteWithTopLevelMetadataMatch)) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.set_cluster("fallback");
-  tcp_proxy_.mutable_deprecated_v1()->add_routes()->set_cluster("cluster_0");
+  tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
+      "cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
       lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
 
@@ -596,7 +603,8 @@ TEST_P(TcpProxyMetadataMatchIntegrationTest,
        DEPRECATED_FEATURE_TEST(EndpointShouldNotMatchRouteWithTopLevelMetadataMatch)) {
   tcp_proxy_.set_stat_prefix("tcp_stats");
   tcp_proxy_.set_cluster("fallback");
-  tcp_proxy_.mutable_deprecated_v1()->add_routes()->set_cluster("cluster_0");
+  tcp_proxy_.mutable_hidden_envoy_deprecated_deprecated_v1()->add_routes()->set_cluster(
+      "cluster_0");
   tcp_proxy_.mutable_metadata_match()->MergeFrom(
       lbMetadata({{"role", "master"}, {"version", "v1"}, {"stage", "prod"}}));
 

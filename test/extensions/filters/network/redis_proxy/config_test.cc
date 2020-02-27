@@ -1,5 +1,5 @@
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 
 #include "common/protobuf/utility.h"
 
@@ -19,16 +19,17 @@ namespace RedisProxy {
 
 TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::redis_proxy::v2::RedisProxy(), context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
+          envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy(), context),
+      ProtoValidationException);
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings settings;
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings settings;
   settings.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
 
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy config;
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy config;
   config.set_stat_prefix("foo");
   config.mutable_settings()->CopyFrom(settings);
 
@@ -47,7 +48,7 @@ prefix_routes:
 stat_prefix: foo
   )EOF";
 
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
                           ProtoValidationException, "value is required");
 }
@@ -61,7 +62,7 @@ stat_prefix: foo
 settings: {}
   )EOF";
 
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
                           ProtoValidationException, "embedded message failed validation");
 }
@@ -75,7 +76,7 @@ settings:
   op_timeout: 0.02s
   )EOF";
 
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
@@ -96,7 +97,7 @@ settings:
   op_timeout: 0.02s
   )EOF";
 
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
@@ -117,7 +118,7 @@ settings:
   op_timeout: 0.02s
   )EOF";
 
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
@@ -140,8 +141,8 @@ settings:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RedisProxyFilterConfigFactory factory;
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-      *dynamic_cast<envoy::config::filter::network::redis_proxy::v2::RedisProxy*>(
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config =
+      *dynamic_cast<envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy*>(
           factory.createEmptyConfigProto().get());
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);

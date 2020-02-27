@@ -24,8 +24,8 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/network:lc_trie_lib",
         "//source/common/stats:symbol_table_lib",
-        "@envoy_api//envoy/api/v3alpha/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -40,6 +40,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/ip_tagging:ip_tagging_filter_lib",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3alpha:pkg_cc_proto",
     ],
 )

@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package envoy.config.cluster.v3alpha;
+
+import "envoy/config/core/v3alpha/base.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/versioning.proto";
+
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.cluster.v3alpha";
+option java_outer_classname = "CircuitBreakerProto";
+option java_multiple_files = true;
+
+// [#protodoc-title: Circuit breakers]
+
+// :ref:`Circuit breaking<arch_overview_circuit_break>` settings can be
+// specified individually for each defined priority.
+message CircuitBreakers {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.cluster.CircuitBreakers";
+
+  // A Thresholds defines CircuitBreaker settings for a
+  // :ref:`RoutingPriority<envoy_api_enum_config.core.v3alpha.RoutingPriority>`.
+  // [#next-free-field: 8]
+  message Thresholds {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
+
+    // The :ref:`RoutingPriority<envoy_api_enum_config.core.v3alpha.RoutingPriority>`
+    // the specified CircuitBreaker settings apply to.
+    core.v3alpha.RoutingPriority priority = 1 [(validate.rules).enum = {defined_only: true}];
+
+    // The maximum number of connections that Envoy will make to the upstream
+    // cluster. If not specified, the default is 1024.
+    google.protobuf.UInt32Value max_connections = 2;
+
+    // The maximum number of pending requests that Envoy will allow to the
+    // upstream cluster. If not specified, the default is 1024.
+    google.protobuf.UInt32Value max_pending_requests = 3;
+
+    // The maximum number of parallel requests that Envoy will make to the
+    // upstream cluster. If not specified, the default is 1024.
+    google.protobuf.UInt32Value max_requests = 4;
+
+    // The maximum number of parallel retries that Envoy will allow to the
+    // upstream cluster. If not specified, the default is 3.
+    google.protobuf.UInt32Value max_retries = 5;
+
+    // If track_remaining is true, then stats will be published that expose
+    // the number of resources remaining until the circuit breakers open. If
+    // not specified, the default is false.
+    bool track_remaining = 6;
+
+    // The maximum number of connection pools per cluster that Envoy will concurrently support at
+    // once. If not specified, the default is unlimited. Set this for clusters which create a
+    // large number of connection pools. See
+    // :ref:`Circuit Breaking <arch_overview_circuit_break_cluster_maximum_connection_pools>` for
+    // more details.
+    google.protobuf.UInt32Value max_connection_pools = 7;
+  }
+
+  // If multiple :ref:`Thresholds<envoy_api_msg_config.cluster.v3alpha.CircuitBreakers.Thresholds>`
+  // are defined with the same
+  // :ref:`RoutingPriority<envoy_api_enum_config.core.v3alpha.RoutingPriority>`, the first one in
+  // the list is used. If no Thresholds is defined for a given
+  // :ref:`RoutingPriority<envoy_api_enum_config.core.v3alpha.RoutingPriority>`, the default values
+  // are used.
+  repeated Thresholds thresholds = 1;
+}

@@ -88,6 +88,26 @@ class UpgradeVisitor(visitor.Visitor):
       proto.name = migrate_annotation.rename
       migrate_annotation.rename = ""
 
+  def _OneofPromotion(self, msg_proto, field_proto, migrate_annotation):
+    """Promote a field to a oneof.
+
+    Args:
+      msg_proto: DescriptorProto for message containing field.
+      field_proto: FieldDescriptorProto for field.
+      migrate_annotation: udpa.annotations.FieldMigrateAnnotation message
+    """
+    if migrate_annotation.oneof_promotion:
+      oneof_index = -1
+      for n, oneof_decl in enumerate(msg_proto.oneof_decl):
+        if oneof_decl.name == migrate_annotation.oneof_promotion:
+          oneof_index = n
+      if oneof_index == -1:
+        oneof_index = len(msg_proto.oneof_decl)
+        oneof_decl = msg_proto.oneof_decl.add()
+        oneof_decl.name = migrate_annotation.oneof_promotion
+      field_proto.oneof_index = oneof_index
+      migrate_annotation.oneof_promotion = ""
+
   def VisitService(self, service_proto, type_context):
     upgraded_proto = copy.deepcopy(service_proto)
     for m in upgraded_proto.method:
@@ -122,7 +142,9 @@ class UpgradeVisitor(visitor.Visitor):
       else:
         f.type_name = self._UpgradedType(f.type_name)
       if f.options.HasExtension(migrate_pb2.field_migrate):
-        self._Rename(f, f.options.Extensions[migrate_pb2.field_migrate])
+        field_migrate = f.options.Extensions[migrate_pb2.field_migrate]
+        self._Rename(f, field_migrate)
+        self._OneofPromotion(upgraded_proto, f, field_migrate)
     # Upgrade nested messages.
     del upgraded_proto.nested_type[:]
     upgraded_proto.nested_type.extend(nested_msgs)

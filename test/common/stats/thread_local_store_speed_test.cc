@@ -1,7 +1,7 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/common/logger.h"
 #include "common/common/thread.h"
@@ -71,7 +71,7 @@ private:
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
-  envoy::config::metrics::v2::StatsConfig stats_config_;
+  envoy::config::metrics::v3alpha::StatsConfig stats_config_;
   std::vector<std::unique_ptr<Stats::StatNameStorage>> stat_names_;
 };
 

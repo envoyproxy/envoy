@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.validate.h"
 
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/logical_host.h"
@@ -19,8 +19,8 @@ namespace DynamicForwardProxy {
 class Cluster : public Upstream::BaseDynamicClusterImpl,
                 public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
 public:
-  Cluster(const envoy::api::v2::Cluster& cluster,
-          const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& config,
+  Cluster(const envoy::config::cluster::v3alpha::Cluster& cluster,
+          const envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig& config,
           Runtime::Loader& runtime,
           Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
           const LocalInfo::LocalInfo& local_info,
@@ -104,8 +104,8 @@ private:
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   const Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
       update_callbacks_handle_;
-  const envoy::api::v2::endpoint::LocalityLbEndpoints dummy_locality_lb_endpoint_;
-  const envoy::api::v2::endpoint::LbEndpoint dummy_lb_endpoint_;
+  const envoy::config::endpoint::v3alpha::LocalityLbEndpoints dummy_locality_lb_endpoint_;
+  const envoy::config::endpoint::v3alpha::LbEndpoint dummy_lb_endpoint_;
   const LocalInfo::LocalInfo& local_info_;
 
   absl::Mutex host_map_lock_;
@@ -115,8 +115,9 @@ private:
   friend class ClusterTest;
 };
 
-class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                           envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig> {
+class ClusterFactory
+    : public Upstream::ConfigurableClusterFactoryBase<
+          envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig> {
 public:
   ClusterFactory()
       : ConfigurableClusterFactoryBase(
@@ -125,8 +126,9 @@ public:
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      const envoy::api::v2::Cluster& cluster,
-      const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& proto_config,
+      const envoy::config::cluster::v3alpha::Cluster& cluster,
+      const envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig&
+          proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;
