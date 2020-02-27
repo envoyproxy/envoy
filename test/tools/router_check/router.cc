@@ -317,17 +317,24 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
   std::string actual = "";
   if (tool_config.route_->directResponseEntry() != nullptr) {
     const Envoy::Router::DirectResponseEntry* entry = tool_config.route_->directResponseEntry();
+
     if (!headers_finalized_) {
       entry->rewritePathHeader(*tool_config.headers_, true);
 
-      if(!entry->responseBody().empty()) {
-        // The real router makes use of sendLocalReply, which automatically sets the content-type
-        //   and content-length headers.
-        // Imitate that behavior here.
-        // TODO(kb000): Use production Envoy::Http::Utility::sendLocalReply instead of copy/pasting code.
-        tool_config.headers_->setContentLength(entry->responseBody().length());
-        tool_config.headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
-      }
+      const auto& encode_headers = [&](Http::ResponseHeaderMapPtr&& headers,
+                                      bool end_stream) -> void {
+        UNREFERENCED_PARAMETER(end_stream);
+        Http::HeaderMapImpl::copyFrom(tool_config.headers_->header_map_, *headers);
+      };
+
+      const auto& encode_data = [&](Buffer::Instance& data, bool end_stream) -> void {
+        UNREFERENCED_PARAMETER(data);
+        UNREFERENCED_PARAMETER(end_stream);
+      };
+      
+      Envoy::Http::Utility::sendLocalReply(false, encode_headers, encode_data, false,
+                                           entry->responseCode(), entry->responseBody(),
+                                           absl::nullopt, false);
 
       entry->finalizeResponseHeaders(*tool_config.headers_, stream_info);
       headers_finalized_ = true;
