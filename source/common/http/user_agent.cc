@@ -21,9 +21,11 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
     return;
   }
 
-  // TODO(jmarantz): use stat-names here.
-  scope_->histogram(prefix_ + "downstream_cx_length_ms", Stats::Histogram::Unit::Milliseconds)
-      .recordValue(span.elapsed().count());
+  // TODO(jmarantz): use stat-names properly here.
+  Stats::StatName name = Stats::StatNameManagedStorage storage(prefix_ + "downstream_cx_length_ms",
+                                                               scope_.symbolTable());
+  scope_->histogramFromStatName(name, Stats::Histogram::Unit::Milliseconds)
+          .recordValue(span.elapsed().count());
 }
 
 void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
