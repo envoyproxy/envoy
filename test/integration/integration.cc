@@ -519,7 +519,8 @@ BaseIntegrationTest::sendRawHttpAndWaitForHeader(uint8_t host_id, int port, cons
   Buffer::OwnedImpl buffer(raw_http);
   auto connection = std::make_unique<RawConnectionDriver>(
       host_id, port, buffer,
-      [&](Network::ClientConnection& client, const Buffer::Instance& data) -> bool {
+      [disconnect_after_headers_complete, response](Network::ClientConnection& client,
+                                                    const Buffer::Instance& data) -> bool {
         response->append(data.toString());
         ENVOY_LOG(debug, "lambdai response: {}", *response);
         if (response->find("\r\n\r\n") != std::string::npos) {

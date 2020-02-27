@@ -115,11 +115,8 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
 }
 
 // TODO(lambdai): skip the tests in ipv6 env since filter chain matches varies at ipv4 dst address.
-// TODO(lambdai): more functionality to achieve the test target:
-// 1. set clients dst address,
-// 2. keep alive client
-// 3. verify the connection alive after drain time out.
-// Confirm that a new listener config with new filter chain will keep all the existing connections.
+// This test case confirms a new listener config with additional filter chains doesn't impact the
+// existing filter chain and connection.
 TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
@@ -134,7 +131,7 @@ TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
   // the initial LDS file has loaded.
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  // step1: verify the first (and the only) filter chain is working correctly
   std::string response;
   auto conn1 = sendRawHttpAndWaitForHeader(1, lookupPort("http"),
                                            "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n", &response,
@@ -151,9 +148,9 @@ TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
         auto* add_filter_chain = listener->add_filter_chains();
         add_filter_chain->CopyFrom(*standard_filter_chain);
         add_filter_chain->set_name("127.0.0.2");
-        auto* dst_ip = add_filter_chain->mutable_filter_chain_match()->add_prefix_ranges();
-        dst_ip->set_address_prefix("127.0.0.2");
-        dst_ip->mutable_prefix_len()->set_value(32);
+        auto* src_ip = add_filter_chain->mutable_filter_chain_match()->add_source_prefix_ranges();
+        src_ip->set_address_prefix("127.0.0.2");
+        src_ip->mutable_prefix_len()->set_value(32);
       });
 
   // Create an LDS response with the new config, and reload config.
@@ -161,16 +158,23 @@ TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
 
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
 
+  // step 2: verify the new filter chain is adopted
   std::string response2;
-  auto conn2 = sendRawHttpAndWaitForHeader(
-      2, lookupPort("http"), "GET / HTTP/1.1\r\nHost: 127.0.0.2\r\n\r\n", &response2, false);
+  auto conn2 = sendRawHttpAndWaitForHeader(2, lookupPort("http"),
+                                           "GET / HTTP/1.1\r\nHost: 127.0.0.2\r\n\r\n", &response2,
+                                           /*disconnect_after_headers_complete=*/false);
   EXPECT_THAT(response2, HasSubstr("HTTP/1.1 200 OK\r\n"));
-  ENVOY_LOG(debug, "lambdai: reach here");
-  conn1->clearShouldExist();
+
+  // step3: verify the opened connection on first filter chain is not impacted by the listener
+  // update.
+  conn1->clearShouldExit();
   response.clear();
   conn1->write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
   conn1->runUntil();
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  conn1->close();
+  conn2->close();
 }
 
 // Confirm that a new listener config with one fewer filter chain will drain the connections on that

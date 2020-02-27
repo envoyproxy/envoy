@@ -65,17 +65,19 @@ public:
   using ExitableReadCallback =
       std::function<bool(Network::ClientConnection&, const Buffer::Instance&)>;
 
-  RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
+  RawConnectionDriver(uint32_t dst_port, Buffer::Instance& initial_data, ReadCallback data_callback,
                       Network::Address::IpVersion version);
-  RawConnectionDriver(uint8_t host_id, uint32_t port, Buffer::Instance& initial_data,
+  RawConnectionDriver(uint8_t src_host_id, uint32_t dst_port, Buffer::Instance& initial_data,
                       ExitableReadCallback data_callback, Network::Address::IpVersion version);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
   bool connecting() { return callbacks_->connecting_; }
   void write(absl::string_view payload);
   void run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block);
+
+  // runUtil and clearShouldExit are supporting write-and-read
   void runUntil();
-  void clearShouldExist() { should_exit_ = false; }
+  void clearShouldExit() { should_exit_ = false; }
 
   void close();
   Network::ConnectionEvent last_connection_event() const {
@@ -84,12 +86,6 @@ public:
 
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
-    // ForwardingFilter(RawConnectionDriver& parent, ReadCallback cb)
-    //     : parent_(parent), data_callback_([cb](Network::ClientConnection& conn, const
-    //     Buffer::Instance& buf){
-    //       cb(conn, buf);
-    //       return false;
-    //     }) {}
     ForwardingFilter(RawConnectionDriver& parent, ExitableReadCallback cb)
         : parent_(parent), data_callback_(cb) {}
 
@@ -97,7 +93,7 @@ private:
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
       bool want_exit = data_callback_(*parent_.client_, data);
       if (want_exit) {
-        parent_.setShouldExist();
+        parent_.setShouldExit();
       }
       data.drain(data.length());
       return Network::FilterStatus::StopIteration;
@@ -119,7 +115,7 @@ private:
     Network::ConnectionEvent last_connection_event_;
   };
 
-  void setShouldExist() { should_exit_ = true; }
+  void setShouldExit() { should_exit_ = true; }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
