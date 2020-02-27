@@ -1,3 +1,5 @@
+#include "envoy/common/exception.h"
+
 #include "common/config/utility.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -33,7 +35,7 @@ template <typename T> void testPrepareDnsRefreshStrategy() {
     config.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
     config.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(2);
     EXPECT_THROW_WITH_REGEX(Utility::prepareDnsRefreshStrategy<T>(config, 5000, random),
-                            Envoy::EnvoyException,
+                            EnvoyException,
                             "dns_failure_refresh_rate must have max_interval greater than "
                             "or equal to the base_interval");
   }

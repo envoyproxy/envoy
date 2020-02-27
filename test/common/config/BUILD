@@ -333,6 +333,7 @@ envoy_cc_test_library(
     name = "utility_test_lib",
     hdrs = ["utility_test.h"],
     deps = [
+        "//include/envoy/common:base_includes",
         "//source/common/config:utility_lib",
         "//test/mocks/runtime:runtime_mocks",
     ],
