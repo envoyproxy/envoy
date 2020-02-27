@@ -1,5 +1,3 @@
-#include "envoy/common/exception.h"
-
 #include "common/config/utility.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -9,9 +7,8 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Config {
-namespace {
 
-template <typename T> static void testPrepareDnsRefreshStrategy() {
+template <typename T> void testPrepareDnsRefreshStrategy() {
   NiceMock<Runtime::MockRandomGenerator> random;
 
   {
@@ -42,6 +39,5 @@ template <typename T> static void testPrepareDnsRefreshStrategy() {
   }
 }
 
-} // namespace
 } // namespace Config
 } // namespace Envoy

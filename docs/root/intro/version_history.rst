@@ -9,6 +9,7 @@ Version history
   minimum.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
+* dns: added support for :ref:`dns_failure_refresh_rate <envoy_api_field_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig.dns_failure_refresh_rate>` for the :ref:`dns cache <envoy_api_msg_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig>` to set the DNS refresh rate during failures.
 * ext_authz: disabled the use of lowercase string matcher for headers matching in HTTP-based `ext_authz`.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher` to false.
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.

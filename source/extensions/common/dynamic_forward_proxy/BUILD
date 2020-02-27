@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "dns_cache_interface",
     hdrs = ["dns_cache.h"],
     deps = [
+        "//include/envoy/common:backoff_strategy_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
