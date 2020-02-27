@@ -355,7 +355,7 @@ typed_config:
   EXPECT_EQ("nope", response->body());
 }
 
-// Upstream fire and forget async call
+// Upstream fire and forget asynchronous call.
 TEST_P(LuaIntegrationTest, UpstreamAsyncHttpCall) {
   const std::string FILTER_AND_CODE =
       R"EOF(

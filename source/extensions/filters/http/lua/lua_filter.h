@@ -321,7 +321,7 @@ private:
 };
 
 /**
- * A class with shared code for building and making http calls
+ * A class with shared code for building and making HTTP calls.
  */
 class LuaFilterUtil : public Filters::Common::Lua::BaseLuaObject<LuaFilterUtil> {
 public:
