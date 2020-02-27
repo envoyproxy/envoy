@@ -643,6 +643,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "direct_response_integration_test",
+    srcs = [
+        "direct_response_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/network/direct_response:config",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
     # The symbol table cluster memory tests take a while to run specially under tsan.
