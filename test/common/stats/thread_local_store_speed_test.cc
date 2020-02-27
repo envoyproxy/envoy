@@ -40,6 +40,7 @@ public:
     store_.shutdownThreading();
     if (tls_) {
       tls_->shutdownGlobalThreading();
+      tls_->shutdownThread();
     }
     if (dispatcher_) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -65,10 +66,10 @@ private:
   Stats::SymbolTablePtr symbol_table_;
   Event::SimulatedTimeSystem time_system_;
   Stats::AllocatorImpl heap_alloc_;
-  Stats::ThreadLocalStoreImpl store_;
-  Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
+  Stats::ThreadLocalStoreImpl store_;
+  Api::ApiPtr api_;
   envoy::config::metrics::v2::StatsConfig stats_config_;
   std::vector<std::unique_ptr<Stats::StatNameStorage>> stat_names_;
 };

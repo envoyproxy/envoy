@@ -3,7 +3,6 @@
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
-
 #endif
 
 #include "benchmark/benchmark.h"
