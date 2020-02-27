@@ -1143,7 +1143,7 @@ TEST_P(Http2CustomSettingsTest, UserDefinedSettings) {
   std::vector<SettingsParameter> custom_parameters{{0x10, 10}, {0x11, 20}};
   setHttp2CustomSettingsParameters(getCustomOptions(), custom_parameters);
   initialize();
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1187,7 +1187,7 @@ TEST_P(Http2CustomSettingsTest, UserDefinedSettingsParametersOverrideNamedParame
        CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS - 1}};
   setHttp2CustomSettingsParameters(getCustomOptions(), named_parameter_overrides);
   initialize();
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1206,7 +1206,7 @@ TEST_P(Http2CustomSettingsTest, NeverAllowServerPushEnablementOnClientConnection
   std::vector<SettingsParameter> custom_parameters{{0x2, 1}};
   setHttp2CustomSettingsParameters(getCustomOptions(), custom_parameters);
   initialize();
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
   request_encoder_->encodeHeaders(request_headers, false);
