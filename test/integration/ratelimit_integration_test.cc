@@ -48,7 +48,7 @@ public:
                      "ratelimit", fake_upstreams_.back()->localAddress());
 
       envoy::config::listener::v3::Filter ratelimit_filter;
-      ratelimit_filter.set_name("envoy.rate_limit");
+      ratelimit_filter.set_name("envoy.filters.http.ratelimit");
       ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ratelimit_filter));
     });

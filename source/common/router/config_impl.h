@@ -472,6 +472,8 @@ public:
 protected:
   const bool case_sensitive_;
   const std::string prefix_rewrite_;
+  Regex::CompiledMatcherPtr regex_rewrite_;
+  std::string regex_rewrite_substitution_;
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
 

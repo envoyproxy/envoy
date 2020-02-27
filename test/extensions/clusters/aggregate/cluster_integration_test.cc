@@ -81,7 +81,7 @@ static_resources:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
           http_filters:
-            name: envoy.router
+            name: envoy.filters.http.router
           codec_type: HTTP1
           route_config:
             name: route_config_0

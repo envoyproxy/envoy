@@ -329,8 +329,9 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
 TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
-  config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter(
+      "{ name: envoy.filters.http.grpc_http1_bridge, typed_config: { \"@type\": "
+      "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
 
   initialize();
@@ -968,7 +969,7 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
@@ -1003,7 +1004,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
@@ -1039,7 +1040,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(

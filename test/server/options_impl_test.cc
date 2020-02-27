@@ -517,7 +517,7 @@ public:
 REGISTER_FACTORY(TestTestFactory, TestFactory){"test-1", "test-2"};
 REGISTER_FACTORY(TestTestingFactory, TestingFactory){"test-1", "test-2"};
 
-TEST(DisableExtensions, IsDisabled) {
+TEST(DisableExtensions, DEPRECATED_FEATURE_TEST(IsDisabled)) {
   EXPECT_LOG_CONTAINS("warning", "failed to disable invalid extension name 'not.a.factory'",
                       OptionsImpl::disableExtensions({"not.a.factory"}));
 

@@ -37,3 +37,14 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "utility_lib",
+    hdrs = ["utility.h"],
+    deps = [
+        "//include/envoy/runtime:runtime_interface",
+        "//source/common/common:macros",
+        "//source/extensions/common:utility_lib",
+        "//source/extensions/filters/http:well_known_names",
+    ],
+)
