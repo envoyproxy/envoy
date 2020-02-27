@@ -4,9 +4,11 @@
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
+#include "test/common/config/utility_test.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -27,7 +29,7 @@ public:
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
 
     EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
-    dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, store_, config_);
+    dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, random_, store_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
 
@@ -55,6 +57,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Network::MockDnsResolver> resolver_{std::make_shared<Network::MockDnsResolver>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl store_;
   std::unique_ptr<DnsCache> dns_cache_;
   MockUpdateCallbacks update_callbacks_;
@@ -623,6 +626,14 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
   config4.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V6_ONLY);
   EXPECT_THROW_WITH_MESSAGE(cache_manager.getCache(config4), EnvoyException,
                             "config specified DNS cache 'foo' with different settings");
+}
+
+// Note: this test is done here, rather than a TYPED_TEST_SUITE in
+// //test/common/config:utility_test, because we did not want to include an extension type in
+// non-extension test suites.
+TEST(UtilityTest, PrepareDnsRefreshStrategy) {
+  Config::testPrepareDnsRefreshStrategy<
+      envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>();
 }
 
 } // namespace
