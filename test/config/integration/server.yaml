@@ -42,11 +42,11 @@ static_resources:
           codec_type: http1
           stat_prefix: router
           http_filters:
-          - name: envoy.health_check
+          - name: envoy.filters.http.health_check
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
               pass_through_mode: false
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
           access_log:

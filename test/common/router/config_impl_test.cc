@@ -4815,7 +4815,7 @@ virtual_hosts:
       cluster: ats
     metadata:
       filter_metadata:
-        envoy.router:
+        envoy.filters.http.router:
           name1: value1
           name2: value2
 )EOF";

@@ -36,6 +36,7 @@
 #include "common/router/retry_state_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/filters/http/common/utility.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/match.h"
@@ -1230,18 +1231,26 @@ PerFilterConfigs::PerFilterConfigs(
   }
 
   for (const auto& it : typed_configs) {
+    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
+    const auto& name =
+        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+
     auto object = createRouteSpecificFilterConfig(
-        it.first, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
+        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
     if (object != nullptr) {
-      configs_[it.first] = std::move(object);
+      configs_[name] = std::move(object);
     }
   }
 
   for (const auto& it : configs) {
-    auto object = createRouteSpecificFilterConfig(it.first, ProtobufWkt::Any::default_instance(),
+    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
+    const auto& name =
+        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+
+    auto object = createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(),
                                                   it.second, factory_context, validator);
     if (object != nullptr) {
-      configs_[it.first] = std::move(object);
+      configs_[name] = std::move(object);
     }
   }
 }

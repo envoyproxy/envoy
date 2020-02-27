@@ -9,7 +9,7 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
           codec_type: auto

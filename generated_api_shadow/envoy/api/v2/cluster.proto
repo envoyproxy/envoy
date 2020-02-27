@@ -734,7 +734,7 @@ message Cluster {
   // cluster. It can be used for stats, logging, and varying filter behavior.
   // Fields should use reverse DNS notation to denote which entity within Envoy
   // will need the information. For instance, if the metadata is intended for
-  // the Router filter, the filter name should be specified as *envoy.router*.
+  // the Router filter, the filter name should be specified as *envoy.filters.http.router*.
   core.Metadata metadata = 25;
 
   // Determines how Envoy selects the protocol used to speak to upstream hosts.

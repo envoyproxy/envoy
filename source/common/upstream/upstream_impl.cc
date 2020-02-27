@@ -45,6 +45,7 @@
 
 #include "server/transport_socket_config_impl.h"
 
+#include "extensions/filters/network/common/utility.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/str_cat.h"
@@ -166,18 +167,28 @@ parseExtensionProtocolOptions(const envoy::config::cluster::v3::Cluster& config,
   std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
+    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
+    // We only handle deprecated network filter names here because no existing HTTP filter has
+    // protocol options.
+    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+
     auto object = createProtocolOptionsConfig(
-        it.first, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
+        name, it.second, ProtobufWkt::Struct::default_instance(), validation_visitor);
     if (object != nullptr) {
-      options[it.first] = std::move(object);
+      options[name] = std::move(object);
     }
   }
 
   for (const auto& it : config.hidden_envoy_deprecated_extension_protocol_options()) {
-    auto object = createProtocolOptionsConfig(it.first, ProtobufWkt::Any::default_instance(),
-                                              it.second, validation_visitor);
+    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
+    // We only handle deprecated network filter names here because no existing HTTP filter has
+    // protocol options.
+    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+
+    auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
+                                              validation_visitor);
     if (object != nullptr) {
-      options[it.first] = std::move(object);
+      options[name] = std::move(object);
     }
   }
 

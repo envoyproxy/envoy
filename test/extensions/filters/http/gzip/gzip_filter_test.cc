@@ -793,6 +793,16 @@ TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
   }
 }
 
+// Test that the deprecated extension name still functions.
+TEST(GzipFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.gzip";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace Gzip
 } // namespace HttpFilters
 } // namespace Extensions
