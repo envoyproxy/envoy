@@ -21,28 +21,42 @@ namespace Envoy {
 // static
 ToolConfig ToolConfig::create(const envoy::RouterCheckToolSchema::ValidationItem& check_config) {
   // Add header field values
-  std::unique_ptr<Http::TestHeaderMapImpl> headers(new Http::TestHeaderMapImpl());
-  headers->addCopy(":authority", check_config.input().authority());
-  headers->addCopy(":path", check_config.input().path());
-  headers->addCopy(":method", check_config.input().method());
-  headers->addCopy("x-forwarded-proto", check_config.input().ssl() ? "https" : "http");
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers(
+      new Http::TestRequestHeaderMapImpl());
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
+      new Http::TestResponseHeaderMapImpl());
+  request_headers->addCopy(":authority", check_config.input().authority());
+  request_headers->addCopy(":path", check_config.input().path());
+  request_headers->addCopy(":method", check_config.input().method());
+  request_headers->addCopy("x-forwarded-proto", check_config.input().ssl() ? "https" : "http");
 
   if (check_config.input().internal()) {
-    headers->addCopy("x-envoy-internal", "true");
+    request_headers->addCopy("x-envoy-internal", "true");
   }
 
-  if (check_config.input().additional_headers().data()) {
+  if (check_config.input().additional_request_headers().data()) {
     for (const envoy::config::core::v3::HeaderValue& header_config :
-         check_config.input().additional_headers()) {
-      headers->addCopy(header_config.key(), header_config.value());
+         check_config.input().additional_request_headers()) {
+      request_headers->addCopy(header_config.key(), header_config.value());
     }
   }
 
-  return ToolConfig(std::move(headers), check_config.input().random_value());
+  if (check_config.input().additional_response_headers().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header_config :
+         check_config.input().additional_response_headers()) {
+      response_headers->addCopy(header_config.key(), header_config.value());
+    }
+  }
+
+  return ToolConfig(std::move(request_headers), std::move(response_headers),
+                    check_config.input().random_value());
 }
 
-ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value)
-    : headers_(std::move(headers)), random_value_(random_value) {}
+ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
+                       std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers,
+                       int random_value)
+    : request_headers_(std::move(request_headers)), response_headers_(std::move(response_headers)),
+      random_value_(random_value) {}
 
 // static
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
@@ -91,6 +105,25 @@ void RouterCheckTool::assignRuntimeFraction(
   }
 }
 
+void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
+                                      Envoy::StreamInfo::StreamInfoImpl stream_info) {
+  if (!headers_finalized_ && tool_config.route_ != nullptr) {
+    if (tool_config.route_->directResponseEntry() != nullptr) {
+      tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
+                                                                   true);
+      tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
+          *tool_config.response_headers_, stream_info);
+    } else if (tool_config.route_->routeEntry() != nullptr) {
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.request_headers_,
+                                                               stream_info, true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.response_headers_,
+                                                                stream_info);
+    }
+  }
+
+  headers_finalized_ = true;
+}
+
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
@@ -126,10 +159,10 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
     headers_finalized_ = false;
     Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
                                                   factory_context_->dispatcher().timeSource());
-
+    stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
     ToolConfig tool_config = ToolConfig::create(check_config);
     tool_config.route_ =
-        config_->route(*tool_config.headers_, stream_info, tool_config.random_value_);
+        config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
 
     const std::string& test_name = check_config.test_name();
     tests_.emplace_back(test_name, std::vector<std::string>{});
@@ -144,10 +177,10 @@ bool RouterCheckTool::compareEntries(const std::string& expected_routes) {
         [this](auto&... params) -> bool { return this->compareRewritePath(params...); },
         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); },
         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); },
-        [this](auto&... params) -> bool { return this->compareHeaderField(params...); },
-        [this](auto&... params) -> bool { return this->compareCustomHeaderField(params...); },
+        [this](auto&... params) -> bool { return this->compareRequestHeaderField(params...); },
+        [this](auto&... params) -> bool { return this->compareResponseHeaderField(params...); },
     };
-
+    finalizeHeaders(tool_config, stream_info);
     // Call appropriate function for each match case.
     for (const auto& test : checkers) {
       if (!test(tool_config, validate)) {
@@ -187,9 +220,9 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
   std::string actual = "";
 
   if (tool_config.route_->routeEntry() != nullptr &&
-      tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_) != nullptr) {
+      tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_) != nullptr) {
     Stats::StatName stat_name =
-        tool_config.route_->routeEntry()->virtualCluster(*tool_config.headers_)->statName();
+        tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches = compareResults(actual, expected, "virtual_cluster_name");
@@ -236,17 +269,8 @@ bool RouterCheckTool::compareVirtualHost(
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    if (!headers_finalized_) {
-      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                               true);
-      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
-      headers_finalized_ = true;
-    }
-
-    actual = tool_config.headers_->get_(Http::Headers::get().Path);
+    actual = tool_config.request_headers_->get_(Http::Headers::get().Path);
   }
   const bool matches = compareResults(actual, expected, "path_rewrite");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
@@ -268,17 +292,8 @@ bool RouterCheckTool::compareRewritePath(
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    if (!headers_finalized_) {
-      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                               true);
-      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
-      headers_finalized_ = true;
-    }
-
-    actual = tool_config.headers_->get_(Http::Headers::get().Host);
+    actual = tool_config.request_headers_->get_(Http::Headers::get().Host);
   }
   const bool matches = compareResults(actual, expected, "host_rewrite");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
@@ -300,17 +315,8 @@ bool RouterCheckTool::compareRewriteHost(
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->directResponseEntry() != nullptr) {
-    if (!headers_finalized_) {
-      tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.headers_, true);
-      tool_config.route_->directResponseEntry()->finalizeResponseHeaders(*tool_config.headers_,
-                                                                         stream_info);
-      headers_finalized_ = true;
-    }
-
-    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
+    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.request_headers_);
   }
 
   const bool matches = compareResults(actual, expected, "path_redirect");
@@ -331,12 +337,12 @@ bool RouterCheckTool::compareRedirectPath(
   return compareRedirectPath(tool_config, expected.path_redirect().value());
 }
 
-bool RouterCheckTool::compareHeaderField(
+bool RouterCheckTool::compareRequestHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
-  if (expected.header_fields().data()) {
-    for (const envoy::config::core::v3::HeaderValue& header : expected.header_fields()) {
-      if (!compareHeaderField(tool_config, header.key(), header.value())) {
+  if (expected.request_header_fields().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.request_header_fields()) {
+      if (!compareRequestHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
     }
@@ -344,42 +350,29 @@ bool RouterCheckTool::compareHeaderField(
   return no_failures;
 }
 
-bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::string& field,
-                                         const std::string& expected) {
-  std::string actual = tool_config.headers_->get_(field);
-  return compareResults(actual, expected, "check_header");
+bool RouterCheckTool::compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
+                                                const std::string& expected) {
+  std::string actual = tool_config.request_headers_->get_(field);
+  return compareResults(actual, expected, "request_header_fields");
 }
 
-bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
-                                               const std::string& expected) {
-  std::string actual = "";
-  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
-                                                factory_context_->dispatcher().timeSource());
-  stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
-  if (tool_config.route_->routeEntry() != nullptr) {
-    if (!headers_finalized_) {
-      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                               true);
-      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
-      headers_finalized_ = true;
-    }
-
-    actual = tool_config.headers_->get_(field);
-  }
-  return compareResults(actual, expected, "custom_header");
-}
-
-bool RouterCheckTool::compareCustomHeaderField(
+bool RouterCheckTool::compareResponseHeaderField(
     ToolConfig& tool_config, const envoy::RouterCheckToolSchema::ValidationAssert& expected) {
   bool no_failures = true;
-  if (expected.custom_header_fields().data()) {
-    for (const envoy::config::core::v3::HeaderValue& header : expected.custom_header_fields()) {
-      if (!compareCustomHeaderField(tool_config, header.key(), header.value())) {
+  if (expected.response_header_fields().data()) {
+    for (const envoy::config::core::v3::HeaderValue& header : expected.response_header_fields()) {
+      if (!compareResponseHeaderField(tool_config, header.key(), header.value())) {
         no_failures = false;
       }
     }
   }
   return no_failures;
+}
+
+bool RouterCheckTool::compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
+                                                 const std::string& expected) {
+  std::string actual = tool_config.response_headers_->get_(field);
+  return compareResults(actual, expected, "response_header_fields");
 }
 
 bool RouterCheckTool::compareResults(const std::string& actual, const std::string& expected,
