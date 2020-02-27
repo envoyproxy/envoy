@@ -87,8 +87,8 @@ public:
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
         server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
-        server_.httpContext(), server_.accessLogManager(), server_.singletonManager(),
-        time_system_);
+        server_.httpContext(), server_.grpcContext(), server_.accessLogManager(),
+        server_.singletonManager(), time_system_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();

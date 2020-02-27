@@ -107,6 +107,7 @@ envoy_cc_library(
     hdrs = ["context_impl.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":google_grpc_stat_names_lib",
         "//include/envoy/grpc:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/stats:stats_interface",
@@ -139,6 +140,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "google_grpc_stat_names_lib",
+    srcs = ["google_grpc_stat_names.cc"],
+    hdrs = ["google_grpc_stat_names.h"],
+    deps = [
+        "//include/envoy/grpc:status",
+        "//source/common/stats:symbol_table_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "google_async_client_lib",
     srcs = ["google_async_client_impl.cc"],
     hdrs = ["google_async_client_impl.h"],
@@ -150,6 +161,7 @@ envoy_cc_library(
         ":context_lib",
         ":google_grpc_context_lib",
         ":google_grpc_creds_lib",
+        ":google_grpc_stat_names_lib",
         ":google_grpc_utils_lib",
         ":typed_async_client_lib",
         "//include/envoy/api:api_interface",

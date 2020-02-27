@@ -8,28 +8,12 @@ namespace Grpc {
 
 ContextImpl::ContextImpl(Stats::SymbolTable& symbol_table)
     : symbol_table_(symbol_table), stat_name_pool_(symbol_table),
-      grpc_(stat_name_pool_.add("grpc")), grpc_web_(stat_name_pool_.add("grpc-web")),
-      success_(stat_name_pool_.add("success")), failure_(stat_name_pool_.add("failure")),
-      total_(stat_name_pool_.add("total")), zero_(stat_name_pool_.add("0")),
+      stat_name_dynamic_pool_(symbol_table), grpc_(stat_name_pool_.add("grpc")),
+      grpc_web_(stat_name_pool_.add("grpc-web")), success_(stat_name_pool_.add("success")),
+      failure_(stat_name_pool_.add("failure")), total_(stat_name_pool_.add("total")),
+      zero_(stat_name_pool_.add("0")),
       request_message_count_(stat_name_pool_.add("request_message_count")),
       response_message_count_(stat_name_pool_.add("response_message_count")) {}
-
-// Makes a stat name from a string, if we don't already have one for it.
-// This always takes a lock on mutex_, and if we haven't seen the name
-// before, it also takes a lock on the symbol table.
-//
-// TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/7008 for
-// a lock-free approach to creating dynamic stat-names based on requests.
-Stats::StatName ContextImpl::makeDynamicStatName(absl::string_view name) {
-  Thread::LockGuard lock(mutex_);
-  auto iter = stat_name_map_.find(name);
-  if (iter != stat_name_map_.end()) {
-    return iter->second;
-  }
-  const Stats::StatName stat_name = stat_name_pool_.add(name);
-  stat_name_map_[std::string(name)] = stat_name;
-  return stat_name;
-}
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
                              const RequestNames& request_names,
@@ -44,7 +28,8 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
   // TODO(jmarantz): Perhaps the universe of likely grpc status codes is
   // sufficiently bounded that we should precompute status StatNames for popular
   // ones beyond "0".
-  const Stats::StatName status_stat_name = success ? zero_ : makeDynamicStatName(status_str);
+  const Stats::StatName status_stat_name =
+      success ? zero_ : stat_name_dynamic_pool_.add(status_str);
   const Stats::SymbolTable::StoragePtr stat_name_storage =
       symbol_table_.join({protocolStatName(protocol), request_names.service_, request_names.method_,
                           status_stat_name});
@@ -109,10 +94,18 @@ ContextImpl::resolveServiceAndMethod(const Http::HeaderEntry* path) {
   if (parts.size() != 2) {
     return request_names;
   }
-  const Stats::StatName service = makeDynamicStatName(parts[0]);
-  const Stats::StatName method = makeDynamicStatName(parts[1]);
+  const Stats::StatName service = stat_name_dynamic_pool_.add(parts[0]);
+  const Stats::StatName method = stat_name_dynamic_pool_.add(parts[1]);
   request_names = RequestNames{service, method};
   return request_names;
+}
+
+GoogleGrpcStatNames& ContextImpl::googleGrpcStatNames() {
+  Thread::LockGuard lock(mutex_);
+  if (google_grpc_stat_names_ == nullptr) {
+    google_grpc_stat_names_ = std::make_unique<GoogleGrpcStatNames>(symbol_table_);
+  }
+  return *google_grpc_stat_names_;
 }
 
 } // namespace Grpc
