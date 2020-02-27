@@ -1049,6 +1049,16 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   disconnect();
 }
 
+// Test that the deprecated extension name still functions.
+TEST(ProxyProtocolConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.listener.proxy_protocol";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<
+          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
+}
+
 } // namespace
 } // namespace ProxyProtocol
 } // namespace ListenerFilters

@@ -15,11 +15,11 @@ Deprecated items below are listed in chronological order.
 * The previous behavior for upstream connection pool circuit breaking described
   `here <https://www.envoyproxy.io/docs/envoy/v1.13.0/intro/arch_overview/upstream/circuit_breaking>`_ has
   been deprecated in favor of the new behavior described :ref:`here <arch_overview_circuit_break>`.
-* Access Logger, HTTP Filter, Network Filter, Stats Sink, and Tracer names have been deprecated in
-  favor of the extension name from the envoy build system. Disable the runtime feature
-  "envoy.deprecated_features.allow_deprecated_extension_names" to disallow the deprecated names.
-  Use of these extension names generates a log message and increments the "deprecated_feature_use"
-  metric in stats.
+* Access Logger, Listener Filter, HTTP Filter, Network Filter, Stats Sink, and Tracer names have
+  been deprecated in favor of the extension name from the envoy build system. Disable the runtime
+  feature "envoy.deprecated_features.allow_deprecated_extension_names" to disallow the deprecated
+  names. Use of these extension names generates a log message and increments the
+  "deprecated_feature_use" metric in stats.
 
   .. csv-table::
     :header: Canonical Names, Deprecated Names
@@ -44,6 +44,11 @@ Deprecated items below are listed in chronological order.
     envoy.filters.http.ratelimit, envoy.rate_limit
     envoy.filters.http.router, envoy.router
     envoy.filters.http.squash, envoy.squash
+    envoy.filters.listener.http_inspector, envoy.listener.http_inspector
+    envoy.filters.listener.original_dst, envoy.listener.original_dst
+    envoy.filters.listener.original_src, envoy.listener.original_src
+    envoy.filters.listener.proxy_protocol, envoy.listener.proxy_protocol
+    envoy.filters.listener.tls_inspector, envoy.listener.tls_inspector
     envoy.filters.network.client_ssl_auth, envoy.client_ssl_auth
     envoy.filters.network.echo, envoy.echo
     envoy.filters.network.ext_authz, envoy.ext_authz
