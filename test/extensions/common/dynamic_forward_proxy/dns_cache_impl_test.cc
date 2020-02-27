@@ -7,8 +7,8 @@
 #include "test/common/config/utility_test.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
