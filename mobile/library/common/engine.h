@@ -26,11 +26,11 @@ public:
 
   ~Engine();
 
-  envoy_status_t run(std::string config, std::string log_level);
-
   Http::Dispatcher& httpDispatcher();
 
 private:
+  envoy_status_t run(std::string config, std::string log_level);
+
   envoy_engine_callbacks callbacks_;
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
