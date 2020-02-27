@@ -50,10 +50,7 @@ public:
   bool doStatTracking() const { return request_names_.has_value(); }
 
 private:
-  template <class T> void chargeStat(const T& headers) {
-    context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
-                        headers.GrpcStatus());
-  }
+  void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

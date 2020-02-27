@@ -235,6 +235,11 @@ void GrpcWebFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
   request_names_ = context_.resolveServiceAndMethod(headers.Path());
 }
 
+void GrpcWebFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
+  context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_names_,
+                      headers.GrpcStatus());
+}
+
 } // namespace GrpcWeb
 } // namespace HttpFilters
 } // namespace Extensions

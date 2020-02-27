@@ -55,10 +55,7 @@ public:
 private:
   friend class GrpcWebFilterTest;
 
-  template <class T> void chargeStat(const T& headers) {
-    context_.chargeStat(*cluster_, Grpc::Context::Protocol::GrpcWeb, *request_names_,
-                        headers.GrpcStatus());
-  }
+  void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
   bool isGrpcWebRequest(const Http::RequestHeaderMap& headers);
 
