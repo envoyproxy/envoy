@@ -8,10 +8,9 @@ namespace Envoy {
 
 static constexpr uint64_t MaxBufferLength = 1024 * 1024;
 
-// The fragment needs to be heap allocated in order to survive past the processing done in the inner loop in the benchmarks below.  Do not attempt to release the actual contents of the buffer.
-void DeleteFragment(const void*, size_t, const Buffer::BufferFragmentImpl* self) {
-  delete self;
-}
+// The fragment needs to be heap allocated in order to survive past the processing done in the inner
+// loop in the benchmarks below. Do not attempt to release the actual contents of the buffer.
+void DeleteFragment(const void*, size_t, const Buffer::BufferFragmentImpl* self) { delete self; }
 
 // Test the creation of an empty OwnedImpl.
 static void BufferCreateEmpty(benchmark::State& state) {
@@ -114,7 +113,8 @@ static void BufferPrependBuffer(benchmark::State& state) {
     // buffer every time without the overhead of a copy, we use an BufferFragment that references
     // (and never deletes) an external string.
     Buffer::OwnedImpl to_add;
-    auto fragment = std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+    auto fragment =
+        std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
     to_add.addBufferFragment(*fragment.release());
 
     buffer.prepend(to_add);
@@ -251,7 +251,8 @@ static void BufferLinearizeSimple(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     buffer.drain(buffer.length());
-    auto fragment = std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+    auto fragment =
+        std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
     buffer.addBufferFragment(*fragment.release());
     benchmark::DoNotOptimize(buffer.linearize(state.range(0)));
   }
@@ -268,7 +269,8 @@ static void BufferLinearizeGeneral(benchmark::State& state) {
   for (auto _ : state) {
     buffer.drain(buffer.length());
     do {
-      auto fragment = std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+      auto fragment =
+          std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
       buffer.addBufferFragment(*fragment.release());
     } while (buffer.length() < static_cast<uint64_t>(state.range(0)));
     benchmark::DoNotOptimize(buffer.linearize(state.range(0)));
