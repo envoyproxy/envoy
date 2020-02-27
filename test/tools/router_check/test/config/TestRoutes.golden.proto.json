@@ -342,7 +342,29 @@
         "response_header_fields": [
           {
             "key": "content-type",
-            "value": "text/plain"
+            "value": "application/json"
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "Header_Fields Content-Type appended Response",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/appended-content-type",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_redirect": "http://www.lyft.com/appended-content-type",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "header_fields": [
+          {
+            "key": "content-type",
+            "value": "text/plain,application/json"
           }
         ]
       }
