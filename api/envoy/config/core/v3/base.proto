@@ -248,14 +248,17 @@ message HeaderValue {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
 
   // Header name.
-  string key = 1 [(validate.rules).string = {min_bytes: 1 max_bytes: 16384}];
+  string key = 1 [
+    (validate.rules).string = {min_bytes: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME}
+  ];
 
   // Header value.
   //
   // The same :ref:`format specifier <config_access_log_format>` as used for
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of `-`.
-  string value = 2 [(validate.rules).string = {max_bytes: 16384}];
+  string value = 2
+      [(validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE}];
 }
 
 // Header name/value pair plus option to control append behavior.

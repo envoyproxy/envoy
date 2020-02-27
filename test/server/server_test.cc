@@ -473,14 +473,42 @@ protected:
   }
 };
 
-class ServerStatsTest : public TestWithSimTimeAndRealSymbolTables, public ServerInstanceImplTest {
+class ServerStatsTest
+    : public TestWithSimTimeAndRealSymbolTables,
+      public ServerInstanceImplTestBase,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 protected:
+  ServerStatsTest() {
+    version_ = std::get<0>(GetParam());
+    manual_flush_ = std::get<1>(GetParam());
+  }
+
   void flushStats() {
-    // Default flush interval is 5 seconds.
-    simTime().sleep(std::chrono::seconds(6));
+    if (manual_flush_) {
+      server_->flushStats();
+    } else {
+      // Default flush interval is 5 seconds.
+      simTime().sleep(std::chrono::seconds(6));
+    }
     server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
+
+  bool manual_flush_;
 };
+
+std::string ipFlushingModeTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return fmt::format(
+      "{}_{}",
+      TestUtility::ipTestParamsToString(
+          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+      std::get<1>(params.param) ? "with_manual_flush" : "with_time_based_flush");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsFlushingMode, ServerStatsTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipFlushingModeTestParamsToString);
 
 TEST_P(ServerStatsTest, FlushStats) {
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
@@ -504,10 +532,6 @@ TEST_P(ServerStatsTest, FlushStats) {
   flushStats();
   EXPECT_EQ(recent_lookups.value(), strobed_recent_lookups);
 }
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, ServerStatsTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
