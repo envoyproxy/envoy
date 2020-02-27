@@ -466,13 +466,13 @@ public:
         address, lookup_family,
         [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
-          std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
           EXPECT_EQ(expected_results, address_as_string_list);
           for (auto expected_absent_result : expected_absent_results) {
             EXPECT_THAT(address_as_string_list, Not(Contains(expected_absent_result)));
           }
           if (expected_ttl) {
+            std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
             for (auto address : results) {
               EXPECT_EQ(address.ttl_, expected_ttl.value());
             }
