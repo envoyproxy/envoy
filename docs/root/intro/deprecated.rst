@@ -79,6 +79,9 @@ Deprecated items below are listed in chronological order.
   and :ref:`allowed_client_headers <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>`
   of HTTP-based `ext_authz` has been deprecated in favor of explicitly setting the
   :ref:`ignore_case <envoy_api_field_type.matcher.StringMatcher.ignore_case>` field.
+* The `header_fields`, `custom_header_fields`, and `additional_headers` fields for the route checker
+  tool have been deprecated in favor of `request_header_fields`, `response_header_fields`,
+  `additional_request_headers`, and `additional_response_headers`.
 
 
 1.13.0 (January 20, 2020)
