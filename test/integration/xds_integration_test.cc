@@ -172,26 +172,30 @@ TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
   conn1->write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
   conn1->runUntil();
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
-
   conn1->close();
   conn2->close();
 }
 
-// Confirm that a new listener config with one fewer filter chain will drain the connections on that
+// Test that a new listener config with one fewer filter chain will drain the connections on that
 // filter chain.
 TEST_P(LdsIntegrationTest, ReloadConfigDeletingFilterChain) {
   autonomous_upstream_ = true;
 
-  // 2 filter chains in initial listener
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_http_protocol_options()->set_accept_http_10(true);
+        hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
+      });
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* standard_filter_chain = listener->mutable_filter_chains(0);
     auto* add_filter_chain = listener->add_filter_chains();
     add_filter_chain->CopyFrom(*standard_filter_chain);
     add_filter_chain->set_name("127.0.0.2");
-    auto* dst_ip = add_filter_chain->mutable_filter_chain_match()->add_prefix_ranges();
-    dst_ip->set_address_prefix("127.0.0.2");
-    dst_ip->mutable_prefix_len()->set_value(32);
+    auto* src_ip = add_filter_chain->mutable_filter_chain_match()->add_source_prefix_ranges();
+    src_ip->set_address_prefix("127.0.0.2");
+    src_ip->mutable_prefix_len()->set_value(32);
   });
 
   initialize();
@@ -200,11 +204,21 @@ TEST_P(LdsIntegrationTest, ReloadConfigDeletingFilterChain) {
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-  std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response,
-                                /*disconnect_after_headers_complete=*/true);
-  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 
+  // Step1: verify the both filter chains are working correctly
+  std::string response1;
+  auto conn1 = sendRawHttpAndWaitForHeader(1, lookupPort("http"),
+                                           "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n", &response1,
+                                           /*disconnect_after_headers_complete=*/false);
+  EXPECT_THAT(response1, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  std::string response2;
+  auto conn2 = sendRawHttpAndWaitForHeader(2, lookupPort("http"),
+                                           "GET / HTTP/1.1\r\nHost: 127.0.0.2\r\n\r\n", &response2,
+                                           /*disconnect_after_headers_complete=*/false);
+  EXPECT_THAT(response2, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  // Step2: delete the 2nd filter chain
   ConfigHelper new_config_helper(version_, *api_,
                                  MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
   // delete the filter chain matching dst ip = 127.0.0.2
@@ -218,10 +232,21 @@ TEST_P(LdsIntegrationTest, ReloadConfigDeletingFilterChain) {
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
 
-  std::string response2;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, true);
-  EXPECT_TRUE(response2.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
-  ASSERT("connection on filter chain 0 is alive after timeout");
+  // Step3: confirm the first connection is alive
+  response1.clear();
+  conn1->clearShouldExit();
+  conn1->write("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+  conn1->runUntil();
+  EXPECT_THAT(response1, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  // Step4: confirm the second connection is closed along with the second filter chain
+  conn2->clearShouldExit();
+  conn2->write("GET / HTTP/1.1\r\nHost: 127.0.0.2\r\n\r\n");
+  conn2->run();
+  // we could reach here only because conn2 is no longer registered in the dispatcher.
+
+  conn1->close();
+  conn2->close();
 }
 
 // Confirm that a new listener config with updated filter chain will drain the connection on the
