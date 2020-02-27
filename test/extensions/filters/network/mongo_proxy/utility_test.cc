@@ -155,7 +155,7 @@ TEST(QueryMessageInfoTest, MaxTime) {
     QueryMessageInfo info(q);
     EXPECT_EQ(1212, info.max_time());
   }
-  
+
   {
     QueryMessageImpl q(0, 0);
     q.fullCollectionName("db.foo");
