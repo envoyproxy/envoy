@@ -141,12 +141,14 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   stats_.dns_query_attempt_.inc();
   host_info.active_query_ =
       resolver_->resolve(host_info.host_info_->resolved_host_, dns_lookup_family_,
-                         [this, host](std::list<Network::DnsResponse>&& response) {
-                           finishResolve(host, std::move(response));
+                         [this, host](Network::DnsResolver::ResolutionStatus status,
+                                      std::list<Network::DnsResponse>&& response) {
+                           finishResolve(host, status, std::move(response));
                          });
 }
 
 void DnsCacheImpl::finishResolve(const std::string& host,
+                                 Network::DnsResolver::ResolutionStatus status,
                                  std::list<Network::DnsResponse>&& response) {
   ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
   const auto primary_host_it = primary_hosts_.find(host);
@@ -157,12 +159,15 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   const bool first_resolve = !primary_host_info.host_info_->first_resolve_complete_;
   primary_host_info.host_info_->first_resolve_complete_ = true;
 
+  // If the DNS resolver successfully resolved with an empty response list, the dns cache does not
+  // update. This ensures that a potentially previously resolved address does not stabilize back to
+  // 0 hosts.
   const auto new_address = !response.empty()
                                ? Network::Utility::getAddressWithPort(*(response.front().address_),
                                                                       primary_host_info.port_)
                                : nullptr;
 
-  if (response.empty()) {
+  if (status == Network::DnsResolver::ResolutionStatus::Failure) {
     stats_.dns_query_failure_.inc();
   } else {
     stats_.dns_query_success_.inc();
@@ -192,6 +197,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   // Kick off the refresh timer.
   // TODO(mattklein123): Consider jitter here. It may not be necessary since the initial host
   // is populated dynamically.
+  // TODO(junr03): more aggressive refresh interval when DNS resolution fails.
+  // related issue: https://github.com/lyft/envoy-mobile/issues/673
   primary_host_info.refresh_timer_->enableTimer(refresh_interval_);
 }
 
