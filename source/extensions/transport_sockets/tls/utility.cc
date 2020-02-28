@@ -135,17 +135,18 @@ absl::optional<std::string> Utility::getX509ExtensionValue(const X509& cert,
     ASN1_OBJECT* extension_object = X509_EXTENSION_get_object(extension);
     const size_t size = OBJ_obj2txt(nullptr, 0, extension_object, 0);
     std::vector<char> buffer;
+    // +1 to allow for NULL byte.
     buffer.resize(size + 1);
     OBJ_obj2txt(buffer.data(), buffer.size(), extension_object, 0);
 
-    if (std::string(buffer.data()) == extension_name) {
+    if (absl::string_view(buffer.data(), size) == extension_name) {
       ASN1_OCTET_STRING* octet_string = X509_EXTENSION_get_data(extension);
       const unsigned char* octet_string_data = octet_string->data;
       long xlen;
       int tag, xclass;
       ASN1_get_object(&octet_string_data, &xlen, &tag, &xclass, octet_string->length);
 
-      return std::string(reinterpret_cast<const char*>(octet_string_data));
+      return std::string(reinterpret_cast<const char*>(octet_string_data), xlen);
     }
   }
 

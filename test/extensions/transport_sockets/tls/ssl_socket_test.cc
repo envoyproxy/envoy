@@ -229,7 +229,7 @@ public:
 
   TestUtilOptions& addExpected509Extension(absl::string_view name,
                                            absl::optional<std::string> value) {
-    expected_x509_extensions_[std::string(name)] = value;
+    expected_x509_extensions_[name] = std::move(value);
 
     return *this;
   }

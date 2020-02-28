@@ -16,6 +16,7 @@
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"
@@ -96,7 +97,7 @@ private:
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
-  mutable absl::flat_hash_map<std::string, absl::optional<std::string>> cached_x509_extensions_;
+  mutable absl::node_hash_map<std::string, absl::optional<std::string>> cached_x509_extensions_;
 };
 
 class SslSocket : public Network::TransportSocket,
