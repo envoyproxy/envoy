@@ -825,7 +825,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
 

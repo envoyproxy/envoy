@@ -21,13 +21,13 @@ namespace {
 
 Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
                                                      uint32_t content_length = 0) {
-  return Http::TestHeaderMapImpl{{":authority", "host"},
-                                 {"content-length", fmt::format("{}", content_length)},
-                                 {":path", "/websocket/test"},
-                                 {":method", "GET"},
-                                 {":scheme", "http"},
-                                 {"upgrade", upgrade_type},
-                                 {"connection", "keep-alive, upgrade"}};
+  return Http::TestRequestHeaderMapImpl{{":authority", "host"},
+                                        {"content-length", fmt::format("{}", content_length)},
+                                        {":path", "/websocket/test"},
+                                        {":method", "GET"},
+                                        {":scheme", "http"},
+                                        {"upgrade", upgrade_type},
+                                        {"connection", "keep-alive, upgrade"}};
 }
 
 Http::TestResponseHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "websocket") {
@@ -37,12 +37,35 @@ Http::TestResponseHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type 
                                          {"content-length", "0"}};
 }
 
+template <class ProxiedHeaders, class OriginalHeaders>
+void commonValidate(ProxiedHeaders& proxied_headers, const OriginalHeaders& original_headers) {
+  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
+  // it back to the proxied headers.
+  if (original_headers.ContentLength() && proxied_headers.ContentLength() == nullptr) {
+    proxied_headers.setContentLength(size_t(0));
+  }
+  // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
+  if (original_headers.ContentLength() == nullptr &&
+      proxied_headers.TransferEncoding() != nullptr) {
+    ASSERT_EQ(proxied_headers.TransferEncoding()->value().getStringView(), "chunked");
+    proxied_headers.removeTransferEncoding();
+  }
+  if (proxied_headers.Connection() != nullptr &&
+      proxied_headers.Connection()->value() == "upgrade" &&
+      original_headers.Connection() != nullptr &&
+      original_headers.Connection()->value() == "keep-alive, upgrade") {
+    // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
+    // header when converting from HTTP/1.1 to H2
+    proxied_headers.setConnection("keep-alive, upgrade");
+  }
+}
+
 } // namespace
 
 void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
-    const Http::HeaderMap& original_proxied_request_headers,
-    const Http::HeaderMap& original_request_headers) {
-  Http::TestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
+    const Http::RequestHeaderMap& original_proxied_request_headers,
+    const Http::RequestHeaderMap& original_request_headers) {
+  Http::TestRequestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
   if (proxied_request_headers.ForwardedProto()) {
     ASSERT_EQ(proxied_request_headers.ForwardedProto()->value().getStringView(), "http");
     proxied_request_headers.removeForwardedProto();
@@ -66,9 +89,9 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
 }
 
 void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
-    const Http::HeaderMap& original_proxied_response_headers,
-    const Http::HeaderMap& original_response_headers) {
-  Http::TestHeaderMapImpl proxied_response_headers(original_proxied_response_headers);
+    const Http::ResponseHeaderMap& original_proxied_response_headers,
+    const Http::ResponseHeaderMap& original_response_headers) {
+  Http::TestResponseHeaderMapImpl proxied_response_headers(original_proxied_response_headers);
 
   // Check for and remove headers added by default for HTTP responses.
   ASSERT_TRUE(proxied_response_headers.Date() != nullptr);
@@ -80,29 +103,6 @@ void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
   commonValidate(proxied_response_headers, original_response_headers);
 
   EXPECT_THAT(&proxied_response_headers, HeaderMapEqualIgnoreOrder(&original_response_headers));
-}
-
-void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
-                                              const Http::HeaderMap& original_headers) {
-  // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
-  // it back to the proxied headers.
-  if (original_headers.ContentLength() && proxied_headers.ContentLength() == nullptr) {
-    proxied_headers.setContentLength(size_t(0));
-  }
-  // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
-  if (original_headers.ContentLength() == nullptr &&
-      proxied_headers.TransferEncoding() != nullptr) {
-    ASSERT_EQ(proxied_headers.TransferEncoding()->value().getStringView(), "chunked");
-    proxied_headers.removeTransferEncoding();
-  }
-  if (proxied_headers.Connection() != nullptr &&
-      proxied_headers.Connection()->value() == "upgrade" &&
-      original_headers.Connection() != nullptr &&
-      original_headers.Connection()->value() == "keep-alive, upgrade") {
-    // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
-    // header when converting from HTTP/1.1 to H2
-    proxied_headers.setConnection("keep-alive, upgrade");
-  }
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,

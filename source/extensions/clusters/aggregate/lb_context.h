@@ -32,7 +32,7 @@ public:
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return context_->metadataMatchCriteria();
   }
-  const Http::HeaderMap* downstreamHeaders() const override {
+  const Http::RequestHeaderMap* downstreamHeaders() const override {
     return context_->downstreamHeaders();
   }
   const Upstream::HealthyAndDegradedLoad&

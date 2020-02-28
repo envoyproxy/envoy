@@ -31,7 +31,7 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   }
 }
 
-void Filter::initiateCall(const Http::HeaderMap& headers) {
+void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (filter_return_ == FilterReturn::StopDecoding) {
     return;
   }

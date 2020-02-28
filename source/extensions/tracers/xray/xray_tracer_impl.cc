@@ -58,7 +58,8 @@ Driver::Driver(const XRayConfiguration& config, Server::Instance& server)
   });
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+                                   Http::RequestHeaderMap& request_headers,
                                    const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.

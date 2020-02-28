@@ -112,7 +112,7 @@ public:
   /**
    * @brief a helper function to determine if the headers represent an envoy internal request
    */
-  static bool isEnvoyInternalRequest(const HeaderMap& headers);
+  static bool isEnvoyInternalRequest(const RequestHeaderMap& headers);
 
   /**
    * Determines if request headers pass Envoy validity checks.
@@ -120,7 +120,7 @@ public:
    * @return details of the error if an error is present, otherwise absl::nullopt
    */
   static absl::optional<std::reference_wrapper<const absl::string_view>>
-  requestHeadersValid(const HeaderMap& headers);
+  requestHeadersValid(const RequestHeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

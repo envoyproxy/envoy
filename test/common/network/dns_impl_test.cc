@@ -36,6 +36,7 @@
 using testing::_;
 using testing::Contains;
 using testing::InSequence;
+using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Not;
 using testing::Return;
@@ -466,17 +467,29 @@ public:
         address, lookup_family,
         [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
+
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
-          EXPECT_EQ(expected_results, address_as_string_list);
+          // Note localhost is getting a special treatment here due to circle ci's hosts file.
+          // If the coverage job is moved from circle, this can be simplified to only the exact
+          // list match.
+          // https://github.com/envoyproxy/envoy/pull/10137#issuecomment-592525544
+          if (address == "localhost" && lookup_family == DnsLookupFamily::V4Only) {
+            EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
+          } else {
+            EXPECT_EQ(expected_results, address_as_string_list);
+          }
+
           for (auto expected_absent_result : expected_absent_results) {
             EXPECT_THAT(address_as_string_list, Not(Contains(expected_absent_result)));
           }
+
           if (expected_ttl) {
             std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
             for (auto address : results) {
               EXPECT_EQ(address.ttl_, expected_ttl.value());
             }
           }
+
           dispatcher_->exit();
         });
   }
