@@ -3,6 +3,7 @@
 #include "envoy/http/context.h"
 
 #include "common/http/codes.h"
+#include "common/http/user_agent.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -20,11 +21,13 @@ public:
   CodeStats& codeStats() override { return code_stats_; }
 
   void setTracer(Tracing::HttpTracer& tracer) { tracer_ = &tracer; }
+  const UserAgentContext& userAgentContext() const override { return user_agent_context_; }
 
 private:
   Tracing::HttpNullTracer null_tracer_;
   Tracing::HttpTracer* tracer_;
-  Http::CodeStatsImpl code_stats_;
+  CodeStatsImpl code_stats_;
+  UserAgentContext user_agent_context_;
 };
 
 } // namespace Http

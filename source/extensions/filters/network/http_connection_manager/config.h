@@ -19,6 +19,7 @@
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -161,7 +162,9 @@ private:
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
-  const std::string stats_prefix_;
+  Stats::StatNamePool stat_name_pool_;
+  std::string stats_prefix_;
+  Stats::StatName stats_prefix_stat_name_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};

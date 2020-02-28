@@ -10,29 +10,41 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
-namespace Envoy {
-/**
- * All stats for user agents. @see stats_macros.h
- */
-#define ALL_USER_AGENTS_STATS(COUNTER)                                                             \
-  COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_cx_destroy_remote_active_rq)                                                  \
-  COUNTER(downstream_rq_total)
+#include "common/stats/symbol_table_impl.h"
 
-/**
- * Wrapper struct for user agent stats. @see stats_macros.h
- */
-struct UserAgentStats {
-  ALL_USER_AGENTS_STATS(GENERATE_COUNTER_STRUCT)
+namespace Envoy {
+namespace Http {
+
+struct UserAgentContext {
+  UserAgentContext(Stats::SymbolTable& symbol_table);
+
+  Stats::SymbolTable& symbol_table_;
+  Stats::StatNamePool pool_;
+  Stats::StatName downstream_cx_length_ms_;
+  Stats::StatName ios_;
+  Stats::StatName android_;
+  Stats::StatName downstream_cx_total_;
+  Stats::StatName downstream_cx_destroy_remote_active_rq_;
+  Stats::StatName downstream_rq_total_;
 };
 
-namespace Http {
+struct UserAgentStats {
+  UserAgentStats(Stats::StatName prefix, Stats::StatName device, Stats::Scope& scope,
+                 const UserAgentContext& context);
+
+  Stats::Counter& downstream_cx_total_;
+  Stats::Counter& downstream_cx_destroy_remote_active_rq_;
+  Stats::Counter& downstream_rq_total_;
+  Stats::Histogram& downstream_cx_length_ms_;
+};
 
 /**
  * Stats support for specific user agents.
  */
 class UserAgent {
 public:
+  UserAgent(const UserAgentContext& context) : context_(context) {}
+
   /**
    * Complete a connection length timespan for the target user agent.
    * @param span supplies the timespan to complete.
@@ -46,8 +58,7 @@ public:
    * @param prefix supplies the stat prefix for the UA stats.
    * @param scope supplies the backing stat scope.
    */
-  void initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
-                             Stats::Scope& scope);
+  void initializeFromHeaders(const HeaderMap& headers, Stats::StatName prefix, Stats::Scope& scope);
 
   /**
    * Called when a connection is being destroyed.
@@ -56,18 +67,12 @@ public:
    */
   void onConnectionDestroy(Network::ConnectionEvent event, bool active_streams);
 
-private:
-  enum class Type {
-    NotInitialized,
-    iOS, // NOLINT(readability-identifier-naming)
-    Android,
-    Unknown
-  };
+  void initStats(Stats::StatName prefix, Stats::StatName device, Stats::Scope& scope);
 
-  Type type_{Type::NotInitialized};
+private:
+  const UserAgentContext& context_;
+  bool initialized_{false};
   std::unique_ptr<UserAgentStats> stats_;
-  std::string prefix_;
-  Stats::Scope* scope_{};
 };
 
 } // namespace Http

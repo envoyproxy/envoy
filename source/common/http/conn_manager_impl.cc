@@ -108,7 +108,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
-      drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
+      drain_close_(drain_close), user_agent_(http_context.userAgentContext()),
+      random_generator_(random_generator), http_context_(http_context),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
       overload_stop_accepting_requests_ref_(
@@ -771,7 +772,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   connection_manager_.user_agent_.initializeFromHeaders(
-      *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_);
+      *request_headers_, connection_manager_.stats_.prefix_stat_name_,
+      connection_manager_.stats_.scope_);
 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
