@@ -433,11 +433,8 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 FireAndForgetHttpWriter::FireAndForgetHttpWriter(Filter& filter) : filter_(filter) {}
 
 int FireAndForgetHttpWriter::luaHttpCallNonblocking(lua_State* state) {
-  if (LuaFilterUtil::makeHttpCall(state, filter_, *this)) {
-    return 0;
-  } else {
-    return 2;
-  }
+  LuaFilterUtil::makeHttpCall(state, filter_, *this);
+  return 0;
 }
 
 Http::AsyncClient::Request*
