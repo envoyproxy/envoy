@@ -48,7 +48,7 @@ int32_t QueryMessageInfo::parseMaxTime(const QueryMessage& query) {
   if (!field) {
     field = query.query()->find("maxTimeMS");
     if (!field) {
-        return 0;
+      return 0;
     }
   }
 
