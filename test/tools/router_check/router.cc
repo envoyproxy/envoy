@@ -125,21 +125,21 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
   headers_finalized_ = true;
 }
 
-void RouterCheckTool::sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry) {
-      const auto& encode_headers = [&](Http::ResponseHeaderMapPtr&& headers,
-                                      bool end_stream) -> void {
-        UNREFERENCED_PARAMETER(end_stream);
-        Http::HeaderMapImpl::copyFrom(tool_config.response_headers_->header_map_, *headers);
-      };
+void RouterCheckTool::sendLocalReply(ToolConfig& tool_config,
+                                     const Router::DirectResponseEntry& entry) {
+  const auto& encode_headers = [&](Http::ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+    UNREFERENCED_PARAMETER(end_stream);
+    Http::HeaderMapImpl::copyFrom(tool_config.response_headers_->header_map_, *headers);
+  };
 
-      const auto& encode_data = [&](Buffer::Instance& data, bool end_stream) -> void {
-        UNREFERENCED_PARAMETER(data);
-        UNREFERENCED_PARAMETER(end_stream);
-      };
-      
-      Envoy::Http::Utility::sendLocalReply(false, encode_headers, encode_data, false,
-                                           entry.responseCode(), entry.responseBody(),
-                                           absl::nullopt, false);
+  const auto& encode_data = [&](Buffer::Instance& data, bool end_stream) -> void {
+    UNREFERENCED_PARAMETER(data);
+    UNREFERENCED_PARAMETER(end_stream);
+  };
+
+  Envoy::Http::Utility::sendLocalReply(false, encode_headers, encode_data, false,
+                                       entry.responseCode(), entry.responseBody(), absl::nullopt,
+                                       false);
 }
 
 RouterCheckTool::RouterCheckTool(
