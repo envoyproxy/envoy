@@ -129,6 +129,15 @@ public:
    *         connection.
    **/
   virtual const std::string& tlsVersion() const PURE;
+
+  /**
+   * Retrieves the value of a specific X.509 extension from the peer cert, if a peer cert exists
+   * and it contains the specified extension.
+   * @param extension_name name of extension to look up
+   * @return absl::optional<std::string> the value of the extension, if it exists.
+   */
+  virtual const absl::optional<std::string>&
+  x509Extension(const std::string& extension_name) const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;
