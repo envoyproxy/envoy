@@ -45,7 +45,7 @@ constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
-bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
+bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
   if (downstream_headers.ForwardedProto() &&
       downstream_headers.ForwardedProto()->value().getStringView() ==
@@ -58,7 +58,7 @@ bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
   return false;
 }
 
-bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_headers,
+bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                               StreamInfo::FilterState& filter_state,
                                               uint32_t max_internal_redirects,
                                               const Http::HeaderEntry& internal_redirect,
@@ -127,7 +127,7 @@ uint64_t percentageOfTimeout(const std::chrono::milliseconds response_time,
 
 } // namespace
 
-void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport) {
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport) {
   if (use_secure_transport) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
@@ -155,7 +155,7 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
 }
 
 FilterUtility::TimeoutData
-FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
+FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& request_headers,
                             bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
                             bool per_try_timeout_hedging_enabled,
                             bool respect_expected_rq_timeout) {
@@ -264,8 +264,9 @@ bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_
   return false;
 }
 
-FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
-                                                               Http::HeaderMap& request_headers) {
+FilterUtility::HedgingParams
+FilterUtility::finalHedgingParams(const RouteEntry& route,
+                                  Http::RequestHeaderMap& request_headers) {
   HedgingParams hedging_params;
   hedging_params.hedge_on_per_try_timeout_ = route.hedgePolicy().hedgeOnPerTryTimeout();
 
@@ -292,7 +293,7 @@ Filter::~Filter() {
 }
 
 const FilterUtility::StrictHeaderChecker::HeaderCheckResult
-FilterUtility::StrictHeaderChecker::checkHeader(Http::HeaderMap& headers,
+FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
                                                 const Http::LowerCaseString& target_header) {
   if (target_header == Http::Headers::get().EnvoyUpstreamRequestTimeoutMs) {
     return isInteger(headers.EnvoyUpstreamRequestTimeoutMs());
@@ -315,7 +316,7 @@ Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr ups
 }
 
 void Filter::chargeUpstreamCode(uint64_t response_status_code,
-                                const Http::HeaderMap& response_headers,
+                                const Http::ResponseHeaderMap& response_headers,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
   // Passing the response_status_code explicitly is an optimization to avoid
@@ -370,7 +371,7 @@ void Filter::chargeUpstreamCode(Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
   const uint64_t response_status_code = enumToInt(code);
-  const auto fake_response_headers = Http::createHeaderMap<Http::HeaderMapImpl>(
+  const auto fake_response_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(response_status_code)}});
   chargeUpstreamCode(response_status_code, *fake_response_headers, upstream_host, dropped);
 }
@@ -426,7 +427,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
-         &request_headers = headers](Http::HeaderMap& response_headers) -> void {
+         &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
           const auto new_path = direct_response->newPath(request_headers);
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
@@ -505,7 +506,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
     callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, "maintenance mode",
-        [modify_headers, this](Http::HeaderMap& headers) {
+        [modify_headers, this](Http::ResponseHeaderMap& headers) {
           if (!config_.suppress_envoy_headers_) {
             headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
           }
@@ -948,7 +949,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->sendLocalReply(
         code, body,
-        [dropped, this](Http::HeaderMap& headers) {
+        [dropped, this](Http::ResponseHeaderMap& headers) {
           if (dropped && !config_.suppress_envoy_headers_) {
             headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
           }
@@ -1359,7 +1360,8 @@ bool Filter::setupRetry() {
   return true;
 }
 
-bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request) {
+bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
+                           UpstreamRequest& upstream_request) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
   const Http::HeaderEntry* location = headers.Location();
 
@@ -1785,7 +1787,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
 }
 
 RetryStatePtr
-ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
+ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                              Upstream::ResourcePriority priority) {

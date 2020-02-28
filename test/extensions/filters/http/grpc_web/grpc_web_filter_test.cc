@@ -85,7 +85,7 @@ public:
 
   void expectErrorResponse(const Http::Code& expected_code, const std::string& expected_message) {
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-        .WillOnce(Invoke([=](Http::HeaderMap& headers, bool) {
+        .WillOnce(Invoke([=](Http::ResponseHeaderMap& headers, bool) {
           uint64_t code;
           ASSERT_TRUE(absl::SimpleAtoi(headers.Status()->value().getStringView(), &code));
           EXPECT_EQ(static_cast<uint64_t>(expected_code), code);
@@ -95,7 +95,7 @@ public:
             [=](Buffer::Instance& data, bool) { EXPECT_EQ(expected_message, data.toString()); }));
   }
 
-  void expectRequiredGrpcUpstreamHeaders(const Http::HeaderMap& request_headers) {
+  void expectRequiredGrpcUpstreamHeaders(const Http::RequestHeaderMap& request_headers) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
               request_headers.ContentType()->value().getStringView());
     // Ensure we never send content-length upstream
@@ -298,8 +298,8 @@ TEST_P(GrpcWebFilterTest, Unary) {
   request_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   request_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
-  EXPECT_EQ("0", request_trailers.GrpcStatus()->value().getStringView());
-  EXPECT_EQ("ok", request_trailers.GrpcMessage()->value().getStringView());
+  EXPECT_EQ("0", request_trailers.get_("grpc-status"));
+  EXPECT_EQ("ok", request_trailers.get_("grpc-message"));
 
   // Tests response headers.
   Http::TestResponseHeaderMapImpl response_headers;

@@ -399,7 +399,7 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseWithHeaders) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
-  Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl(*rl_headers)};
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
                                nullptr);
 

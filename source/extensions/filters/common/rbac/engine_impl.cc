@@ -27,7 +27,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
 }
 
 bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
-                                               const Envoy::Http::HeaderMap& headers,
+                                               const Envoy::Http::RequestHeaderMap& headers,
                                                const StreamInfo::StreamInfo& info,
                                                std::string* effective_policy_id) const {
   bool matched = false;
@@ -51,7 +51,7 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
 bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
                                                const StreamInfo::StreamInfo& info,
                                                std::string* effective_policy_id) const {
-  static const Http::HeaderMapImpl* empty_header = new Http::HeaderMapImpl();
+  static const Http::RequestHeaderMapImpl* empty_header = new Http::RequestHeaderMapImpl();
   return allowed(connection, *empty_header, info, effective_policy_id);
 }
 

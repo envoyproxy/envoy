@@ -52,8 +52,8 @@ using Constants = ConstSingleton<ConstantValues>;
 class Span : public Tracing::Span {
 public:
   Span(const Tracing::Config& config, const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-       Http::HeaderMap& request_headers, const std::string& operation_name, SystemTime start_time,
-       const Tracing::Decision tracing_decision);
+       Http::RequestHeaderMap& request_headers, const std::string& operation_name,
+       SystemTime start_time, const Tracing::Decision tracing_decision);
 
   // Used by spawnChild().
   Span(const envoy::config::trace::v3::OpenCensusConfig& oc_config,
@@ -63,7 +63,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
-  void injectContext(Http::HeaderMap& request_headers) override;
+  void injectContext(Http::RequestHeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
@@ -74,7 +74,7 @@ private:
 };
 
 ::opencensus::trace::Span
-startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& request_headers,
+startSpanHelper(const std::string& name, bool traced, const Http::RequestHeaderMap& request_headers,
                 const envoy::config::trace::v3::OpenCensusConfig& oc_config) {
   // Determine if there is a parent context.
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
@@ -164,7 +164,7 @@ startSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
 
 Span::Span(const Tracing::Config& config,
            const envoy::config::trace::v3::OpenCensusConfig& oc_config,
-           Http::HeaderMap& request_headers, const std::string& operation_name,
+           Http::RequestHeaderMap& request_headers, const std::string& operation_name,
            SystemTime /*start_time*/, const Tracing::Decision tracing_decision)
     : span_(startSpanHelper(operation_name, tracing_decision.traced, request_headers, oc_config)),
       oc_config_(oc_config) {
@@ -190,7 +190,7 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 
 void Span::finishSpan() { span_.End(); }
 
-void Span::injectContext(Http::HeaderMap& request_headers) {
+void Span::injectContext(Http::RequestHeaderMap& request_headers) {
   using OpenCensusConfig = envoy::config::trace::v3::OpenCensusConfig;
   const auto& ctx = span_.context();
   for (const auto& outgoing : oc_config_.outgoing_trace_context()) {
@@ -331,7 +331,8 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
       ::opencensus::trace::ProbabilitySampler(probability)});
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+                                   Http::RequestHeaderMap& request_headers,
                                    const std::string& operation_name, SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   return std::make_unique<Span>(config, oc_config_, request_headers, operation_name, start_time,
