@@ -15,11 +15,9 @@ option java_multiple_files = true;
 option java_generic_services = true;
 
 // [#protodoc-title: Load reporting service]
-// [#not-implemented-hide:] LRS is an Envoy API to emit load report.
-// Envoy will initiate a bidi stream with a management server. Upon connecting,
-// the management server can send a LoadStatsResponse to a cluster it is interested in getting the load report.
-// Envoys in this cluster will aggregate the stats and will send the report in LoadStatsRequests.
-// This is done periodically based on the frequency mentioned in the LoadStatsResponse.
+// [#not-implemented-hide:] LRS is an Envoy API to emit load report. Envoy will initiate a bidi stream with a management server.
+// Upon connecting, the management server can send a LoadStatsResponse to a cluster it is interested in getting the load report.
+// Envoys in this cluster will send LoadStatsRequests. This is done periodically based on the frequency mentioned in the LoadStatsResponse.
 
 service LoadReportingService {
   // Advanced API to allow for multi-dimensional load balancing by remote

@@ -16,13 +16,12 @@ option java_package = "io.envoyproxy.envoy.config.endpoint.v3";
 option java_outer_classname = "LoadReportProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Load Report]
 // These are stats Envoy reports to GLB every so often. Report frequency is
 // defined by
 // :ref:`LoadStatsResponse.load_reporting_interval<envoy_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`.
 // Stats per upstream region/zone and optionally per subzone.
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 // [#next-free-field: 9]
-
 message UpstreamLocalityStats {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.UpstreamLocalityStats";
@@ -60,6 +59,7 @@ message UpstreamLocalityStats {
   uint32 priority = 6;
 }
 
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 // [#next-free-field: 8]
 message UpstreamEndpointStats {
   option (udpa.annotations.versioning).previous_message_type =
@@ -102,6 +102,7 @@ message UpstreamEndpointStats {
   repeated EndpointLoadMetricStats load_metric_stats = 5;
 }
 
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message EndpointLoadMetricStats {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.EndpointLoadMetricStats";
@@ -119,6 +120,7 @@ message EndpointLoadMetricStats {
 
 // Per cluster load stats. Envoy reports these stats a management server in a
 // :ref:`LoadStatsRequest<envoy_api_msg_service.load_stats.v3.LoadStatsRequest>`
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 // Next ID: 7
 // [#next-free-field: 7]
 message ClusterStats {
