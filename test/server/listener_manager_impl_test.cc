@@ -559,9 +559,6 @@ drain_type: modify_only
 TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
   InSequence s;
 
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -575,9 +572,11 @@ drain_type: default
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
 
-  ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(Api::SysCallIntResult{5, 0}));
-  ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(Api::SysCallIntResult{-1, 0}));
-  ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+  ON_CALL(os_sys_calls_, socket(AF_INET, _, 0))
+      .WillByDefault(Return(Api::SysCallSocketResult{5, 0}));
+  ON_CALL(os_sys_calls_, socket(AF_INET6, _, 0))
+      .WillByDefault(Return(Api::SysCallSocketResult{INVALID_SOCKET, 0}));
+  ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
 
@@ -592,9 +591,6 @@ drain_type: default
 TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
   InSequence s;
 
-  NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -608,9 +604,11 @@ drain_type: default
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
 
-  ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(Api::SysCallIntResult{-1, 0}));
-  ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(Api::SysCallIntResult{5, 0}));
-  ON_CALL(os_sys_calls, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+  ON_CALL(os_sys_calls_, socket(AF_INET, _, 0))
+      .WillByDefault(Return(Api::SysCallSocketResult{INVALID_SOCKET, 0}));
+  ON_CALL(os_sys_calls_, socket(AF_INET6, _, 0))
+      .WillByDefault(Return(Api::SysCallSocketResult{5, 0}));
+  ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
 
@@ -1226,9 +1224,11 @@ deprecated_v1:
 filter_chains:
 - filters: []
   )EOF";
+
   Api::OsSysCallsImpl os_syscall;
   auto syscall_result = os_syscall.socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_GE(syscall_result.rc_, 0);
+  ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
+
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {false}))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
@@ -1239,10 +1239,7 @@ filter_chains:
         EXPECT_CALL(server_, hotRestart).Times(0);
         // When bind_to_port is equal to false, create socket fd directly, and do not get socket
         // fd through hot restart.
-        NiceMock<Api::MockOsSysCalls> os_sys_calls;
-        TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-        ON_CALL(os_sys_calls, socket(AF_INET, _, 0))
-            .WillByDefault(Return(Api::SysCallIntResult{syscall_result.rc_, 0}));
+        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
         return real_listener_factory.createListenSocket(address, socket_type, options, params);
       }));
   EXPECT_CALL(listener_foo->target_, initialize());
@@ -1268,7 +1265,7 @@ filter_chains:
 
   Api::OsSysCallsImpl os_syscall;
   auto syscall_result = os_syscall.socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_GE(syscall_result.rc_, 0);
+  ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {{true, false}}))
@@ -1278,10 +1275,7 @@ filter_chains:
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
-        NiceMock<Api::MockOsSysCalls> os_sys_calls;
-        TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-        ON_CALL(os_sys_calls, socket(AF_INET, _, 0))
-            .WillByDefault(Return(Api::SysCallIntResult{syscall_result.rc_, 0}));
+        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
         return real_listener_factory.createListenSocket(address, socket_type, options, params);
       }));
   EXPECT_CALL(listener_foo->target_, initialize());
@@ -3249,7 +3243,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
   ASSERT_NE(nullptr, context);
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
+            Config::Metadata::metadataValue(&context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(envoy::config::core::v3::INBOUND, context->direction());
 }

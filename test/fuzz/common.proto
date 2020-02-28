@@ -15,6 +15,12 @@ message Headers {
   repeated envoy.config.core.v3.HeaderValue headers = 1;
 }
 
+message HttpData {
+  Headers headers = 1;
+  repeated string data = 2;
+  Headers trailers = 3;
+}
+
 message StreamInfo {
   envoy.config.core.v3.Metadata dynamic_metadata = 1;
   uint64 start_time = 2;

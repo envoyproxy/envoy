@@ -204,10 +204,9 @@ UpstreamDrainManager& Config::drainManager() {
   return upstream_drain_manager_slot_->getTyped<UpstreamDrainManager>();
 }
 
-Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
-               TimeSource& time_source)
+Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)), stream_info_(time_source) {
+      upstream_callbacks_(new UpstreamCallbacks(this)) {
   ASSERT(config != nullptr);
 }
 
@@ -290,6 +289,10 @@ void Filter::readDisableDownstream(bool disable) {
   } else {
     config_->stats().downstream_flow_control_resumed_reading_total_.inc();
   }
+}
+
+StreamInfo::StreamInfo& Filter::getStreamInfo() {
+  return read_callbacks_->connection().streamInfo();
 }
 
 void Filter::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {

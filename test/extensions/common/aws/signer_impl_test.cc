@@ -43,7 +43,7 @@ public:
 
   NiceMock<MockCredentialsProvider>* credentials_provider_;
   Event::SimulatedTimeSystem time_system_;
-  Http::MessagePtr message_;
+  Http::RequestMessagePtr message_;
   SignerImpl signer_;
   Credentials credentials_;
   Credentials token_credentials_;

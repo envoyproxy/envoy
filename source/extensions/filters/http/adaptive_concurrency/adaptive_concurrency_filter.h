@@ -58,7 +58,7 @@ public:
                             ConcurrencyControllerSharedPtr controller);
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
 
   // Http::StreamEncoderFilter
   void encodeComplete() override;

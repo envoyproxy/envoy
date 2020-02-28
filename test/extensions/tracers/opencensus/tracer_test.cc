@@ -107,7 +107,7 @@ TEST(OpenCensusTracerTest, Span) {
       new OpenCensus::Driver(oc_config, local_info, *Api::createApiForTest()));
 
   NiceMock<Tracing::MockConfig> config;
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const std::string operation_name{"my_operation_1"};
   SystemTime start_time;
@@ -196,7 +196,7 @@ void testIncomingHeaders(
   std::unique_ptr<Tracing::Driver> driver(
       new OpenCensus::Driver(oc_config, local_info, *Api::createApiForTest()));
   NiceMock<Tracing::MockConfig> config;
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"},
       {":method", "GET"},
       {"x-request-id", "foo"},
@@ -207,7 +207,7 @@ void testIncomingHeaders(
 
   const std::string operation_name{"my_operation_2"};
   SystemTime start_time;
-  Http::TestHeaderMapImpl injected_headers;
+  Http::TestRequestHeaderMapImpl injected_headers;
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, false});

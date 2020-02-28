@@ -101,7 +101,7 @@ uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
 GzipFilter::GzipFilter(const GzipFilterConfigSharedPtr& config)
     : skip_compression_{true}, config_(config) {}
 
-Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   if (config_->runtime().snapshot().featureEnabled("gzip.filter_enabled", 100) &&
       isAcceptEncodingAllowed(headers)) {
     skip_compression_ = false;
@@ -115,7 +115,8 @@ Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bo
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
+                                                    bool end_stream) {
   if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
       isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
       isEtagAllowed(headers) && isTransferEncodingAllowed(headers) && !headers.ContentEncoding()) {
@@ -142,7 +143,7 @@ Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_s
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus GzipFilter::encodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus GzipFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (!skip_compression_) {
     Buffer::OwnedImpl empty_buffer;
     compressor_.compress(empty_buffer, Compressor::State::Finish);
@@ -152,7 +153,7 @@ Http::FilterTrailersStatus GzipFilter::encodeTrailers(Http::HeaderMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-bool GzipFilter::hasCacheControlNoTransform(Http::HeaderMap& headers) const {
+bool GzipFilter::hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   if (cache_control) {
     return StringUtil::caseFindToken(cache_control->value().getStringView(), ",",
@@ -167,7 +168,7 @@ bool GzipFilter::hasCacheControlNoTransform(Http::HeaderMap& headers) const {
 // with a data structure that parses Accept-Encoding values and allows fast lookup of
 // key/priority. Also, this should be part of some utility library.
 // https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
+bool GzipFilter::isAcceptEncodingAllowed(Http::RequestHeaderMap& headers) const {
   const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
 
   if (accept_encoding) {
@@ -178,7 +179,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
       // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        const bool is_gzip = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        const bool is_gzip = !absl::EqualsIgnoreCase(q_value, ZeroQvalueString);
         if (is_gzip) {
           config_->stats().header_gzip_.inc();
           return true;
@@ -198,7 +199,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
       // identity is weighted higher. Note that this filter disregards
       // order/priority at this time.
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-        is_wildcard = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        is_wildcard = !absl::EqualsIgnoreCase(q_value, ZeroQvalueString);
       }
     }
     // If neither identity nor gzip codings are present, return the result of the wildcard.
@@ -214,7 +215,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
   return false;
 }
 
-bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
+bool GzipFilter::isContentTypeAllowed(Http::ResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type && !config_->contentTypeValues().empty()) {
     const absl::string_view value =
@@ -225,7 +226,7 @@ bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
   return true;
 }
 
-bool GzipFilter::isEtagAllowed(Http::HeaderMap& headers) const {
+bool GzipFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
   const bool is_etag_allowed = !(config_->disableOnEtagHeader() && headers.Etag());
   if (!is_etag_allowed) {
     config_->stats().not_compressed_etag_.inc();
@@ -233,7 +234,7 @@ bool GzipFilter::isEtagAllowed(Http::HeaderMap& headers) const {
   return is_etag_allowed;
 }
 
-bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
+bool GzipFilter::isMinimumContentLength(Http::ResponseHeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
@@ -252,7 +253,7 @@ bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
                                     Http::Headers::get().TransferEncodingValues.Chunked));
 }
 
-bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
+bool GzipFilter::isTransferEncodingAllowed(Http::ResponseHeaderMap& headers) const {
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   if (transfer_encoding) {
     for (auto header_value :
@@ -260,10 +261,9 @@ bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
          // computed twice. Find all other sites where this can be improved.
          StringUtil::splitToken(transfer_encoding->value().getStringView(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
-      if (StringUtil::caseCompare(trimmed_value,
-                                  Http::Headers::get().TransferEncodingValues.Gzip) ||
-          StringUtil::caseCompare(trimmed_value,
-                                  Http::Headers::get().TransferEncodingValues.Deflate)) {
+      if (absl::EqualsIgnoreCase(trimmed_value, Http::Headers::get().TransferEncodingValues.Gzip) ||
+          absl::EqualsIgnoreCase(trimmed_value,
+                                 Http::Headers::get().TransferEncodingValues.Deflate)) {
         return false;
       }
     }
@@ -272,7 +272,7 @@ bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
   return true;
 }
 
-void GzipFilter::insertVaryHeader(Http::HeaderMap& headers) {
+void GzipFilter::insertVaryHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* vary = headers.Vary();
   if (vary) {
     if (!StringUtil::findToken(vary->value().getStringView(), ",",
@@ -292,7 +292,7 @@ void GzipFilter::insertVaryHeader(Http::HeaderMap& headers) {
 // https://bz.apache.org/bugzilla/show_bug.cgi?id=45023
 // This design attempts to stay more on the safe side by preserving weak etags and removing
 // the strong ones when disable_on_etag_header is false. Envoy does NOT re-write entity tags.
-void GzipFilter::sanitizeEtagHeader(Http::HeaderMap& headers) {
+void GzipFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.Etag();
   if (etag) {
     absl::string_view value(etag->value().getStringView());

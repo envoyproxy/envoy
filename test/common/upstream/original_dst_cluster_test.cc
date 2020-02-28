@@ -44,17 +44,20 @@ public:
   TestLoadBalancerContext(const Network::Connection* connection, const std::string& key,
                           const std::string& value)
       : connection_(connection) {
-    downstream_headers_ = Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{key, value}}};
+    downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{key, value}}};
   }
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
-  const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_.get(); }
+  const Http::RequestHeaderMap* downstreamHeaders() const override {
+    return downstream_headers_.get();
+  }
 
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
-  Http::HeaderMapPtr downstream_headers_;
+  Http::RequestHeaderMapPtr downstream_headers_;
 };
 
 class OriginalDstClusterTest : public testing::Test {

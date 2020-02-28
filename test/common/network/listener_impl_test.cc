@@ -65,7 +65,7 @@ public:
                    bool bind_to_port)
       : ListenerImpl(dispatcher, std::move(socket), cb, bind_to_port) {}
 
-  MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (int fd));
+  MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };
 
 using ListenerImplTest = ListenerImplTestBase;
@@ -197,8 +197,9 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_))
-      .WillOnce(Invoke(
-          [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
+      .WillOnce(Invoke([](os_fd_t fd) -> Address::InstanceConstSharedPtr {
+        return Address::addressFromFd(fd);
+      }));
 
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -245,8 +246,9 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   listener.enable();
 
   EXPECT_CALL(listener, getLocalAddress(_))
-      .WillOnce(Invoke(
-          [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
+      .WillOnce(Invoke([](os_fd_t fd) -> Address::InstanceConstSharedPtr {
+        return Address::addressFromFd(fd);
+      }));
   EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce(Invoke([&](ConnectionSocketPtr&) -> void {
     client_connection->close(ConnectionCloseType::NoFlush);
   }));

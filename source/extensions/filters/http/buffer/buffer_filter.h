@@ -54,9 +54,10 @@ public:
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
@@ -66,7 +67,7 @@ private:
   BufferFilterConfigSharedPtr config_;
   const BufferFilterSettings* settings_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  Http::HeaderMap* request_headers_{};
+  Http::RequestHeaderMap* request_headers_{};
   uint64_t content_length_{};
   bool config_initialized_{};
 };

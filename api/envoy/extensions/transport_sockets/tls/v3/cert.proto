@@ -303,8 +303,8 @@ message CertificateValidationContext {
   //
   // .. code-block:: yaml
   //
-  // match_subject_alt_names:
-  //   exact: "api.example.com"
+  //  match_subject_alt_names:
+  //    exact: "api.example.com"
   //
   // .. attention::
   //

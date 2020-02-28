@@ -144,7 +144,7 @@ public:
 
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
   const HealthyAndDegradedLoad&
   determinePriorityLoad(const PrioritySet&,

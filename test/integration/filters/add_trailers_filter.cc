@@ -15,7 +15,8 @@ class AddTrailersStreamFilter : public Http::PassThroughFilter {
 public:
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override {
     if (end_stream) {
-      decoder_callbacks_->addDecodedTrailers().setGrpcMessage("decode");
+      decoder_callbacks_->addDecodedTrailers().addCopy(Http::LowerCaseString("grpc-message"),
+                                                       "decode");
     }
 
     return Http::FilterDataStatus::Continue;

@@ -171,14 +171,14 @@ private:
 
   // ScopedRouteInfo by scope name.
   ScopedRouteMap scoped_route_map_;
-  // For creating RDS subscriptions.
-  Server::Configuration::ServerFactoryContext& factory_context_;
 
   // RdsRouteConfigProvider by scope name.
   absl::flat_hash_map<std::string, std::unique_ptr<RdsRouteConfigProviderHelper>>
       route_provider_by_scope_;
   // A map of (hash, scope-name), used to detect the key conflict between scopes.
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
+  // For creating RDS subscriptions.
+  Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::

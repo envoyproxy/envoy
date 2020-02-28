@@ -240,9 +240,11 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_transport_failure_reason_;
   }
 
-  void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
+  void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
+    request_headers_ = &headers;
+  }
 
-  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
+  const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
@@ -282,7 +284,7 @@ private:
   Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
-  const Http::HeaderMap* request_headers_{};
+  const Http::RequestHeaderMap* request_headers_{};
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
 };

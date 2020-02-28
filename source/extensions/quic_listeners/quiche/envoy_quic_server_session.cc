@@ -35,11 +35,12 @@ absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
 }
 
-quic::QuicCryptoServerStreamBase* EnvoyQuicServerSession::CreateQuicCryptoServerStream(
+std::unique_ptr<quic::QuicCryptoServerStreamBase>
+EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
-  return new quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, this,
-                                          stream_helper());
+  return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, this,
+                                        stream_helper());
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {
@@ -100,9 +101,10 @@ void EnvoyQuicServerSession::OnCanWrite() {
   maybeApplyDelayClosePolicy();
 }
 
-void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
-  quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
-  if (event == HANDSHAKE_CONFIRMED) {
+void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
+  quic::QuicServerSessionBase::SetDefaultEncryptionLevel(level);
+  if (level == quic::ENCRYPTION_FORWARD_SECURE) {
+    // This is only reached once, when handshake is done.
     raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }

@@ -21,7 +21,6 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "common/api/api_impl.h"
-#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread_impl.h"
@@ -345,56 +344,6 @@ const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
 const uint32_t Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
 const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
 const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
-
-TestHeaderMapImpl::TestHeaderMapImpl() = default;
-
-TestHeaderMapImpl::TestHeaderMapImpl(
-    const std::initializer_list<std::pair<std::string, std::string>>& values) {
-  for (auto& value : values) {
-    addCopy(value.first, value.second);
-  }
-}
-
-TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
-
-TestHeaderMapImpl::TestHeaderMapImpl(const TestHeaderMapImpl& rhs)
-    : TestHeaderMapImpl(static_cast<const HeaderMap&>(rhs)) {}
-
-TestHeaderMapImpl& TestHeaderMapImpl::operator=(const TestHeaderMapImpl& rhs) {
-  if (&rhs == this) {
-    return *this;
-  }
-
-  clear();
-  copyFrom(rhs);
-
-  return *this;
-}
-
-void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value) {
-  addCopy(LowerCaseString(key), value);
-}
-
-void TestHeaderMapImpl::remove(const std::string& key) { remove(LowerCaseString(key)); }
-
-std::string TestHeaderMapImpl::get_(const std::string& key) const {
-  return get_(LowerCaseString(key));
-}
-
-std::string TestHeaderMapImpl::get_(const LowerCaseString& key) const {
-  const HeaderEntry* header = get(key);
-  if (!header) {
-    return EMPTY_STRING;
-  } else {
-    return std::string(header->value().getStringView());
-  }
-}
-
-bool TestHeaderMapImpl::has(const std::string& key) const {
-  return get(LowerCaseString(key)) != nullptr;
-}
-
-bool TestHeaderMapImpl::has(const LowerCaseString& key) const { return get(key) != nullptr; }
 
 } // namespace Http
 
