@@ -329,21 +329,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_library(
-    name = "utility_test_lib",
-    hdrs = ["utility_test.h"],
-    deps = [
-        "//include/envoy/common:base_includes",
-        "//source/common/config:utility_lib",
-        "//test/mocks/runtime:runtime_mocks",
-    ],
-)
-
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
-        ":utility_test_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",

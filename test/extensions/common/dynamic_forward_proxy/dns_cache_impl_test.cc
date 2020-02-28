@@ -1,10 +1,11 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "common/config/utility.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
-#include "test/common/config/utility_test.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -675,9 +676,45 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
 // Note: this test is done here, rather than a TYPED_TEST_SUITE in
 // //test/common/config:utility_test, because we did not want to include an extension type in
 // non-extension test suites.
+// TODO(junr03): I ran into problems with templatizing this test and macro expansion.
+// I spent too much time trying to figure this out. So for the moment I have copied this test body
+// here. I will spend some more time fixing this, but wanted to land unblocking functionality first.
 TEST(UtilityTest, PrepareDnsRefreshStrategy) {
-  Config::testPrepareDnsRefreshStrategy<
-      envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>();
+  NiceMock<Runtime::MockRandomGenerator> random;
+
+  {
+    // dns_failure_refresh_rate not set.
+    envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig dns_cache_config;
+    BackOffStrategyPtr strategy = Config::Utility::prepareDnsRefreshStrategy<
+        envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(dns_cache_config,
+                                                                              5000, random);
+    EXPECT_NE(nullptr, dynamic_cast<FixedBackOffStrategy*>(strategy.get()));
+  }
+
+  {
+    // dns_failure_refresh_rate set.
+    envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig dns_cache_config;
+    dns_cache_config.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
+    dns_cache_config.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(10);
+    BackOffStrategyPtr strategy = Config::Utility::prepareDnsRefreshStrategy<
+        envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(dns_cache_config,
+                                                                              5000, random);
+    EXPECT_NE(nullptr, dynamic_cast<JitteredBackOffStrategy*>(strategy.get()));
+  }
+
+  {
+    // dns_failure_refresh_rate set with invalid max_interval.
+    envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig dns_cache_config;
+    dns_cache_config.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
+    dns_cache_config.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(2);
+    EXPECT_THROW_WITH_REGEX(
+        Config::Utility::prepareDnsRefreshStrategy<
+            envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(dns_cache_config,
+                                                                                  5000, random),
+        EnvoyException,
+        "dns_failure_refresh_rate must have max_interval greater than "
+        "or equal to the base_interval");
+  }
 }
 
 } // namespace

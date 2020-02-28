@@ -14,9 +14,9 @@ envoy_cc_test(
     srcs = ["dns_cache_impl_test.cc"],
     deps = [
         ":mocks",
+        "//source/common/config:utility_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
-        "//test/common/config:utility_test_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
