@@ -44,7 +44,7 @@ namespace {
     }
 
     Http::AsyncClient::Request * makeHttpCall(lua_State *state, Filter &filter,
-                                              Http::AsyncClient::Callbacks &callbacksListener) {
+                                              Http::AsyncClient::Callbacks &callbacks) {
       const std::string cluster = luaL_checkstring(state, 2);
       luaL_checktype(state, 3, LUA_TTABLE);
       size_t body_size;
@@ -79,7 +79,7 @@ namespace {
       }
 
       return filter.clusterManager().httpAsyncClientForCluster(cluster).send(
-        std::move(message), callbacksListener,
+        std::move(message), callbacks,
         Http::AsyncClient::RequestOptions().setTimeout(timeout));
     }
 }
