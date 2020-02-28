@@ -11,6 +11,7 @@ import "validate/validate.proto";
 
 message TestCase {
   repeated envoy.config.core.v3.HeaderValueOption headers_to_add = 1;
-  repeated string headers_to_remove = 2 [(validate.rules).repeated.items.string.well_known_regex = HTTP_HEADER_NAME];
+  repeated string headers_to_remove = 2
+      [(validate.rules).repeated .items.string.well_known_regex = HTTP_HEADER_NAME];
   test.fuzz.StreamInfo stream_info = 3;
 }
