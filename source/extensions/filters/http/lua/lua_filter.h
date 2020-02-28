@@ -320,17 +320,6 @@ private:
 };
 
 /**
- * A class with shared code for building and making HTTP calls.
- */
-class LuaFilterUtil : public Filters::Common::Lua::BaseLuaObject<LuaFilterUtil> {
-public:
-  static Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
-                                                  Http::AsyncClient::Callbacks& callbacksListener);
-
-  static void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index);
-};
-
-/**
  * Global configuration for the filter.
  */
 class FilterConfig : Logger::Loggable<Logger::Id::lua> {
