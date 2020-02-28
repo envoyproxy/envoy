@@ -394,6 +394,15 @@ void ConnectionManagerImpl::resetAllStreams(
     stream.response_encoder_->getStream().removeCallbacks(stream);
     stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
     if (response_flag.has_value()) {
+      // This code duplicates some of the logic in
+      // onResetStream(). There seems to be no easy way to force
+      // onResetStream to do the right thing within its current API.
+      // Encoding DownstreamProtocolError as reason==LocalReset does
+      // not work because local reset is generated in other places.
+      // Encoding it in the string_view argument would lead to a hack
+      // of the form: if parameter is nonempty, use that; else if the
+      // codec details are nonempty, use those. This hack does not
+      // seem better than the code duplication, so punt for now.
       stream.stream_info_.setResponseFlag(response_flag.value());
       if (*response_flag == StreamInfo::ResponseFlag::DownstreamProtocolError) {
         stream.stream_info_.setResponseCodeDetails(
@@ -661,7 +670,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
   access_log_handlers_.push_back(handler);
 }
 
-void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
+void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
   stream_info_.response_code_ = response_code;
 
@@ -1159,7 +1168,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(
   }
 }
 
-HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
+RequestTrailerMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
 
@@ -1650,7 +1659,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
 
   chargeStats(headers);
 
-  ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream);
+  ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
+                   headers);
 
   // Now actually encode via the codec.
   stream_info_.onFirstDownstreamTxByteSent();
@@ -1690,7 +1700,7 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
   }
 }
 
-HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
+ResponseTrailerMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
 
@@ -1883,6 +1893,14 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl:
   ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
   connection_manager_.doDeferredStreamDestroy(*this);
+
+  // If the codec sets its responseDetails(), impute a
+  // DownstreamProtocolError and propagate the details upwards.
+  const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
+  if (!encoder_details.empty()) {
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    stream_info_.setResponseCodeDetails(encoder_details);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::onAboveWriteBufferHighWatermark() {
@@ -2199,7 +2217,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::handleMetadataAfterHeader
   iterate_from_current_filter_ = saved_state;
 }
 
-HeaderMap& ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedTrailers() {
+RequestTrailerMap& ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedTrailers() {
   return parent_.addDecodedTrailers();
 }
 
@@ -2378,7 +2396,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilter
                      ActiveStream::FilterIterationStartState::CanStartFromCurrent);
 }
 
-HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
+ResponseTrailerMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
   return parent_.addEncodedTrailers();
 }
 

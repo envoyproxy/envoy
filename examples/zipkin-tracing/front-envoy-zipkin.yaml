@@ -35,7 +35,7 @@ static_resources:
                   key: "x-request-id"
                   value: "%REQ(x-request-id)%"
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
   clusters:
   - name: service1

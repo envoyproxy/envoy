@@ -18,7 +18,7 @@ public:
       : RoleBasedAccessControlEngineImpl(rules){};
 
   MOCK_METHOD(bool, allowed,
-              (const Envoy::Network::Connection&, const Envoy::Http::HeaderMap&,
+              (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo&, std::string* effective_policy_id),
               (const));
 

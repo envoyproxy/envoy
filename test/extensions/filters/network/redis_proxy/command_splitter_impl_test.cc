@@ -205,9 +205,7 @@ public:
 TEST_P(RedisSingleServerRequestTest, Success) {
   InSequence s;
 
-  ToLowerTable table;
-  std::string lower_command(GetParam());
-  table.toLowerCase(lower_command);
+  std::string lower_command = absl::AsciiStrToLower(GetParam());
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
@@ -231,9 +229,7 @@ TEST_P(RedisSingleServerRequestTest, Mirrored) {
 
   setupMirrorPolicy();
 
-  ToLowerTable table;
-  std::string lower_command(GetParam());
-  table.toLowerCase(lower_command);
+  std::string lower_command = absl::AsciiStrToLower(GetParam());
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
@@ -258,9 +254,7 @@ TEST_P(RedisSingleServerRequestTest, MirroredFailed) {
 
   setupMirrorPolicy();
 
-  ToLowerTable table;
-  std::string lower_command(GetParam());
-  table.toLowerCase(lower_command);
+  std::string lower_command = absl::AsciiStrToLower(GetParam());
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
@@ -289,9 +283,7 @@ TEST_P(RedisSingleServerRequestTest, SuccessMultipleArgs) {
   makeRequest("hello", std::move(request));
   EXPECT_NE(nullptr, handle_);
 
-  ToLowerTable table;
-  std::string lower_command(GetParam());
-  table.toLowerCase(lower_command);
+  std::string lower_command = absl::AsciiStrToLower(GetParam());
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
@@ -313,9 +305,7 @@ TEST_P(RedisSingleServerRequestTest, Fail) {
   makeRequest("hello", std::move(request));
   EXPECT_NE(nullptr, handle_);
 
-  ToLowerTable table;
-  std::string lower_command(GetParam());
-  table.toLowerCase(lower_command);
+  std::string lower_command = absl::AsciiStrToLower(GetParam());
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(5));
   EXPECT_CALL(store_, deliverHistogramToSinks(
@@ -387,9 +377,7 @@ TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   makeRequest("key", std::move(request));
   EXPECT_NE(nullptr, handle_);
 
-  ToLowerTable table;
-  std::string lower_command("eval");
-  table.toLowerCase(lower_command);
+  std::string lower_command = absl::AsciiStrToLower("eval");
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
@@ -411,9 +399,7 @@ TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
   makeRequest("keykey", std::move(request));
   EXPECT_NE(nullptr, handle_);
 
-  ToLowerTable table;
-  std::string lower_command("evalsha");
-  table.toLowerCase(lower_command);
+  std::string lower_command = absl::AsciiStrToLower("evalsha");
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
@@ -983,9 +969,7 @@ public:
 TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {
   InSequence s;
 
-  ToLowerTable table;
-  std::string lower_command(GetParam());
-  table.toLowerCase(lower_command);
+  std::string lower_command = absl::AsciiStrToLower(GetParam());
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});

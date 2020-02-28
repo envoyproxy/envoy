@@ -69,7 +69,12 @@ message VirtualHost {
   //   The longest wildcards match first.
   //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
   //   must be unique across all virtual hosts or the config will fail to load.
-  repeated string domains = 2 [(validate.rules).repeated = {min_items: 1}];
+  //
+  // Domains cannot contain control characters. This is validated by the well_known_regex HTTP_HEADER_VALUE.
+  repeated string domains = 2 [(validate.rules).repeated = {
+    min_items: 1
+    items {string {well_known_regex: HTTP_HEADER_VALUE}}
+  }];
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
@@ -118,14 +123,14 @@ message VirtualHost {
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
-  // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+  // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 12 [deprecated = true];
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
-  // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+  // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
   map<string, google.protobuf.Any> typed_per_filter_config = 15;
@@ -200,7 +205,7 @@ message Route {
   // about the route. It can be used for configuration, stats, and logging.
   // The metadata should go under the filter namespace that will need it.
   // For instance, if the metadata is intended for the Router filter,
-  // the filter name should be specified as *envoy.router*.
+  // the filter name should be specified as *envoy.filters.http.router*.
   core.Metadata metadata = 4;
 
   // Decorator for the matched route.
@@ -208,14 +213,14 @@ message Route {
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
-  // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+  // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
 
-  // The per_filter_config field can be used to provide route-specific
+  // The typed_per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
-  // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+  // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
   map<string, google.protobuf.Any> typed_per_filter_config = 13;
@@ -314,14 +319,14 @@ message WeightedCluster {
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
-    // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+    // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
     map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
-    // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
+    // *envoy.filters.http.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
     map<string, google.protobuf.Any> typed_per_filter_config = 10;
@@ -530,7 +535,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 32]
+// [#next-free-field: 33]
 message RouteAction {
   enum ClusterNotFoundResponseCode {
     // HTTP status code - 503 Service Unavailable.
@@ -597,7 +602,8 @@ message RouteAction {
     message Header {
       // The name of the request header that will be used to obtain the hash
       // key. If the request header is not present, no hash will be produced.
-      string header_name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string header_name = 1
+          [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
     }
 
     // Envoy supports two types of cookie affinity:
@@ -690,7 +696,7 @@ message RouteAction {
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
     // Upgrade: [upgrade_type] will be proxied upstream.
-    string upgrade_type = 1;
+    string upgrade_type = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE}];
 
     // Determines if upgrades are available on this route. Defaults to true.
     google.protobuf.BoolValue enabled = 2;
@@ -714,7 +720,8 @@ message RouteAction {
     //
     //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
     //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
-    string cluster_header = 2 [(validate.rules).string = {min_bytes: 1}];
+    string cluster_header = 2
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -742,6 +749,10 @@ message RouteAction {
   // place the original path before rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
+  // Only one of *prefix_rewrite* or
+  // :ref:`regex_rewrite <envoy_api_field_route.RouteAction.regex_rewrite>`
+  // may be specified.
+  //
   // .. attention::
   //
   //   Pay careful attention to the use of trailing slashes in the
@@ -764,6 +775,36 @@ message RouteAction {
   //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
   //   requests to */prefix/etc* will be stripped to */etc*.
   string prefix_rewrite = 5;
+
+  // Indicates that during forwarding, portions of the path that match the
+  // pattern should be rewritten, even allowing the substitution of capture
+  // groups from the pattern into the new path as specified by the rewrite
+  // substitution string. This is useful to allow application paths to be
+  // rewritten in a way that is aware of segments with variable content like
+  // identifiers. The router filter will place the original path as it was
+  // before the rewrite into the :ref:`x-envoy-original-path
+  // <config_http_filters_router_x-envoy-original-path>` header.
+  //
+  // Only one of :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`
+  // or *regex_rewrite* may be specified.
+  //
+  // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
+  //
+  // * The path pattern ``^/service/([^/]+)(/.*)$`` paired with a substitution
+  //   string of ``\2/instance/\1`` would transform ``/service/foo/v1/api``
+  //   into ``/v1/api/instance/foo``.
+  //
+  // * The pattern ``one`` paired with a substitution string of ``two`` would
+  //   transform ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/two/zzz``.
+  //
+  // * The pattern ``^(.*?)one(.*)$`` paired with a substitution string of
+  //   ``\1two\2`` would replace only the first occurrence of ``one``,
+  //   transforming path ``/xxx/one/yyy/one/zzz`` into ``/xxx/two/yyy/one/zzz``.
+  //
+  // * The pattern ``(?i)/xxx/`` paired with a substitution string of ``/yyy/``
+  //   would do a case-insensitive match and transform path ``/aaa/XxX/bbb`` to
+  //   ``/aaa/yyy/bbb``.
+  type.matcher.RegexMatchAndSubstitute regex_rewrite = 32;
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
@@ -1263,7 +1304,8 @@ message RateLimit {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
-      string header_name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string header_name = 1
+          [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
@@ -1384,7 +1426,7 @@ message HeaderMatcher {
   reserved 2, 3;
 
   // Specifies the name of the header in the request.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
