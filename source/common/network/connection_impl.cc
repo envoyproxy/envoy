@@ -213,9 +213,6 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   file_event_.reset();
 
-  // Shutdown the socket so the other side can read any data in flight.
-  Api::OsSysCallsSingleton::get().shutdown(ioHandle().fd(), ENVOY_SHUT_WR);
-
   socket_->close();
 
   raiseEvent(close_type);
