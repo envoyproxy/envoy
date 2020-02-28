@@ -122,7 +122,8 @@ private:
 
   void startCacheLoad(const std::string& host, uint16_t default_port);
   void startResolve(const std::string& host, PrimaryHostInfo& host_info);
-  void finishResolve(const std::string& host, std::list<Network::DnsResponse>&& response);
+  void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
+                     std::list<Network::DnsResponse>&& response);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runRemoveCallbacks(const std::string& host);
   void updateTlsHostsMap();
