@@ -188,7 +188,8 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
-// Test that a LDS added listener works as expected.
+// Tests that a LDS deletion before Server initManager been initlialized will block the Server from
+// starting.
 TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
   on_server_init_function_ = [&]() {
     createLdsStream();
@@ -211,8 +212,7 @@ TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 }
 
-// Test that a LDS remove before server initManager initialization will block the Server from
-// starting.
+// Tests that a LDS adding listener works as expected.
 TEST_P(ListenerIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [&]() {
     createLdsStream();
