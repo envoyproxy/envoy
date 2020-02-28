@@ -58,27 +58,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "delta_subscription_lib",
-    srcs = ["delta_subscription_impl.cc"],
-    hdrs = ["delta_subscription_impl.h"],
-    deps = [
-        ":api_version_lib",
-        ":grpc_stream_lib",
-        ":new_grpc_mux_lib",
-        ":utility_lib",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/grpc:async_client_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:backoff_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:token_bucket_impl_lib",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "delta_subscription_state_lib",
     srcs = ["delta_subscription_state.cc"],
     hdrs = ["delta_subscription_state.h"],
@@ -212,10 +191,13 @@ envoy_cc_library(
     hdrs = ["metadata.h"],
     deps = [
         "//include/envoy/config:typed_metadata_interface",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/registry",
+        "//include/envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/shared_pool:shared_pool_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
     ],
@@ -281,10 +263,10 @@ envoy_cc_library(
     srcs = ["subscription_factory_impl.cc"],
     hdrs = ["subscription_factory_impl.h"],
     deps = [
-        ":delta_subscription_lib",
         ":filesystem_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
+        ":new_grpc_mux_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_factory_interface",

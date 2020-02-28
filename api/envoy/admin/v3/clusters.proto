@@ -4,6 +4,7 @@ package envoy.admin.v3;
 
 import "envoy/admin/v3/metrics.proto";
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -76,7 +77,7 @@ message ClusterStatus {
 }
 
 // Current state of a particular host.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HostStatus {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.HostStatus";
 
@@ -126,6 +127,9 @@ message HostStatus {
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
   type.v3.Percent local_origin_success_rate = 8;
+
+  // locality of the host.
+  config.core.v3.Locality locality = 9;
 }
 
 // Health status for a host.

@@ -514,12 +514,12 @@ public:
   /**
    * @param headers request headers.
    */
-  virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
+  virtual void setRequestHeaders(const Http::RequestHeaderMap& headers) PURE;
 
   /**
    * @return request headers.
    */
-  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
+  virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
 };
 
 } // namespace StreamInfo

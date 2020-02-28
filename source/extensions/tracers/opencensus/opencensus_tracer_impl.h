@@ -23,7 +23,7 @@ public:
   /**
    * Implements the abstract Driver's startSpan operation.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::RequestHeaderMap& request_headers,
                              const std::string& operation_name, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 

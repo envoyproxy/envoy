@@ -59,6 +59,7 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Age{"age"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
@@ -172,6 +173,7 @@ public:
     const std::string NoCache{"no-cache"};
     const std::string NoCacheMaxAge0{"no-cache, max-age=0"};
     const std::string NoTransform{"no-transform"};
+    const std::string Private{"private"};
   } CacheControlValues;
 
   struct {

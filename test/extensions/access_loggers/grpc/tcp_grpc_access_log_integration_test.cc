@@ -60,7 +60,7 @@ public:
           MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
               *config_blob);
       auto* access_log = tcp_proxy_config.add_access_log();
-      access_log->set_name("envoy.access_loggers.tcp_grpc");
+      access_log->set_name("grpc_accesslog");
       envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig access_log_config;
       auto* common_config = access_log_config.mutable_common_config();
       common_config->set_log_name("foo");

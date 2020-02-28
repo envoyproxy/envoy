@@ -36,7 +36,7 @@ void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
   span_.log(timestamp, event);
 }
 
-void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
+void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
   request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                   span_.traceIdAsHexString());
@@ -100,8 +100,9 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   });
 }
 
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
-                                   const std::string&, SystemTime start_time,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+                                   Http::RequestHeaderMap& request_headers, const std::string&,
+                                   SystemTime start_time,
                                    const Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
@@ -172,7 +173,7 @@ void ReporterImpl::flushSpans() {
   if (span_buffer_->pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_->pendingSpans());
     const std::string request_body = span_buffer_->serialize();
-    Http::MessagePtr message = std::make_unique<Http::RequestMessageImpl>();
+    Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setPath(collector_.endpoint_);
     message->headers().setHost(driver_.cluster()->name());
@@ -200,7 +201,7 @@ void ReporterImpl::onFailure(Http::AsyncClient::FailureReason) {
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void ReporterImpl::onSuccess(Http::MessagePtr&& http_response) {
+void ReporterImpl::onSuccess(Http::ResponseMessagePtr&& http_response) {
   if (Http::Utility::getResponseStatus(http_response->headers()) !=
       enumToInt(Http::Code::Accepted)) {
     driver_.tracerStats().reports_dropped_.inc();

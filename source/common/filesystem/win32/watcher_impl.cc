@@ -9,7 +9,7 @@ namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
     : api_(api), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
-  SOCKET_FD socks[2];
+  os_fd_t socks[2];
   Api::SysCallIntResult result = os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
   ASSERT(result.rc_ == 0);
 
@@ -141,7 +141,7 @@ void WatcherImpl::issueFirstRead(ULONG_PTR param) {
   ASSERT(rc);
 }
 
-void WatcherImpl::endDirectoryWatch(SOCKET_FD sock, HANDLE event_handle) {
+void WatcherImpl::endDirectoryWatch(os_fd_t sock, HANDLE event_handle) {
   const BOOL rc = ::SetEvent(event_handle);
   ASSERT(rc);
   // let libevent know that a ReadDirectoryChangesW call returned

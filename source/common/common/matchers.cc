@@ -6,6 +6,7 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
+#include "common/common/macros.h"
 #include "common/common/regex.h"
 #include "common/config/metadata.h"
 #include "common/http/path_utility.h"
@@ -100,42 +101,12 @@ bool StringMatcherImpl::match(const absl::string_view value) const {
     return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
                                   : absl::EndsWith(value, matcher_.suffix());
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
+    FALLTHRU;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return regex_->match(value);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-}
-
-bool LowerCaseStringMatcher::match(const absl::string_view value) const {
-  return matcher_.match(value);
-}
-
-bool LowerCaseStringMatcher::match(const ProtobufWkt::Value& value) const {
-  return matcher_.match(value);
-}
-
-envoy::type::matcher::v3::StringMatcher
-LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::v3::StringMatcher& matcher) {
-  envoy::type::matcher::v3::StringMatcher lowercase;
-  switch (matcher.match_pattern_case()) {
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    lowercase.set_hidden_envoy_deprecated_regex(
-        StringUtil::toLower(matcher.hidden_envoy_deprecated_regex()));
-    break;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
-    lowercase.set_exact(StringUtil::toLower(matcher.exact()));
-    break;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
-    lowercase.set_prefix(StringUtil::toLower(matcher.prefix()));
-    break;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
-    lowercase.set_suffix(StringUtil::toLower(matcher.suffix()));
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  return lowercase;
 }
 
 ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher) : matcher_(matcher) {
@@ -184,7 +155,7 @@ PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, b
 }
 
 bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) const {
-  const auto& value = Envoy::Config::Metadata::metadataValue(metadata, matcher_.filter(), path_);
+  const auto& value = Envoy::Config::Metadata::metadataValue(&metadata, matcher_.filter(), path_);
   return value_matcher_ && value_matcher_->match(value);
 }
 

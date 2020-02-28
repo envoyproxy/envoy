@@ -32,6 +32,11 @@ namespace Kafka {
  */
 template <typename T> class Deserializer {
 public:
+  /**
+   * The type this deserializer is deserializing.
+   */
+  typedef T result_type;
+
   virtual ~Deserializer() = default;
 
   /**
@@ -432,7 +437,6 @@ private:
  * First reads the length of the array, then initializes N underlying deserializers of type
  * DeserializerType. After the last of N deserializers is ready, the results of each of them are
  * gathered and put in a vector.
- * @param ResponseType result type returned by deserializer of type DeserializerType.
  * @param DeserializerType underlying deserializer type.
  *
  * From Kafka documentation:
@@ -440,9 +444,11 @@ private:
  * STRING) or a structure. First, the length N is given as an int32_t. Then N instances of type T
  * follow. A null array is represented with a length of -1.
  */
-template <typename ResponseType, typename DeserializerType>
-class ArrayDeserializer : public Deserializer<std::vector<ResponseType>> {
+template <typename DeserializerType>
+class ArrayDeserializer : public Deserializer<std::vector<typename DeserializerType::result_type>> {
 public:
+  using ResponseType = typename DeserializerType::result_type;
+
   /**
    * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
    */
@@ -509,7 +515,6 @@ private:
  * First reads the length of the array, then initializes N underlying deserializers of type
  * DeserializerType. After the last of N deserializers is ready, the results of each of them are
  * gathered and put in a vector.
- * @param ResponseType result type returned by deserializer of type DeserializerType.
  * @param DeserializerType underlying deserializer type.
  *
  * From Kafka documentation:
@@ -517,9 +522,12 @@ private:
  * STRING) or a structure. First, the length N + 1 is given as an UNSIGNED_VARINT. Then N instances
  * of type T follow. A null array is represented with a length of 0.
  */
-template <typename ResponseType, typename DeserializerType>
-class CompactArrayDeserializer : public Deserializer<std::vector<ResponseType>> {
+template <typename DeserializerType>
+class CompactArrayDeserializer
+    : public Deserializer<std::vector<typename DeserializerType::result_type>> {
 public:
+  using ResponseType = typename DeserializerType::result_type;
+
   /**
    * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
    */
@@ -585,7 +593,6 @@ private:
  * First reads the length of the array, then initializes N underlying deserializers of type
  * DeserializerType. After the last of N deserializers is ready, the results of each of them are
  * gathered and put in a vector.
- * @param ResponseType result type returned by deserializer of type DeserializerType.
  * @param DeserializerType underlying deserializer type.
  *
  * From Kafka documentation:
@@ -593,9 +600,12 @@ private:
  * STRING) or a structure. First, the length N is given as an int32_t. Then N instances of type T
  * follow. A null array is represented with a length of -1.
  */
-template <typename ResponseType, typename DeserializerType>
-class NullableArrayDeserializer : public Deserializer<NullableArray<ResponseType>> {
+template <typename DeserializerType>
+class NullableArrayDeserializer
+    : public Deserializer<NullableArray<typename DeserializerType::result_type>> {
 public:
+  using ResponseType = typename DeserializerType::result_type;
+
   /**
    * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
    */
@@ -674,7 +684,6 @@ private:
  * First reads the length of the array, then initializes N underlying deserializers of type
  * DeserializerType. After the last of N deserializers is ready, the results of each of them are
  * gathered and put in a vector.
- * @param ResponseType result type returned by deserializer of type DeserializerType.
  * @param DeserializerType underlying deserializer type.
  *
  * From Kafka documentation:
@@ -682,9 +691,12 @@ private:
  * STRING) or a structure. First, the length N + 1 is given as an UNSIGNED_VARINT. Then N instances
  * of type T follow. A null array is represented with a length of 0.
  */
-template <typename ResponseType, typename DeserializerType>
-class NullableCompactArrayDeserializer : public Deserializer<NullableArray<ResponseType>> {
+template <typename DeserializerType>
+class NullableCompactArrayDeserializer
+    : public Deserializer<NullableArray<typename DeserializerType::result_type>> {
 public:
+  using ResponseType = typename DeserializerType::result_type;
+
   /**
    * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
    */

@@ -5,7 +5,7 @@ namespace Network {
 
 ActiveDnsQuery* ValidationDnsResolver::resolve(const std::string&, DnsLookupFamily,
                                                ResolveCb callback) {
-  callback({});
+  callback(DnsResolver::ResolutionStatus::Success, {});
   return nullptr;
 }
 

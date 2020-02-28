@@ -48,13 +48,17 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   constexpr auto expected_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X)";
   constexpr auto expected_status_code = "202";
   constexpr auto expected_content_length = "1337";
+  constexpr auto expected_client_ip = "10.0.0.100";
+  constexpr auto expected_x_forwarded_for = "false";
+  constexpr auto expected_upstream_address = "10.0.0.200";
+
   auto on_send = [](const std::string& json) {
     ASSERT_FALSE(json.empty());
     daemon::Segment s;
     MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
     ASSERT_FALSE(s.trace_id().empty());
     ASSERT_FALSE(s.id().empty());
-    ASSERT_TRUE(s.annotations().empty());
+    ASSERT_EQ(1, s.annotations().size());
     ASSERT_TRUE(s.parent_id().empty());
     ASSERT_STREQ(expected_span_name, s.name().c_str());
     ASSERT_STREQ(expected_http_method, s.http().request().at("method").c_str());
@@ -62,17 +66,22 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     ASSERT_STREQ(expected_user_agent, s.http().request().at("user_agent").c_str());
     ASSERT_STREQ(expected_status_code, s.http().response().at("status").c_str());
     ASSERT_STREQ(expected_content_length, s.http().response().at("content_length").c_str());
+    ASSERT_STREQ(expected_client_ip, s.http().request().at("client_ip").c_str());
+    ASSERT_STREQ(expected_x_forwarded_for, s.http().request().at("x_forwarded_for").c_str());
+    ASSERT_STREQ(expected_upstream_address, s.annotations().at("upstream_address").c_str());
   };
 
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   Tracer tracer{expected_span_name, std::move(broker_), server_.timeSource()};
-  auto span = tracer.startSpan(expected_span_name, expected_operation_name,
-                               server_.timeSource().systemTime(), absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
+                               absl::nullopt /*headers*/);
   span->setTag("http.method", expected_http_method);
   span->setTag("http.url", expected_http_url);
   span->setTag("user_agent", expected_user_agent);
   span->setTag("http.status_code", expected_status_code);
   span->setTag("response_size", expected_content_length);
+  span->setTag("peer.address", expected_client_ip);
+  span->setTag("upstream_address", expected_upstream_address);
   span->finishSpan();
 }
 
@@ -88,8 +97,8 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
   constexpr auto expected_operation_name = "Create";
   const auto& broker = *broker_;
   Tracer tracer{expected_span_name, std::move(broker_), server_.timeSource()};
-  auto parent_span = tracer.startSpan(expected_span_name, expected_operation_name,
-                                      server_.timeSource().systemTime(), absl::nullopt /*headers*/);
+  auto parent_span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
+                                      absl::nullopt /*headers*/);
 
   const XRay::Span* xray_parent_span = static_cast<XRay::Span*>(parent_span.get());
   const std::string expected_parent_id = xray_parent_span->Id();
@@ -118,8 +127,7 @@ TEST_F(XRayTracerTest, UseExistingHeaderInformation) {
   constexpr auto operation_name = "my operation";
 
   Tracer tracer{span_name, std::move(broker_), server_.timeSource()};
-  auto span =
-      tracer.startSpan(span_name, operation_name, server_.timeSource().systemTime(), xray_header);
+  auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(), xray_header);
 
   const XRay::Span* xray_span = static_cast<XRay::Span*>(span.get());
   ASSERT_STREQ(xray_header.trace_id_.c_str(), xray_span->traceId().c_str());
@@ -131,9 +139,9 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
   constexpr auto operation_name = "my operation";
 
   Tracer tracer{span_name, std::move(broker_), server_.timeSource()};
-  auto span = tracer.startSpan(span_name, operation_name, server_.timeSource().systemTime(),
+  auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
   auto* header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_NE(header, nullptr);
@@ -146,7 +154,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
   constexpr auto span_name = "my span";
   Tracer tracer{span_name, std::move(broker_), server_.timeSource()};
   auto span = tracer.createNonSampledSpan();
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
   auto* header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_NE(header, nullptr);

@@ -72,7 +72,8 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   return true;
 }
 
-void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
+void Utility::appendXff(RequestHeaderMap& headers,
+                        const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
     return;
   }
@@ -80,14 +81,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
   headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
 }
 
-void Utility::appendVia(HeaderMap& headers, const std::string& via) {
+void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& via) {
   // TODO(asraa): Investigate whether it is necessary to append with whitespace here by:
   //     (a) Validating we do not expect whitespace in via headers
   //     (b) Add runtime guarding in case users have upstreams which expect it.
   headers.appendVia(via, ", ");
 }
 
-std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
+std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());
   return fmt::format("https://{}{}", headers.Host()->value().getStringView(),
@@ -234,7 +235,7 @@ bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
          headers.Protocol() && !headers.Protocol()->value().empty();
 }
 
-bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
@@ -295,7 +296,7 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                              bool is_head_request) {
   sendLocalReply(
       is_grpc,
-      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+      [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
         callbacks.encodeHeaders(std::move(headers), end_stream);
       },
       [&](Buffer::Instance& data, bool end_stream) -> void {
@@ -305,7 +306,8 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
 }
 
 void Utility::sendLocalReply(
-    bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    bool is_grpc,
+    std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
     Code response_code, absl::string_view body_text,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
@@ -313,13 +315,13 @@ void Utility::sendLocalReply(
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (is_grpc) {
-    HeaderMapPtr response_headers{new HeaderMapImpl{
-        {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
-        {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
-        {Headers::get().GrpcStatus,
-         std::to_string(
-             enumToInt(grpc_status ? grpc_status.value()
-                                   : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
+    ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
+        {{Headers::get().Status, std::to_string(enumToInt(Code::OK))},
+         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
+         {Headers::get().GrpcStatus,
+          std::to_string(enumToInt(
+              grpc_status ? grpc_status.value()
+                          : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}})};
     if (!body_text.empty() && !is_head_request) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
@@ -329,8 +331,8 @@ void Utility::sendLocalReply(
     return;
   }
 
-  HeaderMapPtr response_headers{
-      new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
+  ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
+      {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
   if (!body_text.empty()) {
     response_headers->setContentLength(body_text.size());
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Text);
@@ -350,7 +352,8 @@ void Utility::sendLocalReply(
 }
 
 Utility::GetLastAddressFromXffInfo
-Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t num_to_skip) {
+Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
+                               uint32_t num_to_skip) {
   const auto xff_header = request_headers.ForwardedFor();
   if (xff_header == nullptr) {
     return {nullptr, false};
@@ -555,11 +558,11 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
-MessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
+RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
   absl::string_view host, path;
   extractHostPathFromUri(http_uri.uri(), host, path);
 
-  MessagePtr message(new RequestMessageImpl());
+  RequestMessagePtr message(new RequestMessageImpl());
   message->headers().setPath(path);
   message->headers().setHost(host);
 

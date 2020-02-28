@@ -256,7 +256,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks&,
+      .WillOnce(Invoke([this](Http::RequestMessagePtr& request, Http::AsyncClient::Callbacks&,
                               const Http::AsyncClient::RequestOptions&) {
         EXPECT_EQ("POST", std::string(request->headers().Method()->value().getStringView()));
         EXPECT_EQ("static_cluster",

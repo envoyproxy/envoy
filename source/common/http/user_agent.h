@@ -46,7 +46,7 @@ public:
    * @param prefix supplies the stat prefix for the UA stats.
    * @param scope supplies the backing stat scope.
    */
-  void initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
+  void initializeFromHeaders(const RequestHeaderMap& headers, const std::string& prefix,
                              Stats::Scope& scope);
 
   /**

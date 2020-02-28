@@ -16,6 +16,7 @@ py_binary(
     deps = [
         "//tools/api_proto_plugin",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
     ],
 )

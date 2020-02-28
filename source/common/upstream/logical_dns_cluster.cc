@@ -100,22 +100,23 @@ void LogicalDnsCluster::startResolve() {
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address, dns_lookup_family_,
-      [this, dns_address](std::list<Network::DnsResponse>&& response) -> void {
+      [this, dns_address](Network::DnsResolver::ResolutionStatus status,
+                          std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
-        info_->stats().update_success_.inc();
 
-        std::chrono::milliseconds refresh_rate = dns_refresh_rate_ms_;
-        if (!response.empty()) {
+        std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
+
+        // If the DNS resolver successfully resolved with an empty response list, the logical DNS
+        // cluster does not update. This ensures that a potentially previously resolved address does
+        // not stabilize back to 0 hosts.
+        if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
+          info_->stats().update_success_.inc();
           // TODO(mattklein123): Move port handling into the DNS interface.
           ASSERT(response.front().address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
               Network::Utility::getAddressWithPort(*(response.front().address_),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
-
-          if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds(0)) {
-            refresh_rate = response.front().ttl_;
-          }
 
           if (!logical_host_) {
             logical_host_.reset(new LogicalHost(info_, hostname_, new_address, localityLbEndpoint(),
@@ -140,13 +141,24 @@ void LogicalDnsCluster::startResolve() {
             logical_host_->setNewAddress(new_address, lbEndpoint());
           }
 
+          // reset failure backoff strategy because there was a success.
           failure_backoff_strategy_->reset();
+
+          if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds(0)) {
+            final_refresh_rate = response.front().ttl_;
+          }
+          ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address,
+                    final_refresh_rate.count());
         } else {
-          refresh_rate = std::chrono::milliseconds(failure_backoff_strategy_->nextBackOffMs());
+          info_->stats().update_failure_.inc();
+          final_refresh_rate =
+              std::chrono::milliseconds(failure_backoff_strategy_->nextBackOffMs());
+          ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms",
+                    dns_address, final_refresh_rate.count());
         }
 
         onPreInitComplete();
-        resolve_timer_->enableTimer(refresh_rate);
+        resolve_timer_->enableTimer(final_refresh_rate);
       });
 }
 

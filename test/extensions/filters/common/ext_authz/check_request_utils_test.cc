@@ -47,8 +47,8 @@ public:
   }
 
   void callHttpCheckAndValidateRequestAttributes(bool include_peer_certificate) {
-    Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
-                                            {":path", "/bar"}};
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
+                                                   {":path", "/bar"}};
     envoy::service::auth::v3::CheckRequest request;
     Protobuf::Map<std::string, std::string> context_extensions;
     context_extensions["key"] = "value";
@@ -146,7 +146,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   envoy::service::auth::v3::CheckRequest request_;
 
   // A client supplied EnvoyAuthPartialBody header should be ignored.
-  Http::TestHeaderMapImpl request_headers{{Http::Headers::get().EnvoyAuthPartialBody.get(), "1"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().EnvoyAuthPartialBody.get(), "1"}};
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(*ssl_, uriSanLocalCertificate())
@@ -166,7 +167,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 // Verify that check request object has only a portion of the request data.
 TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   const uint64_t size = 4049;
-  Http::HeaderMapImpl headers_;
+  Http::RequestHeaderMapImpl headers_;
   envoy::service::auth::v3::CheckRequest request_;
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
@@ -184,7 +185,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
 
 // Verify that check request object has all the request data.
 TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
-  Http::HeaderMapImpl headers_;
+  Http::RequestHeaderMapImpl headers_;
   envoy::service::auth::v3::CheckRequest request_;
 
   EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
@@ -205,8 +206,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
 // proto object.
 // Verify that the source certificate is not set by default.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
-  Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
-                                          {":path", "/bar"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
+                                                 {":path", "/bar"}};
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
