@@ -304,7 +304,7 @@ private:
  * HTTP client that performs non-blocking HTTP calls and ignores the response.
  */
 class FireAndForgetHttpWriter : public Filters::Common::Lua::BaseLuaObject<FireAndForgetHttpWriter>,
-                            public Http::AsyncClient::Callbacks {
+                                public Http::AsyncClient::Callbacks {
 public:
   FireAndForgetHttpWriter(Filter& filter);
 
