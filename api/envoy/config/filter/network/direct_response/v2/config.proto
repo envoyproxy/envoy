@@ -11,7 +11,7 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.direct_response.v3";
 
 // [#protodoc-title: Direct response]
-// Echo :ref:`configuration overview <config_network_filters_direct_response>`.
+// Direct response :ref:`configuration overview <config_network_filters_direct_response>`.
 // [#extension: envoy.filters.network.direct_response]
 message Config {
   // Response data as bytes.
