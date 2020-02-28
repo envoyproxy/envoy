@@ -10,7 +10,7 @@
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/config/utility.h"
-#include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.h"
+#include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -174,9 +174,15 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
         "type.googleapis.com/", factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
   }};
 
-  // Fuzz filter.
-  static UberFilterFuzzer fuzzer;
-  fuzzer.fuzz(input.config(), input.data());
+  try {
+    // Catch invalid header characters.
+    TestUtility::validate(input);
+    // Fuzz filter.
+    static UberFilterFuzzer fuzzer;
+    fuzzer.fuzz(input.config(), input.data());
+  } catch (const ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+  }
 }
 
 } // namespace HttpFilters
