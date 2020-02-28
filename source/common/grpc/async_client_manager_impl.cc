@@ -62,7 +62,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   UNREFERENCED_PARAMETER(scope_);
   UNREFERENCED_PARAMETER(config_);
   UNREFERENCED_PARAMETER(api_);
-  UNREFERENCED_PARAMETER(stat_names);
+  UNREFERENCED_PARAMETER(stat_names_);
   throw EnvoyException("Google C++ gRPC client is not linked");
 #else
   ASSERT(google_tls_slot_ != nullptr);
