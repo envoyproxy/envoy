@@ -14,7 +14,7 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "header_fields": [
+        "response_header_fields": [
           {
             "key": "content-type",
             "value": "text/plain"
@@ -40,7 +40,7 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "header_fields": [
+        "response_header_fields": [
           {
             "key": "content-type",
             "value": "application/json"
@@ -66,7 +66,7 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "header_fields": [
+        "response_header_fields": [
           {
             "key": "content-type",
             "value": "text/plain,application/json"
@@ -88,7 +88,7 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "header_fields": [
+        "response_header_fields": [
           {
             "key": "content-type",
             "value": ""

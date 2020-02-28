@@ -111,6 +111,7 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
     if (tool_config.route_->directResponseEntry() != nullptr) {
       tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
                                                                    true);
+      sendLocalReply(tool_config, *tool_config.route_->directResponseEntry());
       tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
           *tool_config.response_headers_, stream_info);
     } else if (tool_config.route_->routeEntry() != nullptr) {
@@ -122,6 +123,23 @@ void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
   }
 
   headers_finalized_ = true;
+}
+
+void RouterCheckTool::sendLocalReply(ToolConfig& tool_config, const Router::DirectResponseEntry& entry) {
+      const auto& encode_headers = [&](Http::ResponseHeaderMapPtr&& headers,
+                                      bool end_stream) -> void {
+        UNREFERENCED_PARAMETER(end_stream);
+        Http::HeaderMapImpl::copyFrom(tool_config.response_headers_->header_map_, *headers);
+      };
+
+      const auto& encode_data = [&](Buffer::Instance& data, bool end_stream) -> void {
+        UNREFERENCED_PARAMETER(data);
+        UNREFERENCED_PARAMETER(end_stream);
+      };
+      
+      Envoy::Http::Utility::sendLocalReply(false, encode_headers, encode_data, false,
+                                           entry.responseCode(), entry.responseBody(),
+                                           absl::nullopt, false);
 }
 
 RouterCheckTool::RouterCheckTool(
@@ -316,31 +334,7 @@ bool RouterCheckTool::compareRewriteHost(
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
   if (tool_config.route_->directResponseEntry() != nullptr) {
-    const Envoy::Router::DirectResponseEntry* entry = tool_config.route_->directResponseEntry();
-
-    if (!headers_finalized_) {
-      entry->rewritePathHeader(*tool_config.headers_, true);
-
-      const auto& encode_headers = [&](Http::ResponseHeaderMapPtr&& headers,
-                                      bool end_stream) -> void {
-        UNREFERENCED_PARAMETER(end_stream);
-        Http::HeaderMapImpl::copyFrom(tool_config.headers_->header_map_, *headers);
-      };
-
-      const auto& encode_data = [&](Buffer::Instance& data, bool end_stream) -> void {
-        UNREFERENCED_PARAMETER(data);
-        UNREFERENCED_PARAMETER(end_stream);
-      };
-      
-      Envoy::Http::Utility::sendLocalReply(false, encode_headers, encode_data, false,
-                                           entry->responseCode(), entry->responseBody(),
-                                           absl::nullopt, false);
-
-      entry->finalizeResponseHeaders(*tool_config.headers_, stream_info);
-      headers_finalized_ = true;
-    }
-
-    actual = entry->newPath(*tool_config.headers_);
+    actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.request_headers_);
   }
 
   const bool matches = compareResults(actual, expected, "path_redirect");
