@@ -534,6 +534,7 @@ TEST_P(DnsImplTest, LocalLookup) {
     for (auto address : address_list) {
       ENVOY_LOG_MISC(error, "Address: {}", address->ip()->addressAsString());
     }
+    ASSERT_EQ(1, address_list.size());
     EXPECT_TRUE(hasAddress(address_list, "127.0.0.1"));
     EXPECT_FALSE(hasAddress(address_list, "::1"));
     ASSERT_TRUE(false);
