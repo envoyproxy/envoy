@@ -8,8 +8,6 @@
 
 #include "common/config/api_version.h"
 #include "common/config/resources.h"
-
-#include <unistd.h>
 #include "common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -188,7 +186,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
-// Tests that a LDS deletion before Server initManager been initlialized will block the Server from
+// Tests that a LDS deletion before Server initManager been initialized will block the Server from
 // starting.
 TEST_P(ListenerIntegrationTest, RemoveLastUninitializedListener) {
   on_server_init_function_ = [&]() {
