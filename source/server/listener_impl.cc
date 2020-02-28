@@ -257,8 +257,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
-    listener_filter_factories_.push_back(
-        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(), /*ListenerFilterConfig*/ nullptr, *this));
   }
   // Add proxy protocol listener filter if 'use_proxy_proto' flag is set.
   // TODO(jrajahalme): This is the last listener filter on purpose. When filter chain matching
@@ -268,8 +268,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
-    listener_filter_factories_.push_back(
-        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(), /*ListenerFilterConfig*/ nullptr, *this));
   }
 
   const bool need_tls_inspector =
@@ -298,8 +298,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
-    listener_filter_factories_.push_back(
-        factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
+    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
+        Envoy::ProtobufWkt::Empty(), /*ListenerFilterConfig*/ nullptr, *this));
   }
 }
 

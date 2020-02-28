@@ -274,6 +274,14 @@ public:
 /**
  * Listener Filter
  */
+
+/* A mapping from a general listener filter */
+class ListenerFilterConfig {
+public:
+  virtual ~ListenerFilterConfig() = default;
+  virtual bool disabledPredicate() PURE;
+};
+using ListenerFilterConfigSharedPtr = std::shared_ptr<ListenerFilterConfig>;
 class ListenerFilter {
 public:
   virtual ~ListenerFilter() = default;
@@ -301,7 +309,8 @@ public:
    * first is called first).
    * @param filter supplies the filter being added.
    */
-  virtual void addAcceptFilter(ListenerFilterPtr&& filter) PURE;
+  virtual void addAcceptFilter(Network::ListenerFilterConfigSharedPtr lf_config,
+                               ListenerFilterPtr&& filter) PURE;
 };
 
 /**

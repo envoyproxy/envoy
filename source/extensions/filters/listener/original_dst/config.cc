@@ -20,10 +20,11 @@ class OriginalDstConfigFactory : public Server::Configuration::NamedListenerFilt
 public:
   // NamedListenerFilterConfigFactory
   Network::ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::ListenerFactoryContext&) override {
-    return [](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(std::make_unique<OriginalDstFilter>());
+  createListenerFilterFactoryFromProto(const Protobuf::Message&,
+                                       Network::ListenerFilterConfigSharedPtr lf_config,
+                                       Server::Configuration::ListenerFactoryContext&) override {
+    return [lf_config](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(lf_config, std::make_unique<OriginalDstFilter>());
     };
   }
 

@@ -229,9 +229,31 @@ private:
     void unlink();
     void newConnection();
 
+    class OnOffListenerFilter : public Network::ListenerFilter {
+    public:
+      OnOffListenerFilter(bool, Network::ListenerFilterPtr&&) {}
+      Network::FilterStatus onAccept(ListenerFilterCallbacks& cb) {
+        if (isDisabled(cb)) {
+          return Network::FilterStatus::Continue;
+        }
+        return listener_filter_->onAccept(cb);
+      }
+      /**
+       * Check if this filter filter should be disabled on the incoming socket.
+       * @param cb the callbacks the filter instance can use to communicate with the filter chain.
+       **/
+      bool isDisabled(ListenerFilterCallbacks&) { return false; }
+
+    private:
+      Network::ListenerFilterPtr listener_filter_;
+    };
+    using ListenerFilterWrapper = std::unique_ptr<OnOffListenerFilter>;
+
     // Network::ListenerFilterManager
-    void addAcceptFilter(Network::ListenerFilterPtr&& filter) override {
-      accept_filters_.emplace_back(std::move(filter));
+    void addAcceptFilter(Network::ListenerFilterConfigSharedPtr lf_config,
+                         Network::ListenerFilterPtr&& filter) override {
+      accept_filters_.emplace_back(
+          std::make_unique<OnOffListenerFilter>(lf_config->disabledPredicate(), std::move(filter)));
     }
 
     // Network::ListenerFilterCallbacks
@@ -242,8 +264,8 @@ private:
     ActiveTcpListener& listener_;
     Network::ConnectionSocketPtr socket_;
     const bool hand_off_restored_destination_connections_;
-    std::list<Network::ListenerFilterPtr> accept_filters_;
-    std::list<Network::ListenerFilterPtr>::iterator iter_;
+    std::list<ListenerFilterWrapper> accept_filters_;
+    std::list<ListenerFilterWrapper>::iterator iter_;
     Event::TimerPtr timer_;
   };
 

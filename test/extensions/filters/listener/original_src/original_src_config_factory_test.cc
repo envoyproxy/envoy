@@ -29,7 +29,7 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
 
   Network::ListenerFilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*proto_config, context);
+      factory.createFilterListenerFactoryFromProto(*proto_config, context);
   Network::MockListenerFilterManager manager;
   Network::ListenerFilterPtr added_filter;
   EXPECT_CALL(manager, addAcceptFilter_(_))

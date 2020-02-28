@@ -7,6 +7,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -139,7 +141,9 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
             proto_config);
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
-    ret.push_back(factory.createFilterFactoryFromProto(*message, context));
+
+    Network::ListenerFilterConfigSharedPtr lf_config;
+    ret.push_back(factory.createListenerFilterFactoryFromProto(*message, lf_config, context));
   }
   return ret;
 }

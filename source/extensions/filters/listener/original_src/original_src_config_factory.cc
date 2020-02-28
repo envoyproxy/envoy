@@ -13,14 +13,15 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalSrc {
 
-Network::ListenerFilterFactoryCb OriginalSrcConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& message, Server::Configuration::ListenerFactoryContext& context) {
+Network::ListenerFilterFactoryCb OriginalSrcConfigFactory::createListenerFilterFactoryFromProto(
+    const Protobuf::Message& message, Network::ListenerFilterConfigSharedPtr lf_config,
+    Server::Configuration::ListenerFactoryContext& context) {
   auto proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::filters::listener::original_src::v3::OriginalSrc&>(
       message, context.messageValidationVisitor());
   Config config(proto_config);
-  return [config](Network::ListenerFilterManager& filter_manager) -> void {
-    filter_manager.addAcceptFilter(std::make_unique<OriginalSrcFilter>(config));
+  return [lf_config, config](Network::ListenerFilterManager& filter_manager) -> void {
+    filter_manager.addAcceptFilter(lf_config, std::make_unique<OriginalSrcFilter>(config));
   };
 }
 

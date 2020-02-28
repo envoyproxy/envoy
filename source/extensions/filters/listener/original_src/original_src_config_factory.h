@@ -15,9 +15,9 @@ namespace OriginalSrc {
 class OriginalSrcConfigFactory : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Network::ListenerFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& message,
-                               Server::Configuration::ListenerFactoryContext& context) override;
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& message, Network::ListenerFilterConfigSharedPtr lf_config,
+      Server::Configuration::ListenerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

@@ -31,7 +31,7 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
   Server::Configuration::MockListenerFactoryContext context;
   EXPECT_CALL(context, scope()).Times(1);
   Network::ListenerFilterFactoryCb cb =
-      factory->createFilterFactoryFromProto(*proto_config, context);
+      factory->createListenerFilterFactoryFromProto(*proto_config, context);
 
   Network::MockListenerFilterManager manager;
   Network::ListenerFilterPtr added_filter;
