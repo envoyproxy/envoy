@@ -86,7 +86,7 @@ public:
 
 class Filter;
 
-class FireAndForgetHttpWriter;
+class NoopCallbacks;
 
 /**
  * A wrapper for a currently running request/response. This is the primary handle passed to Lua.
@@ -297,26 +297,20 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
-  FireAndForgetHttpWriter* fireAndForgetHttpWriter_;
+  NoopCallbacks* noopCallbacks_;
 };
 
 /**
- * HTTP client that performs non-blocking HTTP calls and ignores the response.
+ * An empty Callbacks client. It will ignore everything, including successes and failures.
  */
-class FireAndForgetHttpWriter : public Filters::Common::Lua::BaseLuaObject<FireAndForgetHttpWriter>,
-                                public Http::AsyncClient::Callbacks {
+class NoopCallbacks : public Http::AsyncClient::Callbacks {
 public:
-  FireAndForgetHttpWriter(Filter& filter);
-
-  int luaHttpCallNonblocking(lua_State* state);
+  NoopCallbacks();
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::ResponseMessagePtr&&) override {}
 
   void onFailure(Http::AsyncClient::FailureReason) override {}
-
-private:
-  Filter& filter_;
 };
 
 /**
