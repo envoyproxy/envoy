@@ -119,12 +119,14 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
     const std::string& local_service_cluster, const Http::HeaderMap& headers,
     const Network::Address::Instance& remote_address) const {
   RateLimit::Descriptor descriptor;
-  bool result = false;
+  bool valid_descriptor = false;
   for (const RateLimitActionPtr& action : actions_) {
-    result = result || action->populateDescriptor(route, descriptor, local_service_cluster, headers,
-                                                  remote_address);
+    if(action->populateDescriptor(route, descriptor, local_service_cluster, headers,
+                                        remote_address)) {
+        valid_descriptor = true;
+      }
     }
-  if (result) {
+  if (valid_descriptor) {
     descriptors.emplace_back(descriptor);
   }
 }

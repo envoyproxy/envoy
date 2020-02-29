@@ -366,6 +366,27 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+// Verify if descriptors are added if atleast one request header matches
+TEST_F(RateLimitPolicyEntryTest, RequestHeadersPartialMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- request_headers:
+    header_name: x-header-name
+    descriptor_key: my_header_name
+- request_headers:
+    header_name: x-header
+    descriptor_key: my_header
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
+                                         default_remote_address_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
 TEST_F(RateLimitPolicyEntryTest, RequestHeadersNoMatch) {
   const std::string yaml = R"EOF(
 actions:
@@ -501,7 +522,8 @@ actions:
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
                                          default_remote_address_);
-  EXPECT_TRUE(descriptors_.empty());
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
+              testing::ContainerEq(descriptors_));
 }
 
 } // namespace
