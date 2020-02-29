@@ -89,7 +89,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), false),
-      ".*assert failure: ioHandle\\(\\).fd\\(\\) != -1.*");
+      ".*assert failure: SOCKET_VALID\\(ioHandle\\(\\)\\.fd\\(\\)\\).*");
 }
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -103,7 +103,6 @@ protected:
     socket_ = std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
                                                          nullptr, true);
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
-
     client_connection_ = dispatcher_->createClientConnection(
         socket_->localAddress(), source_address_, Network::Test::createRawBufferSocket(),
         socket_options_);
@@ -616,12 +615,12 @@ TEST_P(ConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
 #endif
 }
 
+// On our current macOS build, the client connection does not get the early
+// close notification and instead gets the close after reading the FIN.
+// The Windows backend in libevent does not support the EV_CLOSED flag
+// so it won't detect the early close
+#if !defined(__APPLE__) && !defined(WIN32)
 TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
-#ifdef __APPLE__
-  // On our current macOS build, the client connection does not get the early
-  // close notification and instead gets the close after reading the FIN.
-  return;
-#endif
   setUpBasicConnection();
   connect();
 
@@ -633,6 +632,7 @@ TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
   server_connection_->close(ConnectionCloseType::FlushWrite);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   setUpBasicConnection();
@@ -1089,15 +1089,16 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test that a FlushWriteAndDelay close causes Envoy to flush the write and wait for the client/peer
-// to close (until a configured timeout which is not expected to trigger in this test).
+// Test that a FlushWriteAndDelay close causes Envoy to flush the write and wait for the
+// client/peer to close (until a configured timeout which is not expected to trigger in this
+// test).
+//
+// libevent does not provide early close notifications on the currently supported non-Linux
+// builds, so the server connection is never notified of the close. For now, we have chosen to
+// disable tests that rely on this behavior on macOS and Windows (see
+// https://github.com/envoyproxy/envoy/pull/4299).
+#if !defined(__APPLE__) && !defined(WIN32)
 TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
-#ifdef __APPLE__
-  // libevent does not provide early close notifications on the currently supported macOS builds, so
-  // the server connection is never notified of the close. For now, we have chosen to disable tests
-  // that rely on this behavior on macOS (see https://github.com/envoyproxy/envoy/pull/4299).
-  return;
-#endif
   setUpBasicConnection();
   connect();
 
@@ -1133,6 +1134,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
   server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+#endif
 
 // Test that a FlushWriteAndDelay close triggers a timeout which forces Envoy to close the
 // connection when a client has not issued a close within the configured interval.
@@ -1156,8 +1158,8 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
-  // The client _will not_ close the connection. Instead, expect the delayed close timer to trigger
-  // on the server connection.
+  // The client _will not_ close the connection. Instead, expect the delayed close timer to
+  // trigger on the server connection.
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
@@ -1245,8 +1247,8 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithoutPendingWrite)
       }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // The write buffer has been flushed and a delayed close timer has been set. The socket close will
-  // happen as part of the close() since the timeout is no longer required.
+  // The write buffer has been flushed and a delayed close timer has been set. The socket close
+  // will happen as part of the close() since the timeout is no longer required.
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
   server_connection_->close(ConnectionCloseType::FlushWrite);
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(0);
@@ -1256,8 +1258,8 @@ TEST_P(ConnectionImplTest, FlushWriteAfterFlushWriteAndDelayWithoutPendingWrite)
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// Test that delayed close processing can be disabled by setting the delayed close timeout interval
-// to 0.
+// Test that delayed close processing can be disabled by setting the delayed close timeout
+// interval to 0.
 TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   InSequence s1;
 
@@ -1275,8 +1277,8 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
-  // Ensure the delayed close timer is not created when the delayedCloseTimeout config value is set
-  // to 0.
+  // Ensure the delayed close timer is not created when the delayedCloseTimeout config value is
+  // set to 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(0));
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(0);
 
@@ -1289,13 +1291,13 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   // trigger the delayed close timer callback if set.
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
 
-  // Since the delayed close timer never triggers, the connection never closes. Close it here to end
-  // the test cleanly due to the (fd == -1) assert in ~ConnectionImpl().
+  // Since the delayed close timer never triggers, the connection never closes. Close it here to
+  // end the test cleanly due to the (fd == -1) assert in ~ConnectionImpl().
   server_connection->close(ConnectionCloseType::NoFlush);
 }
 
-// Test that the delayed close timer is reset while write flushes are happening when a connection is
-// in delayed close mode.
+// Test that the delayed close timer is reset while write flushes are happening when a connection
+// is in delayed close mode.
 TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) {
   ConnectionMocks mocks = createConnectionMocks();
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
@@ -1324,8 +1326,8 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   EXPECT_CALL(*mocks.timer_, enableTimer(timeout, _)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
 
-  // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its original
-  // timeout value to avoid triggering while the write buffer is being actively flushed.
+  // The write ready event cb (ConnectionImpl::onWriteReady()) will reset the timer to its
+  // original timeout value to avoid triggering while the write buffer is being actively flushed.
   EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) -> IoResult {
         // Partial flush.
@@ -1395,13 +1397,13 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 
   InSequence s1;
 
-  // The actual timeout is insignificant, we just need to enable delayed close processing by setting
-  // it to > 0.
+  // The actual timeout is insignificant, we just need to enable delayed close processing by
+  // setting it to > 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
-  // NOTE: Avoid providing stats storage to the connection via setConnectionStats(). This guarantees
-  // that connection_stats_ is a nullptr and that the callback resiliency validation below tests
-  // that edge case.
+  // NOTE: Avoid providing stats storage to the connection via setConnectionStats(). This
+  // guarantees that connection_stats_ is a nullptr and that the callback resiliency validation
+  // below tests that edge case.
 
   Buffer::OwnedImpl data("data");
   EXPECT_CALL(*mocks.file_event_, activate(Event::FileReadyType::Write))
@@ -1664,7 +1666,8 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWriteFirst) {
 }
 
 // Test that if both sides half-close, but writes have not yet been written to the Transport, that
-// the connection closes only when the writes complete flushing. The write half-close happens first.
+// the connection closes only when the writes complete flushing. The write half-close happens
+// first.
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);
@@ -1686,7 +1689,8 @@ TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedWriteFirst)
 }
 
 // Test that if both sides half-close, but writes have not yet been written to the Transport, that
-// the connection closes only when the writes complete flushing. The read half-close happens first.
+// the connection closes only when the writes complete flushing. The read half-close happens
+// first.
 TEST_F(MockTransportConnectionImplTest, BothHalfCloseWritesNotFlushedReadFirst) {
   std::shared_ptr<MockReadFilter> read_filter(new NiceMock<MockReadFilter>());
   connection_->enableHalfClose(true);

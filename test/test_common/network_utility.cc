@@ -5,6 +5,7 @@
 
 #include "envoy/common/platform.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -31,29 +32,27 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
   Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
-  int err;
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
-    err = result.errno_;
     failing_fn = "bind";
   } else if (type == Address::SocketType::Stream) {
     // Try listening on the port also, if the type is TCP.
-    if (::listen(io_handle->fd(), 1) != 0) {
-      err = errno;
+    result = Api::OsSysCallsSingleton::get().listen(io_handle->fd(), 1);
+    if (result.rc_ != 0) {
       failing_fn = "listen";
     }
   }
   if (failing_fn != nullptr) {
-    if (err == EADDRINUSE) {
+    if (result.errno_ == EADDRINUSE) {
       // The port is already in use. Perfectly normal.
       return nullptr;
-    } else if (err == EACCES) {
+    } else if (result.errno_ == EACCES) {
       // A privileged port, and we don't have privileges. Might want to log this.
       return nullptr;
     }
     // Unexpected failure.
     ADD_FAILURE() << failing_fn << " failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(err) << " (" << err << ")";
+                  << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
     return nullptr;
   }
   // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
@@ -218,9 +217,9 @@ Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance
 UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version)
     : socket_(
           std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)) {
-  // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
-  // modification back to the abstraction layer so it will work for multiple platforms.
-  RELEASE_ASSERT(fcntl(socket_->ioHandle().fd(), F_SETFL, 0) != -1, "");
+  RELEASE_ASSERT(
+      Api::OsSysCallsSingleton::get().setsocketblocking(socket_->ioHandle().fd(), true).rc_ != -1,
+      "");
 }
 
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {

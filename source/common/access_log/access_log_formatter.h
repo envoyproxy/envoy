@@ -90,9 +90,9 @@ public:
   FormatterImpl(const std::string& format);
 
   // Formatter::format
-  std::string format(const Http::HeaderMap& request_headers,
-                     const Http::HeaderMap& response_headers,
-                     const Http::HeaderMap& response_trailers,
+  std::string format(const Http::RequestHeaderMap& request_headers,
+                     const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
@@ -105,18 +105,18 @@ public:
                     bool preserve_types);
 
   // Formatter::format
-  std::string format(const Http::HeaderMap& request_headers,
-                     const Http::HeaderMap& response_headers,
-                     const Http::HeaderMap& response_trailers,
+  std::string format(const Http::RequestHeaderMap& request_headers,
+                     const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   const bool preserve_types_;
   std::map<const std::string, const std::vector<FormatterProviderPtr>> json_output_format_;
 
-  ProtobufWkt::Struct toStruct(const Http::HeaderMap& request_headers,
-                               const Http::HeaderMap& response_headers,
-                               const Http::HeaderMap& response_trailers,
+  ProtobufWkt::Struct toStruct(const Http::RequestHeaderMap& request_headers,
+                               const Http::ResponseHeaderMap& response_headers,
+                               const Http::ResponseTrailerMap& response_trailers,
                                const StreamInfo::StreamInfo& stream_info) const;
 };
 
@@ -129,10 +129,10 @@ public:
   PlainStringFormatter(const std::string& str);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -168,10 +168,10 @@ public:
                          absl::optional<size_t> max_length);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                     const Http::HeaderMap&, const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  std::string format(const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 };
 
@@ -184,10 +184,10 @@ public:
                           absl::optional<size_t> max_length);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,
-                     const Http::HeaderMap&, const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 };
 
@@ -200,11 +200,11 @@ public:
                            absl::optional<size_t> max_length);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
-                     const Http::HeaderMap& response_trailers,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 };
 
@@ -216,10 +216,10 @@ public:
   StreamInfoFormatter(const std::string& field_name);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 
   class FieldExtractor {
@@ -262,10 +262,10 @@ public:
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 };
 
@@ -277,10 +277,10 @@ public:
   FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 
 private:
@@ -298,10 +298,10 @@ public:
   StartTimeFormatter(const std::string& format);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 
 private:

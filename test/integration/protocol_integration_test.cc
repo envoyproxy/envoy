@@ -211,7 +211,10 @@ typed_config:
   response->waitForEndStream();
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
-    EXPECT_EQ("decode", upstream_request_->trailers()->GrpcMessage()->value().getStringView());
+    EXPECT_EQ("decode", upstream_request_->trailers()
+                            ->get(Http::LowerCaseString("grpc-message"))
+                            ->value()
+                            .getStringView());
   }
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
