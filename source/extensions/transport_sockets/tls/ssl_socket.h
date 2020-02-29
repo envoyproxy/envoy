@@ -75,8 +75,7 @@ public:
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
-  const absl::optional<std::string>&
-  x509Extension(const std::string& extension_name) const override;
+  const absl::optional<std::string>& x509Extension(absl::string_view extension_name) const override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 

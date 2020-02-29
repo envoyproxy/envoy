@@ -504,7 +504,7 @@ const std::string& SslSocketInfo::tlsVersion() const {
 }
 
 const absl::optional<std::string>&
-SslSocketInfo::x509Extension(const std::string& extension_name) const {
+SslSocketInfo::x509Extension(absl::string_view extension_name) const {
   auto itr = cached_x509_extensions_.find(extension_name);
   if (itr != cached_x509_extensions_.end()) {
     return itr->second;

@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
 
@@ -137,7 +138,7 @@ public:
    * @return absl::optional<std::string> the value of the extension, if it exists.
    */
   virtual const absl::optional<std::string>&
-  x509Extension(const std::string& extension_name) const PURE;
+  x509Extension(absl::string_view extension_name) const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;
