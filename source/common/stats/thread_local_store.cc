@@ -263,9 +263,7 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   prefix_.free(symbolTable());
 }
 
-// Manages the truncation and tag-extraction of stat names. Tag extraction occurs
-// on the original, untruncated name so the extraction can complete properly,
-// even if the tag values are partially truncated.
+// Manages tag-extraction of stat names.
 class TagExtraction {
 public:
   TagExtraction(ThreadLocalStoreImpl& tls, StatName name) {
@@ -336,7 +334,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (iter != central_cache_map.end()) {
     central_ref = &(iter->second);
   } else if (parent_.checkAndRememberRejection(name, central_rejected_stats, tls_rejected_stats)) {
-    // Note that again we do the name-rejection lookup on the untruncated name.
     return null_stat;
   } else {
     TagExtraction extraction(parent_, name);
