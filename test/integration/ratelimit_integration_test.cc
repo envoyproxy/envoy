@@ -70,7 +70,7 @@ public:
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers{
         {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-        {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}, {"x-forwarded-client-cert": nullptr}};
+        {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
     response_ = codec_client_->makeRequestWithBody(headers, request_size_);
   }
 
