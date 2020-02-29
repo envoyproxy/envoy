@@ -15,8 +15,8 @@ class AddrFamilyAwareSocketOptionImplTest : public SocketOptionTest {
 protected:
   void SetUp() override {
     EXPECT_CALL(os_sys_calls_, socket)
-        .WillRepeatedly(Invoke([](int domain, int type, int protocol) {
-          return Api::SysCallIntResult{::socket(domain, type, protocol), 0};
+        .WillRepeatedly(Invoke([this](int domain, int type, int protocol) {
+          return os_sys_calls_actual_.socket(domain, type, protocol);
         }));
     EXPECT_CALL(os_sys_calls_, close(_)).Times(testing::AnyNumber());
   }
@@ -145,7 +145,9 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Precedence) {
 
 // GetSocketOptionName returns the v4 information for a v4 address
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4GetSocketOptionName) {
-  socket_.local_address_ = Utility::parseInternetAddress("1.2.3.4", 5678);
+  Address::Ipv4Instance address("1.2.3.4", 5678);
+  IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
+  EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),
@@ -158,7 +160,9 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4GetSocketOptionName) {
 
 // GetSocketOptionName returns the v4 information for a v6 address
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6GetSocketOptionName) {
-  socket_.local_address_ = Utility::parseInternetAddress("2::1", 5678);
+  Address::Ipv6Instance address("2::1", 5678);
+  IoHandlePtr io_handle = address.socket(Address::SocketType::Stream);
+  EXPECT_CALL(testing::Const(socket_), ioHandle()).WillRepeatedly(testing::ReturnRef(*io_handle));
 
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10),

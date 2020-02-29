@@ -55,7 +55,7 @@ Configuration
 -------------
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
-* This filter should be configured with the name *envoy.lua*.
+* This filter should be configured with the name *envoy.filters.http.lua*.
 
 Script examples
 ---------------
@@ -277,14 +277,14 @@ metadata()
   metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
-under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
+under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
 :ref:`route entry <envoy_api_msg_route.Route>`.
 
 .. code-block:: yaml
 
   metadata:
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         foo: bar
         baz:
           - bad
@@ -512,7 +512,7 @@ its keys can only be *string* or *numeric*.
 
   function envoy_on_request(request_handle)
     local headers = request_handle:headers()
-    request_handle:streamInfo():dynamicMetadata():set("envoy.lua", "request.info", {
+    request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
       auth: headers:get("authorization),
       token: headers:get("x-request-token"),
     })

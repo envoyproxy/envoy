@@ -62,7 +62,7 @@ TEST_F(RequestFrameCommentTest, SimpleExampleHuffman) {
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
-  TestHeaderMapImpl expected_headers;
+  TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   expected_headers.addCopy("foo", "barbaz");
   EXPECT_CALL(codec.request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
@@ -138,7 +138,7 @@ TEST_F(RequestFrameCommentTest, SimpleExamplePlain) {
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);
   codec.write(WellKnownFrames::initialWindowUpdateFrame(), connection);
-  TestHeaderMapImpl expected_headers;
+  TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   expected_headers.addCopy("foo", "barbaz");
   EXPECT_CALL(codec.request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));

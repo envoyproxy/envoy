@@ -41,9 +41,9 @@ public:
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
   Http::StreamResetReason reset_reason() { return reset_reason_; }
-  const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
-  const Http::HeaderMap& headers() { return *headers_; }
-  const Http::HeaderMapPtr& trailers() { return trailers_; }
+  const Http::ResponseHeaderMap* continue_headers() { return continue_headers_.get(); }
+  const Http::ResponseHeaderMap& headers() { return *headers_; }
+  const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
@@ -73,9 +73,9 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  Http::HeaderMapPtr continue_headers_;
-  Http::HeaderMapPtr headers_;
-  Http::HeaderMapPtr trailers_;
+  Http::ResponseHeaderMapPtr continue_headers_;
+  Http::ResponseHeaderMapPtr headers_;
+  Http::ResponseTrailerMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
   std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};

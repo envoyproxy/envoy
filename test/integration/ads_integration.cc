@@ -96,7 +96,7 @@ AdsIntegrationTest::buildListener(const std::string& name, const std::string& ro
             rds:
               route_config_name: {}
               config_source: {{ ads: {{}} }}
-            http_filters: [{{ name: envoy.router }}]
+            http_filters: [{{ name: envoy.filters.http.router }}]
     )EOF",
       name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config));
 }

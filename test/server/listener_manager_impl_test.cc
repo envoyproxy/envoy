@@ -1107,8 +1107,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  Api::OsSysCallsImpl os_syscall;
-  auto syscall_result = os_syscall.socket(AF_INET, SOCK_STREAM, 0);
+  auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
@@ -1145,8 +1144,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  Api::OsSysCallsImpl os_syscall;
-  auto syscall_result = os_syscall.socket(AF_INET, SOCK_STREAM, 0);
+  auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);

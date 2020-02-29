@@ -165,7 +165,7 @@ message JwtProvider {
   // This field specifies the header name to forward a successfully verified JWT payload to the
   // backend. The forwarded data is::
   //
-  //    base64_encoded(jwt_payload_in_JSON)
+  //    base64url_encoded(jwt_payload_in_JSON)
   //
   // If it is not specified, the payload will not be forwarded.
   string forward_payload_header = 8;

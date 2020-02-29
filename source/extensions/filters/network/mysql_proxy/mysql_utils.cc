@@ -150,7 +150,7 @@ int BufferHelper::peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq)
   if (peekUint32(buffer, val) != MYSQL_SUCCESS) {
     return MYSQL_FAILURE;
   }
-  seq = htonl(val) & MYSQL_HDR_SEQ_MASK;
+  seq = htobe32(val) & MYSQL_HDR_SEQ_MASK;
   len = val & MYSQL_HDR_PKT_SIZE_MASK;
   ENVOY_LOG(trace, "mysql_proxy: MYSQL-hdrseq {}, len {}", seq, len);
   return MYSQL_SUCCESS;

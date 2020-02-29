@@ -102,7 +102,7 @@ void CheckRequestUtils::setRequestTime(envoy::service::auth::v3::AttributeContex
 void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
-    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
+    const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes) {
   httpreq.set_id(std::to_string(stream_id));
   httpreq.set_method(getHeaderStr(headers.Method()));
   httpreq.set_path(getHeaderStr(headers.Path()));
@@ -144,7 +144,7 @@ void CheckRequestUtils::setHttpRequest(
 void CheckRequestUtils::setAttrContextRequest(
     envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
-    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
+    const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes) {
   setRequestTime(req, stream_info);
   setHttpRequest(*req.mutable_http(), stream_id, stream_info, decoding_buffer, headers,
                  max_request_bytes);
@@ -152,7 +152,7 @@ void CheckRequestUtils::setAttrContextRequest(
 
 void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers,
+    const Envoy::Http::RequestHeaderMap& headers,
     Protobuf::Map<std::string, std::string>&& context_extensions,
     envoy::config::core::v3::Metadata&& metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes,

@@ -100,7 +100,7 @@ void Span::finishSpan() {
   broker_.send(json);
 } // namespace XRay
 
-void Span::injectContext(Http::HeaderMap& request_headers) {
+void Span::injectContext(Http::RequestHeaderMap& request_headers) {
   const std::string xray_header_value =
       fmt::format("root={};parent={};sampled={}", traceId(), Id(), sampled() ? "1" : "0");
 
