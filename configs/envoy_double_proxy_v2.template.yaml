@@ -45,18 +45,18 @@
                 #Generally allow front proxy to control timeout and use this as a backstop
                 timeout: 20s
         http_filters:
-        - name: envoy.health_check
+        - name: envoy.filters.http.health_check
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
             pass_through_mode: false
             headers:
               - exact_match: /healthcheck
                 name: :path
-        - name: envoy.buffer
+        - name: envoy.filters.http.buffer
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
             max_request_bytes: 5242880
-        - name: envoy.router
+        - name: envoy.filters.http.router
           typed_config: {}
         tracing:
           operation_name: INGRESS

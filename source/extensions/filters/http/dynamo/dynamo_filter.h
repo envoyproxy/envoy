@@ -75,7 +75,7 @@ private:
   RequestParser::TableDescriptor table_descriptor_{"", true};
   std::string error_type_{};
   MonotonicTime start_decode_;
-  Http::HeaderMap* response_headers_;
+  Http::ResponseHeaderMap* response_headers_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   TimeSource& time_source_;

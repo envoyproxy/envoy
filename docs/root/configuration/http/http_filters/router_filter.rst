@@ -9,7 +9,7 @@ configured :ref:`route table <envoy_api_msg_RouteConfiguration>`. In addition to
 redirection, the filter also handles retry, statistics, etc.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.router.v2.Router>`
-* This filter should be configured with the name *envoy.router*.
+* This filter should be configured with the name *envoy.filters.http.router*.
 
 .. _config_http_filters_router_headers_consumed:
 
@@ -341,7 +341,8 @@ responses.
 x-envoy-original-path
 ^^^^^^^^^^^^^^^^^^^^^
 
-If the route utilizes :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`,
+If the route utilizes :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`
+or :ref:`regex_rewrite <envoy_api_field_route.RouteAction.regex_rewrite>`,
 Envoy will put the original path header in this header. This can be useful for logging and
 debugging.
 

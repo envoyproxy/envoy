@@ -41,12 +41,14 @@ struct ToolConfig {
 
   Stats::SymbolTable& symbolTable() { return *symbol_table_; }
 
-  std::unique_ptr<Http::TestHeaderMapImpl> headers_;
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers_;
+  std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers_;
   Router::RouteConstSharedPtr route_;
   int random_value_{0};
 
 private:
-  ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int random_value);
+  ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_headers,
+             std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers, int random_value);
   Stats::TestSymbolTable symbol_table_;
 };
 
@@ -95,11 +97,18 @@ private:
    * Set UUID as the name for each route for detecting missing tests during the coverage check.
    */
   static void assignUniqueRouteNames(envoy::config::route::v3::RouteConfiguration& route_config);
+
   /**
    * For each route with runtime fraction 0%, set the numerator to a nonzero value so the
    * route can be tested as enabled or disabled.
    */
   static void assignRuntimeFraction(envoy::config::route::v3::RouteConfiguration& route_config);
+
+  /**
+   * Perform header transforms for any request/response headers for the route matched.
+   * Can be called at most once for each test route.
+   */
+  void finalizeHeaders(ToolConfig& tool_config, Envoy::StreamInfo::StreamInfoImpl stream_info);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,
@@ -119,14 +128,14 @@ private:
   bool compareRedirectPath(ToolConfig& tool_config, const std::string& expected);
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareHeaderField(ToolConfig& tool_config, const std::string& field,
-                          const std::string& expected);
-  bool compareHeaderField(ToolConfig& tool_config,
-                          const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
-                                const std::string& expected);
-  bool compareCustomHeaderField(ToolConfig& tool_config,
-                                const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
+                                 const std::string& expected);
+  bool compareRequestHeaderField(ToolConfig& tool_config,
+                                 const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  bool compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
+                                  const std::string& expected);
+  bool compareResponseHeaderField(ToolConfig& tool_config,
+                                  const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.

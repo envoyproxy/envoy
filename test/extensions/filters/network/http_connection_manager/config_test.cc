@@ -97,8 +97,8 @@ route_config:
       route:
         cluster: cluster
 http_filters:
-- name: envoy.router
-- name: envoy.health_check
+- name: envoy.filters.http.router
+- name: envoy.filters.http.health_check
   typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
@@ -108,7 +108,7 @@ http_filters:
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_),
-      EnvoyException, "Error: envoy.router must be the terminal http filter.");
+      EnvoyException, "Error: envoy.filters.http.router must be the terminal http filter.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, NonTerminalFilter) {
@@ -127,7 +127,7 @@ route_config:
       route:
         cluster: cluster
 http_filters:
-- name: envoy.health_check
+- name: envoy.filters.http.health_check
   typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
@@ -138,7 +138,8 @@ http_filters:
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_),
       EnvoyException,
-      "Error: non-terminal filter envoy.health_check is the last filter in a http filter chain.");
+      "Error: non-terminal filter envoy.filters.http.health_check is the last filter in a http "
+      "filter chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
@@ -160,7 +161,7 @@ tracing:
   operation_name: ingress
   max_path_tag_length: 128
 http_filters:
-- name: envoy.router
+- name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -246,7 +247,7 @@ route_config:
 tracing:
   operation_name: ingress
 http_filters:
-- name: envoy.router
+- name: envoy.filters.http.router
   )EOF";
 
   ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::OUTBOUND));
@@ -272,7 +273,7 @@ route_config:
 tracing:
   operation_name: egress
 http_filters:
-- name: envoy.router
+- name: envoy.filters.http.router
   )EOF";
 
   ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::INBOUND));
@@ -292,7 +293,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   tracing:
     operation_name: ingress
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -327,7 +328,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
     overall_sampling:
       value: 3
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -361,7 +362,7 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
     overall_sampling:
       value: 0.3
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -387,7 +388,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -407,7 +408,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -423,7 +424,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -439,7 +440,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -456,7 +457,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -473,7 +474,7 @@ TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -491,7 +492,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -507,7 +508,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutDefault) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -525,7 +526,7 @@ TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeoutOff) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -541,7 +542,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestHeaderCount) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -559,7 +560,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -575,7 +576,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -595,7 +596,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -615,7 +616,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -636,7 +637,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
@@ -659,7 +660,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
@@ -679,7 +680,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
     name: local_route
   normalize_path: true
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
@@ -699,7 +700,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
     name: local_route
   normalize_path: false
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
@@ -718,7 +719,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesDefault) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -735,7 +736,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesTrue) {
     name: local_route
   merge_slashes: true
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -752,7 +753,7 @@ TEST_F(HttpConnectionManagerConfigTest, MergeSlashesFalse) {
     name: local_route
   merge_slashes: false
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -768,7 +769,7 @@ TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -784,7 +785,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -799,7 +800,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
   route_config:
     name: local_route
   http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -823,10 +824,10 @@ route_config:
       route:
         cluster: cluster
 http_filters:
-- name: envoy.http_dynamo_filter
+- name: envoy.filters.http.dynamo
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
-- name: envoy.router
+- name: envoy.filters.http.router
   )EOF";
 
   auto proto_config = parseHttpConnectionManagerFromV2Yaml(yaml_string);
@@ -874,7 +875,7 @@ route_config:
       route:
         cluster: fake_cluster
 http_filters:
-- name: envoy.http_dynamo_filter
+- name: envoy.filters.http.dynamo
   config: {}
 access_log:
 - name: accesslog
@@ -903,7 +904,7 @@ route_config:
       route:
         cluster: fake_cluster
 http_filters:
-- name: envoy.http_dynamo_filter
+- name: envoy.filters.http.dynamo
   typed_config: {}
 access_log:
 - name: accesslog
@@ -933,7 +934,7 @@ route_config:
       route:
         cluster: fake_cluster
 http_filters:
-- name: envoy.http_dynamo_filter
+- name: envoy.filters.http.dynamo
   typed_config: {}
 access_log:
 - name: accesslog
@@ -983,8 +984,8 @@ route_config:
       route:
         cluster: cluster
 http_filters:
-- name: envoy.http_dynamo_filter
-- name: envoy.router
+- name: envoy.filters.http.dynamo
+- name: envoy.filters.http.router
 
   )EOF";
 };
@@ -1090,17 +1091,21 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
   auto websocket_config = hcm_config.add_upgrade_configs();
   websocket_config->set_upgrade_type("websocket");
 
-  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n\fenvoy.router"));
+  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n"
+                                                               "\x19"
+                                                               "envoy.filters.http.router"));
 
   auto foo_config = hcm_config.add_upgrade_configs();
   foo_config->set_upgrade_type("foo");
   foo_config->add_filters()->ParseFromString("\n"
-                                             "\x18"
-                                             "envoy.http_dynamo_filter");
+                                             "\x19"
+                                             "envoy.filters.http.dynamo");
   foo_config->add_filters()->ParseFromString("\n"
-                                             "\x18"
-                                             "envoy.http_dynamo_filter");
-  foo_config->add_filters()->ParseFromString("\n\fenvoy.router");
+                                             "\x19"
+                                             "envoy.filters.http.dynamo");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x19"
+                                             "envoy.filters.http.router");
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
@@ -1132,20 +1137,24 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChainWithRouterNotLast) {
   auto websocket_config = hcm_config.add_upgrade_configs();
   websocket_config->set_upgrade_type("websocket");
 
-  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n\fenvoy.router"));
+  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n"
+                                                               "\x19"
+                                                               "envoy.filters.http.router"));
 
   auto foo_config = hcm_config.add_upgrade_configs();
   foo_config->set_upgrade_type("foo");
-  foo_config->add_filters()->ParseFromString("\n\fenvoy.router");
   foo_config->add_filters()->ParseFromString("\n"
-                                             "\x18"
-                                             "envoy.http_dynamo_filter");
+                                             "\x19"
+                                             "envoy.filters.http.router");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x19"
+                                             "envoy.filters.http.dynamo");
 
-  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
-                                                        route_config_provider_manager_,
-                                                        scoped_routes_config_provider_manager_),
-                            EnvoyException,
-                            "Error: envoy.router must be the terminal http upgrade filter.");
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                  route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException, "Error: envoy.filters.http.router must be the terminal http upgrade filter.");
 }
 
 TEST_F(FilterChainTest, invalidConfig) {
