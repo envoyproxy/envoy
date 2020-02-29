@@ -73,7 +73,7 @@ def runChecks():
   errors += checkFileExpectingOK("exclusions")
 
   errors += checkFileExpectingErrors("typos",
-                                     ["spacific", "reelistic", "Awwful", "kombinations", "woork"])
+                                     ["spacific", "reelistic", "Awwful", "combeenations", "woork"])
   errors += checkFileExpectingErrors(
       "skip_blocks", ["speelinga", "speelingb", "speelingc", "speelingd", "speelinge"])
   errors += checkFileExpectingErrors("on_off", ["speelinga", "speelingb"])

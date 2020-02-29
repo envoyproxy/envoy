@@ -772,7 +772,8 @@ if __name__ == "__main__":
                       type=str,
                       nargs="*",
                       help="specify the files for the script to process.")
-  parser.add_argument('-d', '--debug', action='count', help="Debug spell checker subprocess.")
+  parser.add_argument('-d', '--debug', action='count', help="Debug spell checker subprocess.",
+                      default=0)
   parser.add_argument('--mark',
                       action='store_true',
                       help="Emits extra output to mark misspelled words.")
