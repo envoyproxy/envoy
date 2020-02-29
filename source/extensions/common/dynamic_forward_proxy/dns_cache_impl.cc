@@ -205,9 +205,13 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (status == Network::DnsResolver::ResolutionStatus::Success) {
     failure_backoff_strategy_->reset();
     primary_host_info.refresh_timer_->enableTimer(refresh_interval_);
+    ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', refresh rate {} ms", host,
+              refresh_interval_.count());
   } else {
-    primary_host_info.refresh_timer_->enableTimer(
-        std::chrono::milliseconds(failure_backoff_strategy_->nextBackOffMs()));
+    const uint64_t refresh_interval = failure_backoff_strategy_->nextBackOffMs();
+    primary_host_info.refresh_timer_->enableTimer(std::chrono::milliseconds(refresh_interval));
+    ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) refresh rate {} ms", host,
+              refresh_interval);
   }
 }
 
