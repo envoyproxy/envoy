@@ -1,7 +1,7 @@
 Envoy documentation
 =================================
 
-d.. ifconfig:: release_level in ('pre-release')
+.. ifconfig:: release_level in ('pre-release')
 
   .. attention::
 
