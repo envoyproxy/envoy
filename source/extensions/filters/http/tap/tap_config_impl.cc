@@ -41,7 +41,7 @@ void HttpPerRequestTapperImpl::streamRequestHeaders() {
   sink_handle_->submitTrace(std::move(trace));
 }
 
-void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) {
+void HttpPerRequestTapperImpl::onRequestHeaders(const Http::RequestHeaderMap& headers) {
   request_headers_ = &headers;
   config_->rootMatcher().onHttpRequestHeaders(headers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
@@ -74,7 +74,7 @@ void HttpPerRequestTapperImpl::streamRequestTrailers() {
   }
 }
 
-void HttpPerRequestTapperImpl::onRequestTrailers(const Http::HeaderMap& trailers) {
+void HttpPerRequestTapperImpl::onRequestTrailers(const Http::RequestTrailerMap& trailers) {
   request_trailers_ = &trailers;
   config_->rootMatcher().onHttpRequestTrailers(trailers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
@@ -97,7 +97,7 @@ void HttpPerRequestTapperImpl::streamResponseHeaders() {
   sink_handle_->submitTrace(std::move(trace));
 }
 
-void HttpPerRequestTapperImpl::onResponseHeaders(const Http::HeaderMap& headers) {
+void HttpPerRequestTapperImpl::onResponseHeaders(const Http::ResponseHeaderMap& headers) {
   response_headers_ = &headers;
   config_->rootMatcher().onHttpResponseHeaders(headers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
@@ -126,7 +126,7 @@ void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
          &envoy::data::tap::v3::HttpBufferedTrace::mutable_response);
 }
 
-void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailers) {
+void HttpPerRequestTapperImpl::onResponseTrailers(const Http::ResponseTrailerMap& trailers) {
   response_trailers_ = &trailers;
   config_->rootMatcher().onHttpResponseTrailers(trailers, statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {

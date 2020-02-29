@@ -48,7 +48,7 @@ UserAgentStats::UserAgentStats(Stats::StatName prefix, Stats::StatName device, S
   downstream_rq_total_.inc();
 }
 
-void UserAgent::initializeFromHeaders(const HeaderMap& headers, Stats::StatName prefix,
+void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::StatName prefix,
                                       Stats::Scope& scope) {
   // We assume that the user-agent is consistent based on the first request.
   if (stats_ == nullptr && !initialized_) {

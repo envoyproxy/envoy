@@ -58,7 +58,8 @@ public:
    * @param prefix supplies the stat prefix for the UA stats.
    * @param scope supplies the backing stat scope.
    */
-  void initializeFromHeaders(const HeaderMap& headers, Stats::StatName prefix, Stats::Scope& scope);
+  void initializeFromHeaders(const RequestHeaderMap& headers, Stats::StatName prefix,
+                             Stats::Scope& scope);
 
   /**
    * Called when a connection is being destroyed.

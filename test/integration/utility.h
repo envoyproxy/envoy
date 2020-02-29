@@ -27,7 +27,7 @@ public:
   BufferingStreamDecoder(std::function<void()> on_complete_cb) : on_complete_cb_(on_complete_cb) {}
 
   bool complete() { return complete_; }
-  const Http::HeaderMap& headers() { return *headers_; }
+  const Http::ResponseHeaderMap& headers() { return *headers_; }
   const std::string& body() { return body_; }
 
   // Http::StreamDecoder
@@ -48,7 +48,7 @@ public:
 private:
   void onComplete();
 
-  Http::HeaderMapPtr headers_;
+  Http::ResponseHeaderMapPtr headers_;
   std::string body_;
   bool complete_{};
   std::function<void()> on_complete_cb_;
