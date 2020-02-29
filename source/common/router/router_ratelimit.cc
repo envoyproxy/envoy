@@ -121,11 +121,11 @@ void RateLimitPolicyEntryImpl::populateDescriptors(
   RateLimit::Descriptor descriptor;
   bool valid_descriptor = false;
   for (const RateLimitActionPtr& action : actions_) {
-    if(action->populateDescriptor(route, descriptor, local_service_cluster, headers,
-                                        remote_address)) {
-        valid_descriptor = true;
-      }
+    if (action->populateDescriptor(route, descriptor, local_service_cluster, headers,
+                                   remote_address)) {
+      valid_descriptor = true;
     }
+  }
   if (valid_descriptor) {
     descriptors.emplace_back(descriptor);
   }

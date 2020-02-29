@@ -522,8 +522,9 @@ actions:
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
                                          default_remote_address_);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
-              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
+      testing::ContainerEq(descriptors_));
 }
 
 } // namespace
