@@ -366,7 +366,7 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
-// Verify if descriptors are added if atleast one request header matches
+// Verify if descriptors are added if at-least one request header matches
 TEST_F(RateLimitPolicyEntryTest, RequestHeadersPartialMatch) {
   const std::string yaml = R"EOF(
 actions:
