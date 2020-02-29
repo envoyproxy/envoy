@@ -102,7 +102,8 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
   processing_100_continue_ = false;
 }
 
-void StreamEncoderImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
+void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
+                                          bool end_stream) {
   bool saw_content_length = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
@@ -579,8 +580,8 @@ int ConnectionImpl::onHeadersCompleteBase() {
     absl::string_view encoding = current_headers.TransferEncoding()->value().getStringView();
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
-        encoding != Headers::get().TransferEncodingValues.Identity &&
-        encoding != Headers::get().TransferEncodingValues.Chunked) {
+        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Identity) &&
+        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError();
       throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");

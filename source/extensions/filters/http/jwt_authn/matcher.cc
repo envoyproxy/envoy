@@ -35,7 +35,7 @@ public:
   }
 
   // Check match for HeaderMatcher and QueryParameterMatcher
-  bool matchRoute(const Http::HeaderMap& headers) const {
+  bool matchRoute(const Http::RequestHeaderMap& headers) const {
     bool matches = true;
     // TODO(potatop): matching on RouteMatch runtime is not implemented.
 
@@ -65,7 +65,7 @@ public:
       : BaseMatcherImpl(rule), prefix_(rule.match().prefix()),
         path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
 
-  bool matches(const Http::HeaderMap& headers) const override {
+  bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) &&
         path_matcher_->match(headers.Path()->value().getStringView())) {
       ENVOY_LOG(debug, "Prefix requirement '{}' matched.", prefix_);
@@ -89,7 +89,7 @@ public:
       : BaseMatcherImpl(rule), path_(rule.match().path()),
         path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_)) {}
 
-  bool matches(const Http::HeaderMap& headers) const override {
+  bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) &&
         path_matcher_->match(headers.Path()->value().getStringView())) {
       ENVOY_LOG(debug, "Path requirement '{}' matched.", path_);
@@ -125,7 +125,7 @@ public:
     }
   }
 
-  bool matches(const Http::HeaderMap& headers) const override {
+  bool matches(const Http::RequestHeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers)) {
       const Http::HeaderString& path = headers.Path()->value();
       const absl::string_view query_string = Http::Utility::findQueryStringStart(path);

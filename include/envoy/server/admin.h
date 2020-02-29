@@ -48,7 +48,7 @@ public:
    * @return Http::HeaderMap& to be used by handler to parse header information sent with the
    * request.
    */
-  virtual const Http::HeaderMap& getRequestHeaders() const PURE;
+  virtual const Http::RequestHeaderMap& getRequestHeaders() const PURE;
 };
 
 /**
@@ -58,7 +58,7 @@ public:
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
-  [this](absl::string_view path_and_query, Http::HeaderMap& response_headers,                      \
+  [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,              \
          Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {                \
     return X(path_and_query, response_headers, data, admin_stream);                                \
   }
@@ -80,9 +80,9 @@ public:
    * its data.
    * @return Http::Code the response code.
    */
-  using HandlerCb =
-      std::function<Http::Code(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                               Buffer::Instance& response, AdminStream& admin_stream)>;
+  using HandlerCb = std::function<Http::Code(
+      absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
+      Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
    * Add an admin handler.
@@ -139,7 +139,7 @@ public:
    * @return Http::Code The HTTP response code from the admin request.
    */
   virtual Http::Code request(absl::string_view path_and_query, absl::string_view method,
-                             Http::HeaderMap& response_headers, std::string& body) PURE;
+                             Http::ResponseHeaderMap& response_headers, std::string& body) PURE;
 
   /**
    * Add this Admin's listener to the provided handler, if the listener exists.

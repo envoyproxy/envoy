@@ -66,7 +66,7 @@ public:
   }
 
   const std::string full_config{R"EOF(
-      name: envoy.gzip
+      name: envoy.filters.http.gzip
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.http.gzip.v2.Gzip
         memory_level: 3
@@ -80,7 +80,7 @@ public:
         disable_on_etag_header: true
     )EOF"};
 
-  const std::string default_config{"name: envoy.gzip"};
+  const std::string default_config{"name: envoy.filters.http.gzip"};
 
   const uint64_t window_bits{15 | 16};
 

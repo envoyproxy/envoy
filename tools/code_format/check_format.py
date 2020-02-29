@@ -927,7 +927,7 @@ if __name__ == "__main__":
     owned = []
     maintainers = [
         '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
-        '@junr03', '@dio', '@jmarantz'
+        '@yavlasov', '@junr03', '@dio', '@jmarantz'
     ]
 
     try:

@@ -49,7 +49,7 @@ public:
   SimpleInsertContext(LookupContext& lookup_context, SimpleHttpCache& cache)
       : key_(dynamic_cast<SimpleLookupContext&>(lookup_context).request().key()), cache_(cache) {}
 
-  void insertHeaders(const Http::HeaderMap& response_headers, bool end_stream) override {
+  void insertHeaders(const Http::ResponseHeaderMap& response_headers, bool end_stream) override {
     ASSERT(!committed_);
     response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
     if (end_stream) {
@@ -70,7 +70,7 @@ public:
     }
   }
 
-  void insertTrailers(const Http::HeaderMap&) override {
+  void insertTrailers(const Http::ResponseTrailerMap&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(toddmgreer): support trailers
   }
 
@@ -93,7 +93,7 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request) {
 }
 
 void SimpleHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
-                                    Http::HeaderMapPtr&& response_headers) {
+                                    Http::ResponseHeaderMapPtr&& response_headers) {
   ASSERT(lookup_context);
   ASSERT(response_headers);
   // TODO(toddmgreer): Support updating headers.
@@ -112,7 +112,7 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
       iter->second.body_};
 }
 
-void SimpleHttpCache::insert(const Key& key, Http::HeaderMapPtr&& response_headers,
+void SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
                              std::string&& body) {
   absl::WriterMutexLock lock(&mutex_);
   map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(body)};

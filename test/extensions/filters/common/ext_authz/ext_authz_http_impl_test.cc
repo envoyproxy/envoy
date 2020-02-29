@@ -46,9 +46,8 @@ public:
         .WillByDefault(ReturnRef(async_client_));
   }
 
-  static ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING,
-                                            uint32_t timeout = 250,
-                                            const std::string& path_prefix = "/bar") {
+  ClientConfigSharedPtr createConfig(const std::string& yaml = EMPTY_STRING, uint32_t timeout = 250,
+                                     const std::string& path_prefix = "/bar") {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config{};
     if (yaml.empty()) {
       const std::string default_yaml = R"EOF(
@@ -62,7 +61,12 @@ public:
             allowed_headers:
               patterns:
               - exact: Baz
-              - prefix: "x-"
+                ignore_case: true
+              - prefix: "X-"
+                ignore_case: true
+              - safe_regex:
+                  google_re2: {}
+                  regex: regex-foo.?
             headers_to_add:
             - key: "x-authz-header1"
               value: "value"
@@ -73,18 +77,22 @@ public:
             allowed_upstream_headers:
               patterns:
               - exact: Bar
-              - prefix: "x-"
+                ignore_case: true
+              - prefix: "X-"
+                ignore_case: true
             allowed_client_headers:
               patterns:
               - exact: Foo
-              - prefix: "x-"
+                ignore_case: true
+              - prefix: "X-"
+                ignore_case: true
         )EOF";
       TestUtility::loadFromYaml(default_yaml, proto_config);
     } else {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
 
-    return std::make_shared<ClientConfig>(ClientConfig{proto_config, timeout, path_prefix});
+    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
   Http::RequestMessagePtr sendRequest(std::unordered_map<std::string, std::string>&& headers) {
@@ -245,10 +253,14 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
 
 // Test the client when a request contains headers in the prefix matchers.
 TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
+  const Http::LowerCaseString regexFood{"regex-food"};
+  const Http::LowerCaseString regexFool{"regex-fool"};
   Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().XContentTypeOptions.get(), "foobar"},
                    {Http::Headers::get().XSquashDebug.get(), "foo"},
-                   {Http::Headers::get().ContentType.get(), "bar"}});
+                   {Http::Headers::get().ContentType.get(), "bar"},
+                   {regexFood.get(), "food"},
+                   {regexFool.get(), "fool"}});
 
   EXPECT_EQ(message_ptr->headers().get(Http::Headers::get().ContentType), nullptr);
   const auto* x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
@@ -258,6 +270,14 @@ TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
   const auto* x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
   ASSERT_NE(x_content_type, nullptr);
   EXPECT_EQ(x_content_type->value().getStringView(), "foobar");
+
+  const auto* food = message_ptr->headers().get(regexFood);
+  ASSERT_NE(food, nullptr);
+  EXPECT_EQ(food->value().getStringView(), "food");
+
+  const auto* fool = message_ptr->headers().get(regexFool);
+  ASSERT_NE(fool, nullptr);
+  EXPECT_EQ(fool->value().getStringView(), "fool");
 }
 
 // Verify client response when authorization server returns a 200 OK.

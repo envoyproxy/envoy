@@ -26,7 +26,7 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
-Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
+Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::ResponseHeaderMap& headers) {
   const auto http_response_status = Http::Utility::getResponseStatus(headers);
 
   // Notably, we treat an upstream 200 as a successful response. This differs
@@ -39,7 +39,7 @@ Grpc::Status::GrpcStatus grpcStatusFromHeaders(Http::HeaderMap& headers) {
   }
 }
 
-std::string badContentTypeMessage(const Http::HeaderMap& headers) {
+std::string badContentTypeMessage(const Http::ResponseHeaderMap& headers) {
   if (headers.ContentType() != nullptr) {
     return fmt::format(
         "envoy reverse bridge: upstream responded with unsupported content-type {}, status code {}",
@@ -51,7 +51,7 @@ std::string badContentTypeMessage(const Http::HeaderMap& headers) {
   }
 }
 
-void adjustContentLength(Http::HeaderMap& headers,
+void adjustContentLength(Http::RequestOrResponseHeaderMap& headers,
                          const std::function<uint64_t(uint64_t value)>& adjustment) {
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {

@@ -101,6 +101,16 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   EXPECT_TRUE(inflated);
 }
 
+// Test that the deprecated extension name still functions.
+TEST(BufferFilterFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.buffer";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace
 } // namespace BufferFilter
 } // namespace HttpFilters
