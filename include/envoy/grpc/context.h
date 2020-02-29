@@ -81,6 +81,9 @@ public:
   virtual void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
                                          const RequestNames& request_names, uint64_t amount) PURE;
 
+  /**
+   * @return a struct containing StatNames for google RPC stat tokens.
+   */
   virtual GoogleGrpcStatNames& googleGrpcStatNames() PURE;
 };
 

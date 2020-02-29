@@ -82,7 +82,6 @@ struct ConnectionManagerNamedStats {
 struct ConnectionManagerStats {
   ConnectionManagerNamedStats named_;
   std::string prefix_;
-  Stats::StatName prefix_stat_name_;
   Stats::Scope& scope_;
 };
 
