@@ -41,7 +41,7 @@ ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<v
 void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
 
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
-// the logged failure, eg "EAGAIN" vs "11".
+// the logged failure, e.g., "EAGAIN" vs "11".
 #define _ASSERT_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                    \
   do {                                                                                             \
     if (!(CONDITION)) {                                                                            \

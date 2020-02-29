@@ -143,7 +143,7 @@ message JwtProvider {
   //
   // can be used to extract token from header::
   //
-  //   x-goog-iap-jwt-assertion: <JWT>.
+  //   ``x-goog-iap-jwt-assertion: <JWT>``.
   //
   repeated JwtHeader from_headers = 6;
 

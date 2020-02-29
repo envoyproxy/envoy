@@ -1275,7 +1275,7 @@ typed_config:
 }
 
 /**
- * Sample extension filter which allows every sample_rate-th request.
+ * Sample extension filter which allows every 1 of every `sample_rate` log attempts.
  */
 class SampleExtensionFilter : public Filter {
 public:
