@@ -207,7 +207,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoManageFrameHeader) {
 
   {
     // Last call should also not modify the buffer.
-    Http::TestRequestTrailerMapImpl trailers;
+    Http::TestResponseTrailerMapImpl trailers;
     EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
 
     Envoy::Buffer::OwnedImpl buffer;
@@ -280,7 +280,7 @@ TEST_F(ReverseBridgeTest, GrpcRequest) {
   }
   {
     // Last call should prefix the buffer with the size and insert the gRPC status into trailers.
-    Http::TestRequestTrailerMapImpl trailers;
+    Http::TestResponseTrailerMapImpl trailers;
     EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
 
     Envoy::Buffer::OwnedImpl buffer;
@@ -362,7 +362,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestNoContentLength) {
   }
   {
     // Last call should prefix the buffer with the size and insert the gRPC status into trailers.
-    Http::TestRequestTrailerMapImpl trailers;
+    Http::TestResponseTrailerMapImpl trailers;
     EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
 
     Envoy::Buffer::OwnedImpl buffer;
@@ -438,7 +438,7 @@ TEST_F(ReverseBridgeTest, GrpcRequestInternalError) {
   }
   {
     // Last call should prefix the buffer with the size and insert the appropriate gRPC status.
-    Http::TestRequestTrailerMapImpl trailers;
+    Http::TestResponseTrailerMapImpl trailers;
     EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
 
     Envoy::Buffer::OwnedImpl buffer;
@@ -654,7 +654,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
   }
   {
     // Last call should prefix the buffer with the size and insert the gRPC status into trailers.
-    Http::TestRequestTrailerMapImpl trailers;
+    Http::TestResponseTrailerMapImpl trailers;
     EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
 
     Envoy::Buffer::OwnedImpl buffer;

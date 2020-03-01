@@ -24,9 +24,10 @@ public:
 
   // Allocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
-                               const std::vector<Tag>& tags) override;
+                               const StatNameTagVector& stat_name_tags) override;
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
-                           const std::vector<Tag>& tags, Gauge::ImportMode import_mode) override;
+                           const StatNameTagVector& stat_name_tags,
+                           Gauge::ImportMode import_mode) override;
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 

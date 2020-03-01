@@ -71,7 +71,7 @@ static_resources:
           stat_prefix: config_test
           http_filters:
           - name: envoy.filters.http.on_demand
-          - name: envoy.router
+          - name: envoy.filters.http.router
           codec_type: HTTP2
           rds:
             route_config_name: my_route

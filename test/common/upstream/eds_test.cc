@@ -365,26 +365,27 @@ TEST_F(EdsTest, EndpointMetadata) {
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
   EXPECT_EQ(hosts[0]->metadata()->filter_metadata_size(), 2);
-  EXPECT_EQ(Config::Metadata::metadataValue(*hosts[0]->metadata(),
+  EXPECT_EQ(Config::Metadata::metadataValue(hosts[0]->metadata().get(),
                                             Config::MetadataFilters::get().ENVOY_LB, "string_key")
                 .string_value(),
             std::string("string_value"));
-  EXPECT_EQ(Config::Metadata::metadataValue(*hosts[0]->metadata(), "custom_namespace", "num_key")
-                .number_value(),
-            1.1);
-  EXPECT_FALSE(Config::Metadata::metadataValue(*hosts[0]->metadata(),
+  EXPECT_EQ(
+      Config::Metadata::metadataValue(hosts[0]->metadata().get(), "custom_namespace", "num_key")
+          .number_value(),
+      1.1);
+  EXPECT_FALSE(Config::Metadata::metadataValue(hosts[0]->metadata().get(),
                                                Config::MetadataFilters::get().ENVOY_LB,
                                                Config::MetadataEnvoyLbKeys::get().CANARY)
                    .bool_value());
   EXPECT_FALSE(hosts[0]->canary());
 
   EXPECT_EQ(hosts[1]->metadata()->filter_metadata_size(), 1);
-  EXPECT_TRUE(Config::Metadata::metadataValue(*hosts[1]->metadata(),
+  EXPECT_TRUE(Config::Metadata::metadataValue(hosts[1]->metadata().get(),
                                               Config::MetadataFilters::get().ENVOY_LB,
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value());
   EXPECT_TRUE(hosts[1]->canary());
-  EXPECT_EQ(Config::Metadata::metadataValue(*hosts[1]->metadata(),
+  EXPECT_EQ(Config::Metadata::metadataValue(hosts[1]->metadata().get(),
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
             "v1");
@@ -400,7 +401,7 @@ TEST_F(EdsTest, EndpointMetadata) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   auto& nhosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(nhosts.size(), 2);
-  EXPECT_EQ(Config::Metadata::metadataValue(*nhosts[1]->metadata(),
+  EXPECT_EQ(Config::Metadata::metadataValue(nhosts[1]->metadata().get(),
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
             "v2");

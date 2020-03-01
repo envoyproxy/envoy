@@ -72,7 +72,8 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   return true;
 }
 
-void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
+void Utility::appendXff(RequestHeaderMap& headers,
+                        const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
     return;
   }
@@ -80,14 +81,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
   headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
 }
 
-void Utility::appendVia(HeaderMap& headers, const std::string& via) {
+void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& via) {
   // TODO(asraa): Investigate whether it is necessary to append with whitespace here by:
   //     (a) Validating we do not expect whitespace in via headers
   //     (b) Add runtime guarding in case users have upstreams which expect it.
   headers.appendVia(via, ", ");
 }
 
-std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
+std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());
   return fmt::format("https://{}{}", headers.Host()->value().getStringView(),
@@ -234,7 +235,7 @@ bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
          headers.Protocol() && !headers.Protocol()->value().empty();
 }
 
-bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
@@ -351,7 +352,8 @@ void Utility::sendLocalReply(
 }
 
 Utility::GetLastAddressFromXffInfo
-Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t num_to_skip) {
+Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
+                               uint32_t num_to_skip) {
   const auto xff_header = request_headers.ForwardedFor();
   if (xff_header == nullptr) {
     return {nullptr, false};

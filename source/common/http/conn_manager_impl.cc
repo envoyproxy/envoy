@@ -670,7 +670,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
   access_log_handlers_.push_back(handler);
 }
 
-void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
+void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
   stream_info_.response_code_ = response_code;
 
@@ -1168,7 +1168,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(
   }
 }
 
-HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
+RequestTrailerMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
 
@@ -1700,7 +1700,7 @@ void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilt
   }
 }
 
-HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
+ResponseTrailerMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
   // Trailers can only be added during the last data frame (i.e. end_stream = true).
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
 
@@ -2217,7 +2217,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::handleMetadataAfterHeader
   iterate_from_current_filter_ = saved_state;
 }
 
-HeaderMap& ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedTrailers() {
+RequestTrailerMap& ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedTrailers() {
   return parent_.addDecodedTrailers();
 }
 
@@ -2396,7 +2396,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilter
                      ActiveStream::FilterIterationStartState::CanStartFromCurrent);
 }
 
-HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
+ResponseTrailerMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
   return parent_.addEncodedTrailers();
 }
 

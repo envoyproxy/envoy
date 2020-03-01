@@ -24,7 +24,8 @@ Http::FilterFactoryCb GzipFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the gzip filter. @see NamedHttpFilterConfigFactory.
  */
-REGISTER_FACTORY(GzipFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(GzipFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.gzip"};
 
 } // namespace Gzip
 } // namespace HttpFilters

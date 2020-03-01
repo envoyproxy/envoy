@@ -283,7 +283,7 @@ HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
 }
 
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
-                                                  Http::HeaderMap& response_headers,
+                                                  Http::ResponseHeaderMap& response_headers,
                                                   Buffer::Instance&,
                                                   Server::AdminStream& admin_stream) {
 

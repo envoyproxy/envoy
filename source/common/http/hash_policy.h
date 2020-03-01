@@ -17,14 +17,14 @@ public:
 
   // Http::HashPolicy
   absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
-                                        const HeaderMap& headers,
+                                        const RequestHeaderMap& headers,
                                         const AddCookieCallback add_cookie) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() = default;
     virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
-                                              const HeaderMap& headers,
+                                              const RequestHeaderMap& headers,
                                               const AddCookieCallback add_cookie) const PURE;
 
     // If the method is a terminal method, ignore rest of the hash policy chain.

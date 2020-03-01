@@ -1107,8 +1107,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  Api::OsSysCallsImpl os_syscall;
-  auto syscall_result = os_syscall.socket(AF_INET, SOCK_STREAM, 0);
+  auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
@@ -1145,8 +1144,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  Api::OsSysCallsImpl os_syscall;
-  auto syscall_result = os_syscall.socket(AF_INET, SOCK_STREAM, 0);
+  auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
@@ -3125,7 +3123,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
   ASSERT_NE(nullptr, context);
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
+            Config::Metadata::metadataValue(&context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(envoy::config::core::v3::INBOUND, context->direction());
 }
