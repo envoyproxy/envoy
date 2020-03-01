@@ -33,8 +33,8 @@ namespace Stats {
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
-                           const std::string& tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
+                           StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
+                           SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -81,8 +81,7 @@ class TlsScope;
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent, TlsScope& tls_scope,
-                      absl::string_view tag_extracted_name,
-                      const StatNameTagVector& stat_name_tags);
+                      StatName tag_extracted_name, const StatNameTagVector& stat_name_tags);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -321,7 +320,7 @@ private:
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(Allocator&, StatName name,
-                                                           absl::string_view tag_extracted_name,
+                                                           StatName tag_extracted_name,
                                                            const StatNameTagVector& tags)>;
 
     /**
