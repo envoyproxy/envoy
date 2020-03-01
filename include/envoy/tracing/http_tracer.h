@@ -191,6 +191,7 @@ public:
 };
 
 using HttpTracerPtr = std::unique_ptr<HttpTracer>;
+using HttpTracerSharedPtr = std::shared_ptr<HttpTracer>;
 
 } // namespace Tracing
 } // namespace Envoy
