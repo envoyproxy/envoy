@@ -20,6 +20,7 @@
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/server/overload_manager.h"
+#include "envoy/server/tracer_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
@@ -488,6 +489,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  Grpc::Context& grpcContext() override { return grpc_context_; }
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -501,6 +503,7 @@ public:
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Api::MockApi> api_;
+  Grpc::ContextImpl grpc_context_;
 };
 
 class MockFactoryContext : public virtual FactoryContext {
@@ -625,6 +628,18 @@ class MockFilterChainFactoryContext : public MockFactoryContext, public FilterCh
 public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
+};
+
+class MockTracerFactoryContext : public TracerFactoryContext {
+public:
+  MockTracerFactoryContext();
+  ~MockTracerFactoryContext() override;
+
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
+
+  std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
+      server_factory_context_;
 };
 
 } // namespace Configuration
