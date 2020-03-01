@@ -225,7 +225,7 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
   StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
   EXPECT_FALSE(stream_info.getRequestHeaders());
 
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   stream_info.setRequestHeaders(headers);
   EXPECT_EQ(&headers, stream_info.getRequestHeaders());
 }

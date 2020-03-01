@@ -198,7 +198,7 @@ TEST_F(WatermarkBufferTest, MoveOneByte) {
 }
 
 TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
-  int pipe_fds[2] = {0, 0};
+  os_fd_t pipe_fds[2] = {0, 0};
   ASSERT_EQ(0, pipe(pipe_fds));
 
   buffer_.add(TEN_BYTES, 10);

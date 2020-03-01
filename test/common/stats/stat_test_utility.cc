@@ -143,11 +143,12 @@ Counter& TestStore::counter(const std::string& name) {
   return *counter_ref;
 }
 
-Counter& TestStore::counterFromStatName(StatName stat_name) {
+Counter& TestStore::counterFromStatNameWithTags(const StatName& stat_name,
+                                                StatNameTagVectorOptRef tags) {
   std::string name = symbolTable().toString(stat_name);
   Counter*& counter_ref = counter_map_[name];
   if (counter_ref == nullptr) {
-    counter_ref = &IsolatedStoreImpl::counterFromStatName(stat_name);
+    counter_ref = &IsolatedStoreImpl::counterFromStatNameWithTags(stat_name, tags);
   } else {
     // Ensures StatNames with the same string representation are specified
     // consistently using symbolic/dynamic components on every access.
@@ -164,11 +165,12 @@ Gauge& TestStore::gauge(const std::string& name, Gauge::ImportMode mode) {
   return *gauge_ref;
 }
 
-Gauge& TestStore::gaugeFromStatName(StatName stat_name, Gauge::ImportMode mode) {
+Gauge& TestStore::gaugeFromStatNameWithTags(const StatName& stat_name, StatNameTagVectorOptRef tags,
+                                            Gauge::ImportMode mode) {
   std::string name = symbolTable().toString(stat_name);
   Gauge*& gauge_ref = gauge_map_[name];
   if (gauge_ref == nullptr) {
-    gauge_ref = &IsolatedStoreImpl::gaugeFromStatName(stat_name, mode);
+    gauge_ref = &IsolatedStoreImpl::gaugeFromStatNameWithTags(stat_name, tags, mode);
   } else {
     ASSERT(gauge_ref->statName() == stat_name);
   }
@@ -183,11 +185,13 @@ Histogram& TestStore::histogram(const std::string& name, Histogram::Unit unit) {
   return *histogram_ref;
 }
 
-Histogram& TestStore::histogramFromStatName(StatName stat_name, Histogram::Unit unit) {
+Histogram& TestStore::histogramFromStatNameWithTags(const StatName& stat_name,
+                                                    StatNameTagVectorOptRef tags,
+                                                    Histogram::Unit unit) {
   std::string name = symbolTable().toString(stat_name);
   Histogram*& histogram_ref = histogram_map_[name];
   if (histogram_ref == nullptr) {
-    histogram_ref = &IsolatedStoreImpl::histogramFromStatName(stat_name, unit);
+    histogram_ref = &IsolatedStoreImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
   } else {
     ASSERT(histogram_ref->statName() == stat_name);
   }

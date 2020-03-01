@@ -1087,11 +1087,13 @@ TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
 
 // Validate that disabled extension is reflected in the list of Node extensions.
 TEST_P(ServerInstanceImplTest, DisabledExtension) {
-  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.buffer"});
+  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.filters.http.buffer"});
   initialize("test/server/test_data/server/node_bootstrap.yaml");
   bool disabled_filter_found = false;
   for (const auto& extension : server_->localInfo().node().extensions()) {
-    if (extension.category() == "envoy.filters.http" && extension.name() == "envoy.buffer") {
+    // TODO(zuercher): remove envoy.buffer when old-style name deprecation is completed.
+    if (extension.category() == "envoy.filters.http" &&
+        (extension.name() == "envoy.filters.http.buffer" || extension.name() == "envoy.buffer")) {
       ASSERT_TRUE(extension.disabled());
       disabled_filter_found = true;
     } else {

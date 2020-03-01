@@ -66,8 +66,9 @@ class RouterTestFilter : public Filter {
 public:
   using Filter::Filter;
   // Filter
-  RetryStatePtr createRetryState(const RetryPolicy&, Http::HeaderMap&, const Upstream::ClusterInfo&,
-                                 Runtime::Loader&, Runtime::RandomGenerator&, Event::Dispatcher&,
+  RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
+                                 const Upstream::ClusterInfo&, Runtime::Loader&,
+                                 Runtime::RandomGenerator&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
     retry_state_ = new NiceMock<MockRetryState>();
@@ -2006,7 +2007,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   EXPECT_CALL(encoder2.stream_, resetStream(_));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool end_stream) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) -> void {
         EXPECT_EQ(headers.Status()->value(), "200");
         EXPECT_TRUE(end_stream);
       }));
@@ -2093,7 +2094,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool end_stream) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) -> void {
         EXPECT_EQ(headers.Status()->value(), "200");
         EXPECT_TRUE(end_stream);
       }));
@@ -2190,7 +2191,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   EXPECT_CALL(encoder3.stream_, resetStream(_)).Times(0);
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool end_stream) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) -> void {
         EXPECT_EQ(headers.Status()->value(), "200");
         EXPECT_TRUE(end_stream);
       }));
@@ -2333,7 +2334,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool end_stream) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) -> void {
         EXPECT_EQ(headers.Status()->value(), "200");
         EXPECT_TRUE(end_stream);
       }));
@@ -2430,7 +2431,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
       putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value(), "504");
       }));
   response_timeout_->invokeCallback();
@@ -2515,7 +2516,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).Times(0);
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value(), "502");
       }));
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
@@ -2594,7 +2595,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
 
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value(), "200");
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
@@ -2671,7 +2672,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
   // should't even consult the retry state.
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value(), "200");
       }));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
@@ -4047,7 +4048,7 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
 }
 
 TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
-  Http::TestHeaderMapImpl empty_headers;
+  Http::TestRequestHeaderMapImpl empty_headers;
   { // route says true, header not present, expect true.
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
@@ -4223,7 +4224,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(10);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
-    Http::TestHeaderMapImpl headers;
+    Http::TestRequestHeaderMapImpl headers;
     FilterUtility::TimeoutData timeout =
         FilterUtility::finalTimeout(route, headers, true, false, false, false);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
@@ -5156,7 +5157,7 @@ TEST_P(RouterTestStrictCheckOneHeader, SingleInvalidHeader) {
               setResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& response_headers, bool end_stream) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& response_headers, bool end_stream) -> void {
         EXPECT_EQ(enumToInt(Http::Code::BadRequest),
                   Envoy::Http::Utility::getResponseStatus(response_headers));
         EXPECT_FALSE(end_stream);
@@ -5231,7 +5232,7 @@ TEST_P(RouterTestStrictCheckAllHeaders, MultipleInvalidHeaders) {
               setResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
-      .WillOnce(Invoke([&](Http::HeaderMap& response_headers, bool end_stream) -> void {
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& response_headers, bool end_stream) -> void {
         EXPECT_EQ(enumToInt(Http::Code::BadRequest),
                   Envoy::Http::Utility::getResponseStatus(response_headers));
         EXPECT_FALSE(end_stream);
@@ -5264,7 +5265,7 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
         << fmt::format("'{}' should have passed strict validation", target);
   }
 
-  Http::TestHeaderMapImpl failing_headers{
+  Http::TestRequestHeaderMapImpl failing_headers{
       {"X-envoy-Upstream-rq-timeout-ms", "10.0"},
       {"x-envoy-upstream-rq-per-try-timeout-ms", "1.0"},
       {"x-envoy-max-retries", "2.0"},

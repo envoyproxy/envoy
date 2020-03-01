@@ -411,7 +411,7 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  Http::TestHeaderMapImpl header_map{};
+  Http::TestRequestHeaderMapImpl header_map{};
   stream_info_.health_check_request_ = true;
   EXPECT_CALL(*file_, write(_)).Times(0);
 
@@ -430,7 +430,7 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  Http::TestHeaderMapImpl header_map{};
+  Http::TestRequestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -458,19 +458,19 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   {
-    Http::TestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
+    Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", force_tracing_guid}};
     EXPECT_CALL(*file_, write(_));
     log->log(&forced_header, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
+    Http::TestRequestHeaderMapImpl not_traceable{{"x-request-id", not_traceable_guid}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestHeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
+    Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", sample_tracing_guid}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&sampled_header, &response_headers_, &response_trailers_, stream_info_);
   }
@@ -531,14 +531,14 @@ typed_config:
 
   {
     EXPECT_CALL(*file_, write(_));
-    Http::TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
+    Http::TestRequestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    Http::TestHeaderMapImpl header_map{};
+    Http::TestRequestHeaderMapImpl header_map{};
     stream_info_.health_check_request_ = true;
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
@@ -567,14 +567,14 @@ typed_config:
 
   {
     EXPECT_CALL(*file_, write(_));
-    Http::TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
+    Http::TestRequestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_));
-    Http::TestHeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
+    Http::TestRequestHeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 }
@@ -610,14 +610,14 @@ typed_config:
 
   {
     EXPECT_CALL(*file_, write(_));
-    Http::TestHeaderMapImpl header_map{};
+    Http::TestRequestHeaderMapImpl header_map{};
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    Http::TestHeaderMapImpl header_map{};
+    Http::TestRequestHeaderMapImpl header_map{};
     stream_info_.health_check_request_ = true;
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
@@ -1282,8 +1282,8 @@ public:
   SampleExtensionFilter(uint32_t sample_rate) : sample_rate_(sample_rate) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap&, const Http::HeaderMap&,
-                const Http::HeaderMap&) override {
+  bool evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
+                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) override {
     if (current_++ == 0) {
       return true;
     }
