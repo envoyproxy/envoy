@@ -32,6 +32,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Config {
+namespace {
 
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
@@ -198,5 +199,6 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
+} // namespace
 } // namespace Config
 } // namespace Envoy

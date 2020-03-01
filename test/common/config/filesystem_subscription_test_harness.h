@@ -24,12 +24,14 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Config {
+namespace {
 
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   FilesystemSubscriptionTestHarness()
       : path_(TestEnvironment::temporaryPath("eds.json")),
-        api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+        api_(Api::createApiForTest(stats_store_, simTime())),
+        dispatcher_(api_->allocateDispatcher()),
         subscription_(*dispatcher_, path_, callbacks_, stats_, validation_visitor_, *api_) {}
 
   ~FilesystemSubscriptionTestHarness() override { TestEnvironment::removePath(path_); }
@@ -84,11 +86,12 @@ public:
   }
 
   AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
-                           uint32_t init_fetch_timeout, uint64_t version) override {
+                           uint32_t init_fetch_timeout, uint64_t update_time,
+                           uint64_t version) override {
     // The first attempt always fail unless there was a file there to begin with.
     return SubscriptionTestHarness::statsAre(attempt, success, rejected,
                                              failure + (file_at_start_ ? 0 : 1), init_fetch_timeout,
-                                             version);
+                                             update_time, version);
   }
 
   void expectConfigUpdateFailed() override { stats_.update_failure_.inc(); }
@@ -116,5 +119,6 @@ public:
   bool file_at_start_{false};
 };
 
+} // namespace
 } // namespace Config
 } // namespace Envoy

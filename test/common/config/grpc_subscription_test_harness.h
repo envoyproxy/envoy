@@ -33,6 +33,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Config {
+namespace {
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
@@ -189,5 +190,6 @@ public:
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned
 
+} // namespace
 } // namespace Config
 } // namespace Envoy
