@@ -42,14 +42,7 @@ Stats::SymbolTable::StoragePtr MongoStats::addPrefix(const std::vector<Stats::St
 
 void MongoStats::incCounter(const std::vector<Stats::StatName>& names) {
   const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(names);
-  Stats::StatName stat_name(stat_name_storage.get());
-
-  std::cerr << "Incrementing counter " << scope_.symbolTable().toString(stat_name) << " ("
-            << &scope_.symbolTable() << ")" << std::endl;
-  stat_name.debugPrint();
-
-  Stats::Counter& counter = scope_.counterFromStatName(stat_name);
-  counter.inc();
+  scope_.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
 void MongoStats::recordHistogram(const std::vector<Stats::StatName>& names,
