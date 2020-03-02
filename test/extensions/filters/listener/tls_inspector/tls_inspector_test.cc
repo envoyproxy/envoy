@@ -267,6 +267,17 @@ TEST_F(TlsInspectorTest, InlineReadSucceed) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onAccept(cb_));
 }
+
+// Test that the deprecated extension name still functions.
+TEST(TlsInspectorConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.listener.tls_inspector";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<
+          Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));
+}
+
 } // namespace
 } // namespace TlsInspector
 } // namespace ListenerFilters

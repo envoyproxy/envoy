@@ -272,6 +272,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
 
+  // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are removed.
   const bool need_tls_inspector =
       std::any_of(
           config.filter_chains().begin(), config.filter_chains().end(),
@@ -281,11 +282,13 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                    (matcher.transport_protocol().empty() &&
                     (!matcher.server_names().empty() || !matcher.application_protocols().empty()));
           }) &&
-      !std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
-                   [](const auto& filter) {
-                     return filter.name() ==
-                            Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
-                   });
+      !std::any_of(
+          config.listener_filters().begin(), config.listener_filters().end(),
+          [](const auto& filter) {
+            return filter.name() ==
+                       Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector ||
+                   filter.name() == "envoy.listeners.tls_inspector";
+          });
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
     const std::string message =

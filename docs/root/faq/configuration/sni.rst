@@ -18,7 +18,7 @@ The following is a YAML example of the above requirement.
   address:
     socket_address: { address: 127.0.0.1, port_value: 1234 }
   listener_filters:
-  - name: "envoy.listener.tls_inspector"
+  - name: "envoy.filters.listener.tls_inspector"
     typed_config: {}
   filter_chains:
   - filter_chain_match:
