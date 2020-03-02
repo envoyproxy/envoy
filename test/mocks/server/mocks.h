@@ -59,7 +59,8 @@ namespace Server {
 
 namespace Configuration {
 class MockServerFactoryContext;
-}
+class MockTransportSocketFactoryContext;
+} // namespace Configuration
 
 class MockOptions : public Options {
 public:
@@ -155,7 +156,7 @@ public:
                Stats::ScopePtr&& listener_scope));
   MOCK_METHOD(Http::Code, request,
               (absl::string_view path_and_query, absl::string_view method,
-               Http::HeaderMap& response_headers, std::string& body));
+               Http::ResponseHeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
 
   NiceMock<MockConfigTracker> config_tracker_;
@@ -169,7 +170,7 @@ public:
   MOCK_METHOD(void, setEndStreamOnComplete, (bool));
   MOCK_METHOD(void, addOnDestroyCallback, (std::function<void()>));
   MOCK_METHOD(const Buffer::Instance*, getRequestBody, (), (const));
-  MOCK_METHOD(Http::HeaderMap&, getRequestHeaders, (), (const));
+  MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const));
   MOCK_METHOD(NiceMock<Http::MockStreamDecoderFilterCallbacks>&, getDecoderFilterCallbacks, (),
               (const));
 };
@@ -401,12 +402,14 @@ public:
   MOCK_METHOD(Stats::Store&, stats, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Http::Context&, httpContext, ());
-  MOCK_METHOD(absl::optional<std::reference_wrapper<ProcessContext>>, processContext, ());
+  MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
+  MOCK_METHOD(void, flushStats, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
+  MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -439,6 +442,8 @@ public:
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
       server_factory_context_;
+  std::shared_ptr<testing::NiceMock<Configuration::MockTransportSocketFactoryContext>>
+      transport_socket_factory_context_;
 };
 
 namespace Configuration {
@@ -504,6 +509,7 @@ public:
   ~MockFactoryContext() override;
 
   MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
@@ -527,7 +533,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  MOCK_METHOD(OptProcessContextRef, processContext, ());
+  MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
@@ -562,13 +568,12 @@ public:
 
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
-  MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
+  MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, ());
+  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
   MOCK_METHOD(Stats::Store&, stats, ());
-  MOCK_METHOD(void, setInitManager, (Init::Manager&));
   MOCK_METHOD(Init::Manager*, initManager, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::SlotAllocator&, threadLocal, ());

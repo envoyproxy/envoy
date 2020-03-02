@@ -23,6 +23,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/server:api_listener_lib",
         "//source/server:listener_lib",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -113,6 +114,7 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
+        "//source/server:hot_restarting_child",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
     ],
@@ -141,8 +143,11 @@ envoy_cc_test(
     srcs = ["options_impl_test.cc"],
     deps = [
         "//include/envoy/config:typed_config_interface",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/buffer:config",
         "//source/server:options_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:environment_lib",
@@ -151,6 +156,8 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
     ],
 )
 

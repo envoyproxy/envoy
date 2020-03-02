@@ -23,7 +23,7 @@ RedisCluster::RedisCluster(
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
     Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api,
     ClusterSlotUpdateCallBackSharedPtr lb_factory)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
@@ -158,11 +158,17 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](std::list<Network::DnsResponse>&& response) -> void {
+      [this](Network::DnsResolver::ResolutionStatus status,
+             std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        if (response.empty()) {
-          parent_.info_->stats().update_empty_.inc();
+        if (status == Network::DnsResolver::ResolutionStatus::Failure || response.empty()) {
+          if (status == Network::DnsResolver::ResolutionStatus::Failure) {
+            parent_.info_->stats().update_failure_.inc();
+          } else {
+            parent_.info_->stats().update_empty_.inc();
+          }
+
           if (!resolve_timer_) {
             resolve_timer_ =
                 parent_.dispatcher_.createTimer([this]() -> void { startResolveDns(); });
@@ -365,7 +371,7 @@ RedisClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
-    Envoy::Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Envoy::Stats::ScopePtr&& stats_scope) {
   if (!cluster.has_cluster_type() ||
       cluster.cluster_type().name() != Extensions::Clusters::ClusterTypes::get().Redis) {

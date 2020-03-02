@@ -56,11 +56,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
 TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl request_headers({{":scheme", "http"},
-                                           {":method", "POST"},
-                                           {":authority", "foo"},
-                                           {":path", "/testing.ExampleService/Print"},
-                                           {"content-type", "application/grpc"}});
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
@@ -82,7 +82,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
               HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(200);
   response_headers.setContentType("application/x-protobuf");
   upstream_request_->encodeHeaders(response_headers, false);
@@ -90,7 +90,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   Buffer::OwnedImpl response_data{"defgh"};
   upstream_request_->encodeData(response_data, false);
 
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   response_trailers.setGrpcStatus(std::string("0"));
   upstream_request_->encodeTrailers(response_trailers);
 

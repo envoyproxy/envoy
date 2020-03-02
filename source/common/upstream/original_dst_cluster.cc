@@ -54,8 +54,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         // Create a host we can use immediately.
         auto info = parent_->info();
         HostSharedPtr host(std::make_shared<HostImpl>(
-            info, info->name() + dst_addr.asString(), std::move(host_ip_port),
-            envoy::config::core::v3::Metadata::default_instance(), 1,
+            info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, 1,
             envoy::config::core::v3::Locality().default_instance(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
             envoy::config::core::v3::UNKNOWN));
@@ -104,7 +103,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
 
 OriginalDstCluster::OriginalDstCluster(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
       dispatcher_(factory_context.dispatcher()),
@@ -178,7 +177,7 @@ void OriginalDstCluster::cleanup() {
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 OriginalDstClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   if (cluster.lb_policy() !=
           envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB &&

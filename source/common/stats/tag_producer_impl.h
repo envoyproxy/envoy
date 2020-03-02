@@ -38,7 +38,7 @@ public:
    * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
    * @param tags std::vector a set of Stats::Tag.
    */
-  std::string produceTags(absl::string_view metric_name, std::vector<Tag>& tags) const override;
+  std::string produceTags(absl::string_view metric_name, TagVector& tags) const override;
 
 private:
   friend class DefaultTagRegexTester;
@@ -99,7 +99,7 @@ private:
   // the storage for the prefix string is owned by the TagExtractor, which, depending on
   // implementation, may need make a copy of the prefix.
   absl::flat_hash_map<absl::string_view, std::vector<TagExtractorPtr>> tag_extractor_prefix_map_;
-  std::vector<Tag> default_tags_;
+  TagVector default_tags_;
 };
 
 } // namespace Stats

@@ -32,18 +32,12 @@ MockGrpcMux::~MockGrpcMux() = default;
 MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() = default;
 MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() = default;
 
-GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
-                                       const std::set<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
-  return GrpcMuxWatchPtr(subscribe_(type_url, resources, callbacks));
-}
-
-MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {
+MockSubscriptionCallbacks::MockSubscriptionCallbacks() {
   ON_CALL(*this, resourceName(testing::_))
       .WillByDefault(testing::Invoke(TestUtility::xdsResourceName));
 }
 
-MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() = default;
+MockSubscriptionCallbacks::~MockSubscriptionCallbacks() = default;
 
 } // namespace Config
 } // namespace Envoy

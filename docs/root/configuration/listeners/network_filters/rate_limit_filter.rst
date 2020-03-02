@@ -5,7 +5,7 @@ Rate limit
 
 * Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.rate_limit.v2.RateLimit>`
-* This filter should be configured with the name *envoy.ratelimit*.
+* This filter should be configured with the name *envoy.filters.network.ratelimit*.
 
 .. note::
   Local rate limiting is also supported via the :ref:`local rate limit filter

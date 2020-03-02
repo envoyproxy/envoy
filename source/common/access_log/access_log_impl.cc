@@ -91,15 +91,16 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
 }
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
-                                      const Http::HeaderMap& request_headers,
-                                      const Http::HeaderMap&, const Http::HeaderMap&) {
+                                      const Http::RequestHeaderMap& request_headers,
+                                      const Http::ResponseHeaderMap&,
+                                      const Http::ResponseTrailerMap&) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
   return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
-bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                                const Http::HeaderMap&, const Http::HeaderMap&) {
+bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
+                                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
   if (!info.responseCode()) {
     return compareAgainstValue(0ULL);
   }
@@ -107,8 +108,8 @@ bool StatusCodeFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::
   return compareAgainstValue(info.responseCode().value());
 }
 
-bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                              const Http::HeaderMap&, const Http::HeaderMap&) {
+bool DurationFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
+                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
   absl::optional<std::chrono::nanoseconds> final = info.requestComplete();
   ASSERT(final);
 
@@ -122,8 +123,9 @@ RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& 
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
-bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,
-                             const Http::HeaderMap&, const Http::HeaderMap&) {
+bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&,
+                             const Http::RequestHeaderMap& request_headers,
+                             const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
   const Http::HeaderEntry* uuid = request_headers.RequestId();
   uint64_t random_value;
   // TODO(dnoe): Migrate uuidModBy to take string_view (#6580)
@@ -158,9 +160,10 @@ AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
                      ProtobufMessage::ValidationVisitor& validation_visitor)
     : OperatorFilter(config.filters(), runtime, random, validation_visitor) {}
 
-bool OrFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                        const Http::HeaderMap& response_headers,
-                        const Http::HeaderMap& response_trailers) {
+bool OrFilter::evaluate(const StreamInfo::StreamInfo& info,
+                        const Http::RequestHeaderMap& request_headers,
+                        const Http::ResponseHeaderMap& response_headers,
+                        const Http::ResponseTrailerMap& response_trailers) {
   bool result = false;
   for (auto& filter : filters_) {
     result |= filter->evaluate(info, request_headers, response_headers, response_trailers);
@@ -173,9 +176,10 @@ bool OrFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMa
   return result;
 }
 
-bool AndFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                         const Http::HeaderMap& response_headers,
-                         const Http::HeaderMap& response_trailers) {
+bool AndFilter::evaluate(const StreamInfo::StreamInfo& info,
+                         const Http::RequestHeaderMap& request_headers,
+                         const Http::ResponseHeaderMap& response_headers,
+                         const Http::ResponseTrailerMap& response_trailers) {
   bool result = true;
   for (auto& filter : filters_) {
     result &= filter->evaluate(info, request_headers, response_headers, response_trailers);
@@ -188,16 +192,18 @@ bool AndFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderM
   return result;
 }
 
-bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                                    const Http::HeaderMap&, const Http::HeaderMap&) {
+bool NotHealthCheckFilter::evaluate(const StreamInfo::StreamInfo& info,
+                                    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                    const Http::ResponseTrailerMap&) {
   return !info.healthCheck();
 }
 
 HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config)
     : header_data_(std::make_unique<Http::HeaderUtility::HeaderData>(config.header())) {}
 
-bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap& request_headers,
-                            const Http::HeaderMap&, const Http::HeaderMap&) {
+bool HeaderFilter::evaluate(const StreamInfo::StreamInfo&,
+                            const Http::RequestHeaderMap& request_headers,
+                            const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
   return Http::HeaderUtility::matchHeaders(request_headers, *header_data_);
 }
 
@@ -212,8 +218,8 @@ ResponseFlagFilter::ResponseFlagFilter(
   }
 }
 
-bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                                  const Http::HeaderMap&, const Http::HeaderMap&) {
+bool ResponseFlagFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
+                                  const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }
@@ -228,32 +234,15 @@ GrpcStatusFilter::GrpcStatusFilter(const envoy::config::accesslog::v3::GrpcStatu
   exclude_ = config.exclude();
 }
 
-bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap&,
-                                const Http::HeaderMap& response_headers,
-                                const Http::HeaderMap& response_trailers) {
-  // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
-  // request. When it is returned, it will be in the response trailers. With that said, Envoy will
-  // treat a trailers-only response as a headers-only response, so we have to check the following
-  // in order:
-  //   1. response_trailers gRPC status, if it exists.
-  //   2. response_headers gRPC status, if it exists.
-  //   3. Inferred from info HTTP status, if it exists.
-  //
-  // If none of those options exist, it will default to Grpc::Status::WellKnownGrpcStatus::Unknown.
-  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
-      {Grpc::Common::getGrpcStatus(response_trailers)},
-      {Grpc::Common::getGrpcStatus(response_headers)},
-      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
-                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
-                           : absl::nullopt},
-  }};
+bool GrpcStatusFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap&,
+                                const Http::ResponseHeaderMap& response_headers,
+                                const Http::ResponseTrailerMap& response_trailers) {
 
   Grpc::Status::GrpcStatus status = Grpc::Status::WellKnownGrpcStatus::Unknown;
-  for (const auto& optional_status : optional_statuses) {
-    if (optional_status.has_value()) {
-      status = optional_status.value();
-      break;
-    }
+  const auto& optional_status =
+      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info);
+  if (optional_status.has_value()) {
+    status = optional_status.value();
   }
 
   const bool found = statuses_.find(status) != statuses_.end();

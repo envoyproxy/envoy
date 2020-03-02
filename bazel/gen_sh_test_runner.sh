@@ -3,6 +3,11 @@
 # Used in a genrule to wrap sh_test script for execution in
 # //test/coverage:coverage_tests single binary.
 
+# Do not generate test suites for empty source files.
+if [ -z "$1" ]; then
+  exit 0
+fi
+
 RAW_TEST_NAME="$(basename "$1")"
 # Normalize to something we can use in a TEST(ShTest, ...) name
 TEST_NAME="${RAW_TEST_NAME//./_}"

@@ -4,6 +4,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -29,7 +30,6 @@ public:
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(
           Server::parseListenerFromV2Yaml(api_listener_config()));
     });
-    BaseIntegrationTest::initialize();
   }
 
   void TearDown() override {
@@ -67,22 +67,25 @@ api_listener:
         domains: "*"
       name: route_config_0
     http_filters:
-      - name: envoy.router
+      - name: envoy.filters.http.router
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
       )EOF";
   }
 
-  NiceMock<Http::MockStreamEncoder> stream_encoder_;
+  NiceMock<Http::MockResponseEncoder> stream_encoder_;
 };
+
+ACTION_P(Notify, notification) { notification->Notify(); }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ApiListenerIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ApiListenerIntegrationTest, Basic) {
-  ConditionalInitializer test_ran;
-  test_server_->server().dispatcher().post([this, &test_ran]() -> void {
+  BaseIntegrationTest::initialize();
+  absl::Notification done;
+  test_server_->server().dispatcher().post([this, &done]() -> void {
     ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
     ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
     ASSERT_TRUE(test_server_->server().listenerManager().apiListener()->get().http().has_value());
@@ -97,17 +100,43 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
     Http::TestHeaderMapImpl expected_response_headers{{":status", "200"}};
     EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
     EXPECT_CALL(stream_encoder_, encodeData(_, false));
-    EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true));
+    EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
 
     // Send a headers-only request
     stream_decoder.decodeHeaders(
-        Http::HeaderMapPtr(new Http::TestHeaderMapImpl{
+        Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
             {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
         true);
-
-    test_ran.setReady();
   });
-  test_ran.waitReady();
+  ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+}
+
+TEST_P(ApiListenerIntegrationTest, DestroyWithActiveStreams) {
+  autonomous_allow_incomplete_streams_ = true;
+  BaseIntegrationTest::initialize();
+  absl::Notification done;
+
+  test_server_->server().dispatcher().post([this, &done]() -> void {
+    ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
+    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
+    ASSERT_TRUE(test_server_->server().listenerManager().apiListener()->get().http().has_value());
+    auto& http_api_listener =
+        test_server_->server().listenerManager().apiListener()->get().http()->get();
+
+    ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
+    auto& stream_decoder = http_api_listener.newStream(stream_encoder_);
+
+    // Send a headers-only request
+    stream_decoder.decodeHeaders(
+        Http::RequestHeaderMapPtr(new Http::TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":path", "/api"}, {":scheme", "http"}, {":authority", "host"}}),
+        false);
+
+    done.Notify();
+  });
+  ASSERT_TRUE(done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+  // The server should shutdown the ApiListener at the right time during server termination such
+  // that no crashes occur if termination happens when the ApiListener still has ongoing streams.
 }
 
 } // namespace

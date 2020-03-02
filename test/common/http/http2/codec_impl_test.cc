@@ -17,7 +17,6 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "codec_impl_test_util.h"
@@ -76,7 +75,7 @@ public:
     setupDefaultConnectionMocks();
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillRepeatedly(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+        .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
@@ -132,6 +131,14 @@ public:
     reinterpret_cast<uint8_t*>(data.linearize(data.length()))[index % data.length()] = new_value;
   }
 
+  void expectDetailsRequest(const absl::string_view details) {
+    EXPECT_EQ(details, request_encoder_->getStream().responseDetails());
+  }
+
+  void expectDetailsResponse(const absl::string_view details) {
+    EXPECT_EQ(details, response_encoder_->getStream().responseDetails());
+  }
+
   const Http2SettingsTuple client_settings_;
   const Http2SettingsTuple server_settings_;
   bool allow_metadata_ = false;
@@ -147,10 +154,10 @@ public:
   MockServerConnectionCallbacks server_callbacks_;
   std::unique_ptr<TestServerConnectionImpl> server_;
   ConnectionWrapper server_wrapper_;
-  MockStreamDecoder response_decoder_;
-  StreamEncoder* request_encoder_;
-  MockStreamDecoder request_decoder_;
-  StreamEncoder* response_encoder_{};
+  MockResponseDecoder response_decoder_;
+  RequestEncoder* request_encoder_;
+  MockRequestDecoder request_decoder_;
+  ResponseEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
   // Corrupt a metadata frame payload.
   bool corrupt_metadata_frame_ = false;
@@ -178,7 +185,7 @@ protected:
   void priorityFlood() {
     initialize();
 
-    TestHeaderMapImpl request_headers;
+    TestRequestHeaderMapImpl request_headers;
     HttpTestUtility::addDefaultHeaders(request_headers, "POST");
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
     request_encoder_->encodeHeaders(request_headers, false);
@@ -195,7 +202,7 @@ protected:
   void windowUpdateFlood() {
     initialize();
 
-    TestHeaderMapImpl request_headers;
+    TestRequestHeaderMapImpl request_headers;
     HttpTestUtility::addDefaultHeaders(request_headers);
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
     request_encoder_->encodeHeaders(request_headers, true);
@@ -203,7 +210,7 @@ protected:
     // Send one DATA frame back
     EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
     EXPECT_CALL(response_decoder_, decodeData(_, false));
-    TestHeaderMapImpl response_headers{{":status", "200"}};
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
     response_encoder_->encodeHeaders(response_headers, false);
     Buffer::OwnedImpl data("0");
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
@@ -220,7 +227,7 @@ protected:
   void emptyDataFlood(Buffer::OwnedImpl& data) {
     initialize();
 
-    TestHeaderMapImpl request_headers;
+    TestRequestHeaderMapImpl request_headers;
     HttpTestUtility::addDefaultHeaders(request_headers, "POST");
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
     request_encoder_->encodeHeaders(request_headers, false);
@@ -234,16 +241,12 @@ protected:
       data.add(emptyDataFrame.data(), emptyDataFrame.size());
     }
   }
-
-  // Make sure the test fixture has a fake runtime, for the tests which use
-  // Runtime::LoaderSingleton::getExisting()->mergeValues(...)
-  TestScopedRuntime scoped_runtime_;
 };
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
@@ -252,7 +255,7 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   server_->shutdownNotice();
   server_->goAway();
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
 }
@@ -260,16 +263,16 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
 TEST_P(Http2CodecImplTest, ContinueHeaders) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
   response_encoder_->encode100ContinueHeaders(continue_headers);
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
 };
@@ -277,12 +280,12 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
 TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
 }
@@ -294,7 +297,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   MockStreamCallbacks request_callbacks;
   request_encoder_->getStream().addCallbacks(request_callbacks);
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
@@ -304,7 +307,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
       .WillByDefault(
           Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
 
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   response_encoder_->encodeHeaders(continue_headers, true);
 
   // Flush pending data.
@@ -313,17 +316,18 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+  expectDetailsRequest("http2.violation.of.messaging.rule");
 }
 
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
   response_encoder_->encode100ContinueHeaders(continue_headers);
 
@@ -338,12 +342,12 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   MockStreamCallbacks request_callbacks;
   request_encoder_->getStream().addCallbacks(request_callbacks);
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
   response_encoder_->encode100ContinueHeaders(continue_headers);
 
@@ -360,21 +364,22 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+  expectDetailsRequest("http2.violation.of.messaging.rule");
 };
 
 TEST_P(Http2CodecImplTest, Invalid103) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
   EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
   response_encoder_->encode100ContinueHeaders(continue_headers);
 
-  TestHeaderMapImpl early_hint_headers{{":status", "103"}};
+  TestResponseHeaderMapImpl early_hint_headers{{":status", "103"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(early_hint_headers, false);
 
@@ -386,12 +391,12 @@ TEST_P(Http2CodecImplTest, Invalid103) {
 TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "3"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "3"}};
   // What follows is a hack to get headers that should span into continuation frames. The default
   // maximum frame size is 16K. We will add 3,000 headers that will take us above this size and
   // not easily compress with HPACK. (I confirmed this generates 26,468 bytes of header data
@@ -411,7 +416,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   MockStreamCallbacks request_callbacks;
   request_encoder_->getStream().addCallbacks(request_callbacks);
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
@@ -421,7 +426,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
       .WillByDefault(
           Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
 
-  TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "3"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "3"}};
   // What follows is a hack to get headers that should span into continuation frames. The default
   // maximum frame size is 16K. We will add 3,000 headers that will take us above this size and
   // not easily compress with HPACK. (I confirmed this generates 26,468 bytes of header data
@@ -439,12 +444,13 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+  expectDetailsRequest("http2.invalid.header.field");
 };
 
 TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -460,7 +466,8 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 TEST_P(Http2CodecImplTest, InvalidHeadersFrame) {
   initialize();
 
-  EXPECT_THROW(request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true), CodecProtocolException);
+  EXPECT_THROW(request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true),
+               CodecProtocolException);
   EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
 }
 
@@ -475,35 +482,17 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
       .WillByDefault(
           Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
 
-  request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  request_encoder_->encodeHeaders(TestRequestHeaderMapImpl{}, true);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
-}
-
-TEST_P(Http2CodecImplTest, InvalidHeadersFrameOverridden) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
-        "true"}});
-  initialize();
-
-  MockStreamCallbacks request_callbacks;
-  request_encoder_->getStream().addCallbacks(request_callbacks);
-
-  ON_CALL(client_connection_, write(_, _))
-      .WillByDefault(
-          Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
-
-  request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
-  server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
+  expectDetailsResponse("http2.violation.of.messaging.rule");
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeaders) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -511,16 +500,16 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
   Buffer::OwnedImpl hello("hello");
   request_encoder_->encodeData(hello, false);
   EXPECT_CALL(request_decoder_, decodeTrailers_(_));
-  request_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder_, decodeData(_, false));
   Buffer::OwnedImpl world("world");
   response_encoder_->encodeData(world, false);
   EXPECT_CALL(response_decoder_, decodeTrailers_(_));
-  response_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
@@ -531,7 +520,7 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
       .WillByDefault(
           Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -539,20 +528,20 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeBody) {
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   request_encoder_->encodeData(body, false);
   EXPECT_CALL(request_decoder_, decodeTrailers_(_));
-  request_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
 
   // Flush pending data.
   setupDefaultConnectionMocks();
   server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder_, decodeData(_, false));
   Buffer::OwnedImpl world("world");
   response_encoder_->encodeData(world, false);
   EXPECT_CALL(response_decoder_, decodeTrailers_(_));
-  response_encoder_->encodeTrailers(TestHeaderMapImpl{{"trailing", "header"}});
+  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
 }
 
 TEST_P(Http2CodecImplTest, SmallMetadataVecTest) {
@@ -560,7 +549,7 @@ TEST_P(Http2CodecImplTest, SmallMetadataVecTest) {
   initialize();
 
   // Generates a valid stream_id by sending a request header.
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
@@ -590,7 +579,7 @@ TEST_P(Http2CodecImplTest, LargeMetadataVecTest) {
   initialize();
 
   // Generates a valid stream_id by sending a request header.
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
@@ -617,7 +606,7 @@ TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   initialize();
 
   // Generates a valid stream_id by sending a request header.
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
@@ -652,7 +641,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   ON_CALL(client_connection_, write(_, _))
       .WillByDefault(
           Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_encoder_->encodeHeaders(request_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
@@ -667,7 +656,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
     // Start a response inside the headers callback. This should not result in the client
     // seeing any headers as the stream should already be reset on the other side, even though
     // we don't know about it yet.
-    TestHeaderMapImpl response_headers{{":status", "200"}};
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
     response_encoder_->encodeHeaders(response_headers, false);
   }));
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AtLeast(1));
@@ -682,7 +671,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
 
   InSequence s;
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -691,7 +680,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   ON_CALL(server_connection_, write(_, _))
       .WillByDefault(
           Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
@@ -720,9 +709,9 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   MockStreamCallbacks callbacks;
   request_encoder_->getStream().addCallbacks(callbacks);
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  TestHeaderMapImpl expected_headers;
+  TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -765,16 +754,16 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
 
   // Now create a second stream on the connection.
   MockStreamDecoder response_decoder2;
-  StreamEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
   StreamEncoder* response_encoder2;
   MockStreamCallbacks server_stream_callbacks2;
-  MockStreamDecoder request_decoder2;
+  MockRequestDecoder request_decoder2;
   // When the server stream is created it should check the status of the
   // underlying connection. Pretend it is overrun.
   EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(server_stream_callbacks2, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(server_callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder2 = &encoder;
         encoder.getStream().addCallbacks(server_stream_callbacks2);
         return request_decoder2;
@@ -820,9 +809,9 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   MockStreamCallbacks callbacks;
   request_encoder_->getStream().addCallbacks(callbacks);
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  TestHeaderMapImpl expected_headers;
+  TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -879,9 +868,9 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
   initialize();
   MockStreamCallbacks callbacks;
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  TestHeaderMapImpl expected_headers;
+  TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -902,7 +891,7 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   MockStreamCallbacks callbacks;
   request_encoder_->getStream().addCallbacks(callbacks);
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -930,7 +919,7 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(HeaderMapEqual(&response_headers), true))
       .WillOnce(InvokeWithoutArgs([&]() -> void {
         client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
@@ -961,13 +950,13 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
     EXPECT_CALL(server_callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](StreamEncoder& encoder, bool) -> StreamDecoder& {
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           return request_decoder_;
         }));
 
-    TestHeaderMapImpl request_headers;
+    TestRequestHeaderMapImpl request_headers;
     HttpTestUtility::addDefaultHeaders(request_headers);
     EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
     request_encoder_->encodeHeaders(request_headers, true);
@@ -1067,7 +1056,7 @@ TEST(Http2CodecUtility, reconstituteCrumbledCookies) {
 TEST_P(Http2CodecImplTest, LargeRequestHeadersInvokeResetStream) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(63 * 1024, 'q');
   request_headers.addCopy("big", long_string);
@@ -1080,7 +1069,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAccepted) {
   max_request_headers_kb_ = 64;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(63 * 1024, 'q');
   request_headers.addCopy("big", long_string);
@@ -1101,7 +1090,7 @@ TEST_P(Http2CodecImplTest, LargeMethodRequestEncode) {
   initialize();
 
   const std::string long_method = std::string(79 * 1024, 'a');
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.setReferenceKey(Headers::get().Method, long_method);
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&request_headers), false));
@@ -1113,7 +1102,7 @@ TEST_P(Http2CodecImplTest, LargeMethodRequestEncode) {
 TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   for (int i = 0; i < 100; i++) {
     request_headers.addCopy(std::to_string(i), "");
@@ -1127,7 +1116,7 @@ TEST_P(Http2CodecImplTest, ManyRequestHeadersAccepted) {
   max_request_headers_count_ = 150;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   for (int i = 0; i < 145; i++) {
     request_headers.addCopy(std::to_string(i), "");
@@ -1142,12 +1131,12 @@ TEST_P(Http2CodecImplTest, ManyResponseHeadersAccepted) {
   max_response_headers_count_ = 110;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
 
-  TestHeaderMapImpl response_headers{{":status", "200"}, {"compression", "test"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"compression", "test"}};
   for (int i = 0; i < 105; i++) {
     response_headers.addCopy(std::to_string(i), "");
   }
@@ -1160,7 +1149,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAtLimitAccepted) {
   max_request_headers_kb_ = codec_limit_kb;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string key = "big";
   uint32_t head_room = 77;
@@ -1182,7 +1171,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersOverDefaultCodecLibraryLimit) {
   max_request_headers_kb_ = 66;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(65 * 1024, 'q');
   request_headers.addCopy("big", long_string);
@@ -1200,7 +1189,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersExceedPerHeaderLimit) {
   max_request_headers_kb_ = 81;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(80 * 1024, 'q');
   request_headers.addCopy("big", long_string);
@@ -1216,7 +1205,7 @@ TEST_P(Http2CodecImplTest, ManyLargeRequestHeadersUnderPerHeaderLimit) {
   max_request_headers_kb_ = 81;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(1024, 'q');
   for (int i = 0; i < 80; i++) {
@@ -1234,7 +1223,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAtMaxConfigurable) {
   max_request_headers_kb_ = 96;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(1024, 'q');
   for (int i = 0; i < 95; i++) {
@@ -1251,12 +1240,12 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAtMaxConfigurable) {
 TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
-  TestHeaderMapImpl response_headers{{":status", "200"}, {"compression", "test"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"compression", "test"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
 
@@ -1280,7 +1269,7 @@ TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
 TEST_P(Http2CodecImplTest, PingFlood) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1305,12 +1294,10 @@ TEST_P(Http2CodecImplTest, PingFlood) {
 
 // Verify that codec allows PING flood when mitigation is disabled
 TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_outbound_control_frames",
-        "2147483647"}});
+  max_outbound_control_frames_ = 2147483647;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1331,7 +1318,7 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   max_outbound_control_frames_ = kMaxOutboundControlFrames;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1371,7 +1358,7 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
 TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1384,7 +1371,7 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
         buffer.move(frame);
       }));
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES + 1; ++i) {
     EXPECT_NO_THROW(response_encoder_->encodeHeaders(response_headers, false));
   }
@@ -1401,7 +1388,7 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
 TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1414,7 +1401,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
         buffer.move(frame);
       }));
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
   for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
@@ -1432,11 +1419,10 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
 
 // Verify that codec allows outbound DATA flood when mitigation is disabled
 TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_outbound_frames", "2147483647"}});
+  max_outbound_control_frames_ = 2147483647;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1447,7 +1433,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false)).Times(1);
   EXPECT_CALL(response_decoder_, decodeData(_, false))
       .Times(Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES);
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
   for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES; ++i) {
@@ -1466,7 +1452,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   max_outbound_frames_ = kMaxOutboundFrames;
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1479,7 +1465,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
         buffer.move(frame);
       }));
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
   for (uint32_t i = 0; i < kMaxOutboundFrames - 1; ++i) {
@@ -1506,7 +1492,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
 TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   initialize();
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -1519,7 +1505,7 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
         buffer.move(frame);
       }));
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, false);
   // Account for the single HEADERS frame above
   for (uint32_t i = 0; i < Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
@@ -1540,9 +1526,7 @@ TEST_P(Http2CodecImplTest, PriorityFlood) {
 }
 
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_inbound_priority_frames_per_stream",
-        "2147483647"}});
+  max_inbound_priority_frames_per_stream_ = 2147483647;
 
   priorityFlood();
   EXPECT_NO_THROW(client_->sendPendingFrames());
@@ -1554,10 +1538,7 @@ TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_inbound_window_update_frames_per_"
-        "data_frame_sent",
-        "2147483647"}});
+  max_inbound_window_update_frames_per_data_frame_sent_ = 2147483647;
   windowUpdateFlood();
   EXPECT_NO_THROW(client_->sendPendingFrames());
 }
@@ -1570,10 +1551,7 @@ TEST_P(Http2CodecImplTest, EmptyDataFlood) {
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFloodOverride) {
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_protocol_options.max_consecutive_inbound_frames_with_"
-        "empty_payload",
-        "2147483647"}});
+  max_consecutive_inbound_frames_with_empty_payload_ = 2147483647;
   Buffer::OwnedImpl data;
   emptyDataFlood(data);
   EXPECT_CALL(request_decoder_, decodeData(_, false))

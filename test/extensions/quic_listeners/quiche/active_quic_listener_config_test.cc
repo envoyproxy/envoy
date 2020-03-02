@@ -32,12 +32,12 @@ TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   )EOF";
   TestUtility::loadFromYaml(yaml, *config);
   Network::ActiveUdpListenerFactoryPtr listener_factory =
-      config_factory.createActiveUdpListenerFactory(*config);
+      config_factory.createActiveUdpListenerFactory(*config, /*concurrency=*/1);
   EXPECT_NE(nullptr, listener_factory);
   quic::QuicConfig& quic_config = ActiveQuicListenerFactoryPeer::quicConfig(
       dynamic_cast<ActiveQuicListenerFactory&>(*listener_factory));
-  EXPECT_EQ(10u, quic_config.GetMaxIncomingBidirectionalStreamsToSend());
-  EXPECT_EQ(10u, quic_config.GetMaxIncomingUnidirectionalStreamsToSend());
+  EXPECT_EQ(10u, quic_config.GetMaxBidirectionalStreamsToSend());
+  EXPECT_EQ(10u, quic_config.GetMaxUnidirectionalStreamsToSend());
   EXPECT_EQ(2000u, quic_config.IdleNetworkTimeout().ToMilliseconds());
   // Default value if not present in config.
   EXPECT_EQ(20000u, quic_config.max_time_before_crypto_handshake().ToMilliseconds());

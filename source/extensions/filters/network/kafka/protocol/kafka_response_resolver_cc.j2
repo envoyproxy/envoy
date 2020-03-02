@@ -11,6 +11,28 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+// Implements declaration from 'kafka_response.h'.
+bool responseUsesTaggedFieldsInHeader(const uint16_t api_key, const uint16_t api_version) {
+  switch (api_key) {
+    {% for message_type in message_types %}
+    case {{ message_type.get_extra('api_key') }}:
+      switch (api_version) {
+        {# ApiVersions responses require special handling. #}
+        {% if message_type.get_extra('api_key') != 18 %}
+        {% for flexible_version in message_type.flexible_versions %}
+        case {{ flexible_version }}:
+          return true;
+        {% endfor %}
+        {% endif %}
+        default:
+          return false;
+      }
+    {% endfor %}
+    default:
+      return false;
+  }
+}
+
 /**
  * Creates a parser that is going to process data specific for given response.
  * If corresponding parser cannot be found (what means a newer version of Kafka protocol),

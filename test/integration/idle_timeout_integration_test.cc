@@ -43,10 +43,10 @@ public:
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto encoder_decoder =
-        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
-                                                            {":path", "/test/long/url"},
-                                                            {":scheme", "http"},
-                                                            {":authority", "host"}});
+        codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", method},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"}});
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     AssertionResult result =
@@ -234,7 +234,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
   enable_per_stream_idle_timeout_ = true;
   auto response = setupPerStreamIdleTimeoutTest();
 
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
   waitForTimeout(*response, "downstream_rq_idle_timeout");
 
@@ -251,10 +251,10 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
   auto response = setupPerStreamIdleTimeoutTest();
 
   sleep();
-  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
 
   sleep();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
   sleep();
   upstream_request_->encodeData(1, false);
@@ -263,7 +263,8 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
   codec_client_->sendData(*request_encoder_, 1, false);
 
   sleep();
-  Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"request1", "trailer1"},
+                                                   {"request2", "trailer2"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   sleep();
@@ -325,7 +326,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
-  // Omitting \r\n\n\n does not indicate incomplete request in HTTP2
+  // Omitting \r\n\r\n does not indicate incomplete request in HTTP2
   if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
     return;
   }
@@ -349,7 +350,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequ
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\n\n", &raw_response, true);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response, true);
   EXPECT_THAT(raw_response, testing::Not(testing::HasSubstr("request timeout")));
 }
 
@@ -358,7 +359,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsDisarmedByPrematureEncodeHead
   enable_per_stream_idle_timeout_ = true;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
   waitForTimeout(*response);
 
@@ -371,7 +372,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutIsNotDisarmedByEncode100Continu
   enable_request_timeout_ = true;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
-  upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
+  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
 
   waitForTimeout(*response, "downstream_rq_timeout");
 

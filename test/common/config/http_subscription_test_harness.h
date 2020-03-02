@@ -66,7 +66,7 @@ public:
     UNREFERENCED_PARAMETER(expect_node);
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(Invoke([this, cluster_names, version](Http::MessagePtr& request,
+        .WillOnce(Invoke([this, cluster_names, version](Http::RequestMessagePtr& request,
                                                         Http::AsyncClient::Callbacks& callbacks,
                                                         const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
@@ -136,8 +136,9 @@ public:
     response_json += "]}";
     envoy::service::discovery::v3::DiscoveryResponse response_pb;
     TestUtility::loadFromJson(response_json, response_pb);
-    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", response_code}}};
-    Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
+    Http::ResponseHeaderMapPtr response_headers{
+        new Http::TestResponseHeaderMapImpl{{":status", response_code}}};
+    Http::ResponseMessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
     if (modify) {
@@ -190,7 +191,7 @@ public:
   Runtime::MockRandomGenerator random_gen_;
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
-  Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment> callbacks_;
+  Config::MockSubscriptionCallbacks callbacks_;
   std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;

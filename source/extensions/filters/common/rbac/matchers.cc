@@ -30,6 +30,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const NotMatcher>(permission.not_rule());
   case envoy::config::rbac::v3::Permission::RuleCase::kRequestedServerName:
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
+  case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
+    return std::make_shared<const PathMatcher>(permission.url_path());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -53,6 +55,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const MetadataMatcher>(principal.metadata());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kNotId:
     return std::make_shared<const NotMatcher>(principal.not_id());
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
+    return std::make_shared<const PathMatcher>(principal.url_path());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -71,7 +75,7 @@ AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set) {
 }
 
 bool AndMatcher::matches(const Network::Connection& connection,
-                         const Envoy::Http::HeaderMap& headers,
+                         const Envoy::Http::RequestHeaderMap& headers,
                          const StreamInfo::StreamInfo& info) const {
   for (const auto& matcher : matchers_) {
     if (!matcher->matches(connection, headers, info)) {
@@ -95,7 +99,7 @@ OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::P
 }
 
 bool OrMatcher::matches(const Network::Connection& connection,
-                        const Envoy::Http::HeaderMap& headers,
+                        const Envoy::Http::RequestHeaderMap& headers,
                         const StreamInfo::StreamInfo& info) const {
   for (const auto& matcher : matchers_) {
     if (matcher->matches(connection, headers, info)) {
@@ -107,17 +111,18 @@ bool OrMatcher::matches(const Network::Connection& connection,
 }
 
 bool NotMatcher::matches(const Network::Connection& connection,
-                         const Envoy::Http::HeaderMap& headers,
+                         const Envoy::Http::RequestHeaderMap& headers,
                          const StreamInfo::StreamInfo& info) const {
   return !matcher_->matches(connection, headers, info);
 }
 
-bool HeaderMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap& headers,
+bool HeaderMatcher::matches(const Network::Connection&,
+                            const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo&) const {
   return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
 }
 
-bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::HeaderMap&,
+bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
                         const StreamInfo::StreamInfo&) const {
   const Envoy::Network::Address::InstanceConstSharedPtr& ip =
       destination_ ? connection.localAddress() : connection.remoteAddress();
@@ -125,14 +130,15 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   return range_.isInRange(*ip.get());
 }
 
-bool PortMatcher::matches(const Network::Connection& connection, const Envoy::Http::HeaderMap&,
+bool PortMatcher::matches(const Network::Connection& connection,
+                          const Envoy::Http::RequestHeaderMap&,
                           const StreamInfo::StreamInfo&) const {
   const Envoy::Network::Address::Ip* ip = connection.localAddress().get()->ip();
   return ip && ip->port() == port_;
 }
 
 bool AuthenticatedMatcher::matches(const Network::Connection& connection,
-                                   const Envoy::Http::HeaderMap&,
+                                   const Envoy::Http::RequestHeaderMap&,
                                    const StreamInfo::StreamInfo&) const {
   const auto& ssl = connection.ssl();
   if (!ssl) { // connection was not authenticated
@@ -160,13 +166,13 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
   return matcher_.value().match(ssl->subjectPeerCertificate());
 }
 
-bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
+bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                               const StreamInfo::StreamInfo& info) const {
   return matcher_.match(info.dynamicMetadata());
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,
-                            const Envoy::Http::HeaderMap& headers,
+                            const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& info) const {
   return permissions_.matches(connection, headers, info) &&
          principals_.matches(connection, headers, info) &&
@@ -174,9 +180,17 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
 }
 
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
-                                         const Envoy::Http::HeaderMap&,
+                                         const Envoy::Http::RequestHeaderMap&,
                                          const StreamInfo::StreamInfo&) const {
   return match(connection.requestedServerName());
+}
+
+bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo&) const {
+  if (headers.Path() == nullptr) {
+    return false;
+  }
+  return path_matcher_.match(headers.Path()->value().getStringView());
 }
 
 } // namespace RBAC

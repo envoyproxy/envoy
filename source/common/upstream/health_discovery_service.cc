@@ -127,11 +127,11 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
   return response;
 }
 
-void HdsDelegate::onCreateInitialMetadata(Http::HeaderMap& metadata) {
+void HdsDelegate::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
-void HdsDelegate::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
+void HdsDelegate::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
@@ -201,12 +201,12 @@ void HdsDelegate::onReceiveMessage(
   }
 }
 
-void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
+void HdsDelegate::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
 void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
+  ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
   hds_stream_response_timer_->disableTimer();
   stream_ = nullptr;
   server_response_ms_ = 0;
@@ -235,8 +235,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   for (const auto& host : cluster.load_assignment().endpoints(0).lb_endpoints()) {
     initial_hosts_->emplace_back(
         new HostImpl(info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()),
-                     envoy::config::core::v3::Metadata::default_instance(), 1,
-                     envoy::config::core::v3::Locality().default_instance(),
+                     nullptr, 1, envoy::config::core::v3::Locality().default_instance(),
                      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
                      0, envoy::config::core::v3::UNKNOWN));
   }

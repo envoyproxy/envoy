@@ -145,9 +145,9 @@ public:
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
-                                    {":scheme", "http"},       {":authority", "host"},
-                                    {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
+    Http::TestRequestHeaderMapImpl headers{
+        {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+        {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
     response_ = codec_client_->makeRequestWithBody(headers, request_size_);
   }
 
@@ -287,7 +287,7 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     upstream_request_->encodeHeaders(
-        Http::TestHeaderMapImpl{{":status", std::to_string(response_code)}}, false);
+        Http::TestResponseHeaderMapImpl{{":status", std::to_string(response_code)}}, false);
     upstream_request_->encodeData(response_size_, true);
     response_->waitForEndStream();
 

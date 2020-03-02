@@ -44,12 +44,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(quic::PendingStream* pending,
           16 * 1024, [this]() { runLowWatermarkCallbacks(); },
           [this]() { runHighWatermarkCallbacks(); }) {}
 
-void EnvoyQuicClientStream::encode100ContinueHeaders(const Http::HeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
-  encodeHeaders(headers, false);
-}
-
-void EnvoyQuicClientStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
+void EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
   local_end_stream_ = end_stream;
@@ -74,7 +69,7 @@ void EnvoyQuicClientStream::encodeData(Buffer::Instance& data, bool end_stream) 
   maybeCheckWatermark(bytes_to_send_old, bytes_to_send_new, *filterManagerConnection());
 }
 
-void EnvoyQuicClientStream::encodeTrailers(const Http::HeaderMap& trailers) {
+void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
@@ -109,9 +104,9 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (rst_sent()) {
     return;
   }
-  ASSERT(decoder() != nullptr);
   ASSERT(headers_decompressed());
-  decoder()->decodeHeaders(quicHeadersToEnvoyHeaders(header_list), /*end_stream=*/fin);
+  response_decoder_->decodeHeaders(
+      quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(header_list), /*end_stream=*/fin);
   if (fin) {
     end_stream_decoded_ = true;
   }
@@ -128,7 +123,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   // TODO(danzh): check Envoy per stream buffer limit.
   // Currently read out all the data.
   while (HasBytesToRead()) {
-    struct iovec iov;
+    iovec iov;
     int num_regions = GetReadableRegions(&iov, 1);
     ASSERT(num_regions > 0);
     size_t bytes_read = iov.iov_len;
@@ -150,7 +145,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   // already delivered it or decodeTrailers will be called.
   bool skip_decoding = empty_payload_with_fin && (end_stream_decoded_ || !finished_reading);
   if (!skip_decoding) {
-    decoder()->decodeData(*buffer, finished_reading);
+    response_decoder_->decodeData(*buffer, finished_reading);
     if (finished_reading) {
       end_stream_decoded_ = true;
     }
@@ -170,7 +165,8 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
     // For Google QUIC implementation, trailers may arrived earlier and wait to
     // be consumed after reading all the body. Consume it here.
     // IETF QUIC shouldn't reach here because trailers are sent on same stream.
-    decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
+    response_decoder_->decodeTrailers(
+        spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
   }
   OnFinRead();
@@ -186,8 +182,8 @@ void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len
       !FinishedReadingTrailers()) {
     // Before QPack, trailers can arrive before body. Only decode trailers after finishing decoding
     // body.
-    ASSERT(decoder() != nullptr);
-    decoder()->decodeTrailers(spdyHeaderBlockToEnvoyHeaders(received_trailers()));
+    response_decoder_->decodeTrailers(
+        spdyHeaderBlockToEnvoyHeaders<Http::ResponseTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
   }
 }

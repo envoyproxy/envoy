@@ -33,7 +33,7 @@ namespace Envoy {
 /**
  * Stream decoder wrapper used during integration testing.
  */
-class IntegrationStreamDecoder : public Http::StreamDecoder, public Http::StreamCallbacks {
+class IntegrationStreamDecoder : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   IntegrationStreamDecoder(Event::Dispatcher& dispatcher);
 
@@ -41,9 +41,9 @@ public:
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
   Http::StreamResetReason reset_reason() { return reset_reason_; }
-  const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
-  const Http::HeaderMap& headers() { return *headers_; }
-  const Http::HeaderMapPtr& trailers() { return trailers_; }
+  const Http::ResponseHeaderMap* continue_headers() { return continue_headers_.get(); }
+  const Http::ResponseHeaderMap& headers() { return *headers_; }
+  const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
@@ -57,11 +57,13 @@ public:
   void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder
-  void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
-  void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
-  void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
+
+  // Http::ResponseDecoder
+  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -71,9 +73,9 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  Http::HeaderMapPtr continue_headers_;
-  Http::HeaderMapPtr headers_;
-  Http::HeaderMapPtr trailers_;
+  Http::ResponseHeaderMapPtr continue_headers_;
+  Http::ResponseHeaderMapPtr headers_;
+  Http::ResponseTrailerMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
   std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};
@@ -366,7 +368,7 @@ protected:
   // The config for envoy start-up.
   ConfigHelper config_helper_;
   // The ProcessObject to use when constructing the envoy server.
-  absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
+  ProcessObjectOptRef process_object_{absl::nullopt};
 
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;

@@ -28,7 +28,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kGetLastAddressFromXff: {
     const auto& get_last_address_from_xff = input.get_last_address_from_xff();
     // Use the production HeaderMapImpl to avoid timeouts from TestHeaderMapImpl asserts.
-    Http::HeaderMapImpl headers;
+    Http::RequestHeaderMapImpl headers;
     headers.addCopy(Http::LowerCaseString("x-forwarded-for"),
                     replaceInvalidCharacters(get_last_address_from_xff.xff()));
     // Take num_to_skip modulo 32 to avoid wasting time in lala land.

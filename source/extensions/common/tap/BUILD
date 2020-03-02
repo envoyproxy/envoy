@@ -27,7 +27,6 @@ envoy_cc_library(
         ":tap_interface",
         ":tap_matcher",
         "//source/common/common:assert_lib",
-        "//source/common/common:stack_array",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],

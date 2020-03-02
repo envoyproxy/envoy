@@ -479,8 +479,16 @@ public:
    * filters (append only). Both object types can be consumed by multiple filters.
    * @return the filter state associated with this request.
    */
-  virtual FilterState& filterState() PURE;
+  virtual const FilterStateSharedPtr& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
+
+  /**
+   * Filter State object to be shared between upstream and downstream filters.
+   * @param pointer to upstream connections filter state.
+   * @return pointer to filter state to be used by upstream connections.
+   */
+  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
+  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
 
   /**
    * @param SNI value requested.
@@ -506,12 +514,12 @@ public:
   /**
    * @param headers request headers.
    */
-  virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
+  virtual void setRequestHeaders(const Http::RequestHeaderMap& headers) PURE;
 
   /**
    * @return request headers.
    */
-  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
+  virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
 };
 
 } // namespace StreamInfo

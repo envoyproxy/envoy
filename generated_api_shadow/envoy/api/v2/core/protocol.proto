@@ -24,6 +24,12 @@ message UpstreamHttpProtocolOptions {
   // upstream connections based on the downstream HTTP host/authority header, as seen by the
   // :ref:`router filter <config_http_filters_router>`.
   bool auto_sni = 1;
+
+  // Automatic validate upstream presented certificate for new upstream connections based on the
+  // downstream HTTP host/authority header, as seen by the
+  // :ref:`router filter <config_http_filters_router>`.
+  // This field is intended to set with `auto_sni` field.
+  bool auto_san_validation = 2;
 }
 
 message HttpProtocolOptions {
@@ -117,6 +123,10 @@ message Http2ProtocolOptions {
   // `Maximum concurrent streams <https://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
   // allowed for peer on one HTTP/2 connection. Valid values range from 1 to 2147483647 (2^31 - 1)
   // and defaults to 2147483647.
+  //
+  // For upstream connections, this also limits how many streams Envoy will initiate concurrently
+  // on a single connection. If the limit is reached, Envoy may queue requests or establish
+  // additional connections (as allowed per circuit breaker limits).
   google.protobuf.UInt32Value max_concurrent_streams = 2
       [(validate.rules).uint32 = {lte: 2147483647 gte: 1}];
 

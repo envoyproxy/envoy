@@ -66,12 +66,10 @@ envoy_cc_library(
         "http2_bug_tracker_impl.h",
         "http2_containers_impl.h",
         "http2_estimate_memory_usage_impl.h",
-        "http2_export_impl.h",
         "http2_flag_utils_impl.h",
         "http2_flags_impl.h",
         "http2_logging_impl.h",
         "http2_macros_impl.h",
-        "http2_optional_impl.h",
         "http2_string_utils_impl.h",
     ],
     external_deps = [
@@ -127,7 +125,6 @@ envoy_cc_library(
         "quic_macros_impl.h",
         "quic_map_util_impl.h",
         "quic_mem_slice_impl.h",
-        "quic_optional_impl.h",
         "quic_prefetch_impl.h",
         "quic_ptr_util_impl.h",
         "quic_reference_counted_impl.h",
@@ -206,7 +203,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
-        "//source/common/common:stack_array",
         "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_base",
     ],
@@ -233,14 +229,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_bbr2_sender_impl_lib",
-    hdrs = ["quic_bbr2_sender_impl.h"],
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = ["@com_googlesource_quiche//:quic_core_congestion_control_bbr_lib"],
-)
-
-envoy_cc_library(
     name = "envoy_quic_clock_lib",
     srcs = ["envoy_quic_clock.cc"],
     hdrs = ["envoy_quic_clock.h"],
@@ -248,7 +236,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "@com_googlesource_quiche//:quic_platform",
+        "@com_googlesource_quiche//:quic_core_clock_lib",
     ],
 )
 
@@ -257,6 +245,9 @@ envoy_cc_library(
     hdrs = [
         "quiche_arraysize_impl.h",
         "quiche_logging_impl.h",
+        "quiche_map_util_impl.h",
+        "quiche_optional_impl.h",
+        "quiche_ptr_util_impl.h",
         "quiche_str_cat_impl.h",
         "quiche_string_piece_impl.h",
         "quiche_text_utils_impl.h",
@@ -281,14 +272,10 @@ envoy_cc_library(
         "spdy_containers_impl.h",
         "spdy_endianness_util_impl.h",
         "spdy_estimate_memory_usage_impl.h",
-        "spdy_export_impl.h",
         "spdy_flags_impl.h",
         "spdy_logging_impl.h",
         "spdy_macros_impl.h",
-        "spdy_map_util_impl.h",
         "spdy_mem_slice_impl.h",
-        "spdy_ptr_util_impl.h",
-        "spdy_string_piece_impl.h",
         "spdy_string_utils_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",

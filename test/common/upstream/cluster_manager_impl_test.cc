@@ -102,7 +102,7 @@ public:
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
-  envoy::config::core::v3::Metadata buildMetadata(const std::string& version) const {
+  MetadataConstSharedPtr buildMetadata(const std::string& version) const {
     envoy::config::core::v3::Metadata metadata;
 
     if (!version.empty()) {
@@ -111,7 +111,7 @@ public:
           .set_string_value(version);
     }
 
-    return metadata;
+    return std::make_shared<const envoy::config::core::v3::Metadata>(metadata);
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -1702,7 +1702,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -1761,7 +1762,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
   tcp_drained_cb();
@@ -1792,7 +1794,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
 
@@ -1833,6 +1836,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   ON_CALL(example_com_context, upstreamTransportSocketOptions())
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>("example.com")));
 
+  NiceMock<MockLoadBalancerContext> example_com_context_with_san;
+  ON_CALL(example_com_context_with_san, upstreamTransportSocketOptions())
+      .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
+          "example.com", std::vector<std::string>{"example.com"})));
+
+  NiceMock<MockLoadBalancerContext> example_com_context_with_san2;
+  ON_CALL(example_com_context_with_san2, upstreamTransportSocketOptions())
+      .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>(
+          "example.com", std::vector<std::string>{"example.net"})));
+
   NiceMock<MockLoadBalancerContext> ibm_com_context;
   ON_CALL(ibm_com_context, upstreamTransportSocketOptions())
       .WillByDefault(Return(std::make_shared<Network::TransportSocketOptionsImpl>("ibm.com")));
@@ -1861,7 +1874,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
   EXPECT_CALL(initialized, ready());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // After we are initialized, we should immediately get called back if someone asks for an
   // initialize callback.
@@ -1896,7 +1910,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .Times(8)
+      .Times(10)
       .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
 
   // This should provide us a CP for each of the above hosts, and for different SNIs
@@ -1968,7 +1982,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
   drained_cb = nullptr;
   tcp_drained_cb();
@@ -2000,6 +2015,12 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   Tcp::ConnectionPool::MockInstance* tcp3_example_com =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, &example_com_context));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, &example_com_context_with_san));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san2 =
+      dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, &example_com_context_with_san2));
   Tcp::ConnectionPool::MockInstance* tcp3_ibm_com =
       dynamic_cast<Tcp::ConnectionPool::MockInstance*>(cluster_manager_->tcpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, &ibm_com_context));
@@ -2010,10 +2031,15 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_EQ(tcp2_example_com, tcp3_example_com);
   EXPECT_EQ(tcp2_ibm_com, tcp3_ibm_com);
 
+  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san);
+  EXPECT_NE(tcp3_example_com, tcp3_example_com_with_san2);
+  EXPECT_NE(tcp3_example_com_with_san, tcp3_example_com_with_san2);
+
   // Now add and remove a host that we never have a conn pool to. This should not lead to any
   // drain callbacks, etc.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
   factory_.tls_.shutdownThread();
 }
 
@@ -2134,7 +2160,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _))
       .WillOnce(ReturnNew<Http::ConnectionPool::MockInstance>());
@@ -2159,7 +2186,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   factory_.tls_.shutdownThread();
 }
@@ -2213,7 +2240,8 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
-  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success,
+               TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _)).WillOnce(Return(mock_cp));
@@ -2234,7 +2262,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
   EXPECT_CALL(*tcp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
   dns_timer_->invokeCallback();
-  dns_callback(TestUtility::makeDnsResponse({}));
+  dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
   // The drained callback might get called when the CP is being destroyed.
   EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(Invoke(drained_cb));
@@ -2978,7 +3006,7 @@ public:
       }
       EXPECT_CALL(os_sys_calls,
                   setsockopt_(_, name_val.first.level(), name_val.first.option(), _, sizeof(int)))
-          .WillOnce(Invoke([&name_val](int, int, int, const void* optval, socklen_t) -> int {
+          .WillOnce(Invoke([&name_val](os_fd_t, int, int, const void* optval, socklen_t) -> int {
             EXPECT_EQ(name_val.second, *static_cast<const int*>(optval));
             return 0;
           }));
@@ -3256,7 +3284,7 @@ public:
             }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.level(),
                                           ENVOY_SOCKET_SO_KEEPALIVE.option(), _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+        .WillOnce(Invoke([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
         }));
@@ -3264,7 +3292,7 @@ public:
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPCNT.level(),
                                             ENVOY_SOCKET_TCP_KEEPCNT.option(), _, sizeof(int)))
           .WillOnce(
-              Invoke([&keepalive_probes](int, int, int, const void* optval, socklen_t) -> int {
+              Invoke([&keepalive_probes](os_fd_t, int, int, const void* optval, socklen_t) -> int {
                 EXPECT_EQ(keepalive_probes.value(), *static_cast<const int*>(optval));
                 return 0;
               }));
@@ -3272,16 +3300,17 @@ public:
     if (keepalive_time.has_value()) {
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPIDLE.level(),
                                             ENVOY_SOCKET_TCP_KEEPIDLE.option(), _, sizeof(int)))
-          .WillOnce(Invoke([&keepalive_time](int, int, int, const void* optval, socklen_t) -> int {
-            EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
-            return 0;
-          }));
+          .WillOnce(
+              Invoke([&keepalive_time](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+                EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
+                return 0;
+              }));
     }
     if (keepalive_interval.has_value()) {
       EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_TCP_KEEPINTVL.level(),
                                             ENVOY_SOCKET_TCP_KEEPINTVL.option(), _, sizeof(int)))
-          .WillOnce(
-              Invoke([&keepalive_interval](int, int, int, const void* optval, socklen_t) -> int {
+          .WillOnce(Invoke(
+              [&keepalive_interval](os_fd_t, int, int, const void* optval, socklen_t) -> int {
                 EXPECT_EQ(keepalive_interval.value(), *static_cast<const int*>(optval));
                 return 0;
               }));

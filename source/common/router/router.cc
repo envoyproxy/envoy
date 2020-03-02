@@ -28,6 +28,7 @@
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
+#include "common/network/upstream_subject_alt_names.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -44,7 +45,7 @@ constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
-bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
+bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
   if (downstream_headers.ForwardedProto() &&
       downstream_headers.ForwardedProto()->value().getStringView() ==
@@ -57,7 +58,7 @@ bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
   return false;
 }
 
-bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_headers,
+bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                               StreamInfo::FilterState& filter_state,
                                               uint32_t max_internal_redirects,
                                               const Http::HeaderEntry& internal_redirect,
@@ -126,7 +127,7 @@ uint64_t percentageOfTimeout(const std::chrono::milliseconds response_time,
 
 } // namespace
 
-void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport) {
+void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport) {
   if (use_secure_transport) {
     headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
@@ -154,7 +155,7 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
 }
 
 FilterUtility::TimeoutData
-FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
+FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& request_headers,
                             bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
                             bool per_try_timeout_hedging_enabled,
                             bool respect_expected_rq_timeout) {
@@ -223,7 +224,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
   }
 
-  if (timeout.per_try_timeout_ >= timeout.global_timeout_) {
+  if (timeout.per_try_timeout_ >= timeout.global_timeout_ && timeout.global_timeout_.count() != 0) {
     timeout.per_try_timeout_ = std::chrono::milliseconds(0);
   }
 
@@ -263,8 +264,9 @@ bool FilterUtility::trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_
   return false;
 }
 
-FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
-                                                               Http::HeaderMap& request_headers) {
+FilterUtility::HedgingParams
+FilterUtility::finalHedgingParams(const RouteEntry& route,
+                                  Http::RequestHeaderMap& request_headers) {
   HedgingParams hedging_params;
   hedging_params.hedge_on_per_try_timeout_ = route.hedgePolicy().hedgeOnPerTryTimeout();
 
@@ -291,7 +293,7 @@ Filter::~Filter() {
 }
 
 const FilterUtility::StrictHeaderChecker::HeaderCheckResult
-FilterUtility::StrictHeaderChecker::checkHeader(Http::HeaderMap& headers,
+FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
                                                 const Http::LowerCaseString& target_header) {
   if (target_header == Http::Headers::get().EnvoyUpstreamRequestTimeoutMs) {
     return isInteger(headers.EnvoyUpstreamRequestTimeoutMs());
@@ -314,7 +316,7 @@ Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr ups
 }
 
 void Filter::chargeUpstreamCode(uint64_t response_status_code,
-                                const Http::HeaderMap& response_headers,
+                                const Http::ResponseHeaderMap& response_headers,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
   // Passing the response_status_code explicitly is an optimization to avoid
@@ -369,12 +371,12 @@ void Filter::chargeUpstreamCode(Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
   const uint64_t response_status_code = enumToInt(code);
-  Http::HeaderMapImpl fake_response_headers{
-      {Http::Headers::get().Status, std::to_string(response_status_code)}};
-  chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
+  const auto fake_response_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+      {{Http::Headers::get().Status, std::to_string(response_status_code)}});
+  chargeUpstreamCode(response_status_code, *fake_response_headers, upstream_host, dropped);
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
   // These get stripped by HTTP/1 codec where applicable.
   ASSERT(headers.Path());
@@ -386,10 +388,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Extract debug configuration from filter state. This is used further along to determine whether
   // we should append cluster and host headers to the response, and whether to forward the request
   // upstream.
-  const StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
   const DebugConfig* debug_config =
-      filter_state.hasData<DebugConfig>(DebugConfig::key())
-          ? &(filter_state.getDataReadOnly<DebugConfig>(DebugConfig::key()))
+      filter_state->hasData<DebugConfig>(DebugConfig::key())
+          ? &(filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key()))
           : nullptr;
 
   // TODO: Maybe add a filter API for this.
@@ -425,7 +427,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [this, direct_response,
-         &request_headers = headers](Http::HeaderMap& response_headers) -> void {
+         &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
           const auto new_path = direct_response->newPath(request_headers);
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
@@ -504,7 +506,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
     callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, "maintenance mode",
-        [modify_headers, this](Http::HeaderMap& headers) {
+        [modify_headers, this](Http::ResponseHeaderMap& headers) {
           if (!config_.suppress_envoy_headers_) {
             headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
           }
@@ -519,17 +521,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
-  if (upstream_http_protocol_options.has_value() &&
-      upstream_http_protocol_options.value().auto_sni()) {
-    const auto host_str = headers.Host()->value().getStringView();
-    const auto parsed_authority = Http::Utility::parseAuthority(host_str);
-    if (!parsed_authority.is_ip_address_) {
-      // TODO: Add SAN verification here and use it from dynamic_forward_proxy
-      // Update filter state with the host/authority to use for setting SNI in the transport
-      // socket options. This is referenced during the getConnPool() call below.
-      callbacks_->streamInfo().filterState().setData(
+  if (upstream_http_protocol_options.has_value()) {
+    const auto parsed_authority =
+        Http::Utility::parseAuthority(headers.Host()->value().getStringView());
+    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options.value().auto_sni()) {
+      callbacks_->streamInfo().filterState()->setData(
           Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(host_str),
+          std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::StateType::Mutable);
+    }
+
+    if (upstream_http_protocol_options.value().auto_san_validation()) {
+      callbacks_->streamInfo().filterState()->setData(
+          Network::UpstreamSubjectAltNames::key(),
+          std::make_unique<Network::UpstreamSubjectAltNames>(
+              std::vector<std::string>{std::string(parsed_authority.host_)}),
           StreamInfo::FilterState::StateType::Mutable);
     }
   }
@@ -627,7 +633,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-      callbacks_->streamInfo().filterState());
+      *callbacks_->streamInfo().filterState());
 
   return config_.cm_.httpConnPoolForCluster(route_entry_->clusterName(), route_entry_->priority(),
                                             protocol, this);
@@ -681,7 +687,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
 
   // upstream_requests_.size() cannot be 0 because we add to it unconditionally
@@ -734,13 +740,13 @@ void Filter::maybeDoShadowing() {
     const auto& shadow_policy = shadow_policy_wrapper.get();
 
     ASSERT(!shadow_policy.cluster().empty());
-    Http::MessagePtr request(new Http::RequestMessageImpl(
-        Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
+    Http::RequestMessagePtr request(new Http::RequestMessageImpl(
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_)));
     if (callbacks_->decodingBuffer()) {
       request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
     }
     if (downstream_trailers_) {
-      request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
+      request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*downstream_trailers_));
     }
 
     config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request),
@@ -943,7 +949,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->sendLocalReply(
         code, body,
-        [dropped, this](Http::HeaderMap& headers) {
+        [dropped, this](Http::ResponseHeaderMap& headers) {
           if (dropped && !config_.suppress_envoy_headers_) {
             headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
           }
@@ -1061,7 +1067,7 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
   }
 }
 
-void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+void Filter::onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
                                           UpstreamRequest& upstream_request) {
   chargeUpstreamCode(100, *headers, upstream_request.upstream_host_, false);
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
@@ -1106,7 +1112,7 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
   final_upstream_request->moveIntoList(std::move(final_upstream_request), upstream_requests_);
 }
 
-void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
+void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                UpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
@@ -1123,9 +1129,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     }
   }
 
-  if (grpc_status.has_value() &&
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.outlier_detection_support_for_grpc_status")) {
+  if (grpc_status.has_value()) {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(grpc_to_http_status);
   } else {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
@@ -1258,7 +1262,8 @@ void Filter::onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_re
   callbacks_->encodeData(data, end_stream);
 }
 
-void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest& upstream_request) {
+void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                                UpstreamRequest& upstream_request) {
   // This should be true because when we saw headers we either reset the stream
   // (hence wouldn't have made it to onUpstreamTrailers) or all other in-flight
   // streams.
@@ -1355,7 +1360,8 @@ bool Filter::setupRetry() {
   return true;
 }
 
-bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request) {
+bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
+                           UpstreamRequest& upstream_request) {
   ENVOY_STREAM_LOG(debug, "attempting internal redirect", *callbacks_);
   const Http::HeaderEntry* location = headers.Location();
 
@@ -1372,13 +1378,13 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
-  StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
 
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, filter_state,
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, *filter_state,
                                                route_entry_->maxInternalRedirects(), *location,
                                                *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
@@ -1490,14 +1496,14 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+void Filter::UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
   parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
-void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void Filter::UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
@@ -1507,7 +1513,7 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
 
   awaiting_headers_ = false;
   if (!parent_.config_.upstream_logs_.empty()) {
-    upstream_headers_ = std::make_unique<Http::HeaderMapImpl>(*headers);
+    upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
@@ -1522,12 +1528,12 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
   parent_.onUpstreamData(data, *this, end_stream);
 }
 
-void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+void Filter::UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
 
   maybeEndDecode(true);
   if (!parent_.config_.upstream_logs_.empty()) {
-    upstream_trailers_ = std::make_unique<Http::HeaderMapImpl>(*trailers);
+    upstream_trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers);
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
@@ -1582,7 +1588,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
   }
 }
 
-void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
+void Filter::UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   ASSERT(!encode_complete_);
   encode_complete_ = true;
   encode_trailers_ = true;
@@ -1699,7 +1705,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
+void Filter::UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host,
                                           const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
@@ -1781,7 +1787,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 }
 
 RetryStatePtr
-ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
+ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                              Upstream::ResourcePriority priority) {
@@ -1789,7 +1795,7 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::HeaderMap& request
                                 priority);
 }
 
-void Filter::UpstreamRequest::setRequestEncoder(Http::StreamEncoder& request_encoder) {
+void Filter::UpstreamRequest::setRequestEncoder(Http::RequestEncoder& request_encoder) {
   request_encoder_ = &request_encoder;
   // Now that there is an encoder, have the connection manager inform the manager when the
   // downstream buffers are overrun. This may result in immediate watermark callbacks referencing

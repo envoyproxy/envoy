@@ -60,7 +60,6 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:stack_array",
     ],
 )
 
@@ -125,6 +124,9 @@ envoy_cc_library(
         "grpc",
     ],
     deps = [
+        ":google_grpc_creds_lib",
+        "//include/envoy/api:api_interface",
+        "//include/envoy/registry",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -132,6 +134,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

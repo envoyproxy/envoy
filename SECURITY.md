@@ -423,4 +423,5 @@ and security team to ensure they still qualify for inclusion on the list.
 | envoy-security@tetrate.io                             | Tetrate       | No       | 12/19       |
 | security@vmware.com                                   | VMware        | No       | 12/19       |
 | envoy-security@pinterest.com                          | Pinterest     | Yes      | 12/19       |
-| envoy-security@dropbox.com                            | Dropbox       | Yes      | 01 /20      |
+| envoy-security@dropbox.com                            | Dropbox       | Yes      | 01/20       |
+| envoy-security-predisclosure@stripe.com               | Stripe        | Yes      | 01/20       |

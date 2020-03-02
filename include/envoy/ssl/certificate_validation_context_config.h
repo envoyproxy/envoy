@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 namespace Envoy {
@@ -61,6 +62,13 @@ public:
    * @return whether to ignore expired certificates (both too new and too old).
    */
   virtual bool allowExpiredCertificate() const PURE;
+
+  /**
+   * @return client certificate validation configuration.
+   */
+  virtual envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+      TrustChainVerification
+      trustChainVerification() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

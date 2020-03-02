@@ -60,7 +60,7 @@ InstanceImpl::InstanceImpl(
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
-                         process_context ? OptProcessContextRef(std::ref(*process_context))
+                         process_context ? ProcessContextOptRef(std::ref(*process_context))
                                          : absl::nullopt)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
@@ -74,7 +74,7 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_context_(*this) {
+      server_contexts_(*this) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -194,6 +194,7 @@ void InstanceImpl::updateServerStats() {
   server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
                                        parent_stats.parent_memory_allocated_);
   server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+  server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
   server_stats_->parent_connections_.set(parent_stats.parent_connections_);
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
@@ -578,6 +579,13 @@ void InstanceImpl::terminate() {
 
   // Shutdown all the workers now that the main dispatch loop is done.
   if (listener_manager_ != nullptr) {
+    // Also shutdown the listener manager's ApiListener, if there is one, which runs on the main
+    // thread. This needs to happen ahead of calling thread_local_.shutdown() below to prevent any
+    // objects in the ApiListener destructor to reference any objects in thread local storage.
+    if (listener_manager_->apiListener().has_value()) {
+      listener_manager_->apiListener()->get().shutdown();
+    }
+
     listener_manager_->stopWorkers();
   }
 

@@ -98,7 +98,7 @@ public:
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
                Network::DnsResolverSharedPtr dns_resolver,
-               Server::Configuration::TransportSocketFactoryContext& factory_context,
+               Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                Stats::ScopePtr&& stats_scope, bool added_via_api,
                ClusterSlotUpdateCallBackSharedPtr factory);
 
@@ -145,12 +145,14 @@ private:
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool master)
-        : Upstream::HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
-                             parent.lbEndpoint().load_balancing_weight().value(),
-                             parent.localityLbEndpoint().locality(),
-                             parent.lbEndpoint().endpoint().health_check_config(),
-                             parent.localityLbEndpoint().priority(),
-                             parent.lbEndpoint().health_status()),
+        : Upstream::HostImpl(
+              cluster, hostname, address,
+              // TODO(zyfjeff): Created through metadata shared pool
+              std::make_shared<envoy::config::core::v3::Metadata>(parent.lbEndpoint().metadata()),
+              parent.lbEndpoint().load_balancing_weight().value(),
+              parent.localityLbEndpoint().locality(),
+              parent.lbEndpoint().endpoint().health_check_config(),
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           master_(master) {}
 
     bool isMaster() const { return master_; }
@@ -294,7 +296,7 @@ private:
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;
 };
 } // namespace Redis

@@ -5,7 +5,7 @@
 #include "envoy/http/header_map.h"
 
 namespace Envoy {
-void HttpTestUtility::addDefaultHeaders(Http::HeaderMap& headers,
+void HttpTestUtility::addDefaultHeaders(Http::RequestHeaderMap& headers,
                                         const std::string default_method) {
   headers.setScheme("http");
   headers.setMethod(default_method);

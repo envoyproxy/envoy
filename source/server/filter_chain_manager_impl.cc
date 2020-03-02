@@ -115,13 +115,18 @@ ServerLifecycleNotifier& FilterChainFactoryContextImpl::lifecycleNotifier() {
   return parent_context_.lifecycleNotifier();
 }
 
-OptProcessContextRef FilterChainFactoryContextImpl::processContext() {
+ProcessContextOptRef FilterChainFactoryContextImpl::processContext() {
   return parent_context_.processContext();
 }
 
 Configuration::ServerFactoryContext&
 FilterChainFactoryContextImpl::getServerFactoryContext() const {
   return parent_context_.getServerFactoryContext();
+}
+
+Configuration::TransportSocketFactoryContext&
+FilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
+  return parent_context_.getTransportSocketFactoryContext();
 }
 
 Stats::Scope& FilterChainFactoryContextImpl::listenerScope() {
@@ -609,9 +614,13 @@ Api::Api& FactoryContextImpl::api() { return server_.api(); }
 ServerLifecycleNotifier& FactoryContextImpl::lifecycleNotifier() {
   return server_.lifecycleNotifier();
 }
-OptProcessContextRef FactoryContextImpl::processContext() { return server_.processContext(); }
+ProcessContextOptRef FactoryContextImpl::processContext() { return server_.processContext(); }
 Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
+}
+Configuration::TransportSocketFactoryContext&
+FactoryContextImpl::getTransportSocketFactoryContext() const {
+  return server_.transportSocketFactoryContext();
 }
 const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
   return config_.metadata();

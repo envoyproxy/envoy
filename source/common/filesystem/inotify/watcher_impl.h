@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 
@@ -20,11 +21,11 @@ namespace Filesystem {
  */
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:
-  WatcherImpl(Event::Dispatcher& dispatcher);
+  WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api);
   ~WatcherImpl() override;
 
   // Filesystem::Watcher
-  void addWatch(const std::string& path, uint32_t events, OnChangedCb cb) override;
+  void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
 
 private:
   struct FileWatch {
@@ -39,6 +40,7 @@ private:
 
   void onInotifyEvent();
 
+  Api::Api& api_;
   int inotify_fd_;
   Event::FileEventPtr inotify_event_;
   std::unordered_map<int, DirectoryWatch> callback_map_;
