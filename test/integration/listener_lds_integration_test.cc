@@ -156,7 +156,7 @@ protected:
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().Listener);
-    for (const auto& listener_blob : listener_configs) {
+    for (const std::string& listener_blob : listener_configs) {
       const auto listener_config =
           TestUtility::parseYaml<envoy::config::listener::v3::Listener>(listener_blob);
       response.add_resources()->PackFrom(API_DOWNGRADE(listener_config));
