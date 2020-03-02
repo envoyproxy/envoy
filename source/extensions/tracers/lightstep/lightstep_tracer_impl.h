@@ -32,7 +32,7 @@ namespace Lightstep {
 
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
   COUNTER(spans_sent)                                                                              \
-  COUNTER(spans_dropped)                                                                              \
+  COUNTER(spans_dropped)                                                                           \
   COUNTER(timer_flushed)
 
 struct LightstepTracerStats {

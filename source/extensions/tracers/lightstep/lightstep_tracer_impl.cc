@@ -7,8 +7,8 @@
 
 #include "envoy/config/trace/v3/trace.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"

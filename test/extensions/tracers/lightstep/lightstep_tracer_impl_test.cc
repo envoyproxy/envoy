@@ -90,15 +90,14 @@ public:
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms",
-                                             _))
-      .Times(AtLeast(1))
-      .WillRepeatedly(Return(1000));
+    EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(1000));
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
-                                             LightStepDriver::DefaultMinFlushSpans))
-      .Times(AtLeast(1))
-      .WillRepeatedly(Return(min_flush_spans));
+    EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
+                                               LightStepDriver::DefaultMinFlushSpans))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(min_flush_spans));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
@@ -213,7 +212,6 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
-
 
   Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, true});
