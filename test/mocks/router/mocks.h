@@ -115,6 +115,9 @@ public:
     return retriable_request_headers_;
   }
 
+  MOCK_METHOD(RetryPolicyExtensionSharedPtr, retryPolicyExtension, (const Http::HeaderMap&),
+              (const));
+
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 

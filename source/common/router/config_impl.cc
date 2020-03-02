@@ -129,7 +129,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
     }
   }
 
-  if (!retry_policy.has_typed_config()) {
+  if (retry_policy.has_typed_config()) {
     const std::string type{
         TypeUtil::typeUrlToDescriptorFullName(retry_policy.typed_config().type_url())};
     RetryPolicyFactory* factory =
