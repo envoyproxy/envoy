@@ -451,7 +451,7 @@ private:
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
-  const RouteEntry* route_entry_{};
+  std::shared_ptr<const RouteEntry> route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;

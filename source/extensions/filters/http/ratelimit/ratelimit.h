@@ -122,10 +122,11 @@ public:
 
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
-  void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                    std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                    const Router::RouteEntry* route_entry,
-                                    const Http::HeaderMap& headers) const;
+  void
+  populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
+                               std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                               const std::shared_ptr<const Envoy::Router::RouteEntry>& route_entry,
+                               const Http::HeaderMap& headers) const;
   void populateResponseHeaders(Http::HeaderMap& response_headers);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
 

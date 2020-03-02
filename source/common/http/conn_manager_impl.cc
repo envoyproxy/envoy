@@ -918,7 +918,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   if (hasCachedRoute()) {
-    const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+    const auto route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
       if (idle_timeout_ms_.count()) {
@@ -1396,7 +1396,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
       route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
     }
   }
-  stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
+  stream_info_.setRouteEntry(route ? route->routeEntry() : nullptr);
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {
     cached_cluster_info_ = nullptr;

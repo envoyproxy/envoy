@@ -300,18 +300,20 @@ private:
               const absl::optional<std::chrono::milliseconds>& timeout,
               const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
                   hash_policy)
-        : route_entry_(cluster_name, timeout, hash_policy) {}
+        : route_entry_(std::make_shared<RouteEntryImpl>(cluster_name, timeout, hash_policy)) {}
 
     // Router::Route
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
-    const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
+    const std::shared_ptr<const Router::RouteEntry> routeEntry() const override {
+      return route_entry_;
+    }
     const Router::Decorator* decorator() const override { return nullptr; }
     const Router::RouteTracing* tracingConfig() const override { return nullptr; }
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
 
-    RouteEntryImpl route_entry_;
+    std::shared_ptr<RouteEntryImpl> route_entry_;
   };
 
   void cleanup();

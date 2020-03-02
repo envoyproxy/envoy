@@ -734,13 +734,13 @@ const DirectResponseEntry* RouteEntryImplBase::directResponseEntry() const {
   }
 }
 
-const RouteEntry* RouteEntryImplBase::routeEntry() const {
+const std::shared_ptr<const RouteEntry> RouteEntryImplBase::routeEntry() const {
   // A route for a request can exclusively be a route entry, a direct response entry,
   // or a redirect entry.
   if (isDirectResponse()) {
     return nullptr;
   } else {
-    return this;
+    return shared_from_this();
   }
 }
 

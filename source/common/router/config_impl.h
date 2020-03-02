@@ -93,7 +93,7 @@ class SslRedirectRoute : public Route {
 public:
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
-  const RouteEntry* routeEntry() const override { return nullptr; }
+  const std::shared_ptr<const RouteEntry> routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const RouteTracing* tracingConfig() const override { return nullptr; }
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
@@ -476,7 +476,7 @@ public:
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override;
-  const RouteEntry* routeEntry() const override;
+  const std::shared_ptr<const RouteEntry> routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
@@ -507,7 +507,9 @@ private:
     envoy::type::v3::FractionalPercent fractional_runtime_default_{};
   };
 
-  class DynamicRouteEntry : public RouteEntry, public Route {
+  class DynamicRouteEntry : public RouteEntry,
+                            public Route,
+                            public std::enable_shared_from_this<DynamicRouteEntry> {
   public:
     DynamicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
         : parent_(parent), cluster_name_(name) {}
@@ -593,7 +595,9 @@ private:
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
-    const RouteEntry* routeEntry() const override { return this; }
+    const std::shared_ptr<const RouteEntry> routeEntry() const override {
+      return shared_from_this();
+    }
     const Decorator* decorator() const override { return parent_->decorator(); }
     const RouteTracing* tracingConfig() const override { return parent_->tracingConfig(); }
 

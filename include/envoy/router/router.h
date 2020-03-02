@@ -487,59 +487,6 @@ public:
   virtual bool hedgeOnPerTryTimeout() const PURE;
 };
 
-class MetadataMatchCriterion {
-public:
-  virtual ~MetadataMatchCriterion() = default;
-
-  /*
-   * @return const std::string& the name of the metadata key
-   */
-  virtual const std::string& name() const PURE;
-
-  /*
-   * @return const Envoy::HashedValue& the value for the metadata key
-   */
-  virtual const HashedValue& value() const PURE;
-};
-
-using MetadataMatchCriterionConstSharedPtr = std::shared_ptr<const MetadataMatchCriterion>;
-
-class MetadataMatchCriteria;
-using MetadataMatchCriteriaConstPtr = std::unique_ptr<const MetadataMatchCriteria>;
-
-class MetadataMatchCriteria {
-public:
-  virtual ~MetadataMatchCriteria() = default;
-
-  /*
-   * @return std::vector<MetadataMatchCriterionConstSharedPtr>& a vector of
-   * metadata to be matched against upstream endpoints when load
-   * balancing, sorted lexically by name.
-   */
-  virtual const std::vector<MetadataMatchCriterionConstSharedPtr>&
-  metadataMatchCriteria() const PURE;
-
-  /**
-   * Creates a new MetadataMatchCriteria, merging existing
-   * metadata criteria with the provided criteria. The result criteria is the
-   * combination of both sets of criteria, with those from the metadata_matches
-   * ProtobufWkt::Struct taking precedence.
-   * @param metadata_matches supplies the new criteria.
-   * @return MetadataMatchCriteriaConstPtr the result criteria.
-   */
-  virtual MetadataMatchCriteriaConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
-
-  /**
-   * Creates a new MetadataMatchCriteria with criteria vector reduced to given names
-   * @param names names of metadata keys to preserve
-   * @return MetadataMatchCriteriaConstPtr the result criteria. Returns nullptr if the result
-   * criteria are empty.
-   */
-  virtual MetadataMatchCriteriaConstPtr
-  filterMatchCriteria(const std::set<std::string>& names) const PURE;
-};
-
 /**
  * Criterion that a route entry uses for matching TLS connection context.
  */
@@ -594,17 +541,84 @@ public:
  */
 class HttpRouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
-/**
- * An individual resolved route entry.
- */
-class RouteEntry : public ResponseEntry {
+class MetadataMatchCriterion {
 public:
-  ~RouteEntry() override = default;
+  virtual ~MetadataMatchCriterion() = default;
+
+  /*
+   * @return const std::string& the name of the metadata key
+   */
+  virtual const std::string& name() const PURE;
+
+  /*
+   * @return const Envoy::HashedValue& the value for the metadata key
+   */
+  virtual const HashedValue& value() const PURE;
+};
+
+using MetadataMatchCriterionConstSharedPtr = std::shared_ptr<const MetadataMatchCriterion>;
+
+class MetadataMatchCriteria;
+using MetadataMatchCriteriaConstPtr = std::unique_ptr<const MetadataMatchCriteria>;
+
+class MetadataMatchCriteria {
+public:
+  virtual ~MetadataMatchCriteria() = default;
+
+  /*
+   * @return std::vector<MetadataMatchCriterionConstSharedPtr>& a vector of
+   * metadata to be matched against upstream endpoints when load
+   * balancing, sorted lexically by name.
+   */
+  virtual const std::vector<MetadataMatchCriterionConstSharedPtr>&
+  metadataMatchCriteria() const PURE;
+
+  /**
+   * Creates a new MetadataMatchCriteria, merging existing
+   * metadata criteria with the provided criteria. The result criteria is the
+   * combination of both sets of criteria, with those from the metadata_matches
+   * ProtobufWkt::Struct taking precedence.
+   * @param metadata_matches supplies the new criteria.
+   * @return MetadataMatchCriteriaConstPtr the result criteria.
+   */
+  virtual MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
+
+  /**
+   * Creates a new MetadataMatchCriteria with criteria vector reduced to given names
+   * @param names names of metadata keys to preserve
+   * @return MetadataMatchCriteriaConstPtr the result criteria. Returns nullptr if the result
+   * criteria are empty.
+   */
+  virtual MetadataMatchCriteriaConstPtr
+  filterMatchCriteria(const std::set<std::string>& names) const PURE;
+};
+
+/**
+ * Upstream endpoint info like cluster_name for a Route.
+ */
+class UpstreamEndpointInfo {
+public:
+  virtual ~UpstreamEndpointInfo() = default;
 
   /**
    * @return const std::string& the upstream cluster that owns the route.
    */
   virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
+   * selecting an upstream host
+   */
+  virtual const MetadataMatchCriteria* metadataMatchCriteria() const PURE;
+};
+
+/**
+ * An individual resolved route entry.
+ */
+class RouteEntry : public ResponseEntry, public UpstreamEndpointInfo {
+public:
+  ~RouteEntry() override = default;
 
   /**
    * Returns the HTTP status code to use when configured cluster is not found.
@@ -712,12 +726,6 @@ public:
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
-
-  /**
-   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
-   * selecting an upstream host
-   */
-  virtual const MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 
   /**
    * @return const std::multimap<std::string, std::string> the opaque configuration associated
@@ -893,7 +901,7 @@ public:
   /**
    * @return the route entry or nullptr if there is no matching route for the request.
    */
-  virtual const RouteEntry* routeEntry() const PURE;
+  virtual const std::shared_ptr<const RouteEntry> routeEntry() const PURE;
 
   /**
    * @return the decorator or nullptr if not defined for the request.

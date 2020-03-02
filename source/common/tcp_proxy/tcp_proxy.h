@@ -61,7 +61,7 @@ class UpstreamDrainManager;
 /**
  * Route is an individual resolved route for a connection.
  */
-class Route {
+class Route : public Router::UpstreamEndpointInfo {
 public:
   virtual ~Route() = default;
 
@@ -71,17 +71,6 @@ public:
    * @return bool true if this route matches a given connection.
    */
   virtual bool matches(Network::Connection& connection) const PURE;
-
-  /**
-   * @return const std::string& the upstream cluster that owns the route.
-   */
-  virtual const std::string& clusterName() const PURE;
-
-  /**
-   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
-   * selecting an upstream host
-   */
-  virtual const Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

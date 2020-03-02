@@ -454,6 +454,11 @@ public:
   virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
   /**
+   * @param route_entry sets the RouteEntry for HTTP and UpstreamEndpointInfo for TCP.
+   */
+  virtual void setRouteEntry(const std::shared_ptr<const Router::RouteEntry>& route_entry) PURE;
+
+  /**
    * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this
    * will be nullptr if no route was selected.
    */

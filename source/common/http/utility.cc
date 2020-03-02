@@ -668,7 +668,7 @@ void Utility::traversePerFilterConfigGeneric(
     return;
   }
 
-  const Router::RouteEntry* routeEntry = route->routeEntry();
+  const std::shared_ptr<const Router::RouteEntry> routeEntry = route->routeEntry();
 
   if (routeEntry != nullptr) {
     auto maybe_vhost_config = routeEntry->virtualHost().perFilterConfig(filter_name);

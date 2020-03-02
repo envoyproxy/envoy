@@ -50,7 +50,7 @@ void BufferFilter::initConfig() {
   }
 
   const std::string& name = HttpFilterNames::get().Buffer;
-  const auto* entry = callbacks_->route()->routeEntry();
+  const auto entry = callbacks_->route()->routeEntry();
   const auto* route_local = entry->mostSpecificPerFilterConfigTyped<BufferFilterSettings>(name);
 
   settings_ = route_local ? route_local : settings_;

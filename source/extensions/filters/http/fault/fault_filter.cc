@@ -109,7 +109,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   fault_settings_ = config_->settings();
   if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
     const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
-    const auto* route_entry = decoder_callbacks_->route()->routeEntry();
+    const auto route_entry = decoder_callbacks_->route()->routeEntry();
 
     const auto* per_route_settings =
         route_entry->mostSpecificPerFilterConfigTyped<FaultSettings>(name);

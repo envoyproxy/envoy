@@ -44,7 +44,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
-  const Router::RouteEntry* route_entry = route->routeEntry();
+  const auto route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
 
@@ -188,10 +188,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   }
 }
 
-void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                          std::vector<RateLimit::Descriptor>& descriptors,
-                                          const Router::RouteEntry* route_entry,
-                                          const Http::HeaderMap& headers) const {
+void Filter::populateRateLimitDescriptors(
+    const Router::RateLimitPolicy& rate_limit_policy,
+    std::vector<RateLimit::Descriptor>& descriptors,
+    const std::shared_ptr<const Envoy::Router::RouteEntry>& route_entry,
+    const Http::HeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(config_->stage())) {
     const std::string& disable_key = rate_limit.disableKey();

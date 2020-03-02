@@ -4,6 +4,8 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 
+#include "common/protobuf/utility.h"
+
 #include "extensions/filters/network/thrift_proxy/router/router.h"
 
 namespace Envoy {
