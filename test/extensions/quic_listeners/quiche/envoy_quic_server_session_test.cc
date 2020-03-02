@@ -5,6 +5,7 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/core/quic_versions.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
@@ -88,7 +89,7 @@ public:
   explicit TestQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                       quic::QuicCompressedCertsCache* compressed_certs_cache,
                                       quic::QuicSession* session,
-                                      quic::QuicCryptoServerStream::Helper* helper)
+                                      quic::QuicCryptoServerStreamBase::Helper* helper)
       : quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, session, helper) {}
 
   using quic::QuicCryptoServerStream::QuicCryptoServerStream;
