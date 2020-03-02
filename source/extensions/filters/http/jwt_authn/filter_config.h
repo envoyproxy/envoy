@@ -66,7 +66,7 @@ public:
   virtual bool bypassCorsPreflightRequest() const PURE;
 
   // Finds the matcher that matched the header
-  virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
+  virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                        const StreamInfo::FilterState& filter_state) const PURE;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -104,7 +104,7 @@ public:
 
   bool bypassCorsPreflightRequest() const override { return proto_config_.bypass_cors_preflight(); }
 
-  virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
+  virtual const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                        const StreamInfo::FilterState& filter_state) const override {
     for (const auto& pair : rule_pairs_) {
       if (pair.matcher_->matches(headers)) {

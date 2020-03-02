@@ -188,7 +188,7 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value().getStringView(),
                   std::to_string(enumToInt(Http::Code::Forbidden)));
       }));
@@ -225,7 +225,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value().getStringView(),
                   std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
       }));

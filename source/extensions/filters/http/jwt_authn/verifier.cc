@@ -29,10 +29,11 @@ struct CompletionState {
 
 class ContextImpl : public Verifier::Context {
 public:
-  ContextImpl(Http::HeaderMap& headers, Tracing::Span& parent_span, Verifier::Callbacks* callback)
+  ContextImpl(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
+              Verifier::Callbacks* callback)
       : headers_(headers), parent_span_(parent_span), callback_(callback) {}
 
-  Http::HeaderMap& headers() const override { return headers_; }
+  Http::RequestHeaderMap& headers() const override { return headers_; }
 
   Tracing::Span& parentSpan() const override { return parent_span_; }
 
@@ -64,7 +65,7 @@ public:
   }
 
 private:
-  Http::HeaderMap& headers_;
+  Http::RequestHeaderMap& headers_;
   Tracing::Span& parent_span_;
   Verifier::Callbacks* callback_;
   std::unordered_map<const Verifier*, CompletionState> completion_states_;
@@ -395,8 +396,8 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
 
 } // namespace
 
-ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Tracing::Span& parent_span,
-                                         Callbacks* callback) {
+ContextSharedPtr Verifier::createContext(Http::RequestHeaderMap& headers,
+                                         Tracing::Span& parent_span, Callbacks* callback) {
   return std::make_shared<ContextImpl>(headers, parent_span, callback);
 }
 

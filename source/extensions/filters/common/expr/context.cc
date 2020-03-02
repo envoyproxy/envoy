@@ -13,14 +13,14 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-namespace {
-
 absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header) {
   if (header == nullptr) {
     return {};
   }
   return CelValue::CreateStringView(header->value().getStringView());
 }
+
+namespace {
 
 absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
                                         absl::string_view value) {
@@ -51,14 +51,6 @@ absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
 }
 
 } // namespace
-
-absl::optional<CelValue> HeadersWrapper::operator[](CelValue key) const {
-  if (value_ == nullptr || !key.IsString()) {
-    return {};
-  }
-  auto out = value_->get(Http::LowerCaseString(std::string(key.StringOrDie().value())));
-  return convertHeaderEntry(out);
-}
 
 absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
@@ -144,8 +136,9 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return CelValue::CreateInt64(info_.responseFlags());
   } else if (value == GrpcStatus) {
     auto const& optional_status = Grpc::Common::getGrpcStatus(
-        trailers_.value_ ? *trailers_.value_ : ConstSingleton<Http::HeaderMapImpl>::get(),
-        headers_.value_ ? *headers_.value_ : ConstSingleton<Http::HeaderMapImpl>::get(), info_);
+        trailers_.value_ ? *trailers_.value_ : ConstSingleton<Http::ResponseTrailerMapImpl>::get(),
+        headers_.value_ ? *headers_.value_ : ConstSingleton<Http::ResponseHeaderMapImpl>::get(),
+        info_);
     if (optional_status.has_value()) {
       return CelValue::CreateInt64(optional_status.value());
     }

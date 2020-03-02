@@ -19,21 +19,19 @@ namespace Envoy {
 namespace Network {
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
-  if (fd_ != -1) {
+  if (SOCKET_VALID(fd_)) {
     IoSocketHandleImpl::close();
   }
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::close() {
-  ASSERT(fd_ != -1);
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const auto& result = os_syscalls.close(fd_);
-  fd_ = -1;
-  return Api::IoCallUint64Result(result.rc_,
-                                 Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  ASSERT(SOCKET_VALID(fd_));
+  const int rc = Api::OsSysCallsSingleton::get().close(fd_).rc_;
+  SET_SOCKET_INVALID(fd_);
+  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
 }
 
-bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }
+bool IoSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 
 Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                                   uint64_t num_slice) {
@@ -48,10 +46,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
     num_bytes_to_read += slice_length;
   }
   ASSERT(num_bytes_to_read <= max_length);
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result =
-      os_syscalls.readv(fd_, iov.begin(), static_cast<int>(num_slices_to_read));
-  return sysCallResultToIoCallResult(result);
+  return sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
+      fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
@@ -68,9 +64,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   if (num_slices_to_write == 0) {
     return Api::ioCallUint64ResultNoError();
   }
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.writev(fd_, iov.begin(), num_slices_to_write);
-  return sysCallResultToIoCallResult(result);
+  return sysCallResultToIoCallResult(
+      Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
@@ -126,7 +121,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       cmsg->cmsg_type = IP_PKTINFO;
       auto pktinfo = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
       pktinfo->ipi_ifindex = 0;
+#ifdef WIN32
+      pktinfo->ipi_addr.s_addr = self_ip->ipv4()->address();
+#else
       pktinfo->ipi_spec_dst.s_addr = self_ip->ipv4()->address();
+#endif
 #else
       cmsg->cmsg_type = IP_SENDSRCADDR;
       cmsg->cmsg_len = CMSG_LEN(sizeof(in_addr));
@@ -162,7 +161,7 @@ IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& re
            : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
 }
 
-Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghdr& cmsg,
+Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
                                                              uint32_t self_port) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
     auto info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
@@ -199,12 +198,12 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const struct cmsghd
 
 absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader(
 #ifdef SO_RXQ_OVFL
-    const struct cmsghdr& cmsg) {
+    const cmsghdr& cmsg) {
   if (cmsg.cmsg_type == SO_RXQ_OVFL) {
     return *reinterpret_cast<const uint32_t*>(CMSG_DATA(&cmsg));
   }
 #else
-    const struct cmsghdr&) {
+    const cmsghdr&) {
 #endif
   return absl::nullopt;
 }
@@ -230,6 +229,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       ++num_slices_for_read;
     }
   }
+  if (num_slices_for_read == 0) {
+    return Api::ioCallUint64ResultNoError();
+  }
 
   sockaddr_storage peer_addr;
   msghdr hdr;
@@ -238,13 +240,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_iov = iov.begin();
   hdr.msg_iovlen = num_slices_for_read;
   hdr.msg_flags = 0;
-
-  auto cmsg = reinterpret_cast<struct cmsghdr*>(cbuf.begin());
+  auto cmsg = reinterpret_cast<cmsghdr*>(cbuf.begin());
   cmsg->cmsg_len = cmsg_space;
   hdr.msg_control = cmsg;
   hdr.msg_controllen = cmsg_space;
-  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_sys_calls.recvmsg(fd_, &hdr, 0);
+  const Api::SysCallSizeResult result = Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, 0);
   if (result.rc_ < 0) {
     return sysCallResultToIoCallResult(result);
   }
@@ -269,26 +269,23 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   }
 
   // Get overflow, local and peer addresses from control message.
-  if (hdr.msg_controllen > 0) {
-    struct cmsghdr* cmsg;
-    for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-      if (output.local_address_ == nullptr) {
-        try {
-          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-          if (addr != nullptr) {
-            // This is a IP packet info message.
-            output.local_address_ = std::move(addr);
-            continue;
-          }
-        } catch (const EnvoyException& e) {
-          PANIC(fmt::format("Invalid destination address for fd: {}, error: {}", fd_, e.what()));
+  for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+    if (output.local_address_ == nullptr) {
+      try {
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
+        if (addr != nullptr) {
+          // This is a IP packet info message.
+          output.local_address_ = std::move(addr);
+          continue;
         }
+      } catch (const EnvoyException& e) {
+        PANIC(fmt::format("Invalid destination address for fd: {}, error: {}", fd_, e.what()));
       }
-      if (output.dropped_packets_ != nullptr) {
-        absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
-        if (maybe_dropped) {
-          *output.dropped_packets_ = *maybe_dropped;
-        }
+    }
+    if (output.dropped_packets_ != nullptr) {
+      absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
+      if (maybe_dropped) {
+        *output.dropped_packets_ = *maybe_dropped;
       }
     }
   }
