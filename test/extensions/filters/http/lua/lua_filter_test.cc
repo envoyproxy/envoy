@@ -1457,7 +1457,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
 
   const std::string METADATA{R"EOF(
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         foo.bar:
           name: foo
           prop: bar

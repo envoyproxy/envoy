@@ -30,7 +30,8 @@ ProtobufTypes::MessagePtr OriginalSrcConfigFactory::createEmptyConfigProto() {
 /**
  * Static registration for the original_src filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(OriginalSrcConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory);
+REGISTER_FACTORY(OriginalSrcConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.original_src"};
 
 } // namespace OriginalSrc
 } // namespace ListenerFilters

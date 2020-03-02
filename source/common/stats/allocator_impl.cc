@@ -50,8 +50,9 @@ void AllocatorImpl::debugPrint() {
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
   StatsSharedImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
-                  const std::vector<Tag>& tags)
-      : MetricImpl<BaseClass>(name, tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc) {}
+                  const StatNameTagVector& stat_name_tags)
+      : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
+        alloc_(alloc) {}
 
   ~StatsSharedImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
@@ -121,8 +122,8 @@ protected:
 class CounterImpl : public StatsSharedImpl<Counter> {
 public:
   CounterImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
-              const std::vector<Tag>& tags)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {}
+              const StatNameTagVector& stat_name_tags)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
   void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
@@ -149,8 +150,8 @@ private:
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
   GaugeImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
-            const std::vector<Tag>& tags, ImportMode import_mode)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {
+            const StatNameTagVector& stat_name_tags, ImportMode import_mode)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
     switch (import_mode) {
     case ImportMode::Accumulate:
       flags_ |= Flags::LogicAccumulate;
@@ -228,20 +229,20 @@ public:
 };
 
 CounterSharedPtr AllocatorImpl::makeCounter(StatName name, absl::string_view tag_extracted_name,
-                                            const std::vector<Tag>& tags) {
+                                            const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
   }
-  auto counter = CounterSharedPtr(new CounterImpl(name, *this, tag_extracted_name, tags));
+  auto counter = CounterSharedPtr(new CounterImpl(name, *this, tag_extracted_name, stat_name_tags));
   counters_.insert(counter.get());
   return counter;
 }
 
 GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_extracted_name,
-                                        const std::vector<Tag>& tags,
+                                        const StatNameTagVector& stat_name_tags,
                                         Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
@@ -249,7 +250,8 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
   }
-  auto gauge = GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, tags, import_mode));
+  auto gauge =
+      GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode));
   gauges_.insert(gauge.get());
   return gauge;
 }
