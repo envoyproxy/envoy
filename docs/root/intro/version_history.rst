@@ -28,9 +28,9 @@ Version history
 * router: added support for :ref:`regex_rewrite
   <envoy_api_field_route.RouteAction.regex_rewrite>` for path rewriting using regular expressions and capture groups.
 * router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
-* runtime: integer values may now be parsed as booleans.
 * runtime: enabling the runtime feature "envoy.deprecated_features.allow_deprecated_extension_names"
   disables the use of deprecated extension names.
+* runtime: integer values may now be parsed as booleans.
 * sds: added :ref:`GenericSecret <envoy_api_msg_auth.GenericSecret>` to support secret of generic type.
 * stat sinks: stat sink extensions use the "envoy.stat_sinks" name space. A mapping of extension
   names is available in the :ref:`deprecated <deprecated>` documentation.
