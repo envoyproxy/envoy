@@ -30,8 +30,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
         return alloc_.makeGauge(name, name, StatNameTagVector{}, import_mode);
       }),
       histograms_([this](StatName name, Histogram::Unit unit) -> HistogramSharedPtr {
-        return HistogramSharedPtr(
-            new HistogramImpl(name, unit, *this, name, StatNameTagVector{}));
+        return HistogramSharedPtr(new HistogramImpl(name, unit, *this, name, StatNameTagVector{}));
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
       null_gauge_(new NullGaugeImpl(symbol_table)) {}

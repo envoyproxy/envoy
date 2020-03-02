@@ -49,7 +49,7 @@ void AllocatorImpl::debugPrint() {
 // wasted in the alignment padding next to flags_.
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
-  StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName  tag_extracted_name,
+  StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
                   const StatNameTagVector& stat_name_tags)
       : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
         alloc_(alloc) {}

@@ -1639,8 +1639,8 @@ protected:
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
     Stats::StatNameManagedStorage storage(name, *symbol_table_);
     Stats::StatName stat_name = storage.statName();
-    gauges_.push_back(alloc_.makeGauge(stat_name, stat_name, cluster_tags,
-                                        Stats::Gauge::ImportMode::Accumulate));
+    gauges_.push_back(
+        alloc_.makeGauge(stat_name, stat_name, cluster_tags, Stats::Gauge::ImportMode::Accumulate));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {

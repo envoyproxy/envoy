@@ -575,9 +575,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
   StatNameTagHelper tag_helper(parent_, name, absl::nullopt);
 
   TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(
-          name, parent.unit(), tag_helper.tagExtractedName(), tag_helper.statNameTags(),
-          symbolTable()));
+      new ThreadLocalHistogramImpl(name, parent.unit(), tag_helper.tagExtractedName(),
+                                   tag_helper.statNameTags(), symbolTable()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -619,8 +618,8 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent,
                                          TlsScope& tls_scope, StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags)
-    : MetricImpl(name, tag_extracted_name, stat_name_tags, parent.symbolTable()),
-      unit_(unit), parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
+    : MetricImpl(name, tag_extracted_name, stat_name_tags, parent.symbolTable()), unit_(unit),
+      parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()), interval_statistics_(interval_histogram_),
       cumulative_statistics_(cumulative_histogram_), merged_(false) {}
 

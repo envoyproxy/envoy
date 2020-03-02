@@ -32,9 +32,8 @@ namespace Stats {
  */
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
-  ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
-                           StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
-                           SymbolTable& symbol_table);
+  ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
+                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -319,9 +318,8 @@ private:
     HistogramOptConstRef findHistogram(StatName name) const override;
 
     template <class StatType>
-    using MakeStatFn = std::function<RefcountPtr<StatType>(Allocator&, StatName name,
-                                                           StatName tag_extracted_name,
-                                                           const StatNameTagVector& tags)>;
+    using MakeStatFn = std::function<RefcountPtr<StatType>(
+        Allocator&, StatName name, StatName tag_extracted_name, const StatNameTagVector& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
