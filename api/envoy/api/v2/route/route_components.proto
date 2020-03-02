@@ -1018,9 +1018,6 @@ message RetryPolicy {
   // HTTP headers which must be present in the request for retries to be attempted.
   repeated HeaderMatcher retriable_request_headers = 10;
 
-  // The name of the retry policy. The field is used for pluggable retry policy.
-  string name = 11 [(validate.rules).string = {min_bytes: 1}];
-
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported retry policy implementations for further documentation.
   oneof config_type {
