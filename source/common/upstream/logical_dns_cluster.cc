@@ -59,8 +59,9 @@ LogicalDnsCluster::LogicalDnsCluster(
           cluster.has_load_assignment()
               ? convertPriority(cluster.load_assignment())
               : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())) {
-  failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
-      cluster, dns_refresh_rate_ms_.count(), factory_context.random());
+  failure_backoff_strategy_ =
+      Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
+          cluster, dns_refresh_rate_ms_.count(), factory_context.random());
 
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
