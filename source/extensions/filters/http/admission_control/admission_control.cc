@@ -53,9 +53,7 @@ AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigShare
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&, bool) {
   deferred_sample_task_ =
-    std::make_unique<Cleanup>([this](){
-      config_->getController().recordFailure();
-        });
+      std::make_unique<Cleanup>([this]() { config_->getController().recordFailure(); });
 
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     return Http::FilterHeadersStatus::Continue;
