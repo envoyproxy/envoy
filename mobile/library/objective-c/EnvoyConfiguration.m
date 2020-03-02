@@ -7,6 +7,8 @@
 - (instancetype)initWithStatsDomain:(NSString *)statsDomain
               connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
+       dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
+        dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                   statsFlushSeconds:(UInt32)statsFlushSeconds {
   self = [super init];
   if (!self) {
@@ -16,6 +18,8 @@
   self.statsDomain = statsDomain;
   self.connectTimeoutSeconds = connectTimeoutSeconds;
   self.dnsRefreshSeconds = dnsRefreshSeconds;
+  self.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
+  self.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
   self.statsFlushSeconds = statsFlushSeconds;
   return self;
 }
@@ -27,6 +31,10 @@
         [NSString stringWithFormat:@"%lu", (unsigned long)self.connectTimeoutSeconds],
     @"dns_refresh_rate_seconds" :
         [NSString stringWithFormat:@"%lu", (unsigned long)self.dnsRefreshSeconds],
+    @"dns_failure_refresh_rate_seconds_base" :
+        [NSString stringWithFormat:@"%lu", (unsigned long)self.dnsFailureRefreshSecondsBase],
+    @"dns_failure_refresh_rate_seconds_max" :
+        [NSString stringWithFormat:@"%lu", (unsigned long)self.dnsFailureRefreshSecondsMax],
     @"stats_flush_interval_seconds" :
         [NSString stringWithFormat:@"%lu", (unsigned long)self.statsFlushSeconds],
     @"device_os" : @"iOS"

@@ -5,16 +5,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import org.mockito.Mockito.mock
 
-private const val TEST_CONFIG = """
-mock_template:
-- name: mock
-  connect_timeout: {{ connect_timeout_seconds }}
-  dns_refresh_rate: {{ dns_refresh_rate_seconds }}
-  stats_flush_interval: {{ stats_flush_interval_seconds }}
-  stats_domain: {{ stats_domain }}
-  os: {{ device_os }}
-"""
-
 class EnvoyBuilderTest {
 
   private lateinit var clientBuilder: EnvoyClientBuilder
@@ -23,7 +13,7 @@ class EnvoyBuilderTest {
 
   @Test
   fun `adding log level builder uses log level for running Envoy`() {
-    clientBuilder = EnvoyClientBuilder(Custom(TEST_CONFIG))
+    clientBuilder = EnvoyClientBuilder(Standard())
     clientBuilder.addEngineType { engine }
 
     clientBuilder.addLogLevel(LogLevel.DEBUG)
@@ -59,6 +49,17 @@ class EnvoyBuilderTest {
     clientBuilder.addDNSRefreshSeconds(1234)
     val envoy = clientBuilder.build()
     assertThat(envoy.envoyConfiguration!!.dnsRefreshSeconds).isEqualTo(1234)
+  }
+
+  @Test
+  fun `specifying DNS failure refresh overrides default`() {
+    clientBuilder = EnvoyClientBuilder(Standard())
+    clientBuilder.addEngineType { engine }
+
+    clientBuilder.addDNSFailureRefreshSeconds(1234, 5678)
+    val envoy = clientBuilder.build()
+    assertThat(envoy.envoyConfiguration!!.dnsFailureRefreshSecondsBase).isEqualTo(1234)
+    assertThat(envoy.envoyConfiguration!!.dnsFailureRefreshSecondsMax).isEqualTo(5678)
   }
 
   @Test

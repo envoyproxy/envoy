@@ -18,6 +18,8 @@ open class EnvoyClientBuilder(
   private var statsDomain = "0.0.0.0"
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
+  private var dnsFailureRefreshSecondsBase = 2
+  private var dnsFailureRefreshSecondsMax = 10
   private var statsFlushSeconds = 60
 
   /**
@@ -59,6 +61,18 @@ open class EnvoyClientBuilder(
   }
 
   /**
+   * Add a rate at which to refresh DNS in case of DNS failure.
+   *
+   * @param base rate in seconds.
+   * @param max rate in seconds.
+   */
+  fun addDNSFailureRefreshSeconds(base: Int, max: Int): EnvoyClientBuilder {
+    this.dnsFailureRefreshSecondsBase = base
+    this.dnsFailureRefreshSecondsMax = max
+    return this
+  }
+
+  /**
    * Add an interval at which to flush Envoy stats.
    *
    * @param statsFlushSeconds interval at which to flush Envoy stats.
@@ -79,7 +93,7 @@ open class EnvoyClientBuilder(
         return Envoy(engineType(), configuration.yaml, logLevel)
       }
       is Standard -> {
-        Envoy(engineType(), EnvoyConfiguration(statsDomain, connectTimeoutSeconds, dnsRefreshSeconds, statsFlushSeconds), logLevel)
+        Envoy(engineType(), EnvoyConfiguration(statsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, statsFlushSeconds), logLevel)
       }
     }
   }

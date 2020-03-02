@@ -33,10 +33,13 @@ static_resources:
           - name: envoy.filters.http.dynamic_forward_proxy
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
-              dns_cache_config:
+              dns_cache_config: &dns_cache_config
                 name: dynamic_forward_proxy_cache_config
                 dns_lookup_family: AUTO
                 dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+                dns_failure_refresh_rate:
+                  base_interval: {{ dns_failure_refresh_rate_seconds_base }}s
+                  max_interval: {{ dns_failure_refresh_rate_seconds_max }}s
           - name: envoy.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -48,10 +51,7 @@ static_resources:
       name: envoy.clusters.dynamic_forward_proxy
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-        dns_cache_config:
-          name: dynamic_forward_proxy_cache_config
-          dns_lookup_family: AUTO
-          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+        dns_cache_config: *dns_cache_config
     transport_socket: &base_transport_socket
       name: envoy.transport_sockets.tls
       typed_config:
@@ -75,10 +75,7 @@ static_resources:
       name: envoy.clusters.dynamic_forward_proxy
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-        dns_cache_config:
-          name: dynamic_forward_proxy_cache_config
-          dns_lookup_family: AUTO
-          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+        dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
   - name: base_wwan
@@ -88,10 +85,7 @@ static_resources:
       name: envoy.clusters.dynamic_forward_proxy
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-        dns_cache_config:
-          name: dynamic_forward_proxy_cache_config
-          dns_lookup_family: AUTO
-          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+        dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
   - name: base_h2
@@ -102,10 +96,7 @@ static_resources:
       name: envoy.clusters.dynamic_forward_proxy
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-        dns_cache_config:
-          name: dynamic_forward_proxy_cache_config
-          dns_lookup_family: AUTO
-          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+        dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
   - name: base_wlan_h2
@@ -116,10 +107,7 @@ static_resources:
       name: envoy.clusters.dynamic_forward_proxy
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-        dns_cache_config:
-          name: dynamic_forward_proxy_cache_config
-          dns_lookup_family: AUTO
-          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+        dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
   - name: base_wwan_h2
@@ -130,10 +118,7 @@ static_resources:
       name: envoy.clusters.dynamic_forward_proxy
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-        dns_cache_config:
-          name: dynamic_forward_proxy_cache_config
-          dns_lookup_family: AUTO
-          dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
+        dns_cache_config: *dns_cache_config
     transport_socket: *base_transport_socket
     upstream_connection_options: *upstream_opts
   - name: stats
