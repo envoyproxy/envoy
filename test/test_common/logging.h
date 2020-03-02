@@ -19,7 +19,7 @@ namespace Envoy {
  * The log_level is the minimum log severity required to print messages.
  * Messages below this loglevel will be suppressed.
  *
- * Note that during the scope of this object, command-line overrides, eg
+ * Note that during the scope of this object, command-line overrides, e.g.,
  * --log-level trace, will not take effect.
  *
  * Also note: instantiating this setter should only occur when the system is
