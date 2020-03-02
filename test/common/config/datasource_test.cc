@@ -37,7 +37,8 @@ protected:
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 
   using AsyncClientSendFunc = std::function<Http::AsyncClient::Request*(
-      Http::MessagePtr&, Http::AsyncClient::Callbacks&, const Http::AsyncClient::RequestOptions)>;
+      Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+      const Http::AsyncClient::RequestOptions)>;
 
   void initialize(AsyncClientSendFunc func, int num_retries = 1) {
     retry_timer_ = new Event::MockTimer();
@@ -109,7 +110,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceReturnFailure) {
   TestUtility::loadFromYaml(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
-  initialize([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
     callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
     return nullptr;
@@ -148,10 +149,10 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWith503) {
   TestUtility::loadFromYaml(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
-  initialize([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+    callbacks.onSuccess(Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
     return nullptr;
   });
 
@@ -188,10 +189,10 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWithEmptyBody) {
   TestUtility::loadFromYaml(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
-  initialize([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}})});
+    callbacks.onSuccess(Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})});
     return nullptr;
   });
 
@@ -230,11 +231,12 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessIncorrectSha256) {
 
   const std::string body = "hello world";
 
-  initialize([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    Http::MessagePtr response(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+    Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
     response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+
     callbacks.onSuccess(std::move(response));
     return nullptr;
   });
@@ -273,32 +275,36 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccess) {
   EXPECT_TRUE(config.has_remote());
 
   const std::string body = "hello world";
-  initialize([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    Http::MessagePtr response(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+    Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
     response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
-    std::string async_data = "non-empty";
-    remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-        cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-        [&](const std::string& data) {
-          EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-          EXPECT_EQ(data, body);
-          async_data = data;
-        });
+    callbacks.onSuccess(std::move(response));
+    return nullptr;
+  });
 
-    EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-    EXPECT_CALL(init_watcher_, ready());
-    init_target_handle_->initialize(init_watcher_);
+  std::string async_data = "non-empty";
+  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
+      [&](const std::string& data) {
+        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
+        EXPECT_EQ(data, body);
+        async_data = data;
+      });
 
-    EXPECT_EQ(async_data, body);
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
+  EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+
+  EXPECT_EQ(async_data, body);
 }
 
 TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmpty) {
-    AsyncDataSourcePb config;
+  AsyncDataSourcePb config;
 
-    std::string yaml = R"EOF(
+  std::string yaml = R"EOF(
     remote:
       http_uri:
         uri: https://example.com/data
@@ -306,39 +312,38 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmpty) {
       sha256:
         xxxxxx
   )EOF";
-    TestUtility::loadFromYaml(yaml, config);
-    EXPECT_TRUE(config.has_remote());
+  TestUtility::loadFromYaml(yaml, config);
+  EXPECT_TRUE(config.has_remote());
 
-    initialize([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                   const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-      callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-          Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
-      return nullptr;
-    });
+  initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                 const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+    callbacks.onSuccess(Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+    return nullptr;
+  });
 
-    std::string async_data = "non-empty";
-    remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-        cm_, init_manager_, config.remote(), dispatcher_, random_, false,
-        [&](const std::string& data) { async_data = data; });
+  std::string async_data = "non-empty";
+  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, false,
+      [&](const std::string& data) { async_data = data; });
 
-    EXPECT_CALL(init_watcher_, ready());
-    EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-        .WillOnce(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
-          retry_timer_cb_();
-        }));
-    init_target_handle_->initialize(init_watcher_);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
+      .WillOnce(Invoke(
+          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+  init_target_handle_->initialize(init_watcher_);
 
-    EXPECT_EQ(async_data, "non-empty");
+  EXPECT_EQ(async_data, "non-empty");
 }
 
 TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {
-    const std::string body = "hello world";
-    std::string async_data = "non-empty";
+  const std::string body = "hello world";
+  std::string async_data = "non-empty";
 
-    {
-      AsyncDataSourcePb config;
+  {
+    AsyncDataSourcePb config;
 
-      std::string yaml = R"EOF(
+    std::string yaml = R"EOF(
     remote:
       http_uri:
         uri: https://example.com/data
@@ -346,37 +351,38 @@ TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {
       sha256:
         b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
   )EOF";
-      TestUtility::loadFromYaml(yaml, config);
-      EXPECT_TRUE(config.has_remote());
+    TestUtility::loadFromYaml(yaml, config);
+    EXPECT_TRUE(config.has_remote());
 
-      initialize([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-        Http::MessagePtr response(new Http::ResponseMessageImpl(
-            Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-        response->body() = std::make_unique<Buffer::OwnedImpl>(body);
-        callbacks.onSuccess(std::move(response));
-        return nullptr;
-      });
+    initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                   const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+      Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+          Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+      response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
-      remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-          cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-          [&](const std::string& data) {
-            EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-            EXPECT_EQ(data, body);
-            async_data = data;
-          });
-    }
+      callbacks.onSuccess(std::move(response));
+      return nullptr;
+    });
 
-    EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-    EXPECT_CALL(init_watcher_, ready());
-    init_target_handle_->initialize(init_watcher_);
-    EXPECT_EQ(async_data, body);
+    remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+        cm_, init_manager_, config.remote(), dispatcher_, random_, true,
+        [&](const std::string& data) {
+          EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
+          EXPECT_EQ(data, body);
+          async_data = data;
+        });
+  }
+
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
+  EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_EQ(async_data, body);
 }
 
 TEST_F(AsyncDataSourceTest, loadRemoteDataSourceWithRetry) {
-    AsyncDataSourcePb config;
+  AsyncDataSourcePb config;
 
-    std::string yaml = R"EOF(
+  std::string yaml = R"EOF(
     remote:
       http_uri:
         uri: https://example.com/data
@@ -388,56 +394,56 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceWithRetry) {
           base_interval: 1s
         num_retries: 3
   )EOF";
-    TestUtility::loadFromYaml(yaml, config);
-    EXPECT_TRUE(config.has_remote());
+  TestUtility::loadFromYaml(yaml, config);
+  EXPECT_TRUE(config.has_remote());
 
-    const std::string body = "hello world";
-    int num_retries = 3;
+  const std::string body = "hello world";
+  int num_retries = 3;
 
-    initialize(
-        [&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-            const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-          callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-              Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
-          return nullptr;
-        },
-        num_retries);
-    response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+  initialize(
+      [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks.onSuccess(Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+        return nullptr;
+      },
+      num_retries);
 
-    std::string async_data = "non-empty";
-    remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-        cm_, init_manager_, config.remote(), dispatcher_, random_, true,
-        [&](const std::string& data) {
-          EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
-          EXPECT_EQ(data, body);
-          async_data = data;
-        });
+  std::string async_data = "non-empty";
+  remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+      cm_, init_manager_, config.remote(), dispatcher_, random_, true,
+      [&](const std::string& data) {
+        EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
+        EXPECT_EQ(data, body);
+        async_data = data;
+      });
 
-    EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
-    EXPECT_CALL(init_watcher_, ready());
-    EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-        .WillRepeatedly(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
-          if (--num_retries == 0) {
-            EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-                .WillOnce(Invoke(
-                    [&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-                      Http::MessagePtr response(new Http::ResponseMessageImpl(
-                          Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-                      response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _))
+      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
+        if (--num_retries == 0) {
+          EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+              .WillOnce(Invoke(
+                  [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+                    Http::ResponseMessagePtr response(
+                        new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                            new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+                    response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
-                      callbacks.onSuccess(std::move(response));
-                      return nullptr;
-                    }));
-          }
+                    callbacks.onSuccess(std::move(response));
+                    return nullptr;
+                  }));
+        }
 
-          retry_timer_cb_();
-        }));
-    init_target_handle_->initialize(init_watcher_);
+        retry_timer_cb_();
+      }));
+  init_target_handle_->initialize(init_watcher_);
 
-    EXPECT_EQ(async_data, body);
+  EXPECT_EQ(async_data, body);
 }
 
 } // namespace
-} // namespace
 } // namespace Config
+} // namespace Envoy
