@@ -44,28 +44,32 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     : allow_empty_(allow_empty), callback_(std::move(callback)),
       fetcher_(std::make_unique<Config::DataFetcher::RemoteDataFetcher>(cm, source.http_uri(),
                                                                         source.sha256(), *this)),
-      init_target_("RemoteAsyncDataProvider", [this]() { start(); }) {
-  manager.add(init_target_);
+      init_target_("RemoteAsyncDataProvider", [this]() { start(); }),
+      retries_remaining_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
 
   uint64_t base_interval_ms = RetryInitialDelayMilliseconds;
   uint64_t max_interval_ms = RetryMaxDelayMilliseconds;
   if (source.has_retry_policy()) {
     if (source.retry_policy().has_retry_back_off()) {
-      base_interval_ms =
-          PROTOBUF_GET_MS_REQUIRED(source.retry_policy().retry_back_off(), base_interval);
-      max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(source.retry_policy().retry_back_off(),
-                                                   max_interval, base_interval_ms * 10);
-    }
+      base_interval_ms = std::max(
+          1UL, PROTOBUF_GET_MS_REQUIRED(source.retry_policy().retry_back_off(), base_interval));
 
-    if (source.retry_policy().has_num_retries()) {
-      retries_remaining_ =
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount);
+      max_interval_ms =
+          std::max(1UL, PROTOBUF_GET_MS_OR_DEFAULT(source.retry_policy().retry_back_off(),
+                                                   max_interval, base_interval_ms * 10));
+
+      if (max_interval_ms < base_interval_ms) {
+        throw EnvoyException("max_interval must greater than or equal to the base_interval");
+      }
     }
   }
 
   backoff_strategy_ =
       std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
   retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });
+
+  manager.add(init_target_);
 }
 
 } // namespace DataSource

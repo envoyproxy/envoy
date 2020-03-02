@@ -76,9 +76,9 @@ public:
 
   // Config::DataFetcher::RemoteDataFetcherCallback
   void onFailure(Config::DataFetcher::FailureReason failure) override {
-    ENVOY_LOG(warn, "Failed to fetch remote data, failure reasue: {}", enumToInt(failure));
+    ENVOY_LOG(debug, "Failed to fetch remote data, failure reason: {}", enumToInt(failure));
     if (retries_remaining_-- == 0) {
-      ENVOY_LOG(warn, "Retry limit exceeded.");
+      ENVOY_LOG(warn, "Retry limit exceeded for fetching data from remote data source.");
       if (allow_empty_) {
         callback_(EMPTY_STRING);
       }
@@ -88,7 +88,7 @@ public:
     }
 
     const auto retry_ms = std::chrono::milliseconds(backoff_strategy_->nextBackOffMs());
-    ENVOY_LOG(warn, "Remote data provider will retry in {} ms.", retry_ms.count());
+    ENVOY_LOG(debug, "Remote data provider will retry in {} ms.", retry_ms.count());
     retry_timer_->enableTimer(retry_ms);
   }
 
@@ -102,7 +102,7 @@ private:
 
   Event::TimerPtr retry_timer_;
   BackOffStrategyPtr backoff_strategy_;
-  uint32_t retries_remaining_{1};
+  uint32_t retries_remaining_;
 };
 
 using RemoteAsyncDataProviderPtr = std::unique_ptr<RemoteAsyncDataProvider>;

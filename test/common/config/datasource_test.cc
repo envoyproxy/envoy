@@ -444,6 +444,32 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceWithRetry) {
   EXPECT_EQ(async_data, body);
 }
 
+TEST_F(AsyncDataSourceTest, baseIntervalGreaterThanMaxInterval) {
+  AsyncDataSourcePb config;
+
+  std::string yaml = R"EOF(
+    remote:
+      http_uri:
+        uri: https://example.com/data
+        cluster: cluster_1
+      sha256:
+        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+      retry_policy:
+        retry_back_off:
+          base_interval: 10s
+          max_interval: 1s
+        num_retries: 3
+  )EOF";
+  TestUtility::loadFromYaml(yaml, config);
+  EXPECT_TRUE(config.has_remote());
+
+  EXPECT_THROW_WITH_MESSAGE(std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+                                cm_, init_manager_, config.remote(), dispatcher_, random_, true,
+                                [&](const std::string&) {}),
+                            EnvoyException,
+                            "max_interval must greater than or equal to the base_interval");
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
