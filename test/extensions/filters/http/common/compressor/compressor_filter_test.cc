@@ -263,10 +263,12 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
   {
     EXPECT_TRUE(isAcceptEncodingAllowed("*"));
     EXPECT_EQ(1, stats_.counter("test.test.header_wildcard").value());
+    EXPECT_EQ(5, stats_.counter("test.test.header_compressor_used").value());
   }
   {
     EXPECT_TRUE(isAcceptEncodingAllowed("*;q=1"));
     EXPECT_EQ(2, stats_.counter("test.test.header_wildcard").value());
+    EXPECT_EQ(5, stats_.counter("test.test.header_compressor_used").value());
   }
   {
     // test header is not valid due to q=0.

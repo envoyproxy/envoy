@@ -2,12 +2,13 @@
 
 #include "envoy/compressor/compressor.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
-#include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "common/protobuf/protobuf.h"
+
+#include "extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,6 +22,13 @@ namespace Compressors {
  * If the request was not marked for compression, the filter increments "not_compressed", but does
  * not add to "total_uncompressed_bytes". This way, the user can measure the memory performance of
  * the compression.
+ *
+ * "header_compressor_used" is a number of requests whose Accept-Encoding header explicitly stated
+ * that the response body should be compressed with the encoding provided by this filter instance.
+ *
+ * "header_compressor_overshadowed" is a number of requests skipped by this filter instance because
+ * they were handled by another filter in the same filter chain.
+ *
  * "header_gzip" is specific to the gzip filter and is deprecated since it duplicates
  * "header_compressor_used".
  */
@@ -55,7 +63,7 @@ public:
   virtual std::unique_ptr<Compressor::Compressor> makeCompressor() PURE;
 
   Runtime::Loader& runtime() { return runtime_; }
-  CompressorStats& stats() { return stats_; }
+  const CompressorStats& stats() { return stats_; }
   const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
@@ -79,52 +87,34 @@ private:
     return CompressorStats{ALL_COMPRESSOR_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  uint32_t content_length_;
+  const uint32_t content_length_;
+  const StringUtil::CaseUnorderedSet content_type_values_;
+  const bool disable_on_etag_header_;
+  const bool remove_accept_encoding_header_;
 
-  StringUtil::CaseUnorderedSet content_type_values_;
-  bool disable_on_etag_header_;
-  bool remove_accept_encoding_header_;
-  CompressorStats stats_;
+  const CompressorStats stats_;
   Runtime::Loader& runtime_;
-  std::string content_encoding_;
+  const std::string content_encoding_;
 };
 using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 
 /**
  * A filter that compresses data dispatched from the upstream upon client request.
  */
-class CompressorFilter : public Http::StreamFilter {
+class CompressorFilter : public Http::PassThroughFilter {
 public:
   explicit CompressorFilter(const CompressorFilterConfigSharedPtr config);
-
-  // Http::StreamFilterBase
-  void onDestroy() override {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    return Http::FilterDataStatus::Continue;
-  }
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
-    return Http::FilterTrailersStatus::Continue;
-  }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
-    return Http::FilterHeadersStatus::Continue;
-  }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
-  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
-    return Http::FilterMetadataStatus::Continue;
-  }
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
-    encoder_callbacks_ = &callbacks;
-  }
 
 private:
   // TODO(gsagula): This is here temporarily and just to facilitate testing. Ideally all
@@ -143,7 +133,7 @@ private:
 
   class EncodingDecision : public StreamInfo::FilterState::Object {
   public:
-    enum class HeaderStat { NotValid, Identity, Wildcard, Overshadowed, Used };
+    enum class HeaderStat { NotValid, Identity, Wildcard, ValidCompressor };
     EncodingDecision(const std::string& encoding, const HeaderStat stat)
         : encoding_(encoding), stat_(stat) {}
     const std::string& encoding() const { return encoding_; }
@@ -155,14 +145,12 @@ private:
   };
 
   std::unique_ptr<EncodingDecision> chooseEncoding(const Http::ResponseHeaderMap& headers) const;
+  bool shouldCompress(const EncodingDecision& decision) const;
 
   bool skip_compression_;
   std::unique_ptr<Compressor::Compressor> compressor_;
-  CompressorFilterConfigSharedPtr config_;
+  const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
-
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
 };
 
 } // namespace Compressors

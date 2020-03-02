@@ -63,6 +63,8 @@ CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
   if (accept_encoding != nullptr) {
+    // Capture the value of the "Accept-Encoding" request header to use it later when making
+    // decision on compressing the corresponding HTTP response.
     accept_encoding_ = std::make_unique<std::string>(accept_encoding->value().getStringView());
   }
 
@@ -82,6 +84,13 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   decoder_callbacks_ = &callbacks;
 
   absl::string_view key = compressorRegistryKey();
+  // To properly handle the cases where the decision on instantiating a compressor depends on
+  // the presence of other compression filters in the chain the filters need to be aware of each
+  // other. This is achieved by exploiting per-request data objects StreamInfo::FilterState: upon
+  // setting up a CompressorFilter, the new instance registers itself in the filter state. Then in
+  // the method isAcceptEncodingAllowed() the first filter is making a decision which encoder needs
+  // to be used for a request, with e.g. "Accept-Encoding: br;q=0.75, gzip;q=0.5", and caches it in
+  // the state. All other compression filters in the sequence use the cached decision.
   const StreamInfo::FilterStateSharedPtr& filter_state = callbacks.streamInfo().filterState();
   if (filter_state->hasData<CompressorRegistry>(key)) {
     CompressorRegistry& registry = filter_state->getDataMutable<CompressorRegistry>(key);
@@ -105,6 +114,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
     headers.removeContentLength();
     headers.setContentEncoding(config_->contentEncoding());
     config_->stats().compressed_.inc();
+    // Finally instantiate the compressor.
     compressor_ = config_->makeCompressor();
   } else if (!skip_compression_) {
     skip_compression_ = true;
@@ -142,6 +152,12 @@ bool CompressorFilter::hasCacheControlNoTransform(Http::ResponseHeaderMap& heade
   return false;
 }
 
+// This function makes decision on which encoding to use for the response body and is
+// supposed to be called only once per request even if there are multiple compressor
+// filters in the chain. To make a decision the function needs to know what's the
+// request's Accept-Encoding, the response's Content-Type and the list of compressor
+// filters in the current chain.
+// TODO(rojkov): add an explicit fuzzer for chooseEncoding().
 std::unique_ptr<CompressorFilter::EncodingDecision>
 CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
@@ -154,9 +170,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
         StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
   }
 
-  // There could be many compressors registered for the same content encoding, e.g. consider a case
-  // when there are two gzip filters using different compression levels for different content sizes.
-  // In such case we ignore duplicates (or different filters for the same encoding) registered last.
+  // Find all compressors enabled for the filter chain.
   std::map<std::string, uint32_t> allowed_compressors;
   uint32_t registration_count{0};
   for (const auto& filter_config :
@@ -164,6 +178,15 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
            .filterState()
            ->getDataReadOnly<CompressorRegistry>(compressorRegistryKey())
            .filter_configs_) {
+    // A compressor filter may be limited to compress certain Content-Types. If the response's
+    // content type doesn't match the list of content types this filter is enabled for then
+    // it must be excluded from the decision process.
+    // For example, there are two compressor filters in the chain e.g. "gzip" and "brotli".
+    // "gzip" is configured to compress only "text/html" and "brotli" is configured to compress only
+    // "application/javascript". Then comes a request with Accept-Encoding header "gzip;q=1,
+    // br;q=.5". The corresponding response content type is "application/javascript". If "gzip" is
+    // not excluded from the decision process then it will take precedens over "brotli" and the
+    // resulting response won't be compressed at all.
     if (!content_type_value.empty() && !filter_config->contentTypeValues().empty()) {
       auto iter = filter_config->contentTypeValues().find(content_type_value);
       if (iter == filter_config->contentTypeValues().end()) {
@@ -171,6 +194,11 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
         continue;
       }
     }
+
+    // There could be many compressors registered for the same content encoding, e.g. consider a
+    // case when there are two gzip filters using different compression levels for different content
+    // sizes. In such case we ignore duplicates (or different filters for the same encoding)
+    // registered last.
     auto enc = allowed_compressors.find(filter_config->contentEncoding());
     if (enc == allowed_compressors.end()) {
       allowed_compressors.insert({filter_config->contentEncoding(), registration_count});
@@ -178,6 +206,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     }
   }
 
+  // Find all encodings accepted by the user agent and adjust the list of allowed compressors.
   for (const auto token : StringUtil::splitToken(*accept_encoding_, ",", false /* keep_empty */)) {
     EncPair pair = std::make_pair(StringUtil::trim(StringUtil::cropRight(token, ";")), 1);
     const auto params = StringUtil::cropLeft(token, ";");
@@ -187,6 +216,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
           absl::EqualsIgnoreCase("q", StringUtil::trim(StringUtil::cropRight(params, "=")))) {
         auto result = absl::SimpleAtof(StringUtil::trim(q_value), &pair.second);
         if (!result) {
+          // Skip unparsable q-value.
           continue;
         }
       }
@@ -194,25 +224,27 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
 
     pairs.push_back(pair);
 
-    // Disallow compressors with "q=0".
-    // The reason why we add encodings to "pairs" even with "q=0" is that "pairs" contains
-    // client's expectations and "allowed_compressors" is what the server can handle. Consider
-    // the cases of "Accept-Encoding: gzip;q=0, deflate, *" and "Accept-Encoding: deflate, *"
-    // whereas the server has only "gzip" configured. If we just exclude the encodings with "q=0"
-    // from "pairs" then upon noticing "*" we don't know if "gzip" is acceptable by the client.
     if (!pair.second) {
+      // Disallow compressors with "q=0".
+      // The reason why we add encodings to "pairs" even with "q=0" is that "pairs" contains
+      // client's expectations and "allowed_compressors" is what Envoy can handle. Consider
+      // the cases of "Accept-Encoding: gzip;q=0, deflate, *" and "Accept-Encoding: deflate, *"
+      // whereas the proxy has only "gzip" configured. If we just exclude the encodings with "q=0"
+      // from "pairs" then upon noticing "*" we don't know if "gzip" is acceptable by the client.
       allowed_compressors.erase(std::string(pair.first));
     }
   }
 
-  if (pairs.empty()) {
-    // If the Accept-Encoding field-value is empty, then only the "identity" encoding is acceptable.
-    config_->stats().header_not_valid_.inc();
+  if (pairs.empty() || allowed_compressors.empty()) {
+    // If there's no intersection between accepted encodings and the ones provided by the allowed
+    // compressors, then only the "identity" encoding is acceptable.
     return std::make_unique<CompressorFilter::EncodingDecision>(
         Http::Headers::get().AcceptEncodingValues.Identity,
         CompressorFilter::EncodingDecision::HeaderStat::NotValid);
   }
 
+  // Find intersection of encodings accepted by the user agent and provided
+  // by the allowed compressors and choose the one with the highest q-value.
   EncPair choice{Http::Headers::get().AcceptEncodingValues.Identity, 0};
   for (const auto pair : pairs) {
     if ((pair.second > choice.second) &&
@@ -224,7 +256,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   }
 
   if (!choice.second) {
-    config_->stats().header_not_valid_.inc();
+    // The value of "Accept-Encoding" must be invalid as we ended up with zero q-value.
     return std::make_unique<CompressorFilter::EncodingDecision>(
         Http::Headers::get().AcceptEncodingValues.Identity,
         CompressorFilter::EncodingDecision::HeaderStat::NotValid);
@@ -232,7 +264,6 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
 
   // The "identity" encoding (no compression) is always available.
   if (choice.first == Http::Headers::get().AcceptEncodingValues.Identity) {
-    config_->stats().header_identity_.inc();
     return std::make_unique<CompressorFilter::EncodingDecision>(
         Http::Headers::get().AcceptEncodingValues.Identity,
         CompressorFilter::EncodingDecision::HeaderStat::Identity);
@@ -240,35 +271,50 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
 
   // If wildcard is given then use which ever compressor is registered first.
   if (choice.first == Http::Headers::get().AcceptEncodingValues.Wildcard) {
-    if (!allowed_compressors.empty()) {
-      config_->stats().header_wildcard_.inc();
-      auto first_registered = std::min_element(
-          allowed_compressors.begin(), allowed_compressors.end(),
-          [](const std::pair<std::string, uint32_t>& a,
-             const std::pair<std::string, uint32_t>& b) -> bool { return a.second < b.second; });
-      return std::make_unique<CompressorFilter::EncodingDecision>(
-          first_registered->first, CompressorFilter::EncodingDecision::HeaderStat::Wildcard);
-    }
+    auto first_registered = std::min_element(
+        allowed_compressors.begin(), allowed_compressors.end(),
+        [](const std::pair<std::string, uint32_t>& a,
+           const std::pair<std::string, uint32_t>& b) -> bool { return a.second < b.second; });
+    return std::make_unique<CompressorFilter::EncodingDecision>(
+        first_registered->first, CompressorFilter::EncodingDecision::HeaderStat::Wildcard);
   }
 
-  if (absl::EqualsIgnoreCase(config_->contentEncoding(), choice.first)) {
-    config_->stats().header_compressor_used_.inc();
-    // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
-    if (absl::EqualsIgnoreCase("gzip", choice.first)) {
-      config_->stats().header_gzip_.inc();
-    }
-    return std::make_unique<CompressorFilter::EncodingDecision>(
-        std::string(choice.first), CompressorFilter::EncodingDecision::HeaderStat::Used);
-  } else if (!allowed_compressors.empty()) {
-    config_->stats().header_compressor_overshadowed_.inc();
-    return std::make_unique<CompressorFilter::EncodingDecision>(
-        std::string(choice.first), CompressorFilter::EncodingDecision::HeaderStat::Overshadowed);
-  }
-
-  config_->stats().header_not_valid_.inc();
   return std::make_unique<CompressorFilter::EncodingDecision>(
-      Http::Headers::get().AcceptEncodingValues.Identity,
-      CompressorFilter::EncodingDecision::HeaderStat::NotValid);
+      std::string(choice.first), CompressorFilter::EncodingDecision::HeaderStat::ValidCompressor);
+}
+
+// Check if this filter was chosen to compress. Also update the filter's stat counters releated to
+// the Accept-Encoding header.
+bool CompressorFilter::shouldCompress(const CompressorFilter::EncodingDecision& decision) const {
+  const bool should_compress =
+      absl::EqualsIgnoreCase(config_->contentEncoding(), decision.encoding());
+
+  switch (decision.stat()) {
+  case CompressorFilter::EncodingDecision::HeaderStat::ValidCompressor:
+    if (should_compress) {
+      config_->stats().header_compressor_used_.inc();
+      // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
+      if (absl::EqualsIgnoreCase("gzip", config_->contentEncoding())) {
+        config_->stats().header_gzip_.inc();
+      }
+    } else {
+      // Some other compressor filter in the same chain compressed the response body,
+      // but not this filter.
+      config_->stats().header_compressor_overshadowed_.inc();
+    }
+    break;
+  case CompressorFilter::EncodingDecision::HeaderStat::Identity:
+    config_->stats().header_identity_.inc();
+    break;
+  case CompressorFilter::EncodingDecision::HeaderStat::Wildcard:
+    config_->stats().header_wildcard_.inc();
+    break;
+  default:
+    config_->stats().header_not_valid_.inc();
+    break;
+  }
+
+  return should_compress;
 }
 
 bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const {
@@ -285,34 +331,12 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
   if (filter_state->hasData<CompressorFilter::EncodingDecision>(encoding_decision_key)) {
     const CompressorFilter::EncodingDecision& decision =
         filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
-    if (absl::EqualsIgnoreCase(config_->contentEncoding(), decision.encoding())) {
-      config_->stats().header_compressor_used_.inc();
-      // TODO(rojkov): Remove this increment when the gzip-specific stat is gone.
-      if (absl::EqualsIgnoreCase("gzip", config_->contentEncoding())) {
-        config_->stats().header_gzip_.inc();
-      }
-      return true;
-    }
-
-    switch (decision.stat()) {
-    case CompressorFilter::EncodingDecision::HeaderStat::Identity:
-      config_->stats().header_identity_.inc();
-      break;
-    case CompressorFilter::EncodingDecision::HeaderStat::Wildcard:
-      config_->stats().header_wildcard_.inc();
-      break;
-    case CompressorFilter::EncodingDecision::HeaderStat::NotValid:
-      config_->stats().header_not_valid_.inc();
-      break;
-    default:
-      config_->stats().header_compressor_overshadowed_.inc();
-    }
-
-    return false;
+    return shouldCompress(decision);
   }
 
+  // No cached decision found, so decide now.
   std::unique_ptr<CompressorFilter::EncodingDecision> decision = chooseEncoding(headers);
-  bool result = absl::EqualsIgnoreCase(config_->contentEncoding(), decision->encoding());
+  bool result = shouldCompress(*decision);
   filter_state->setData(encoding_decision_key, std::move(decision),
                         StreamInfo::FilterState::StateType::ReadOnly);
   return result;

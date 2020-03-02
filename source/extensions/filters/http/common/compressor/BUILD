@@ -14,12 +14,12 @@ envoy_cc_library(
     hdrs = ["compressor.h"],
     deps = [
         "//include/envoy/compressor:compressor_interface",
-        "//include/envoy/http:filter_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/common/protobuf",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
     ],
 )
