@@ -149,13 +149,22 @@ stats_config:
       patterns:
         - safe_regex:
             google_re2: {}
-            regex: 'cluster\.[\w]+?\.upstream_rq_total'
-        - safe_regex:
-            google_re2: {}
             regex: 'cluster\.[\w]+?\.upstream_cx_active'
         - safe_regex:
             google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_retry'
+        - safe_regex:
+            google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_retry_overflow'
+        - safe_regex:
+            google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_retry_success'
+        - safe_regex:
+            google_re2: {}
             regex: 'cluster\.[\w]+?\.upstream_rq_time'
+        - safe_regex:
+            google_re2: {}
+            regex: 'cluster\.[\w]+?\.upstream_rq_total'
 watchdog:
   megamiss_timeout: 60s
   miss_timeout: 60s
