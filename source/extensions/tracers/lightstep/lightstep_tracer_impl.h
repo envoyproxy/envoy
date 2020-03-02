@@ -32,6 +32,7 @@ namespace Lightstep {
 
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
   COUNTER(spans_sent)                                                                              \
+  COUNTER(spans_dropped)                                                                              \
   COUNTER(timer_flushed)
 
 struct LightstepTracerStats {
@@ -92,7 +93,7 @@ private:
 
   private:
     std::unique_ptr<lightstep::BufferChain> active_report_;
-    Callback* active_callback_;
+    Callback* active_callback_ = nullptr;
     Http::AsyncClient::Request* active_request_ = nullptr;
     LightStepDriver& driver_;
 
@@ -104,6 +105,8 @@ private:
     explicit LightStepMetricsObserver(LightStepDriver& driver);
 
     void OnSpansSent(int num_spans) noexcept override;
+
+    void OnSpansDropped(int num_spans) noexcept override;
 
   private:
     LightStepDriver& driver_;

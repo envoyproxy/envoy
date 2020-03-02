@@ -124,6 +124,10 @@ void LightStepDriver::LightStepMetricsObserver::OnSpansSent(int num_spans) noexc
   driver_.tracerStats().spans_sent_.add(num_spans);
 }
 
+void LightStepDriver::LightStepMetricsObserver::OnSpansDropped(int num_spans) noexcept {
+  driver_.tracerStats().spans_dropped_.add(num_spans);
+}
+
 LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(
     const std::shared_ptr<lightstep::LightStepTracer>& tracer, LightStepDriver& driver,
     Event::Dispatcher& dispatcher)
