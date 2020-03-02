@@ -123,10 +123,10 @@ public:
                          const std::string& stats_prefix);
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) override;
 
 private:
   static AdmissionControlStats generateStats(Stats::Scope& scope, const std::string& prefix) {

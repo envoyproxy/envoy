@@ -70,17 +70,17 @@ public:
   }
 
   void sampleFailedRequest() {
-    Http::TestHeaderMapImpl failure_headers{{":status", "504"}};
+    Http::ResponseHeaderMapImpl failure_headers{{":status", "504"}};
     filter_->encodeHeaders(failure_headers, true);
   }
 
   void sampleSuccessfulRequest() {
-    Http::TestHeaderMapImpl success_headers{{":status", "200"}};
+    Http::ResponseHeaderMapImpl success_headers{{":status", "200"}};
     filter_->encodeHeaders(success_headers, true);
   }
 
   void sampleCustomRequest(std::string&& http_error_code) {
-    Http::TestHeaderMapImpl headers{{":status", http_error_code}};
+    Http::ResponseHeaderMapImpl headers{{":status", http_error_code}};
     filter_->encodeHeaders(headers, true);
   }
 
@@ -271,7 +271,7 @@ aggression_coefficient:
   }
 
   // We expect no rejections.
-  Http::TestHeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -289,7 +289,7 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
     sampleFailedRequest();
   }
 
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
@@ -304,7 +304,7 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
 
   // We expect rejections due to the failure rate.
   EXPECT_EQ(0, scope_.counter("test_prefix.rq_rejected").value());
-  Http::TestHeaderMapImpl request_headers;
+  Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(1, scope_.counter("test_prefix.rq_rejected").value());

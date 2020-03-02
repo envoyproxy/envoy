@@ -51,7 +51,7 @@ AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigShare
                                                const std::string& stats_prefix)
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
 
-Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&, bool) {
+Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   deferred_sample_task_ =
       std::make_unique<Cleanup>([this]() { config_->getController().recordFailure(); });
 
@@ -69,7 +69,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::HeaderMap& headers,
+Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   if (end_stream) {
     const uint64_t status_code = Http::Utility::getResponseStatus(headers);
