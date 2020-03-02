@@ -646,7 +646,7 @@ TEST_P(Http2CodecImplTest, EncodeMetadataWhileDispatchingTest) {
     metadata_map_vector.push_back(std::move(metadata_map_ptr));
   }
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
     response_encoder_->encodeMetadata(metadata_map_vector);
