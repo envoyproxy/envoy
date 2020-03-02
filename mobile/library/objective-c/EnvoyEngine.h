@@ -133,6 +133,8 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 @property (nonatomic, strong) NSString *statsDomain;
 @property (nonatomic, assign) UInt32 connectTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
+@property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
+@property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 
 /**
@@ -141,6 +143,8 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 - (instancetype)initWithStatsDomain:(NSString *)statsDomain
               connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
+       dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
+        dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                   statsFlushSeconds:(UInt32)statsFlushSeconds;
 
 /**

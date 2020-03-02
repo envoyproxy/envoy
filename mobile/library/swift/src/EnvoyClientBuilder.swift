@@ -15,6 +15,8 @@ public final class EnvoyClientBuilder: NSObject {
   private var statsDomain: String = "0.0.0.0"
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsRefreshSeconds: UInt32 = 60
+  private var dnsFailureRefreshSecondsBase: UInt32 = 2
+  private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var statsFlushSeconds: UInt32 = 60
 
   // MARK: - Public
@@ -77,6 +79,19 @@ public final class EnvoyClientBuilder: NSObject {
     return self
   }
 
+  /// Add a rate at which to refresh DNS in case of DNS failure.
+  ///
+  /// - parameter base: base rate in seconds.
+  /// - parameter max: max rate in seconds.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addDNSFailureRefreshSeconds(base: UInt32, max: UInt32) -> EnvoyClientBuilder {
+    self.dnsFailureRefreshSecondsBase = base
+    self.dnsFailureRefreshSecondsMax = max
+    return self
+  }
+
   /// Add an interval at which to flush Envoy stats.
   ///
   /// - parameter statsFlushSeconds: Interval at which to flush Envoy stats.
@@ -100,6 +115,9 @@ public final class EnvoyClientBuilder: NSObject {
       let config = EnvoyConfiguration(statsDomain: self.statsDomain,
                                       connectTimeoutSeconds: self.connectTimeoutSeconds,
                                       dnsRefreshSeconds: self.dnsRefreshSeconds,
+                                      dnsFailureRefreshSecondsBase:
+                                        self.dnsFailureRefreshSecondsBase,
+                                      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
                                       statsFlushSeconds: self.statsFlushSeconds)
       return EnvoyClient(config: config, logLevel: self.logLevel, engine: engine)
     }
