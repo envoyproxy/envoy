@@ -1,6 +1,7 @@
-#include "envoy/api/v2/listener/listener.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/rbac/v2/rbac.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
 #include "extensions/filters/network/rbac/config.h"
 
@@ -42,14 +43,14 @@ public:
                   principals:
                     - not_id:
                         any: true
-       -  name: envoy.echo
+       -  name: envoy.filters.network.echo
           config:
 )EOF";
   }
 
   void initializeFilter(const std::string& config) {
-    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      envoy::api::v2::listener::Filter filter;
+    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      envoy::config::listener::v3::Filter filter;
       TestUtility::loadFromYaml(config, filter);
       ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
       auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);

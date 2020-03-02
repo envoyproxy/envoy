@@ -9,6 +9,12 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "api_listener_interface",
+    hdrs = ["api_listener.h"],
+    deps = [":codec_interface"],
+)
+
+envoy_cc_library(
     name = "async_client_interface",
     hdrs = ["async_client.h"],
     external_deps = ["abseil_optional"],
@@ -17,7 +23,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -87,6 +93,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "header_map_interface",
     hdrs = ["header_map.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",

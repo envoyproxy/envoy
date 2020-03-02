@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/empty_string.h"
@@ -57,9 +57,9 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 }
 
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
-    HeaderMap& request_headers, Network::Connection& connection, ConnectionManagerConfig& config,
-    const Router::Config& route_config, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info) {
+    RequestHeaderMap& request_headers, Network::Connection& connection,
+    ConnectionManagerConfig& config, const Router::Config& route_config,
+    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (Utility::isUpgrade(request_headers)) {
@@ -230,7 +230,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   return final_remote_address;
 }
 
-void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_headers,
+void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& request_headers,
                                                           Runtime::Loader& runtime,
                                                           ConnectionManagerConfig& config,
                                                           const Router::Route* route) {
@@ -246,9 +246,11 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     return;
   }
 
-  const envoy::type::FractionalPercent* client_sampling = &config.tracingConfig()->client_sampling_;
-  const envoy::type::FractionalPercent* random_sampling = &config.tracingConfig()->random_sampling_;
-  const envoy::type::FractionalPercent* overall_sampling =
+  const envoy::type::v3::FractionalPercent* client_sampling =
+      &config.tracingConfig()->client_sampling_;
+  const envoy::type::v3::FractionalPercent* random_sampling =
+      &config.tracingConfig()->random_sampling_;
+  const envoy::type::v3::FractionalPercent* overall_sampling =
       &config.tracingConfig()->overall_sampling_;
 
   if (route && route->tracingConfig()) {
@@ -277,7 +279,7 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
   request_headers.setRequestId(x_request_id);
 }
 
-void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_headers,
+void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request_headers,
                                                        Network::Connection& connection,
                                                        ConnectionManagerConfig& config) {
   // When AlwaysForwardOnly is set, always forward the XFCC header without modification.
@@ -363,8 +365,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers,
-                                                     const HeaderMap* request_headers,
+void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
+                                                     const RequestHeaderMap* request_headers,
                                                      const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
@@ -395,8 +397,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
   }
 }
 
-/* static */
-bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
+bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
   ASSERT(request_headers.Path());
   bool is_valid_path = true;

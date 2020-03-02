@@ -1,5 +1,5 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -27,7 +27,7 @@ public:
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
     config_helper_.addFilter(filter_config);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* lua_cluster = bootstrap.mutable_static_resources()->add_clusters();
       lua_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       lua_cluster->set_name("lua_cluster");
@@ -38,8 +38,9 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [domain](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                     hcm) {
+        [domain](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)
@@ -105,7 +106,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LuaIntegrationTest,
 TEST_P(LuaIntegrationTest, CallMetadataDuringLocalReply) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -130,7 +131,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, RequestAndResponse) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -173,11 +174,11 @@ typed_config:
 
   initializeFilter(FILTER_AND_CODE);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   Http::StreamEncoder& encoder = encoder_decoder.first;
@@ -217,7 +218,7 @@ typed_config:
                        ->value()
                        .getStringView());
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data1("good");
   upstream_request_->encodeData(response_data1, false);
@@ -250,7 +251,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -273,17 +274,17 @@ typed_config:
   initializeFilter(FILTER_AND_CODE);
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
   ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
   ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data1("good");
   lua_request_->encodeData(response_data1, true);
@@ -308,7 +309,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -333,17 +334,17 @@ typed_config:
   initializeFilter(FILTER_AND_CODE);
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
   ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
   ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);
 
   response->waitForEndStream();
@@ -358,7 +359,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, ChangeRoute) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -371,11 +372,11 @@ typed_config:
   initializeFilter(FILTER_AND_CODE);
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   waitForNextUpstreamRequest(2);
@@ -392,7 +393,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, SurviveMultipleCalls) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -404,11 +405,11 @@ typed_config:
   initializeFilter(FILTER_AND_CODE);
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
 
   for (uint32_t i = 0; i < 30; ++i) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -428,7 +429,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, SignatureVerification) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -496,7 +497,7 @@ typed_config:
       "295234f7c14fa46303b7e977d2c89ba8a39a46a35f33eb07a332";
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "https"},
       {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"message", "hello"},
       {"keyid", "foo"},       {"signature", signature},        {"hash", "sha256"}};

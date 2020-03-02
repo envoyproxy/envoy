@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/ssl/connection.h"
@@ -137,8 +137,6 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
-  // The request was rejected due to invalid characters in the HOST/:authority header.
-  const std::string InvalidAuthority = "invalid_authority";
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
@@ -464,8 +462,8 @@ public:
   /**
    * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this request
    */
-  virtual envoy::api::v2::core::Metadata& dynamicMetadata() PURE;
-  virtual const envoy::api::v2::core::Metadata& dynamicMetadata() const PURE;
+  virtual envoy::config::core::v3::Metadata& dynamicMetadata() PURE;
+  virtual const envoy::config::core::v3::Metadata& dynamicMetadata() const PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
@@ -481,8 +479,16 @@ public:
    * filters (append only). Both object types can be consumed by multiple filters.
    * @return the filter state associated with this request.
    */
-  virtual FilterState& filterState() PURE;
+  virtual const FilterStateSharedPtr& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
+
+  /**
+   * Filter State object to be shared between upstream and downstream filters.
+   * @param pointer to upstream connections filter state.
+   * @return pointer to filter state to be used by upstream connections.
+   */
+  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
+  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
 
   /**
    * @param SNI value requested.
@@ -508,12 +514,12 @@ public:
   /**
    * @param headers request headers.
    */
-  virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
+  virtual void setRequestHeaders(const Http::RequestHeaderMap& headers) PURE;
 
   /**
    * @return request headers.
    */
-  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
+  virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
 };
 
 } // namespace StreamInfo

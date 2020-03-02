@@ -6,16 +6,16 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Wrapper for StreamDecoder that just forwards to an "inner" decoder.
+ * Wrapper for ResponseDecoder that just forwards to an "inner" decoder.
  */
-class StreamDecoderWrapper : public StreamDecoder {
+class ResponseDecoderWrapper : public ResponseDecoder {
 public:
-  // StreamDecoder
-  void decode100ContinueHeaders(HeaderMapPtr&& headers) override {
+  // ResponseDecoder
+  void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
     inner_.decode100ContinueHeaders(std::move(headers));
   }
 
-  void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override {
+  void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
     if (end_stream) {
       onPreDecodeComplete();
     }
@@ -39,7 +39,7 @@ public:
     }
   }
 
-  void decodeTrailers(HeaderMapPtr&& trailers) override {
+  void decodeTrailers(ResponseTrailerMapPtr&& trailers) override {
     onPreDecodeComplete();
     inner_.decodeTrailers(std::move(trailers));
     onDecodeComplete();
@@ -50,7 +50,7 @@ public:
   }
 
 protected:
-  StreamDecoderWrapper(StreamDecoder& inner) : inner_(inner) {}
+  ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when a decode is complete. This is called
@@ -59,20 +59,16 @@ protected:
   virtual void onPreDecodeComplete() PURE;
   virtual void onDecodeComplete() PURE;
 
-  StreamDecoder& inner_;
+  ResponseDecoder& inner_;
 };
 
 /**
- * Wrapper for StreamEncoder that just forwards to an "inner" encoder.
+ * Wrapper for RequestEncoder that just forwards to an "inner" encoder.
  */
-class StreamEncoderWrapper : public StreamEncoder {
+class RequestEncoderWrapper : public RequestEncoder {
 public:
-  // StreamEncoder
-  void encode100ContinueHeaders(const HeaderMap& headers) override {
-    inner_.encode100ContinueHeaders(headers);
-  }
-
-  void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
+  // RequestEncoder
+  void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
     inner_.encodeHeaders(headers, end_stream);
     if (end_stream) {
       onEncodeComplete();
@@ -86,7 +82,7 @@ public:
     }
   }
 
-  void encodeTrailers(const HeaderMap& trailers) override {
+  void encodeTrailers(const RequestTrailerMap& trailers) override {
     inner_.encodeTrailers(trailers);
     onEncodeComplete();
   }
@@ -98,7 +94,7 @@ public:
   Stream& getStream() override { return inner_.getStream(); }
 
 protected:
-  StreamEncoderWrapper(StreamEncoder& inner) : inner_(inner) {}
+  RequestEncoderWrapper(RequestEncoder& inner) : inner_(inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when an encode is complete. This is called at
@@ -106,7 +102,7 @@ protected:
    */
   virtual void onEncodeComplete() PURE;
 
-  StreamEncoder& inner_;
+  RequestEncoder& inner_;
 };
 
 } // namespace Http

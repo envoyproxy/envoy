@@ -212,6 +212,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_known_issue_asserts",
+    values = {"define": "disable_known_issue_asserts=true"},
+)
+
+config_setting(
     name = "enable_perf_annotation",
     values = {"define": "perf_annotation=enabled"},
 )
@@ -323,6 +328,11 @@ config_setting(
     values = {"define": "manual_stamp=manual_stamp"},
 )
 
+config_setting(
+    name = "android_logger",
+    values = {"define": "logger=android"},
+)
+
 alias(
     name = "apple",
     actual = select(
@@ -369,4 +379,9 @@ alias(
             "//conditions:default": ":darwin_x86_64",
         },
     ),
+)
+
+alias(
+    name = "remote_jdk11",
+    actual = "@bazel_tools//tools/jdk:remote_jdk11",
 )

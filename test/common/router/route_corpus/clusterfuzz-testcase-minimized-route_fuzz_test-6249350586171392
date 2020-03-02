@@ -1,0 +1,157 @@
+config {
+  virtual_hosts {
+    name: "7ard0" require_tls: 8  domains: ""
+    routes {
+      match {
+        case_sensitive {
+          value: true
+        }
+        safe_regex {
+          google_re2 {
+            max_program_size {
+              value: 1868323924
+            }
+          }
+          regex: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      }
+      redirect {
+        host_redirect: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn€nnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        strip_query: true
+      }
+      name: "\020"
+    }
+    routes {
+      match {
+        case_sensitive {
+          value: true
+        }
+        safe_regex {
+          google_re2 {
+            max_program_size {
+              value: 1868323924
+            }
+          }
+          regex: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      }
+      redirect {
+        path_redirect: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\1%7\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        path: ""
+      }
+      direct_response {
+        status: 246
+        body {
+          inline_bytes: "."
+        }
+      }
+    }
+    routes {
+      match {
+        safe_regex {
+          google_re2 {
+            max_program_size {
+              value: 1868323924
+            }
+          }
+          regex: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn?nnnnnnnnnnnnnnnnnnnnnnnnnnnnn^nnnnnnnnnnnnnnn"
+        }
+      }
+      redirect {
+        host_redirect: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        path_redirect: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\17€\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        safe_regex {
+          google_re2 {
+            max_program_size {
+              value: 1868323924
+            }
+          }
+          regex: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn?nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      }
+      redirect {
+        host_redirect: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.nnnnnnnnnnnnnnnnnnnnnnnn"
+        path_redirect: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177K177\177\177\177\177\177\177\177"
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        case_sensitive {
+          value: true
+        }
+        safe_regex {
+          google_re2 {
+            max_program_size {
+              value: 1868323924
+            }
+          }
+          regex: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn?nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnXnnnnnnn"
+        }
+      }
+      redirect {
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        case_sensitive {
+          value: true
+        }
+        safe_regex {
+          google_re2 {
+            max_program_size {
+              value: 1868323924
+            }
+          }
+          regex: "."
+        }
+      }
+      redirect {
+        path_redirect: "\177\177\177\177\177\177\177\177\17%\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        case_sensitive {
+          value: true
+        }
+        safe_regex {
+          google_re2 {
+            max_program_size {
+              value: 1868323924
+            }
+          }
+          regex: "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn‡nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        }
+      }
+      redirect {
+        host_redirect: "nnnnnnnnnnnnnnnnÑnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        strip_query: true
+      }
+      name: "\020"
+    }
+    routes {
+      match {
+        path: ""
+      }
+      direct_response {
+        status: 246
+        body {
+          inline_bytes: "."
+        }
+      }
+    }
+  }
+}

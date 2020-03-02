@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -66,7 +66,7 @@ public:
 
   void log(SystemTime timestamp, const std::string& event) override;
 
-  void injectContext(Http::HeaderMap& request_headers) override;
+  void injectContext(Http::RequestHeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
@@ -93,7 +93,7 @@ public:
    * Constructor. It adds itself and a newly-created Zipkin::Tracer object to a thread-local store.
    * Also, it associates the given random-number generator to the Zipkin::Tracer object it creates.
    */
-  Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
+  Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
          Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
          const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
@@ -109,7 +109,7 @@ public:
    * Thus, this implementation of the virtual function startSpan() ignores the operation name
    * ("ingress" or "egress") passed by the caller.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::HeaderMap& request_headers,
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Http::RequestHeaderMap& request_headers,
                              const std::string&, SystemTime start_time,
                              const Tracing::Decision tracing_decision) override;
 
@@ -145,15 +145,15 @@ private:
 struct CollectorInfo {
   // The Zipkin collector endpoint/path to receive the collected trace data. e.g. /api/v1/spans if
   // HTTP_JSON_V1 or /api/v2/spans otherwise.
-  std::string endpoint_{ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT};
+  std::string endpoint_{DEFAULT_COLLECTOR_ENDPOINT};
 
   // The version of the collector. This is related to endpoint's supported payload specification and
   // transport. Currently it defaults to envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1. In
   // the future, we will throw when collector_endpoint_version is not specified.
-  envoy::config::trace::v2::ZipkinConfig::CollectorEndpointVersion version_{
-      envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1};
+  envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_{
+      envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1};
 
-  bool shared_span_context_{ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT};
+  bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
 };
 
 /**
@@ -194,7 +194,7 @@ public:
 
   // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.
-  void onSuccess(Http::MessagePtr&&) override;
+  void onSuccess(Http::ResponseMessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
   /**

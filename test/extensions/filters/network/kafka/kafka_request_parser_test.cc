@@ -22,8 +22,8 @@ class KafkaRequestParserTest : public testing::Test, public BufferBasedTest {};
 class MockRequestParserResolver : public RequestParserResolver {
 public:
   MockRequestParserResolver() = default;
-  MOCK_CONST_METHOD3(createParser,
-                     RequestParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
+  MOCK_METHOD(RequestParserSharedPtr, createParser, (int16_t, int16_t, RequestContextSharedPtr),
+              (const));
 };
 
 TEST_F(KafkaRequestParserTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
@@ -52,7 +52,7 @@ TEST_F(KafkaRequestParserTest, RequestStartParserTestShouldReturnRequestHeaderPa
 class MockParser : public RequestParser {
 public:
   RequestParseResponse parse(absl::string_view&) override {
-    throw new EnvoyException("should not be invoked");
+    throw EnvoyException("should not be invoked");
   }
 };
 
@@ -96,50 +96,6 @@ TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldExtractHeaderAndResolveN
   assertStringViewIncrement(data, orig_data, header_len);
 }
 
-TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldHandleExceptionsDuringFeeding) {
-  // given
-
-  // This deserializer throws during feeding.
-  class ThrowingRequestHeaderDeserializer : public RequestHeaderDeserializer {
-  public:
-    uint32_t feed(absl::string_view& data) override {
-      // Move some pointers to simulate data consumption.
-      data = {data.data() + FAILED_DESERIALIZER_STEP, data.size() - FAILED_DESERIALIZER_STEP};
-      throw EnvoyException("feed");
-    };
-
-    bool ready() const override { throw std::runtime_error("should not be invoked at all"); };
-
-    RequestHeader get() const override {
-      throw std::runtime_error("should not be invoked at all");
-    };
-  };
-
-  const MockRequestParserResolver parser_resolver;
-
-  const int32_t request_size = 1024; // There are still 1024 bytes to read to complete the request.
-  RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
-  RequestHeaderParser testee{parser_resolver, request_context,
-                             std::make_unique<ThrowingRequestHeaderDeserializer>()};
-
-  const absl::string_view orig_data = putGarbageIntoBuffer();
-  absl::string_view data = orig_data;
-
-  // when
-  const RequestParseResponse result = testee.parse(data);
-
-  // then
-  ASSERT_EQ(result.hasData(), true);
-  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
-  ASSERT_EQ(result.message_, nullptr);
-  ASSERT_EQ(result.failure_data_, nullptr);
-
-  ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
-            request_size - FAILED_DESERIALIZER_STEP);
-
-  assertStringViewIncrement(data, orig_data, FAILED_DESERIALIZER_STEP);
-}
-
 TEST_F(KafkaRequestParserTest, RequestDataParserShouldHandleDeserializerExceptionsDuringFeeding) {
   // given
 
@@ -156,7 +112,7 @@ TEST_F(KafkaRequestParserTest, RequestDataParserShouldHandleDeserializerExceptio
     int32_t get() const override { throw std::runtime_error("should not be invoked at all"); };
   };
 
-  RequestContextSharedPtr request_context{new RequestContext{1024, {}}};
+  RequestContextSharedPtr request_context{new RequestContext{1024, {0, 0, 0, absl::nullopt}}};
   RequestDataParser<int32_t, ThrowingDeserializer> testee{request_context};
 
   absl::string_view data = putGarbageIntoBuffer();
@@ -190,7 +146,8 @@ TEST_F(KafkaRequestParserTest,
        RequestDataParserShouldHandleDeserializerReturningReadyButLeavingData) {
   // given
   const int32_t request_size = 1024; // There are still 1024 bytes to read to complete the request.
-  RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
+  RequestContextSharedPtr request_context{
+      new RequestContext{request_size, {0, 0, 0, absl::nullopt}}};
 
   RequestDataParser<int32_t, SomeBytesDeserializer> testee{request_context};
 

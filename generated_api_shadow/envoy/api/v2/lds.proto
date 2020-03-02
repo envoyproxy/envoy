@@ -8,6 +8,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -17,7 +18,7 @@ option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "LdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.service.listener.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.service.listener.v3";
 
 // [#protodoc-title: Listener]
 // Listener :ref:`configuration overview <config_listeners>`
@@ -27,6 +28,8 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.service.listener
 // consist of a complete update of all listeners. Existing connections will be
 // allowed to drain from listeners that are no longer present.
 service ListenerDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.api.v2.Listener";
+
   rpc DeltaListeners(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 

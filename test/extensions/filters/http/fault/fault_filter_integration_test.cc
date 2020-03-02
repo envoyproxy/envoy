@@ -18,7 +18,7 @@ public:
 
   const std::string upstream_rate_limit_config_ =
       R"EOF(
-name: envoy.fault
+name: envoy.filters.http.fault
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
   response_rate_limit:
@@ -30,7 +30,7 @@ typed_config:
 
   const std::string header_fault_config_ =
       R"EOF(
-name: envoy.fault
+name: envoy.filters.http.fault
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
   delay:
@@ -55,7 +55,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FaultIntegrationTestAllProtocols,
 TEST_P(FaultIntegrationTestAllProtocols, NoFault) {
   const std::string filter_config =
       R"EOF(
-name: envoy.fault
+name: envoy.filters.http.fault
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
 )EOF";
@@ -96,12 +96,12 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
 TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
   initializeFilter(header_fault_config_);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-envoy-fault-delay-request", "200"},
-                                          {"x-envoy-fault-throughput-response", "1"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-envoy-fault-delay-request", "200"},
+                                                 {"x-envoy-fault-throughput-response", "1"}};
   const auto current_time = simTime().monotonicTime();
   IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();

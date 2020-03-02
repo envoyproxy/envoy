@@ -9,15 +9,15 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/matchers.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
@@ -48,7 +48,7 @@ public:
    * @param headers supplies the response headers, which may be modified during this call.
    * @param stream_info holds additional information about the request.
    */
-  virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
+  virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
@@ -71,7 +71,7 @@ public:
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
    *         or an empty string otherwise.
    */
-  virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
+  virtual std::string newPath(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Returns the response body to send with direct responses.
@@ -87,7 +87,7 @@ public:
    * @param headers supplies the request headers, which may be modified during this call.
    * @param insert_envoy_original_path insert x-envoy-original-path header?
    */
-  virtual void rewritePathHeader(Http::HeaderMap& headers,
+  virtual void rewritePathHeader(Http::RequestHeaderMap& headers,
                                  bool insert_envoy_original_path) const PURE;
 
   /**
@@ -264,7 +264,7 @@ public:
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
-  virtual RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
+  virtual RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                          DoRetryCallback callback) PURE;
 
   /**
@@ -275,7 +275,7 @@ public:
    * @param response_headers supplies the response headers.
    * @return bool true if a retry would be warranted based on the retry policy.
    */
-  virtual bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers) PURE;
+  virtual bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) PURE;
 
   /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
@@ -360,7 +360,7 @@ public:
    * @return the default fraction of traffic the should be shadowed, if the runtime key is not
    *         present.
    */
-  virtual const envoy::type::FractionalPercent& defaultValue() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& defaultValue() const PURE;
 };
 
 using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
@@ -467,7 +467,7 @@ public:
    * @return percent chance that an additional upstream request should be sent
    * on top of the value from initialRequests().
    */
-  virtual const envoy::type::FractionalPercent& additionalRequestChance() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& additionalRequestChance() const PURE;
 
   /**
    * @return bool indicating whether request hedging should occur when a request
@@ -530,11 +530,23 @@ public:
   filterMatchCriteria(const std::set<std::string>& names) const PURE;
 };
 
+/**
+ * Criterion that a route entry uses for matching TLS connection context.
+ */
 class TlsContextMatchCriteria {
 public:
   virtual ~TlsContextMatchCriteria() = default;
 
+  /**
+   * @return bool indicating whether the client presented credentials.
+   */
   virtual const absl::optional<bool>& presented() const PURE;
+
+  /**
+   * @return bool indicating whether the client credentials successfully validated against the TLS
+   * context validation context.
+   */
+  virtual const absl::optional<bool>& validated() const PURE;
 };
 
 using TlsContextMatchCriteriaConstPtr = std::unique_ptr<const TlsContextMatchCriteria>;
@@ -603,7 +615,7 @@ public:
    * @param stream_info holds additional information about the request.
    * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
-  virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
+  virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       bool insert_envoy_original_path) const PURE;
 
@@ -718,7 +730,7 @@ public:
    * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
    * this route.
    */
-  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 
   /**
    * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
@@ -775,6 +787,12 @@ public:
   virtual InternalRedirectAction internalRedirectAction() const PURE;
 
   /**
+   * @returns the threshold of number of previously handled internal redirects, for this route to
+   * stop handle internal redirects.
+   */
+  virtual uint32_t maxInternalRedirects() const PURE;
+
+  /**
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
@@ -798,6 +816,13 @@ public:
    * @return the operation name
    */
   virtual const std::string& getOperation() const PURE;
+
+  /**
+   * This method returns whether the decorator information
+   * should be propagated to other services.
+   * @return whether to propagate
+   */
+  virtual bool propagate() const PURE;
 };
 
 using DecoratorConstPtr = std::unique_ptr<const Decorator>;
@@ -813,19 +838,19 @@ public:
    * This method returns the client sampling percentage.
    * @return the client sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getClientSampling() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& getClientSampling() const PURE;
 
   /**
    * This method returns the random sampling percentage.
    * @return the random sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getRandomSampling() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& getRandomSampling() const PURE;
 
   /**
    * This method returns the overall sampling percentage.
    * @return the overall sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
+  virtual const envoy::type::v3::FractionalPercent& getOverallSampling() const PURE;
 
   /**
    * This method returns the route level tracing custom tags.
@@ -896,7 +921,7 @@ public:
    *        allows stable choices between calls if desired.
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
+  virtual RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
 

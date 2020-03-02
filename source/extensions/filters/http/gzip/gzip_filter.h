@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
+#include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
@@ -54,7 +54,7 @@ struct GzipStats {
 class GzipFilterConfig {
 
 public:
-  GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
+  GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip,
                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
@@ -75,9 +75,9 @@ public:
 
 private:
   static Compressor::ZlibCompressorImpl::CompressionLevel compressionLevelEnum(
-      envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level);
+      envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::Enum compression_level);
   static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
-      envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy);
+      envoy::extensions::filters::http::gzip::v3::Gzip::CompressionStrategy compression_strategy);
   static StringUtil::CaseUnorderedSet
   contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
@@ -115,11 +115,12 @@ public:
   void onDestroy() override{};
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
@@ -127,12 +128,13 @@ public:
   };
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }
@@ -145,15 +147,15 @@ private:
   // the logic in these private member functions would be available in another class.
   friend class GzipFilterTest;
 
-  bool hasCacheControlNoTransform(Http::HeaderMap& headers) const;
-  bool isAcceptEncodingAllowed(Http::HeaderMap& headers) const;
-  bool isContentTypeAllowed(Http::HeaderMap& headers) const;
-  bool isEtagAllowed(Http::HeaderMap& headers) const;
-  bool isMinimumContentLength(Http::HeaderMap& headers) const;
-  bool isTransferEncodingAllowed(Http::HeaderMap& headers) const;
+  bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
+  bool isAcceptEncodingAllowed(Http::RequestHeaderMap& headers) const;
+  bool isContentTypeAllowed(Http::ResponseHeaderMap& headers) const;
+  bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
+  bool isMinimumContentLength(Http::ResponseHeaderMap& headers) const;
+  bool isTransferEncodingAllowed(Http::ResponseHeaderMap& headers) const;
 
-  void sanitizeEtagHeader(Http::HeaderMap& headers);
-  void insertVaryHeader(Http::HeaderMap& headers);
+  void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
+  void insertVaryHeader(Http::ResponseHeaderMap& headers);
 
   bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;

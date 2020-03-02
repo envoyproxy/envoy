@@ -51,27 +51,30 @@ public:
    *         existence of the x-forwarded-for header. Again see the method for more details.
    */
   static Network::Address::InstanceConstSharedPtr
-  mutateRequestHeaders(HeaderMap& request_headers, Network::Connection& connection,
+  mutateRequestHeaders(RequestHeaderMap& request_headers, Network::Connection& connection,
                        ConnectionManagerConfig& config, const Router::Config& route_config,
                        Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
 
-  static void mutateResponseHeaders(HeaderMap& response_headers, const HeaderMap* request_headers,
+  static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
+                                    const RequestHeaderMap* request_headers,
                                     const std::string& via);
 
   // Sanitize the path in the header map if forced by config.
   // Side affect: the string view of Path header is invalidated.
   // Return false if error happens during the sanitization.
-  static bool maybeNormalizePath(HeaderMap& request_headers, const ConnectionManagerConfig& config);
+  static bool maybeNormalizePath(RequestHeaderMap& request_headers,
+                                 const ConnectionManagerConfig& config);
 
   /**
    * Mutate request headers if request needs to be traced.
    */
-  static void mutateTracingRequestHeader(HeaderMap& request_headers, Runtime::Loader& runtime,
-                                         ConnectionManagerConfig& config,
+  static void mutateTracingRequestHeader(RequestHeaderMap& request_headers,
+                                         Runtime::Loader& runtime, ConnectionManagerConfig& config,
                                          const Router::Route* route);
 
 private:
-  static void mutateXfccRequestHeader(HeaderMap& request_headers, Network::Connection& connection,
+  static void mutateXfccRequestHeader(RequestHeaderMap& request_headers,
+                                      Network::Connection& connection,
                                       ConnectionManagerConfig& config);
 };
 

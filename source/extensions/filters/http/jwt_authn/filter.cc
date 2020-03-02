@@ -16,7 +16,7 @@ namespace JwtAuthn {
 
 namespace {
 
-bool isCorsPreflightRequest(const Http::HeaderMap& headers) {
+bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
   return headers.Method() &&
          headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
          headers.Origin() && !headers.Origin()->value().empty() &&
@@ -42,7 +42,7 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
 
   state_ = Calling;
@@ -59,7 +59,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
 
   // Verify the JWT token, onComplete() will be called when completed.
   const auto* verifier =
-      config_->findVerifier(headers, decoder_callbacks_->streamInfo().filterState());
+      config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
   if (!verifier) {
     onComplete(Status::Ok);
   } else {
@@ -112,7 +112,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
   if (state_ == Calling) {
     return Http::FilterTrailersStatus::StopIteration;

@@ -1,7 +1,7 @@
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
@@ -44,7 +44,7 @@ typed_config:
                                            ipVersionToDnsFamily(GetParam()), max_hosts);
     config_helper_.addFilter(filter);
 
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
@@ -52,17 +52,17 @@ typed_config:
 
     // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
-        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
 
     // Setup the initial CDS cluster.
     cluster_.mutable_connect_timeout()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     cluster_.set_name("cluster_0");
-    cluster_.set_lb_policy(envoy::api::v2::Cluster::CLUSTER_PROVIDED);
+    cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
 
     if (upstream_tls_) {
-      envoy::api::v2::auth::UpstreamTlsContext tls_context;
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
       auto* validation_context =
           tls_context.mutable_common_tls_context()->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
@@ -103,7 +103,7 @@ typed_config:
 
   // TODO(mattklein123): This logic is duplicated in various places. Cleanup in a follow up.
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     auto* tls_cert = common_tls_context->add_tls_certificates();
     tls_cert->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
@@ -122,7 +122,7 @@ typed_config:
   bool upstream_tls_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
-  envoy::api::v2::Cluster cluster_;
+  envoy::config::cluster::v3::Cluster cluster_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
@@ -134,7 +134,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
 TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -159,7 +159,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
 TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -195,7 +195,7 @@ TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
 TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -221,7 +221,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
   setup(1);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -233,7 +233,7 @@ TEST_P(ProxyFilterIntegrationTest, DNSCacheHostOverflow) {
   checkSimpleRequestSuccess(1024, 1024, response.get());
 
   // Send another request, this should lead to a response directly from the filter.
-  const Http::TestHeaderMapImpl request_headers2{
+  const Http::TestRequestHeaderMapImpl request_headers2{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -249,7 +249,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   upstream_tls_ = true;
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -274,7 +274,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   upstream_tls_ = true;
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
@@ -306,7 +306,7 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsInvalidSAN) {
   fake_upstreams_[0]->setReadDisableOnNewConnection(false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestHeaderMapImpl request_headers{
+  const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},

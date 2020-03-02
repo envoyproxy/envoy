@@ -1,7 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/network/socket_option_factory.h"
 
@@ -43,26 +43,6 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
         envoy_address->ip()->ipv6()->address();
   }
   return quic::QuicSocketAddress(ss);
-}
-
-Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
-  Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  for (const auto& entry : header_list) {
-    // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
-    headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
-  }
-  return headers;
-}
-
-Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
-  Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  for (auto entry : header_block) {
-    // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
-    std::string key(entry.first);
-    std::string value(entry.second);
-    headers->addCopy(Http::LowerCaseString(key), value);
-  }
-  return headers;
 }
 
 spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {
@@ -123,7 +103,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
     connection_socket->addOptions(options);
   }
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
-                                     envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+                                     envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
     return connection_socket;
@@ -135,7 +115,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
     local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
   }
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
-                                     envoy::api::v2::core::SocketOption::STATE_BOUND)) {
+                                     envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
     connection_socket->close();
   }

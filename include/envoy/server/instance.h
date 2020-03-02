@@ -196,7 +196,7 @@ public:
   /**
    * @return the server-wide process context.
    */
-  virtual OptProcessContextRef processContext() PURE;
+  virtual ProcessContextOptRef processContext() PURE;
 
   /**
    * @return ThreadLocal::Instance& the thread local storage engine for the server. This is used to
@@ -220,6 +220,13 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
+   * Flush the stats sinks outside of a flushing interval.
+   * Note: stats flushing may not be synchronous.
+   * Therefore, this function may return prior to flushing taking place.
+   */
+  virtual void flushStats() PURE;
+
+  /**
    * @return ProtobufMessage::ValidationContext& validation context for configuration
    *         messages.
    */
@@ -229,6 +236,11 @@ public:
    * @return Configuration::ServerFactoryContext& factory context for filters.
    */
   virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * @return Configuration::TransportSocketFactoryContext& factory context for transport sockets.
+   */
+  virtual Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() PURE;
 };
 
 } // namespace Server

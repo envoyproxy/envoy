@@ -32,13 +32,13 @@ public:
     decodeCommandReply_(message);
   }
 
-  MOCK_METHOD1(decodeGetMore_, void(GetMoreMessagePtr& message));
-  MOCK_METHOD1(decodeInsert_, void(InsertMessagePtr& message));
-  MOCK_METHOD1(decodeKillCursors_, void(KillCursorsMessagePtr& message));
-  MOCK_METHOD1(decodeQuery_, void(QueryMessagePtr& message));
-  MOCK_METHOD1(decodeReply_, void(ReplyMessagePtr& message));
-  MOCK_METHOD1(decodeCommand_, void(CommandMessagePtr& message));
-  MOCK_METHOD1(decodeCommandReply_, void(CommandReplyMessagePtr& message));
+  MOCK_METHOD(void, decodeGetMore_, (GetMoreMessagePtr & message));
+  MOCK_METHOD(void, decodeInsert_, (InsertMessagePtr & message));
+  MOCK_METHOD(void, decodeKillCursors_, (KillCursorsMessagePtr & message));
+  MOCK_METHOD(void, decodeQuery_, (QueryMessagePtr & message));
+  MOCK_METHOD(void, decodeReply_, (ReplyMessagePtr & message));
+  MOCK_METHOD(void, decodeCommand_, (CommandMessagePtr & message));
+  MOCK_METHOD(void, decodeCommandReply_, (CommandReplyMessagePtr & message));
 };
 
 class MongoCodecImplTest : public testing::Test {

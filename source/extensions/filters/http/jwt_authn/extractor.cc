@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "common/common/utility.h"
 #include "common/http/headers.h"
@@ -11,8 +11,8 @@
 
 #include "absl/strings/match.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using Envoy::Http::LowerCaseString;
 
 namespace Envoy {
@@ -89,10 +89,10 @@ public:
   ExtractorImpl(const JwtProvider& provider);
 
   ExtractorImpl(
-      const std::vector<const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider*>&
+      const std::vector<const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider*>&
           providers);
 
-  std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const override;
+  std::vector<JwtLocationConstPtr> extract(const Http::RequestHeaderMap& headers) const override;
 
   void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
 
@@ -179,7 +179,8 @@ void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::st
   param_location_spec.specified_issuers_.insert(issuer);
 }
 
-std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& headers) const {
+std::vector<JwtLocationConstPtr>
+ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   std::vector<JwtLocationConstPtr> tokens;
 
   // Check header locations first

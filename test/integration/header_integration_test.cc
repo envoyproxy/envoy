@@ -1,10 +1,10 @@
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/http/router/v2/router.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/api/v2/endpoint.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/metadata.h"
@@ -31,7 +31,7 @@ std::string ipSuppressEnvoyHeadersTestParamsToString(
 }
 
 void disableHeaderValueOptionAppend(
-    Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& header_value_options) {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
     i.mutable_append()->set_value(false);
   }
@@ -39,7 +39,7 @@ void disableHeaderValueOptionAppend(
 
 const std::string http_connection_mgr_config = R"EOF(
 http_filters:
-  - name: envoy.router
+  - name: envoy.filters.http.router
 codec_type: HTTP1
 use_remote_address: false
 xff_num_trusted_hops: 1
@@ -201,9 +201,9 @@ public:
     fake_upstreams_.clear();
   }
 
-  void addHeader(Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>* field,
+  void addHeader(Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>* field,
                  const std::string& key, const std::string& value, bool append) {
-    envoy::api::v2::core::HeaderValueOption* header_value_option = field->Add();
+    envoy::config::core::v3::HeaderValueOption* header_value_option = field->Add();
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(key);
     mutable_header->set_value(value);
@@ -211,12 +211,12 @@ public:
   }
 
   void prepareEDS() {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       ASSERT(static_resources->clusters_size() == 1);
 
       static_resources->mutable_clusters(0)->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
               R"EOF(
                   name: cluster_0
                   type: EDS
@@ -235,30 +235,40 @@ public:
       // host must come before the eds-cluster's host to keep the upstreams and ports in the same
       // order.
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(
               R"EOF(
                       name: unused-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
-                      hosts:
-                        - socket_address:
-                            address: {}
-                            port_value: 0
+                      load_assignment:
+                        cluster_name: unused-cluster
+                        endpoints:
+                        - lb_endpoints:
+                          - endpoint:
+                              address:
+                                socket_address:
+                                  address: {}
+                                  port_value: 0
                   )EOF",
               Network::Test::getLoopbackAddressString(version_))));
 
       static_resources->add_clusters()->CopyFrom(
-          TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(
+          TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(
               R"EOF(
                       name: eds-cluster
                       type: STATIC
                       lb_policy: ROUND_ROBIN
                       http2_protocol_options: {{}}
                       connect_timeout: 5s
-                      hosts:
-                        - socket_address:
-                            address: {}
-                            port_value: 0
+                      load_assignment:
+                        cluster_name: eds-cluster
+                        endpoints:
+                        - lb_endpoints:
+                          - endpoint:
+                              address:
+                                socket_address:
+                                  address: {}
+                                  port_value: 0
                   )EOF",
               Network::Test::getLoopbackAddressString(version_))));
     });
@@ -268,11 +278,11 @@ public:
 
   void initializeFilter(HeaderMode mode, bool inject_route_config_headers) {
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
           // Overwrite default config with our own.
           TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
-          envoy::config::filter::http::router::v2::Router router_config;
+          envoy::extensions::filters::http::router::v3::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
           hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
 

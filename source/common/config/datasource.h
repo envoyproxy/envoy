@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -25,13 +25,14 @@ namespace DataSource {
  * @return std::string with DataSource contents.
  * @throw EnvoyException if no DataSource case is specified and !allow_empty.
  */
-std::string read(const envoy::api::v2::core::DataSource& source, bool allow_empty, Api::Api& api);
+std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
+                 Api::Api& api);
 
 /**
  * @param source data source.
  * @return absl::optional<std::string> path to DataSource if a filename, otherwise absl::nullopt.
  */
-absl::optional<std::string> getPath(const envoy::api::v2::core::DataSource& source);
+absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source);
 
 /**
  * Callback for async data source.
@@ -40,7 +41,7 @@ using AsyncDataSourceCb = std::function<void(const std::string&)>;
 
 class LocalAsyncDataProvider {
 public:
-  LocalAsyncDataProvider(Init::Manager& manager, const envoy::api::v2::core::DataSource& source,
+  LocalAsyncDataProvider(Init::Manager& manager, const envoy::config::core::v3::DataSource& source,
                          bool allow_empty, Api::Api& api, AsyncDataSourceCb&& callback)
       : init_target_("LocalAsyncDataProvider", [this, &source, allow_empty, &api, callback]() {
           callback(DataSource::read(source, allow_empty, api));
@@ -61,7 +62,7 @@ class RemoteAsyncDataProvider : public Config::DataFetcher::RemoteDataFetcherCal
                                 public Logger::Loggable<Logger::Id::config> {
 public:
   RemoteAsyncDataProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
-                          const envoy::api::v2::core::RemoteDataSource& source,
+                          const envoy::config::core::v3::RemoteDataSource& source,
                           Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                           bool allow_empty, AsyncDataSourceCb&& callback);
 

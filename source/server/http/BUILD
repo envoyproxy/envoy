@@ -48,6 +48,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/memory:utils_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:raw_buffer_socket_lib",
@@ -60,10 +61,10 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 

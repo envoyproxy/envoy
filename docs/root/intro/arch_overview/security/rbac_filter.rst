@@ -79,9 +79,11 @@ The following attributes are exposed to the language runtime:
    request.total_size, int, Total size of the request including the headers
    request.protocol, string, Request protocol e.g. "HTTP/2"
    response.code, int, Response HTTP status code
+   response.grpc_status, int, Response gRPC status code
    response.headers, string map, All response headers
    response.trailers, string map, All response trailers
    response.size, int, Size of the response body
+   response.total_size, int, Total size of the response including the approximate uncompressed size of the headers and the trailers
    response.flags, int, Additional details about the response beyond the standard response code
    source.address, string, Downstream connection remote address
    source.port, int, Downstream connection remote port
