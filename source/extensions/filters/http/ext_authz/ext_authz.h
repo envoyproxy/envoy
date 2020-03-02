@@ -202,7 +202,7 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::StreamDecoderFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
+  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()) {}
 
   // Http::StreamFilterBase
@@ -220,7 +220,7 @@ public:
 
 private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
-  void initiateCall(const Http::HeaderMap& headers);
+  void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   bool isBufferFull();
 
@@ -238,7 +238,7 @@ private:
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  Http::HeaderMap* request_headers_;
+  Http::RequestHeaderMap* request_headers_;
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;

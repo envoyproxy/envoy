@@ -17,5 +17,5 @@ resources:
         rds:
           route_config_name: route_config_0
           config_source: { path: {{ rds_json_path }} }
-        http_filters: [{ name: envoy.router }]
+        http_filters: [{ name: envoy.filters.http.router }]
         foo: bar

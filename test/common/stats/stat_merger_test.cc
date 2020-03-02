@@ -7,6 +7,7 @@
 
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -26,6 +27,34 @@ public:
     EXPECT_EQ(initial, g1.importMode()) << name;
     g1.mergeImportMode(merge);
     EXPECT_EQ(merge, g1.importMode()) << name;
+  }
+
+  void dynamicEncodeDecodeTest(absl::string_view input_name) {
+    SymbolTable& symbol_table = store_.symbolTable();
+
+    // Encode the input name into a joined StatName, using "D:" to indicate
+    // a dynamic component.
+    std::vector<StatName> components;
+    StatNamePool symbolic_pool(symbol_table);
+    StatNameDynamicPool dynamic_pool(symbol_table);
+
+    for (absl::string_view segment : absl::StrSplit(input_name, ".")) {
+      if (absl::StartsWith(segment, "D:")) {
+        std::string hacked = absl::StrReplaceAll(segment.substr(2), {{",", "."}});
+        components.push_back(dynamic_pool.add(hacked));
+      } else {
+        components.push_back(symbolic_pool.add(segment));
+      }
+    }
+    SymbolTable::StoragePtr joined = symbol_table.join(components);
+    StatName stat_name(joined.get());
+
+    std::string name = symbol_table.toString(stat_name);
+    StatMerger::DynamicsMap dynamic_map;
+    dynamic_map[name] = StatMerger::DynamicContext::encodeSegments(stat_name);
+    StatMerger::DynamicContext dynamic_context(symbol_table);
+    StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
+    EXPECT_EQ(stat_name, decoded) << name;
   }
 
   IsolatedStoreImpl store_;
@@ -178,6 +207,119 @@ TEST_F(StatMergerTest, gaugeMergeImportMode) {
   mergeTest("s1.version", Gauge::ImportMode::NeverImport, Gauge::ImportMode::NeverImport);
   mergeTest("newgauge2", Gauge::ImportMode::Uninitialized, Gauge::ImportMode::Accumulate);
   mergeTest("s2.version", Gauge::ImportMode::Uninitialized, Gauge::ImportMode::NeverImport);
+}
+
+class StatMergerDynamicTest : public testing::Test {
+public:
+  void init(SymbolTablePtr&& symbol_table) { symbol_table_ = std::move(symbol_table); }
+
+  /**
+   * Test helper function takes an input_descriptor. And input_descriptor is
+   * mostly like the stringified StatName, but each segment that is prefixed by
+   * "D:" is dynamic, and within a segment, we map "," to ".". The "D:" hack
+   * restricts the stat names we can test by making a prefix special. The ","
+   * hack does that too, allowing us to represent a single multi-segment dynamic
+   * token in the tests. These hacks were easy to implement (~ 3 lines of code)
+   * and provide a reasonably concise way to make a few test-cases.
+   *
+   * The test-helper ensures that a StatName created from a descriptor can
+   * be encoded into a DynamicsMap, and also decoded back into a StatName
+   * that compares as expected.
+   *
+   * @param a pattern describing a stat-name with dynamic and symbolic components.
+   * @return the number of elements in the dynamic map.
+   */
+  uint32_t dynamicEncodeDecodeTest(absl::string_view input_descriptor) {
+    // Encode the input name into a joined StatName, using "D:" to indicate
+    // a dynamic component.
+    std::vector<StatName> components;
+    StatNamePool symbolic_pool(*symbol_table_);
+    StatNameDynamicPool dynamic_pool(*symbol_table_);
+
+    for (absl::string_view segment : absl::StrSplit(input_descriptor, ".")) {
+      if (absl::StartsWith(segment, "D:")) {
+        std::string hacked = absl::StrReplaceAll(segment.substr(2), {{",", "."}});
+        components.push_back(dynamic_pool.add(hacked));
+      } else {
+        components.push_back(symbolic_pool.add(segment));
+      }
+    }
+    StatName stat_name;
+    SymbolTable::StoragePtr joined;
+
+    if (components.size() == 1) {
+      stat_name = components[0];
+    } else {
+      joined = symbol_table_->join(components);
+      stat_name = StatName(joined.get());
+    }
+
+    std::string name = symbol_table_->toString(stat_name);
+    StatMerger::DynamicsMap dynamic_map;
+    StatMerger::DynamicSpans spans = StatMerger::DynamicContext::encodeSegments(stat_name);
+    uint32_t size = 0;
+    if (!spans.empty()) {
+      dynamic_map[name] = spans;
+      size = spans.size();
+    }
+    StatMerger::DynamicContext dynamic_context(*symbol_table_);
+    StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
+    EXPECT_EQ(name, symbol_table_->toString(decoded)) << "input=" << input_descriptor;
+    EXPECT_TRUE(stat_name == decoded) << "input=" << input_descriptor << ", name=" << name;
+
+    return size;
+  }
+
+  SymbolTablePtr symbol_table_;
+};
+
+TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
+  init(std::make_unique<SymbolTableImpl>());
+
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:dynamic"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello...world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello.world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("hello.D:world"));
+  EXPECT_EQ(2, dynamicEncodeDecodeTest("D:hello.D:world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,world"));
+  EXPECT_EQ(4, dynamicEncodeDecodeTest("one.D:two.three.D:four.D:five.six.D:seven,eight.nine"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:one,two,three"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello..world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("hello..D:world"));
+  EXPECT_EQ(2, dynamicEncodeDecodeTest("D:hello..D:world"));
+  EXPECT_EQ(3, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,,world"));
+  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,,,world"));
+}
+
+TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
+  init(std::make_unique<FakeSymbolTableImpl>());
+
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:dynamic"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello...world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("one.D:two.three.D:four.D:five.six.D:seven,eight.nine"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:one,two,three"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..D:world"));
+  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
+
+  // TODO(#10008): these tests fail because fake/real symbol tables
+  // deal with empty components differently.
+  // EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,,world"));
+  // EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello,,,world"));
 }
 
 class StatMergerThreadLocalTest : public testing::Test {

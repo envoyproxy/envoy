@@ -102,7 +102,8 @@ void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& head
   processing_100_continue_ = false;
 }
 
-void StreamEncoderImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
+void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
+                                          bool end_stream) {
   bool saw_content_length = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
