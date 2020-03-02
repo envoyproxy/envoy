@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/semantic_version.proto";
@@ -306,27 +307,10 @@ message DataSource {
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RetryPolicy";
 
-  message RetryBackOff {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.core.RetryPolicy.RetryBackOff";
-
-    // Specifies the base interval between retries. This parameter is required and must be greater
-    // than zero. Values less than 1 ms are rounded up to 1 ms.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
-      required: true
-      gt {}
-    }];
-
-    // Specifies the maximum interval between retries. This parameter is optional, but must be
-    // greater than or equal to the `base_interval` if set. The default is 10 times the
-    // `base_interval`.
-    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
-  }
-
   // Specifies parameters that control retry back off. This parameter is optional, in which case the
   // default base interval is 1000 milliseconds. The default maximum interval is 10 times
   // the base interval.
-  RetryBackOff retry_back_off = 1;
+  BackOffStrategy retry_back_off = 1;
 
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1.
