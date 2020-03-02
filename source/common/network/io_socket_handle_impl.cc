@@ -1,5 +1,7 @@
 #include "common/network/io_socket_handle_impl.h"
 
+#include <sys/socket.h>
+
 #include <cerrno>
 #include <iostream>
 
@@ -218,9 +220,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_iov = iov.begin();
   hdr.msg_iovlen = num_slices_for_read;
   hdr.msg_flags = 0;
-  auto cmsg = reinterpret_cast<struct cmsghdr*>(cbuf.begin());
-  cmsg->cmsg_len = cmsg_space_;
-  hdr.msg_control = cmsg;
+  hdr.msg_control = cbuf.begin();
   hdr.msg_controllen = cmsg_space_;
   const Api::SysCallSizeResult result = Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, 0);
   if (result.rc_ < 0) {
@@ -246,24 +246,27 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", fd_, e.what()));
   }
 
-  // Get overflow, local address from control message.
-  for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-    if (output.msg_[0].local_address_ == nullptr) {
-      try {
-        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-        if (addr != nullptr) {
-          // This is a IP packet info message.
-          output.msg_[0].local_address_ = std::move(addr);
-          continue;
+  if (hdr.msg_controllen > 0) {
+    // Get overflow, local address from control message.
+    for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
+         cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+      if (output.msg_[0].local_address_ == nullptr) {
+        try {
+          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
+          if (addr != nullptr) {
+            // This is a IP packet info message.
+            output.msg_[0].local_address_ = std::move(addr);
+            continue;
+          }
+        } catch (const EnvoyException& e) {
+          PANIC(fmt::format("Invalid destination address for fd: {}, error: {}", fd_, e.what()));
         }
-      } catch (const EnvoyException& e) {
-        PANIC(fmt::format("Invalid destination address for fd: {}, error: {}", fd_, e.what()));
       }
-    }
-    if (output.dropped_packets_ != nullptr) {
-      absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
-      if (maybe_dropped) {
-        *output.dropped_packets_ = *maybe_dropped;
+      if (output.dropped_packets_ != nullptr) {
+        absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
+        if (maybe_dropped) {
+          *output.dropped_packets_ = *maybe_dropped;
+        }
       }
     }
   }
@@ -364,11 +367,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   // Get overflow from first packet header.
   if (output.dropped_packets_ != nullptr) {
     msghdr& hdr = mmsg_hdr[0].msg_hdr;
-    struct cmsghdr* cmsg;
-    for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-      absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
-      if (maybe_dropped) {
-        *output.dropped_packets_ = *maybe_dropped;
+    if (hdr.msg_controllen > 0) {
+      struct cmsghdr* cmsg;
+      for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+        absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
+        if (maybe_dropped) {
+          *output.dropped_packets_ = *maybe_dropped;
+        }
       }
     }
   }
