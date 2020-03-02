@@ -76,7 +76,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/squash @yuval-k @alyssawilk
 /*/extensions/filters/common/ext_authz @gsagula @dio
 /*/extensions/filters/common/original_src @klarose @snowp
-/*/extensions/filters/common/proxy_protocol @wez470 @mattklein123
+/*/extensions/filters/common/proxy_protocol @wez470 @alyssawilk
 /*/extensions/filters/listener/tls_inspector @piotrsikora @htuch
 /*/extensions/grpc_credentials/example @wozz @htuch
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
@@ -98,5 +98,5 @@ extensions/filters/common/original_src @snowp @klarose
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @lambdai
 /*/extensions/filters/network/local_ratelimit @mattklein123 @junr03
-/*/extensions/filters/network/proxy_protocol @wez470 @mattklein123
+/*/extensions/filters/network/proxy_protocol @wez470 @alyssawilk
 /*/extensions/filters/http/aws_request_signing @rgs1 @derekargueta @mattklein123 @marcomagdy
