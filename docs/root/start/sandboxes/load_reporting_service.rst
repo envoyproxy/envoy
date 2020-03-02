@@ -3,11 +3,16 @@
 Load Reporting Service (LRS)
 ============================
 
-This simple example demonstrates Envoy's Load Reporting Service (LRS) capability and how to use it
+This simple example demonstrates Envoy's Load Reporting Service (LRS) capability and how to use it.
 
-All incoming requests are routed via Envoy to a simple goLang web server aka http_server. We scale up two containers and randomly send requests to each. 
-Envoy is configured to initiate the connection with LRS Server. LRS Server enables the stats by sending LoadStatsResponse.
-Sending requests to http_server will be counted towards successful requests and will be visible in LRS Server logs.
+Lets say Cluster A (downstream) talks to Cluster B (Upstream) and Cluster C (Upstream). When enabling Load Report for
+Cluster A, LRS server should be sending LoadStatsResponse to Cluster A with LoadStatsResponse.Clusters to be B and C.
+LRS server will then receive LoadStatsRequests (with total requests, successful requests etc) from Cluster A to Cluster B and
+from Cluster A to Cluster C.
+
+In this example, all incoming requests are routed via Envoy to a simple goLang web server aka http_server.
+We scale up two containers and randomly send requests to each. Envoy is configured to initiate the connection with LRS Server.
+LRS Server enables the stats by sending LoadStatsResponse. Sending requests to http_server will be counted towards successful requests and will be visible in LRS Server logs.
 
 
 Running the Sandbox
@@ -79,3 +84,4 @@ Terminal 1 ::
     ............................
     lrs_server_1    | 2020/02/12 17:09:09 Got stats from cluster `http_service` node `0022a319e1e2` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:3 total_issued_requests:3 > load_report_interval:<seconds:2 nanos:2458000 >
     lrs_server_1    | 2020/02/12 17:09:09 Got stats from cluster `http_service` node `2417806c9d9a` - cluster_name:"local_service" upstream_locality_stats:<locality:<> total_successful_requests:9 total_issued_requests:9 > load_report_interval:<seconds:2 nanos:6487000 >
+

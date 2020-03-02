@@ -2,51 +2,33 @@ package server
 
 import (
 	"context"
+	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
+	gcpLoadStats "github.com/envoyproxy/go-control-plane/envoy/service/load_stats/v2"
 	"github.com/golang/protobuf/ptypes/duration"
 	"google.golang.org/grpc"
 	"log"
-	"sync/atomic"
-
-	core "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
-	gcpLoadStats "github.com/envoyproxy/go-control-plane/envoy/service/load_stats/v2"
 )
 
-type NodeMetadata struct {
-	stream stream
-	node   *core.Node
-}
-
+// Server handling Load Stats communication
 type Server interface {
 	gcpLoadStats.LoadReportingServiceServer
 	SendResponse(cluster string, upstreamCluster []string, frequency int64)
 }
 
-// Callbacks is a collection of callbacks inserted into the server operation.
-// The callbacks are invoked synchronously.
-type Callbacks interface {
-	// OnStreamOpen is called once an xDS stream is open with a stream ID and the type URL (or "" for ADS).
-	// Returning an error will end processing and close the stream. OnStreamClosed will still be called.
-	OnStreamOpen(context.Context, int64) error
-	// OnStreamClosed is called immediately prior to closing an xDS stream with a stream ID.
-	OnStreamClosed(int64)
-	// OnStreamRequest is called once a request is received on a stream.
-	// Returning an error will end processing and close the stream. OnStreamClosed will still be called.
-	OnStreamRequest(int64, *gcpLoadStats.LoadStatsRequest) error
-	// OnStreamResponse is called immediately prior to sending a response on a stream.
-	OnStreamResponse(int64, *gcpLoadStats.LoadStatsResponse)
-}
-
-// NewLrsServer creates handlers from a config watcher and callbacks.
-func NewServer(ctx context.Context, callbacks Callbacks) Server {
-	return &server{callbacks: callbacks, ctx: ctx, lrsCache: make(map[string]map[string]NodeMetadata)}
+func NewServer(ctx context.Context) Server {
+	return &server{ctx: ctx, lrsCache: make(map[string]map[string]NodeMetadata)}
 }
 
 type server struct {
-	callbacks Callbacks
-	// streamCount for counting bi-di streams
-	streamCount int64
-	ctx         context.Context
-	lrsCache    map[string]map[string]NodeMetadata
+	ctx context.Context
+	// This cache stores stream objects (and Node data) for every node (within a cluster) upon connection
+	lrsCache map[string]map[string]NodeMetadata
+}
+
+// Struct to hold stream object and node details
+type NodeMetadata struct {
+	stream stream
+	node   *core.Node
 }
 
 type stream interface {
@@ -56,16 +38,21 @@ type stream interface {
 	Recv() (*gcpLoadStats.LoadStatsRequest, error)
 }
 
-// process handles a bi-di stream request
-func (s *server) process(stream stream, reqCh <-chan *gcpLoadStats.LoadStatsRequest) error {
-	// increment stream count
-	streamID := atomic.AddInt64(&s.streamCount, 1)
+// Handles incoming stream connections and LoadStatsRequests
+func (s *server) StreamLoadStats(stream gcpLoadStats.LoadReportingService_StreamLoadStatsServer) error {
+	reqCh := make(chan *gcpLoadStats.LoadStatsRequest)
 
-	if s.callbacks != nil {
-		if err := s.callbacks.OnStreamOpen(stream.Context(), streamID); err != nil {
-			return err
+	// goroutine to handle incoming LoadStatsRequests
+	go func() {
+		for {
+			req, err := stream.Recv()
+			if err != nil {
+				close(reqCh)
+				return
+			}
+			reqCh <- req
 		}
-	}
+	}()
 
 	for {
 		select {
@@ -78,28 +65,29 @@ func (s *server) process(stream stream, reqCh <-chan *gcpLoadStats.LoadStatsRequ
 				return nil
 			}
 
-			if s.callbacks != nil {
-                if err := s.callbacks.OnStreamRequest(streamID, req); err != nil {
-                    return err
-                }
-            }
-
 			clusterName := req.GetNode().GetCluster()
 			nodeId := req.GetNode().GetId()
+
+			// Check whether any Node from Cluster has already connected or not.
+			// If yes, Cluster should be present in the cache
+			// If not, add Cluster <-> Node <-> Stream object in cache
 			if _, exist := s.lrsCache[clusterName]; !exist {
+				// Add all Nodes and its stream objects into the cache
 				log.Printf("Adding new cluster to cache `%s` with node `%s`", clusterName, nodeId)
 				s.lrsCache[clusterName] = make(map[string]NodeMetadata)
 				s.lrsCache[clusterName][nodeId] = NodeMetadata{
-                    node:   req.GetNode(),
-                    stream: stream,
-                }
+					node:   req.GetNode(),
+					stream: stream,
+				}
 			} else if _, exist := s.lrsCache[clusterName][nodeId]; !exist {
-			    log.Printf("Adding new node `%s` to existing cluster `%s`", nodeId, clusterName)
-			    s.lrsCache[clusterName][nodeId] = NodeMetadata{
-                    node:   req.GetNode(),
-                    stream: stream,
-                }
-			} else{
+				// Add remaining Nodes of a Cluster and its stream objects into the cache
+				log.Printf("Adding new node `%s` to existing cluster `%s`", nodeId, clusterName)
+				s.lrsCache[clusterName][nodeId] = NodeMetadata{
+					node:   req.GetNode(),
+					stream: stream,
+				}
+			} else {
+				// After Load Report is enabled, log the Load Report stats received
 				for i := 0; i < len(req.ClusterStats); i++ {
 					if len(req.ClusterStats[i].UpstreamLocalityStats) > 0 {
 						log.Printf("Got stats from cluster `%s` node `%s` - %s", req.Node.Cluster, req.Node.Id, req.GetClusterStats()[i])
@@ -110,52 +98,26 @@ func (s *server) process(stream stream, reqCh <-chan *gcpLoadStats.LoadStatsRequ
 	}
 }
 
-// handler converts a blocking read call to channels and initiates stream processing
-func (s *server) handler(stream stream) error {
-	// a channel for receiving incoming requests
-	reqCh := make(chan *gcpLoadStats.LoadStatsRequest)
-	reqStop := int32(0)
-	go func() {
-		for {
-			req, err := stream.Recv()
-			if atomic.LoadInt32(&reqStop) != 0 {
-				return
-			}
-			if err != nil {
-				close(reqCh)
-				return
-			}
-			reqCh <- req
-		}
-	}()
-
-	err := s.process(stream, reqCh)
-	atomic.StoreInt32(&reqStop, 1)
-
-	return err
-}
-
-func (s *server) StreamLoadStats(stream gcpLoadStats.LoadReportingService_StreamLoadStatsServer) error {
-	return s.handler(stream)
-}
-
+// Initialize Load Reporting for a given cluster to a list of UpStreamClusters
 func (s *server) SendResponse(cluster string, upstreamClusters []string, frequency int64) {
+	// Check whether any Node from given Cluster is connected or not.
 	clusterDetails, exist := s.lrsCache[cluster]
 	if !exist {
-		log.Printf("Cannot send response as cluster `%s` is not connected", cluster)
+		log.Printf("Cannot send response as cluster `%s` because is not connected", cluster)
 		return
 	}
 
-    for nodeId, nodeDetails := range clusterDetails{
-        log.Printf("Creating LRS response for cluster %s, node %s with frequency %d secs", nodeDetails.node.Cluster, nodeId, frequency)
-        err := nodeDetails.stream.Send(&gcpLoadStats.LoadStatsResponse{
-            Clusters:                  upstreamClusters,
-            LoadReportingInterval:     &duration.Duration{Seconds: frequency},
-            ReportEndpointGranularity: true,
-        })
+	// To enable Load Report, send LoadStatsResponse to all Nodes within a Cluster
+	for nodeId, nodeDetails := range clusterDetails {
+		log.Printf("Creating LRS response for cluster %s, node %s with frequency %d secs", nodeDetails.node.Cluster, nodeId, frequency)
+		err := nodeDetails.stream.Send(&gcpLoadStats.LoadStatsResponse{
+			Clusters:                  upstreamClusters,
+			LoadReportingInterval:     &duration.Duration{Seconds: frequency},
+			ReportEndpointGranularity: true,
+		})
 
-        if err != nil {
-            log.Panicf("Unable to send response to cluster %s node %s due to err: %s", nodeDetails.node.Cluster, nodeId, err)
-        }
-    }
+		if err != nil {
+			log.Panicf("Unable to send response to cluster %s node %s due to err: %s", nodeDetails.node.Cluster, nodeId, err)
+		}
+	}
 }

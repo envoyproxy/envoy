@@ -17,8 +17,12 @@ import (
 func main() {
 	var g errgroup.Group
 
+	// This is how often Envoy will send the load report
+	const StatsFrequencyInSeconds = 2
+
 	// Start gRPC server
 	g.Go(func() error {
+		// Listening on port 18000
 		address := ":18000"
 		lis, err := net.Listen("tcp", address)
 		if err != nil {
@@ -27,10 +31,9 @@ func main() {
 
 		grpcServer := grpc.NewServer()
 		ctx := context.Background()
-
-		xdsServer := server.NewServer(ctx, &callbacks{})
+		xdsServer := server.NewServer(ctx)
 		gcpLoadStats.RegisterLoadReportingServiceServer(grpcServer, xdsServer)
-		startCollectingStats(xdsServer, "http_service", []string{"local_service"}, 2)
+		startCollectingStats(xdsServer, "http_service", []string{"local_service"}, StatsFrequencyInSeconds)
 
 		log.Printf("LRS Server is up and running on %s", address)
 		reflection.Register(grpcServer)
@@ -51,21 +54,4 @@ func startCollectingStats(server server.Server, cluster string, upstreamClusters
 			return
 		}
 	}()
-}
-
-type callbacks struct {
-}
-
-func (c *callbacks) OnStreamOpen(ctx context.Context, streamID int64) error {
-	return nil
-}
-
-func (c *callbacks) OnStreamClosed(streamID int64) {
-}
-
-func (c *callbacks) OnStreamRequest(streamID int64, request *gcpLoadStats.LoadStatsRequest) error {
-	return nil
-}
-
-func (c *callbacks) OnStreamResponse(streamID int64, response *gcpLoadStats.LoadStatsResponse) {
 }
