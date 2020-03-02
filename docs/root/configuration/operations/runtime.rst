@@ -260,8 +260,8 @@ with the new code paths are flushed out ahead of time, rather than after the cod
    Versions of Envoy prior to 1.14.1 cannot parse runtime booleans from integer values and require
    an explicit "true" or "false". Mistakenly placing an integer such as "0" to represent "false"
    will lead to usage of the default value. This is especially important to keep in mind for case of
-   runtime overrides for deprecated features, as it will can potentially result in unexpected Envoy
-   behaviors.
+   runtime overrides for :ref:`deprecated features<deprecated>`, as it will can potentially result
+   in unexpected Envoy behaviors.
 
 Statistics
 ----------

@@ -344,7 +344,7 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
 
   uint64_t parse_int;
   if (absl::SimpleAtoi(stripped, &parse_int)) {
-    entry.bool_value_ = static_cast<bool>(parse_int);
+    entry.bool_value_ = (parse_int != 0);
     // This is really an integer, so return false here not because of failure, but so we continue to
     // parse doubles/int.
     return false;

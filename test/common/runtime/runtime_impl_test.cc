@@ -655,6 +655,9 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
   EXPECT_EQ(false, snapshot->getBoolean("file13", true));
   EXPECT_EQ(false, snapshot->getBoolean("file13", false));
 
+  EXPECT_EQ(0, snapshot->getInteger("bool_as_int0", 333));
+  EXPECT_EQ(1, snapshot->getInteger("bool_as_int1", 333));
+
   EXPECT_EQ(false, snapshot->getBoolean("bool_as_int0", true));
   EXPECT_EQ(false, snapshot->getBoolean("bool_as_int0", false));
   EXPECT_EQ(true, snapshot->getBoolean("bool_as_int1", false));
