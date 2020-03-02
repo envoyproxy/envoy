@@ -28,7 +28,7 @@ If a custom location is desired, `from_headers` or `from_params` can be used to 
 
 ## HTTP header to pass successfully verified JWT
 
-If a JWT is valid, its payload will be passed to the backend in a new HTTP header specified in `forward_payload_header` field. Its value is base64 encoded JWT payload in JSON.
+If a JWT is valid, its payload will be passed to the backend in a new HTTP header specified in `forward_payload_header` field. Its value is base64url-encoded JWT payload in JSON.
 
 
 ## Further header options
