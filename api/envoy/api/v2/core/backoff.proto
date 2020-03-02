@@ -12,13 +12,13 @@ option java_outer_classname = "BackoffProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 
-// [#protodoc-title: Backoff]
+// [#protodoc-title: Backoff Strategy]
 
 // Configuration defining a jittered exponential back off strategy.
-message BackOffStrategy {
-  // The base interval to be used for the next back off computation. It should be greater than
-  // zero and less than or equal to :ref:`max_interval
-  // <envoy_api_field_BackOffStrategy.max_interval>`.
+message BackoffStrategy {
+  // The base interval to be used for the next back off computation. It should
+  // be greater than zero and less than or equal to :ref:`max_interval
+  // <envoy_api_field_core.BackoffStrategy.max_interval>`.
   google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {gt {}}];
 
   // The cap on the next back off value.
