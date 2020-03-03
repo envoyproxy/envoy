@@ -52,7 +52,7 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.filters.network.redis_proxy
+        name: redis
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
@@ -147,7 +147,7 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.filters.network.redis_proxy
+        name: redis
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
@@ -259,7 +259,7 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.filters.network.redis_proxy
+        name: redis
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats

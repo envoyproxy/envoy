@@ -229,7 +229,7 @@ public:
         udpa::type::v1::TypedStruct typed_struct;
         MessageUtil::unpackTo(typed_config, typed_struct);
         // Not handling nested structs or typed structs in typed structs
-        type = typed_struct.type_url();
+        type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
       }
       Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
       if (factory != nullptr) {
