@@ -80,7 +80,7 @@ TEST_F(FileSystemImplTest, FileReadToEndSuccess) {
   EXPECT_EQ(data, file_system_.fileReadToEnd(file_path));
 }
 
-// Files are read into std::string; verify that all bytes (eg non-ascii characters) come back
+// Files are read into std::string; verify that all bytes (e.g., non-ascii characters) come back
 // unmodified
 TEST_F(FileSystemImplTest, FileReadToEndSuccessBinary) {
   std::string data;
