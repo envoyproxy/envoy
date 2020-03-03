@@ -66,10 +66,10 @@ public:
   uint64_t numConnections() const override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
-  void addListener(absl::optional<uint64_t> overrided_listener,
+  void addListener(absl::optional<uint64_t> overridden_listener,
                    Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
-  void removeFilterChains(Network::DrainingFilterChains& draining_filter_chains,
+  void removeFilterChains(const Network::DrainingFilterChains& draining_filter_chains,
                           std::function<void()> completion) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
@@ -150,7 +150,7 @@ private:
      * Schedule to remove and destroy the active connections which are not tracked by listener
      * config. Caution: The connection are not destroyed yet when function returns.
      */
-    void removeFilterChains(std::list<const Network::FilterChain*> draining_fitler_chains);
+    void removeFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains);
 
     /**
      * Update the listener config. The follow up connections will see the new config. The existing

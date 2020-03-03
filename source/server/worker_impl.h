@@ -42,12 +42,12 @@ public:
              Api::Api& api, const std::string& worker_name);
 
   // Server::Worker
-  void addListener(absl::optional<uint64_t> overrided_listener, Network::ListenerConfig& listener,
+  void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
                    AddListenerCompletion completion) override;
   uint64_t numConnections() const override;
 
   void removeListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
-  void removeFilterChains(Network::DrainingFilterChains& draining_filter_chains,
+  void removeFilterChains(const Network::DrainingFilterChains& draining_filter_chains,
                           std::function<void()> completion) override;
   void start(GuardDog& guard_dog) override;
   void initializeStats(Stats::Scope& scope, const std::string& prefix) override;

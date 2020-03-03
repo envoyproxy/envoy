@@ -133,8 +133,10 @@ struct ListenerManagerStats {
 struct DrainingFilterChains : public Network::DrainingFilterChains {
   DrainingFilterChains(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal);
   virtual ~DrainingFilterChains() = default;
-  virtual uint64_t getDrainingListenerTag() override { return draining_listener_->listenerTag(); }
-  virtual std::list<const Network::FilterChain*>& getDrainingFilterChains() override {
+  virtual uint64_t getDrainingListenerTag() const override {
+    return draining_listener_->listenerTag();
+  }
+  virtual const std::list<const Network::FilterChain*>& getDrainingFilterChains() const override {
     return draining_filter_chains_;
   }
 
@@ -192,7 +194,7 @@ private:
     uint64_t workers_pending_removal_;
   };
 
-  void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overrided_listener,
+  void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overridden_listener,
                            ListenerImpl& listener, ListenerCompletionCallback completion_callback);
   ProtobufTypes::MessagePtr dumpListenerConfigs();
   static ListenerManagerStats generateStats(Stats::Scope& scope);

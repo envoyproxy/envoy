@@ -345,10 +345,11 @@ public:
   MOCK_METHOD(void, incNumConnections, ());
   MOCK_METHOD(void, decNumConnections, ());
   MOCK_METHOD(void, addListener,
-              (absl::optional<uint64_t> overrided_listener, ListenerConfig& config));
+              (absl::optional<uint64_t> overridden_listener, ListenerConfig& config));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
   MOCK_METHOD(void, removeFilterChains,
-              (DrainingFilterChains & draining_filter_chains, std::function<void()> completion));
+              (const DrainingFilterChains& draining_filter_chains,
+               std::function<void()> completion));
   MOCK_METHOD(void, stopListeners, (uint64_t listener_tag));
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());

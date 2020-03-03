@@ -12,10 +12,7 @@ private:
   class DeferredTask : public DeferredDeletable {
   public:
     DeferredTask(std::function<void()>&& task) : task_(std::move(task)) {}
-    ~DeferredTask() override {
-      task_();
-      task_ = nullptr;
-    }
+    ~DeferredTask() override { task_(); }
     std::function<void()> task_;
   };
 

@@ -106,6 +106,11 @@ public:
 class ServerFactoryContext : public virtual CommonFactoryContext {
 public:
   ~ServerFactoryContext() override = default;
+
+  /**
+   * return DrainManager& drain manager which has life no shorter than the life of the current
+   * context.
+   */
   virtual Envoy::Server::DrainManager& drainManager() PURE;
 };
 

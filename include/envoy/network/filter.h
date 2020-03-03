@@ -452,8 +452,8 @@ public:
 class DrainingFilterChains {
 public:
   virtual ~DrainingFilterChains() = default;
-  virtual uint64_t getDrainingListenerTag() PURE;
-  virtual std::list<const FilterChain*>& getDrainingFilterChains() PURE;
+  virtual uint64_t getDrainingListenerTag() const PURE;
+  virtual const std::list<const FilterChain*>& getDrainingFilterChains() const PURE;
 };
 
 } // namespace Network

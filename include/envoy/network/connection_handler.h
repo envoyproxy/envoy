@@ -39,10 +39,10 @@ public:
 
   /**
    * Adds a listener to the handler. and replace the existing listener.
-   * @param overrided_listener tag of the existing listener. nullopt if no previous listener.
+   * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    */
-  virtual void addListener(absl::optional<uint64_t> overrided_listener,
+  virtual void addListener(absl::optional<uint64_t> overridden_listener,
                            ListenerConfig& config) PURE;
 
   /**
@@ -58,7 +58,7 @@ public:
    * could be defered deleted!), invoke the completion.
    * @param draining_filter_chains supplies the listener and the the filter chains.
    */
-  virtual void removeFilterChains(DrainingFilterChains& draining_filter_chains,
+  virtual void removeFilterChains(const DrainingFilterChains& draining_filter_chains,
                                   std::function<void()> completion) PURE;
 
   /**

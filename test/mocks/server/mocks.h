@@ -336,7 +336,7 @@ public:
 
   // Server::Worker
   MOCK_METHOD(void, addListener,
-              (absl::optional<uint64_t> overrided_listener, Network::ListenerConfig& listener,
+              (absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
                AddListenerCompletion completion));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
@@ -347,7 +347,7 @@ public:
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
   MOCK_METHOD(void, removeFilterChains,
-              (Network::DrainingFilterChains & draining_filter_chains,
+              (const Network::DrainingFilterChains& draining_filter_chains,
                std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;

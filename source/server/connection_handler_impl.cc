@@ -28,19 +28,19 @@ void ConnectionHandlerImpl::decNumConnections() {
   --num_handler_connections_;
 }
 
-void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overrided_listener,
+void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config) {
   ActiveListenerDetails details;
   if (config.listenSocketFactory().socketType() == Network::Address::SocketType::Stream) {
-    if (overrided_listener.has_value()) {
+    if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
-        if (listener.second.listener_->listenerTag() == overrided_listener) {
+        if (listener.second.listener_->listenerTag() == overridden_listener) {
           listener.second.tcp_listener_->get().updateListenerConfig(config);
           return;
         }
       }
       ASSERT(false, absl::StrCat("fail to replace tcp listener ", config.name(), " tagged ",
-                                 overrided_listener.value()));
+                                 overridden_listener.value()));
       // TODO(lambdai): Fallback to addListener.
       // Requires returning code to trigger a remove listener on failure.
     }
@@ -69,12 +69,12 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 }
 
 void ConnectionHandlerImpl::removeFilterChains(
-    Network::DrainingFilterChains& draining_filter_chains, std::function<void()> completion) {
+    const Network::DrainingFilterChains& draining_filter_chains, std::function<void()> completion) {
   for (auto& listener : listeners_) {
-    // TODO(lambdai):
+    // TODO(lambdai): merge the optimistic path and the pessimistic locking.
     if (listener.second.listener_->listenerTag() ==
         draining_filter_chains.getDrainingListenerTag()) {
-      ASSERT(!listener.second.tcp_listener_.has_value());
+      ASSERT(listener.second.tcp_listener_.has_value());
       listener.second.tcp_listener_->get().removeFilterChains(
           draining_filter_chains.getDrainingFilterChains());
       Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
@@ -412,14 +412,14 @@ ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeFilterChains(
-    std::list<const Network::FilterChain*> draining_fitler_chains) {
+    const std::list<const Network::FilterChain*>& draining_filter_chains) {
   // need to recover the original deleting state
   // TODO(lambdai): determine if removFilterChains could be invoked when is_deleting
   // TODO(lambdai): RAII
   // alternatively, erase the iterator of connections prior to the connection removal
   bool was_deleting = is_deleting_;
   is_deleting_ = true;
-  for (const auto* filter_chain : draining_fitler_chains) {
+  for (const auto* filter_chain : draining_filter_chains) {
     auto iter = connections_by_context_.find(filter_chain);
     if (iter == connections_by_context_.end()) {
       // It is possible when listener is stopping.

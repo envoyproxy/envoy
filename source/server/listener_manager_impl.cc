@@ -637,12 +637,12 @@ std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl
 }
 
 void ListenerManagerImpl::addListenerToWorker(Worker& worker,
-                                              absl::optional<uint64_t> overrided_listener,
+                                              absl::optional<uint64_t> overridden_listener,
                                               ListenerImpl& listener,
                                               ListenerCompletionCallback completion_callback) {
-  if (overrided_listener.has_value()) {
-    ENVOY_LOG(debug, "replacing existing listener {}", overrided_listener.value());
-    worker.addListener(overrided_listener, listener, [this, &listener](bool success) -> void {
+  if (overridden_listener.has_value()) {
+    ENVOY_LOG(debug, "replacing existing listener {}", overridden_listener.value());
+    worker.addListener(overridden_listener, listener, [this, &listener](bool success) -> void {
       server_.dispatcher().post([this, success, &listener]() -> void {
         // TODO: I don't have a concrete case to generate the failure.
         UNREFERENCED_PARAMETER(success);
@@ -653,7 +653,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
     return;
   }
   worker.addListener(
-      overrided_listener, listener, [this, &listener, completion_callback](bool success) -> void {
+      overridden_listener, listener, [this, &listener, completion_callback](bool success) -> void {
         // The add listener completion runs on the worker thread. Post back to the main thread to
         // avoid locking.
         server_.dispatcher().post([this, success, &listener, completion_callback]() -> void {

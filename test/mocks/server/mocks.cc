@@ -120,9 +120,9 @@ MockWorkerFactory::~MockWorkerFactory() = default;
 MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _, _))
       .WillByDefault(
-          Invoke([this](absl::optional<uint64_t> overrided_listener,
+          Invoke([this](absl::optional<uint64_t> overridden_listener,
                         Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
-            UNREFERENCED_PARAMETER(overrided_listener);
+            UNREFERENCED_PARAMETER(overridden_listener);
             config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
