@@ -270,6 +270,35 @@ public:
   }
 
   /**
+   * Translate a nested typed_config into a proto message provided by the implementation factory.
+   * This function assumes that the message only contains typed_config field.
+   * @param extension_name name of extension corresponding to config.
+   * @param enclosing_message proto that contains a field 'typed_config'. Note: the enclosing proto
+   * is provided because for statically registered implementations, a custom config is generally
+   * optional, which means the conversion must be done conditionally.
+   * @param validation_visitor message validation visitor instance.
+   * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
+   * proto to be filled with the translated configuration.
+   */
+  template <class ProtoMessage, class Factory>
+  static ProtobufTypes::MessagePtr
+  translateAnyToFactoryConfig(const ProtoMessage& enclosing_message,
+                              ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr, "");
+
+    // Check that the config type is not google.protobuf.Empty
+    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+
+    translateOpaqueConfig(enclosing_message.typed_config(), ProtobufWkt::Struct(),
+                          validation_visitor, *config);
+    return config;
+  }
+
+  /**
    * Truncates the message to a length less than default GRPC trailers size limit (by default 8KiB).
    */
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
