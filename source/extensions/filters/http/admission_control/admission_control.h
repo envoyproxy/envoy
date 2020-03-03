@@ -56,7 +56,7 @@ class ThreadLocalControllerImpl : public ThreadLocalController,
                               public ThreadLocal::ThreadLocalObject {
 public:
   ThreadLocalControllerImpl(TimeSource& time_source, std::chrono::seconds sampling_window);
-  ~ThreadLocalControllerImpl() {}
+  virtual ~ThreadLocalControllerImpl() = default;
   virtual void recordSuccess() override { recordRequest(true); }
   virtual void recordFailure() override { recordRequest(false); }
 

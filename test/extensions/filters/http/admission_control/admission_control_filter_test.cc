@@ -25,9 +25,9 @@ namespace HttpFilters {
 namespace AdmissionControl {
 namespace {
 
-class MockThreadLocalController : public ThreadLocalController {
+class MockThreadLocalController : public ThreadLocal::ThreadLocalObject, public ThreadLocalController {
 public:
-  MockThreadLocalController();
+  MockThreadLocalController() {}
   MOCK_METHOD(uint32_t, requestTotalCount, ());
   MOCK_METHOD(uint32_t, requestSuccessCount, ());
   MOCK_METHOD(void, recordSuccess, ());
@@ -43,7 +43,7 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
     tls->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<MockThreadLocalController>();
+      return controller_;
     });
     return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_,
                                                           scope_, std::move(tls));
@@ -68,6 +68,7 @@ protected:
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::shared_ptr<AdmissionControlFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  std::shared_ptr<MockThreadLocalController> controller_;
   const std::string default_yaml_{R"EOF(
 enabled:
   default_value: true
@@ -95,8 +96,8 @@ aggression_coefficient:
 
   // Fail lots of requests so that we would normally expect a ~100% rejection rate. It should pass
   // below since the filter is disabled.
-  EXPECT_CALL(config->getController(), requestTotalCount()).WillOnce(Return(1000));
-  EXPECT_CALL(config->getController(), requestSuccessCount()).WillOnce(Return(0));
+  EXPECT_CALL(*controller_, requestTotalCount()).WillOnce(Return(1000));
+  EXPECT_CALL(*controller_, requestSuccessCount()).WillOnce(Return(0));
 
   // We expect no rejections.
   Http::RequestHeaderMapImpl request_headers;
@@ -113,8 +114,8 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
 
   // Fail lots of requests so that we would normally expect a ~100% rejection rate. It should pass
   // below since the request is a healthcheck.
-  EXPECT_CALL(config->getController(), requestTotalCount()).WillOnce(Return(1000));
-  EXPECT_CALL(config->getController(), requestSuccessCount()).WillOnce(Return(0));
+  EXPECT_CALL(*controller_, requestTotalCount()).WillOnce(Return(1000));
+  EXPECT_CALL(*controller_, requestSuccessCount()).WillOnce(Return(0));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -125,8 +126,8 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   setupFilter(config);
 
   // Fail lots of requests so that we can expect a ~100% rejection rate.
-  EXPECT_CALL(config->getController(), requestTotalCount()).WillOnce(Return(1000));
-  EXPECT_CALL(config->getController(), requestSuccessCount()).WillOnce(Return(0));
+  EXPECT_CALL(*controller_, requestTotalCount()).WillOnce(Return(1000));
+  EXPECT_CALL(*controller_, requestSuccessCount()).WillOnce(Return(0));
 
   // We expect rejections due to the failure rate.
   EXPECT_EQ(0, scope_.counter("test_prefix.rq_rejected").value());
@@ -141,8 +142,8 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   // Fail exactly half of the requests so we get a ~50% rejection rate.
-  EXPECT_CALL(config->getController(), requestTotalCount()).WillOnce(Return(1000));
-  EXPECT_CALL(config->getController(), requestSuccessCount()).WillOnce(Return(500));
+  EXPECT_CALL(*controller_, requestTotalCount()).WillOnce(Return(1000));
+  EXPECT_CALL(*controller_, requestSuccessCount()).WillOnce(Return(500));
 
   // Random numbers in the range [0,1e4) are considered for the rejection calculation. One request
   // should fail and the other should pass.
@@ -159,13 +160,13 @@ TEST_F(AdmissionControlTest, ErrorCodes) {
   auto config = makeConfig(default_yaml_);
   setupFilter(config);
 
-  EXPECT_CALL(config->getController(), recordSuccess());
+  EXPECT_CALL(*controller_, recordSuccess());
   sampleCustomRequest("200");
 
-  EXPECT_CALL(config->getController(), recordFailure());
+  EXPECT_CALL(*controller_, recordFailure());
   sampleCustomRequest("400");
 
-  EXPECT_CALL(config->getController(), recordFailure());
+  EXPECT_CALL(*controller_, recordFailure());
   sampleCustomRequest("500");
 }
 
