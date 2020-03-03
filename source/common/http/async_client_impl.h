@@ -153,7 +153,7 @@ private:
     }
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
     Router::RetryPolicyExtensionSharedPtr
-    retryPolicyExtension(const Http::HeaderMap&) const override {
+    retryPolicyExtension(const Http::RequestHeaderMap&) const override {
       return {};
     }
 

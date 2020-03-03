@@ -264,7 +264,7 @@ public:
    * @return Upstream::RetryPolicySharedPtr pluggable retry policy
    */
   virtual RetryPolicyExtensionSharedPtr
-  retryPolicyExtension(const Http::HeaderMap& request_headers) const PURE;
+  retryPolicyExtension(const Http::RequestHeaderMap& request_headers) const PURE;
 };
 
 /**
@@ -275,7 +275,8 @@ public:
   virtual ~RetryPolicyFactory() = default;
 
   virtual RetryPolicyExtensionSharedPtr
-  createRetryPolicy(const Protobuf::Message& config, const Http::HeaderMap& request_header) PURE;
+  createRetryPolicy(const Protobuf::Message& config,
+                    const Http::RequestHeaderMap& request_header) PURE;
 
   std::string category() const override { return "envoy.retry_policy"; }
 };

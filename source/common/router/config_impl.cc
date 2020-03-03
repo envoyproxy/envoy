@@ -165,7 +165,7 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
 }
 
 RetryPolicyExtensionSharedPtr
-RetryPolicyImpl::retryPolicyExtension(const Http::HeaderMap& request_header) const {
+RetryPolicyImpl::retryPolicyExtension(const Http::RequestHeaderMap& request_header) const {
   if (retry_policy_config_.first == nullptr) {
     return nullptr;
   }

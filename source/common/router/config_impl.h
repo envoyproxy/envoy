@@ -260,7 +260,7 @@ public:
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
   RetryPolicyExtensionSharedPtr
-  retryPolicyExtension(const Http::HeaderMap& request_header) const override;
+  retryPolicyExtension(const Http::RequestHeaderMap& request_header) const override;
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};

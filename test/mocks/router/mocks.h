@@ -116,7 +116,7 @@ public:
     return retriable_request_headers_;
   }
 
-  MOCK_METHOD(RetryPolicyExtensionSharedPtr, retryPolicyExtension, (const Http::HeaderMap&),
+  MOCK_METHOD(RetryPolicyExtensionSharedPtr, retryPolicyExtension, (const Http::RequestHeaderMap&),
               (const));
 
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
@@ -135,7 +135,7 @@ public:
 
 class MockRetryPolicyExtension : public RetryPolicyExtension {
 public:
-  MOCK_METHOD(void, recordResponseHeaders, (const Http::HeaderMap&));
+  MOCK_METHOD(void, recordResponseHeaders, (const Http::ResponseHeaderMap&));
   MOCK_METHOD(void, recordReset, (Http::StreamResetReason));
   MOCK_METHOD(bool, shouldRetry, (), (const));
 };
@@ -143,7 +143,7 @@ public:
 class MockRetryPolicyFactory : public RetryPolicyFactory {
 public:
   MOCK_METHOD(RetryPolicyExtensionSharedPtr, createRetryPolicy,
-              (const Protobuf::Message&, const Http::HeaderMap&));
+              (const Protobuf::Message&, const Http::RequestHeaderMap&));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
 
   std::string name() const override { return "envoy.test_retry_policy"; }
