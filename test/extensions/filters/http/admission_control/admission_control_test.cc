@@ -70,17 +70,17 @@ public:
   }
 
   void sampleFailedRequest() {
-    Http::ResponseHeaderMapImpl failure_headers{{":status", "504"}};
+    Http::TestResponseHeaderMapImpl failure_headers{{":status", "504"}};
     filter_->encodeHeaders(failure_headers, true);
   }
 
   void sampleSuccessfulRequest() {
-    Http::ResponseHeaderMapImpl success_headers{{":status", "200"}};
+    Http::TestResponseHeaderMapImpl success_headers{{":status", "200"}};
     filter_->encodeHeaders(success_headers, true);
   }
 
   void sampleCustomRequest(std::string&& http_error_code) {
-    Http::ResponseHeaderMapImpl headers{{":status", http_error_code}};
+    Http::TestResponseHeaderMapImpl headers{{":status", http_error_code}};
     filter_->encodeHeaders(headers, true);
   }
 
