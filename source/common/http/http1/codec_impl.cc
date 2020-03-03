@@ -243,11 +243,44 @@ void StreamEncoderImpl::endEncode() {
     connection_.buffer().add(CRLF);
   }
 
-  connection_.flushOutput();
+  connection_.flushOutput(true);
   connection_.onEncodeComplete();
 }
 
-void ConnectionImpl::flushOutput() {
+void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) {
+  if (!flood_protection_) {
+    return;
+  }
+  // It's messy and complicated to try to tag the final write of an HTTP response for response
+  // tracking for flood protection. Instead, write an empty buffer fragment after the response,
+  // to allow for tracking.
+  // When the response is written out, the fragment will be deleted and the counter will be updated
+  // by ServerConnectionImpl::releaseOutboundResponse()
+  auto fragment =
+      Buffer::OwnedBufferFragmentImpl::create(absl::string_view("", 0), response_buffer_releasor_);
+  output_buffer.addBufferFragment(*fragment.release());
+  ASSERT(outbound_responses_ < max_outbound_responses_);
+  outbound_responses_++;
+}
+
+void ServerConnectionImpl::doFloodProtectionChecks() const {
+  if (!flood_protection_) {
+    return;
+  }
+  // Before sending another response, make sure it won't exceed flood protection thresholds.
+  if (outbound_responses_ >= max_outbound_responses_) {
+    ENVOY_CONN_LOG(trace, "error sending response: Too many pending responses queued", connection_);
+    stats_.response_flood_.inc();
+    throw FrameFloodException("Too many responses queued.");
+  }
+}
+
+void ConnectionImpl::flushOutput(bool end_encode) {
+  if (end_encode) {
+    // If this is an HTTP response in ServerConnectionImpl, track outbound responses for flood
+    // protection
+    maybeAddSentinelBufferFragment(output_buffer_);
+  }
   connection().write(output_buffer_, false);
   ASSERT(0UL == output_buffer_.length());
 }
@@ -278,6 +311,9 @@ static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) {
+  // Do flood checks before attempting to write any responses.
+  flood_checks_();
+
   started_response_ = true;
 
   // The contract is that client codecs must ensure that :status is present.
@@ -387,14 +423,15 @@ void ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
 
-  auto& current_headers = headersOrTrailers();
+  auto& headers_or_trailers = headersOrTrailers();
   if (!current_header_field_.empty()) {
     current_header_field_.inlineTransform([](char c) { return absl::ascii_tolower(c); });
-    current_headers.addViaMove(std::move(current_header_field_), std::move(current_header_value_));
+    headers_or_trailers.addViaMove(std::move(current_header_field_),
+                                   std::move(current_header_value_));
   }
 
   // Check if the number of headers exceeds the limit.
-  if (current_headers.size() > max_headers_count_) {
+  if (headers_or_trailers.size() > max_headers_count_) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders);
     const absl::string_view header_type =
@@ -538,26 +575,27 @@ int ConnectionImpl::onHeadersCompleteBase() {
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
   }
-  RequestOrResponseHeaderMap& current_headers = requestOrResponseHeaders();
-  if (Utility::isUpgrade(current_headers)) {
+  RequestOrResponseHeaderMap& request_or_response_headers = requestOrResponseHeaders();
+  if (Utility::isUpgrade(request_or_response_headers)) {
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
-    if (current_headers.Upgrade() &&
-        absl::EqualsIgnoreCase(current_headers.Upgrade()->value().getStringView(),
+    if (request_or_response_headers.Upgrade() &&
+        absl::EqualsIgnoreCase(request_or_response_headers.Upgrade()->value().getStringView(),
                                Http::Headers::get().UpgradeValues.H2c)) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
-      current_headers.removeUpgrade();
-      if (current_headers.Connection()) {
+      request_or_response_headers.removeUpgrade();
+      if (request_or_response_headers.Connection()) {
         const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
         std::string new_value = StringUtil::removeTokens(
-            current_headers.Connection()->value().getStringView(), ",", tokens_to_remove, ",");
+            request_or_response_headers.Connection()->value().getStringView(), ",",
+            tokens_to_remove, ",");
         if (new_value.empty()) {
-          current_headers.removeConnection();
+          request_or_response_headers.removeConnection();
         } else {
-          current_headers.setConnection(new_value);
+          request_or_response_headers.setConnection(new_value);
         }
       }
-      current_headers.remove(Headers::get().Http2Settings);
+      request_or_response_headers.remove(Headers::get().Http2Settings);
     } else {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
@@ -566,8 +604,9 @@ int ConnectionImpl::onHeadersCompleteBase() {
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
-  if (current_headers.TransferEncoding()) {
-    absl::string_view encoding = current_headers.TransferEncoding()->value().getStringView();
+  if (request_or_response_headers.TransferEncoding()) {
+    absl::string_view encoding =
+        request_or_response_headers.TransferEncoding()->value().getStringView();
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
         !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Identity) &&
@@ -631,7 +670,18 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection, Stat
                                            const uint32_t max_request_headers_count)
     : ConnectionImpl(connection, stats, HTTP_REQUEST, max_request_headers_kb,
                      max_request_headers_count, formatter(settings), settings.enable_trailers_),
-      callbacks_(callbacks), codec_settings_(settings) {}
+      callbacks_(callbacks), codec_settings_(settings),
+      response_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
+        releaseOutboundResponse(fragment);
+      }),
+      // Pipelining is generally not well supported on the internet and has a series of dangerous
+      // overflow bugs. As such we are disabling it for now, and removing this temporary override if
+      // no one objects. If you use this integer to restore prior behavior, contact the
+      // maintainer team as it will otherwise be removed entirely soon.
+      max_outbound_responses_(
+          Runtime::getInteger("envoy.do_not_use_going_away_max_http2_outbound_responses", 2)),
+      flood_protection_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_flood_protection")) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   if (active_request_.value().remote_complete_) {
@@ -752,7 +802,7 @@ int ServerConnectionImpl::onHeadersComplete() {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this, header_key_formatter_.get());
+    active_request_.emplace(*this, header_key_formatter_.get(), flood_checks_);
     active_request_.value().request_decoder_ =
         &callbacks_.newStream(active_request_.value().response_encoder_);
   }
@@ -831,6 +881,13 @@ void ServerConnectionImpl::onBelowLowWatermark() {
   if (active_request_.has_value()) {
     active_request_.value().response_encoder_.runLowWatermarkCallbacks();
   }
+}
+
+void ServerConnectionImpl::releaseOutboundResponse(
+    const Buffer::OwnedBufferFragmentImpl* fragment) {
+  ASSERT(outbound_responses_ >= 1);
+  --outbound_responses_;
+  delete fragment;
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, Stats::Scope& stats,

@@ -143,7 +143,7 @@ message JwtProvider {
   //
   // can be used to extract token from header::
   //
-  //   x-goog-iap-jwt-assertion: <JWT>.
+  //   ``x-goog-iap-jwt-assertion: <JWT>``.
   //
   repeated JwtHeader from_headers = 6;
 
@@ -461,27 +461,27 @@ message JwtAuthentication {
   //
   // .. code-block:: yaml
   //
-  // rules:
-  //   - match:
-  //       prefix: /healthz
-  //   - match:
-  //       prefix: /baz
-  //     requires:
-  //       provider_name: provider1
-  //   - match:
-  //       prefix: /foo
-  //     requires:
-  //       requires_any:
-  //         requirements:
-  //           - provider_name: provider1
-  //           - provider_name: provider2
-  //   - match:
-  //       prefix: /bar
-  //     requires:
-  //       requires_all:
-  //         requirements:
-  //           - provider_name: provider1
-  //           - provider_name: provider2
+  //   rules:
+  //     - match:
+  //         prefix: /healthz
+  //     - match:
+  //         prefix: /baz
+  //       requires:
+  //         provider_name: provider1
+  //     - match:
+  //         prefix: /foo
+  //       requires:
+  //         requires_any:
+  //           requirements:
+  //             - provider_name: provider1
+  //             - provider_name: provider2
+  //     - match:
+  //         prefix: /bar
+  //       requires:
+  //         requires_all:
+  //           requirements:
+  //             - provider_name: provider1
+  //             - provider_name: provider2
   //
   repeated RequirementRule rules = 2;
 

@@ -579,7 +579,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
       ProtoValidationException);
 }
 
-TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
+TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
               start(_));
@@ -588,7 +588,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
 }
 
-TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
+TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
               start(_));
