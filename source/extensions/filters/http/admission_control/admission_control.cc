@@ -33,8 +33,7 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       aggression_(
           proto_config.has_aggression_coefficient()
               ? std::make_unique<Runtime::Double>(proto_config.aggression_coefficient(), runtime_)
-              : nullptr) {
-}
+              : nullptr) {}
 
 double AdmissionControlFilterConfig::aggression() const {
   return std::max<double>(1.0, aggression_ ? aggression_->value() : defaultAggression);
@@ -44,7 +43,8 @@ AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigShare
                                                const std::string& stats_prefix)
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
 
-Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool end_stream) {
+Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&,
+                                                                bool end_stream) {
   if (!end_stream || !config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -89,7 +89,7 @@ bool AdmissionControlFilter::shouldRejectRequest() const {
 }
 
 ThreadLocalControllerImpl::ThreadLocalControllerImpl(TimeSource& time_source,
-                                             std::chrono::seconds sampling_window)
+                                                     std::chrono::seconds sampling_window)
     : time_source_(time_source), sampling_window_(sampling_window) {}
 
 void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {

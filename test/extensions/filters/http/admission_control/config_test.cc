@@ -39,9 +39,8 @@ public:
     tls->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalControllerImpl>(time_system_, std::chrono::seconds(10));
     });
-    return std::make_shared<AdmissionControlFilterConfig>(
-        proto, runtime_, time_system_, random_,
-        scope_, std::move(tls));
+    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_,
+                                                          scope_, std::move(tls));
   }
 
 protected:

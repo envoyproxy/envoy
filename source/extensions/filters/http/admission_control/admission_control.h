@@ -4,8 +4,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/time.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -53,7 +53,7 @@ public:
 };
 
 class ThreadLocalControllerImpl : public ThreadLocalController,
-                              public ThreadLocal::ThreadLocalObject {
+                                  public ThreadLocal::ThreadLocalObject {
 public:
   ThreadLocalControllerImpl(TimeSource& time_source, std::chrono::seconds sampling_window);
   virtual ~ThreadLocalControllerImpl() = default;
@@ -139,7 +139,8 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
 
 private:
   static AdmissionControlStats generateStats(Stats::Scope& scope, const std::string& prefix) {

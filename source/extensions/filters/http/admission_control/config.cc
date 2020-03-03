@@ -21,11 +21,13 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
 
   // Create the thread-local controller.
   auto tls = context.threadLocal().allocateSlot();
-  auto sampling_window = std::chrono::seconds(PROTOBUF_GET_MS_OR_DEFAULT(config, sampling_window,
-      1000 * defaultSamplingWindow.count()) / 1000);
-  tls->set([sampling_window, &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalControllerImpl>(context.timeSource(), sampling_window);
-  });
+  auto sampling_window = std::chrono::seconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(config, sampling_window, 1000 * defaultSamplingWindow.count()) /
+      1000);
+  tls->set(
+      [sampling_window, &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        return std::make_shared<ThreadLocalControllerImpl>(context.timeSource(), sampling_window);
+      });
 
   AdmissionControlFilterConfigSharedPtr filter_config =
       std::make_shared<AdmissionControlFilterConfig>(config, context.runtime(),

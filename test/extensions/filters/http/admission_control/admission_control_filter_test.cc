@@ -25,7 +25,8 @@ namespace HttpFilters {
 namespace AdmissionControl {
 namespace {
 
-class MockThreadLocalController : public ThreadLocal::ThreadLocalObject, public ThreadLocalController {
+class MockThreadLocalController : public ThreadLocal::ThreadLocalObject,
+                                  public ThreadLocalController {
 public:
   MockThreadLocalController() {}
   MOCK_METHOD(uint32_t, requestTotalCount, (), (override));
@@ -37,13 +38,12 @@ public:
 class TestConfig : public AdmissionControlFilterConfig {
 public:
   TestConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
-              TimeSource& time_source, Runtime::RandomGenerator& random,
-              Stats::Scope& scope, ThreadLocal::SlotPtr&& tls, MockThreadLocalController& controller) :
-    AdmissionControlFilterConfig(proto_config, runtime, time_source, random, scope, std::move(tls)),
-    controller_(controller) {}
-  virtual ThreadLocalController& getController() const override {
-    return controller_;
-  }
+             TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope,
+             ThreadLocal::SlotPtr&& tls, MockThreadLocalController& controller)
+      : AdmissionControlFilterConfig(proto_config, runtime, time_source, random, scope,
+                                     std::move(tls)),
+        controller_(controller) {}
+  virtual ThreadLocalController& getController() const override { return controller_; }
 
 private:
   MockThreadLocalController& controller_;
@@ -57,8 +57,8 @@ public:
     AdmissionControlFilterConfig::AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
-    return std::make_shared<TestConfig>(
-        proto, runtime_, time_system_, random_, scope_, std::move(tls), controller_);
+    return std::make_shared<TestConfig>(proto, runtime_, time_system_, random_, scope_,
+                                        std::move(tls), controller_);
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
@@ -196,6 +196,9 @@ TEST_F(AdmissionControlTest, ErrorCodes) {
   EXPECT_CALL(controller_, recordFailure());
   sampleCustomRequest("500");
 }
+
+// TODO(tonya11en): The intent is to fill this out with more tests after soliciting feedback on the
+// general approach.
 
 } // namespace
 } // namespace AdmissionControl
