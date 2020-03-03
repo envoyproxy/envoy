@@ -364,7 +364,7 @@ typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
     function envoy_on_request(request_handle)
-      local headers, body = request_handle:httpCallNonblocking(
+      local headers, body = request_handle:httpCall(
       "lua_cluster",
       {
         [":method"] = "POST",
@@ -372,7 +372,8 @@ typed_config:
         [":authority"] = "lua_cluster"
       },
       "hello world",
-      5000)
+      5000,
+      true)
     end
 )EOF";
 

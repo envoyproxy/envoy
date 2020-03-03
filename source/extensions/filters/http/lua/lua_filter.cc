@@ -210,6 +210,15 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 
 int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
+  bool asynchronous = lua_toboolean(state, 6);
+  if(asynchronous) {
+    return luaHttpCallNonblocking(state);
+  } else {
+    return luaHttpCallBlocking(state);
+  }
+}
+
+int StreamHandleWrapper::luaHttpCallBlocking(lua_State* state) {
   http_request_ = makeHttpCall(state, filter_, *this);
   if (http_request_) {
     state_ = State::HttpCall;

@@ -145,7 +145,6 @@ public:
             {"logErr", static_luaLogErr},
             {"logCritical", static_luaLogCritical},
             {"httpCall", static_luaHttpCall},
-            {"httpCallNonblocking", static_luaHttpCallNonblocking},
             {"respond", static_luaRespond},
             {"streamInfo", static_luaStreamInfo},
             {"connection", static_luaConnection},
@@ -160,9 +159,20 @@ private:
    * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
    * @param 3 (string): Body. Can be nil.
    * @param 4 (int): Timeout in milliseconds for the call.
+   * @param 5 (bool): Flag. If true, filter continues without waiting for HTTP response from upstream service.
    * @return headers (table), body (string/nil)
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCall);
+
+  /**
+   * Perform an HTTP call to an upstream host.
+   * @param 1 (string): The name of the upstream cluster to call. This cluster must be configured.
+   * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
+   * @param 3 (string): Body. Can be nil.
+   * @param 4 (int): Timeout in milliseconds for the call.
+   * @return headers (table), body (string/nil)
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCallBlocking);
 
   /**
    * Perform a non-blocking HTTP call to an upstream host. Fires and forgets.

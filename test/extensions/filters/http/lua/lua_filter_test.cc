@@ -803,7 +803,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
 TEST_F(LuaHttpFilterTest, HttpCallNonblocking) {
   const std::string SCRIPT{R"EOF(
         function envoy_on_request(request_handle)
-          local headers, body = request_handle:httpCallNonblocking(
+          local headers, body = request_handle:httpCall(
             "cluster",
             {
               [":method"] = "POST",
@@ -812,7 +812,8 @@ TEST_F(LuaHttpFilterTest, HttpCallNonblocking) {
               ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
             },
             "hello world",
-            5000)
+            5000,
+            true)
         end
       )EOF"};
 
