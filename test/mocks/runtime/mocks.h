@@ -58,8 +58,7 @@ public:
               (absl::string_view key, const envoy::type::v3::FractionalPercent& default_value,
                uint64_t random_value),
               (const));
-  MOCK_METHOD(absl::optional<std::reference_wrapper<const std::string>>, get,
-              (absl::string_view key), (const));
+  MOCK_METHOD(ConstStringOptRef, get, (absl::string_view key), (const));
   MOCK_METHOD(bool, exists, (absl::string_view key), (const));
   MOCK_METHOD(uint64_t, getInteger, (absl::string_view key, uint64_t default_value), (const));
   MOCK_METHOD(double, getDouble, (absl::string_view key, double default_value), (const));
