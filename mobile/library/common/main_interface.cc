@@ -62,6 +62,12 @@ envoy_status_t set_preferred_network(envoy_network_t network) {
   return ENVOY_SUCCESS;
 }
 
+void flush_stats() {
+  if (auto e = engine_.lock()) {
+    e->flushStats();
+  }
+}
+
 /**
  * External entrypoint for library.
  */
