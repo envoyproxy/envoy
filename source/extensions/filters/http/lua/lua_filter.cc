@@ -211,14 +211,14 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
   bool asynchronous = lua_toboolean(state, 6);
-  if(asynchronous) {
-    return luaHttpCallNonblocking(state);
+  if (asynchronous) {
+    return luaHttpCallAsynchronous(state);
   } else {
-    return luaHttpCallBlocking(state);
+    return luaHttpCallSynchronous(state);
   }
 }
 
-int StreamHandleWrapper::luaHttpCallBlocking(lua_State* state) {
+int StreamHandleWrapper::luaHttpCallSynchronous(lua_State* state) {
   http_request_ = makeHttpCall(state, filter_, *this);
   if (http_request_) {
     state_ = State::HttpCall;
@@ -230,7 +230,7 @@ int StreamHandleWrapper::luaHttpCallBlocking(lua_State* state) {
   }
 }
 
-int StreamHandleWrapper::luaHttpCallNonblocking(lua_State* state) {
+int StreamHandleWrapper::luaHttpCallAsynchronous(lua_State* state) {
   makeHttpCall(state, filter_, *noopCallbacks_);
   return 0;
 }

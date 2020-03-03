@@ -365,7 +365,7 @@ TEST_F(LuaHttpFilterTest, ScriptTrailersNoBodyRequestBodyTrailers) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-// Script asking for blocking body, request that is headers only.
+// Script asking for synchronous body, request that is headers only.
 TEST_F(LuaHttpFilterTest, ScriptBodyRequestHeadersOnly) {
   InSequence s;
   setup(BODY_SCRIPT);
@@ -376,7 +376,7 @@ TEST_F(LuaHttpFilterTest, ScriptBodyRequestHeadersOnly) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Script asking for blocking body, request that has a body.
+// Script asking for synchronous body, request that has a body.
 TEST_F(LuaHttpFilterTest, ScriptBodyRequestBody) {
   InSequence s;
   setup(BODY_SCRIPT);
@@ -391,7 +391,7 @@ TEST_F(LuaHttpFilterTest, ScriptBodyRequestBody) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
-// Script asking for blocking body, request that has a body in multiple frames.
+// Script asking for synchronous body, request that has a body in multiple frames.
 TEST_F(LuaHttpFilterTest, ScriptBodyRequestBodyTwoFrames) {
   InSequence s;
   setup(BODY_SCRIPT);
@@ -410,7 +410,7 @@ TEST_F(LuaHttpFilterTest, ScriptBodyRequestBodyTwoFrames) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data2, true));
 }
 
-// Scripting asking for blocking body, request that has a body in multiple frames follows by
+// Scripting asking for synchronous body, request that has a body in multiple frames follows by
 // trailers.
 TEST_F(LuaHttpFilterTest, ScriptBodyRequestBodyTwoFramesTrailers) {
   InSequence s;
@@ -434,7 +434,7 @@ TEST_F(LuaHttpFilterTest, ScriptBodyRequestBodyTwoFramesTrailers) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-// Script asking for blocking body and trailers, request that is headers only.
+// Script asking for synchronous body and trailers, request that is headers only.
 TEST_F(LuaHttpFilterTest, ScriptBodyTrailersRequestHeadersOnly) {
   InSequence s;
   setup(BODY_TRAILERS_SCRIPT);
@@ -446,7 +446,7 @@ TEST_F(LuaHttpFilterTest, ScriptBodyTrailersRequestHeadersOnly) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Script asking for blocking body and trailers, request that has a body.
+// Script asking for synchronous body and trailers, request that has a body.
 TEST_F(LuaHttpFilterTest, ScriptBodyTrailersRequestBody) {
   InSequence s;
   setup(BODY_TRAILERS_SCRIPT);
@@ -462,7 +462,7 @@ TEST_F(LuaHttpFilterTest, ScriptBodyTrailersRequestBody) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
-// Script asking for blocking body and trailers, request that has a body and trailers.
+// Script asking for synchronous body and trailers, request that has a body and trailers.
 TEST_F(LuaHttpFilterTest, ScriptBodyTrailersRequestBodyTrailers) {
   InSequence s;
   setup(BODY_TRAILERS_SCRIPT);
@@ -708,8 +708,8 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 }
 
-// Response blocking body.
-TEST_F(LuaHttpFilterTest, ResponseBlockingBody) {
+// Response synchronous body.
+TEST_F(LuaHttpFilterTest, ResponseSynchronousBody) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_response(response_handle)
       response_handle:logTrace(response_handle:headers():get(":status"))
@@ -799,9 +799,9 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   callbacks->onSuccess(std::move(response_message));
 }
 
-// Basic HTTP request flow. Async flag set to false
+// Basic HTTP request flow. Asynchronous flag set to false.
 TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
-const std::string SCRIPT{R"EOF(
+  const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
         "cluster",
@@ -862,8 +862,8 @@ const std::string SCRIPT{R"EOF(
   callbacks->onSuccess(std::move(response_message));
 }
 
-// Basic nonblocking, fire-and-forget HTTP request flow.
-TEST_F(LuaHttpFilterTest, HttpCallNonblocking) {
+// Basic asynchronous, fire-and-forget HTTP request flow.
+TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
   const std::string SCRIPT{R"EOF(
         function envoy_on_request(request_handle)
           local headers, body = request_handle:httpCall(

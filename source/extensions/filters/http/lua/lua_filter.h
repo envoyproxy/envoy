@@ -159,30 +159,11 @@ private:
    * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
    * @param 3 (string): Body. Can be nil.
    * @param 4 (int): Timeout in milliseconds for the call.
-   * @param 5 (bool): Flag. If true, filter continues without waiting for HTTP response from upstream service.
+   * @param 5 (bool): Flag. If true, filter continues without waiting for HTTP response from
+   * upstream service. False/synchronous by default.
    * @return headers (table), body (string/nil)
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCall);
-
-  /**
-   * Perform an HTTP call to an upstream host.
-   * @param 1 (string): The name of the upstream cluster to call. This cluster must be configured.
-   * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
-   * @param 3 (string): Body. Can be nil.
-   * @param 4 (int): Timeout in milliseconds for the call.
-   * @return headers (table), body (string/nil)
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCallBlocking);
-
-  /**
-   * Perform a non-blocking HTTP call to an upstream host. Fires and forgets.
-   * @param 1 (string): The name of the upstream cluster to call. This cluster must be configured.
-   * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
-   * @param 3 (string): Body. Can be nil.
-   * @param 4 (int): Timeout in milliseconds for the call.
-   * @return headers (table), body (string/nil)
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCallNonblocking);
 
   /**
    * Perform an inline response. This call is currently only valid on the request path. Further
@@ -270,6 +251,9 @@ private:
    * This is the closure/iterator returned by luaBodyChunks() above.
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
+
+  int luaHttpCallSynchronous(lua_State* state);
+  int luaHttpCallAsynchronous(lua_State* state);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
