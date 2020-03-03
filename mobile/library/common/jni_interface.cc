@@ -31,7 +31,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
 }
 
 static void jvm_on_exit() {
-  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_exit");
+  __android_log_write(ANDROID_LOG_INFO, "[Envoy]", "library is exiting");
   // Note that this is not dispatched because the thread that
   // needs to be detached is the engine thread.
   // This function is called from the context of the engine's
@@ -73,6 +73,7 @@ extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_setPreferredNetwork(JNIEnv* env,
                                                                             jclass, // class
                                                                             jint network) {
+  __android_log_write(ANDROID_LOG_INFO, "[Envoy]", "setting preferred network");
   return set_preferred_network(static_cast<envoy_network_t>(network));
 }
 
@@ -129,7 +130,7 @@ static JNIEnv* get_env() {
   JNIEnv* env = nullptr;
   int get_env_res = static_jvm->GetEnv((void**)&env, JNI_VERSION);
   if (get_env_res == JNI_EDETACHED) {
-    __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "equals JNI_EDETACHED");
+    __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "environment is JNI_EDETACHED");
     // Note: the only thread that should need to be attached is Envoy's engine std::thread.
     // TODO: harden this piece of code to make sure that we are only needing to attach Envoy
     // engine's std::thread, and that we detach it successfully.
@@ -155,7 +156,7 @@ static void jvm_on_headers(envoy_headers headers, bool end_stream, void* context
 }
 
 static void jvm_on_data(envoy_data data, bool end_stream, void* context) {
-  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_data");
+  __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_data");
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
 
@@ -177,12 +178,12 @@ static void jvm_on_data(envoy_data data, bool end_stream, void* context) {
 }
 
 static void jvm_on_metadata(envoy_headers metadata, void* context) {
-  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_metadata");
-  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", std::to_string(metadata.length).c_str());
+  __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_metadata");
+  __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", std::to_string(metadata.length).c_str());
 }
 
 static void jvm_on_trailers(envoy_headers trailers, void* context) {
-  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_trailers");
+  __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_trailers");
 
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
@@ -198,7 +199,7 @@ static void jvm_on_trailers(envoy_headers trailers, void* context) {
 }
 
 static void jvm_on_error(envoy_error error, void* context) {
-  __android_log_write(ANDROID_LOG_ERROR, "jni_lib", "jvm_on_error");
+  __android_log_write(ANDROID_LOG_VERBOSE, "[Envoy]", "jvm_on_error");
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
 
