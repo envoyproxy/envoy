@@ -342,7 +342,13 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
   absl::string_view stripped = entry.raw_string_value_;
   stripped = absl::StripAsciiWhitespace(stripped);
 
-  if (absl::EqualsIgnoreCase(stripped, "true")) {
+  uint64_t parse_int;
+  if (absl::SimpleAtoi(stripped, &parse_int)) {
+    entry.bool_value_ = (parse_int != 0);
+    // This is really an integer, so return false here not because of failure, but so we continue to
+    // parse doubles/int.
+    return false;
+  } else if (absl::EqualsIgnoreCase(stripped, "true")) {
     entry.bool_value_ = true;
     return true;
   } else if (absl::EqualsIgnoreCase(stripped, "false")) {

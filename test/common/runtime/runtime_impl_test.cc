@@ -624,6 +624,8 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
     empty: {}
     file_with_words: "some words"
     file_with_double: 23.2
+    bool_as_int0: 0
+    bool_as_int1: 1
   )EOF");
   setup();
 
@@ -652,6 +654,20 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(false, snapshot->getBoolean("file13", true));
   EXPECT_EQ(false, snapshot->getBoolean("file13", false));
+
+  EXPECT_EQ(0, snapshot->getInteger("bool_as_int0", 333));
+  EXPECT_EQ(1, snapshot->getInteger("bool_as_int1", 333));
+
+  EXPECT_EQ(false, snapshot->getBoolean("bool_as_int0", true));
+  EXPECT_EQ(false, snapshot->getBoolean("bool_as_int0", false));
+  EXPECT_EQ(true, snapshot->getBoolean("bool_as_int1", false));
+  EXPECT_EQ(true, snapshot->getBoolean("bool_as_int1", true));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", false));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", true));
+
+  // Test that a double value is not parsed as a boolean even though integers are fine.
+  EXPECT_EQ(true, snapshot->getBoolean("file_with_double", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file_with_double", false));
 
   // Not a boolean. Expect the default.
   EXPECT_EQ(true, snapshot->getBoolean("file1", true));
@@ -714,7 +730,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(17, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(19, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
