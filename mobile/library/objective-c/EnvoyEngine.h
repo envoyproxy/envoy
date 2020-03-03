@@ -196,7 +196,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 
 #pragma mark - EnvoyEngineImpl
 
-// Concrete implementation of the `EnvoyEngine` protocol.
+// Concrete implementation of the `EnvoyEngine` interface.
 @interface EnvoyEngineImpl : NSObject <EnvoyEngine>
 
 @end

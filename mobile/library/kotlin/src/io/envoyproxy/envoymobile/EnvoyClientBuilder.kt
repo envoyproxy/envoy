@@ -24,7 +24,10 @@ open class EnvoyClientBuilder(
 
   /**
    * Add a log level to use with Envoy.
+   *
    * @param logLevel the log level to use with Envoy.
+   *
+   * @return this builder.
    */
   fun addLogLevel(logLevel: LogLevel): EnvoyClientBuilder {
     this.logLevel = logLevel
@@ -33,7 +36,10 @@ open class EnvoyClientBuilder(
 
   /**
    * Add a domain to flush stats to.
+   *
    * @param statsDomain the domain to flush stats to.
+   *
+   * @return this builder.
    */
   fun addStatsDomain(statsDomain: String): EnvoyClientBuilder {
     this.statsDomain = statsDomain
@@ -44,6 +50,8 @@ open class EnvoyClientBuilder(
    * Add a timeout for new network connections to hosts in the cluster.
    *
    * @param connectTimeoutSeconds timeout for new network connections to hosts in the cluster.
+   *
+   * @return this builder.
    */
   fun addConnectTimeoutSeconds(connectTimeoutSeconds: Int): EnvoyClientBuilder {
     this.connectTimeoutSeconds = connectTimeoutSeconds
@@ -54,6 +62,8 @@ open class EnvoyClientBuilder(
    * Add a rate at which to refresh DNS.
    *
    * @param dnsRefreshSeconds rate in seconds to refresh DNS.
+   *
+   * @return this builder.
    */
   fun addDNSRefreshSeconds(dnsRefreshSeconds: Int): EnvoyClientBuilder {
     this.dnsRefreshSeconds = dnsRefreshSeconds
@@ -65,6 +75,8 @@ open class EnvoyClientBuilder(
    *
    * @param base rate in seconds.
    * @param max rate in seconds.
+   *
+   * @return this builder.
    */
   fun addDNSFailureRefreshSeconds(base: Int, max: Int): EnvoyClientBuilder {
     this.dnsFailureRefreshSecondsBase = base
@@ -76,6 +88,8 @@ open class EnvoyClientBuilder(
    * Add an interval at which to flush Envoy stats.
    *
    * @param statsFlushSeconds interval at which to flush Envoy stats.
+   *
+   * @return this builder.
    */
   fun addStatsFlushSeconds(statsFlushSeconds: Int): EnvoyClientBuilder {
     this.statsFlushSeconds = statsFlushSeconds

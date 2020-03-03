@@ -1,7 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
+/* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
-
   public final String statsDomain;
   public final Integer connectTimeoutSeconds;
   public final Integer dnsRefreshSeconds;
@@ -10,7 +10,7 @@ public class EnvoyConfiguration {
   public final Integer statsFlushSeconds;
 
   /**
-   * Create an EnvoyConfiguration with a user provided configuration values.
+   * Create a new instance of the configuration.
    *
    * @param statsDomain                  the domain to flush stats to.
    * @param connectTimeoutSeconds        timeout for new network connections to hosts in

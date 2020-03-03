@@ -22,6 +22,7 @@ apple_static_framework_import(
     ],
     sdk_frameworks = [
         "SystemConfiguration",
+        "UIKit",
     ],
     visibility = ["//visibility:public"],
 )

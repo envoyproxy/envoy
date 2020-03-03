@@ -112,13 +112,13 @@ public final class EnvoyClientBuilder: NSObject {
     case .custom(let yaml):
       return EnvoyClient(configYAML: yaml, logLevel: self.logLevel, engine: engine)
     case .standard:
-      let config = EnvoyConfiguration(statsDomain: self.statsDomain,
-                                      connectTimeoutSeconds: self.connectTimeoutSeconds,
-                                      dnsRefreshSeconds: self.dnsRefreshSeconds,
-                                      dnsFailureRefreshSecondsBase:
-                                        self.dnsFailureRefreshSecondsBase,
-                                      dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
-                                      statsFlushSeconds: self.statsFlushSeconds)
+      let config = EnvoyConfiguration(
+        statsDomain: self.statsDomain,
+        connectTimeoutSeconds: self.connectTimeoutSeconds,
+        dnsRefreshSeconds: self.dnsRefreshSeconds,
+        dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
+        dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
+        statsFlushSeconds: self.statsFlushSeconds)
       return EnvoyClient(config: config, logLevel: self.logLevel, engine: engine)
     }
   }

@@ -18,6 +18,7 @@ objc_library(
     ],
     sdk_frameworks = [
         "SystemConfiguration",
+        "UIKit",
     ],
     visibility = ["//visibility:public"],
     deps = ["//library/common:envoy_main_interface_lib"],
