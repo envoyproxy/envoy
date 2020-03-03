@@ -152,7 +152,7 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
   EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
 
-  // Should continue since SR has become stale and there's no additional data.
+  // Should continue forwarding since SR has become stale and there's no additional data.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordSuccess());
   sampleCustomRequest("200");
@@ -177,15 +177,22 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
 TEST_F(AdmissionControlTest, ErrorCodes) {
   auto config = makeConfig(default_yaml_);
 
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
+
   setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordSuccess());
   sampleCustomRequest("200");
 
   setupFilter(config);
-  EXPECT_CALL(controller_, recordFailure());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_CALL(controller_, recordSuccess());
   sampleCustomRequest("400");
 
   setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordFailure());
   sampleCustomRequest("500");
 }

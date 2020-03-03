@@ -150,7 +150,7 @@ private:
 
   AdmissionControlFilterConfigSharedPtr config_;
   AdmissionControlStats stats_;
-  std::unique_ptr<Cleanup> deferred_sample_task_;
+  std::unique_ptr<Cleanup> deferred_record_failure_;
 };
 
 } // namespace AdmissionControl

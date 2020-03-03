@@ -56,7 +56,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  deferred_sample_task_ =
+  deferred_record_failure_ =
       std::make_unique<Cleanup>([this]() { config_->getController().recordFailure(); });
 
   return Http::FilterHeadersStatus::Continue;
@@ -68,9 +68,10 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
     const uint64_t status_code = Http::Utility::getResponseStatus(headers);
     if (status_code < 500) {
       config_->getController().recordSuccess();
-      deferred_sample_task_->cancel();
+      ASSERT(deferred_record_failure_);
+      deferred_record_failure_->cancel();
     } else {
-      deferred_sample_task_.reset();
+      deferred_record_failure_.reset();
     }
   }
   return Http::FilterHeadersStatus::Continue;
