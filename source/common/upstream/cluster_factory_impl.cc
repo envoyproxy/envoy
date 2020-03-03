@@ -57,6 +57,13 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
   } else {
     cluster_type = cluster.cluster_type().name();
   }
+
+  if (cluster.common_lb_config().use_hostname() &&
+      !(cluster.type() == envoy::config::cluster::v3::Cluster::STRICT_DNS ||
+        cluster.type() == envoy::config::cluster::v3::Cluster::LOGICAL_DNS)) {
+    throw EnvoyException(
+        fmt::format("Cannot use hostname loadbalancing for cluster of type: '{}'", cluster_type));
+  }
   ClusterFactory* factory = Registry::FactoryRegistry<ClusterFactory>::getFactory(cluster_type);
 
   if (factory == nullptr) {

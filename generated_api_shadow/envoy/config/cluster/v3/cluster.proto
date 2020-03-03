@@ -381,7 +381,7 @@ message Cluster {
   }
 
   // Common configuration for all load balancer implementations.
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message CommonLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.CommonLbConfig";
@@ -473,6 +473,11 @@ message Cluster {
     // If set to `true`, the cluster manager will drain all existing
     // connections to upstream hosts whenever hosts are added or removed from the cluster.
     bool close_connections_on_host_set_change = 6;
+
+    // If set to `true`, the cluster will use hostname instead of the resolved
+    // name to load balance hosts. Only valid for StrictDNS and LogicalDNS
+    // clusters.
+    bool use_hostname = 7;
   }
 
   message RefreshRate {
