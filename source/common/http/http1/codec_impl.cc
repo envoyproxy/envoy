@@ -698,28 +698,28 @@ void ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
   bool is_connect = (method == HTTP_CONNECT);
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
-  if (!active_request_.value().request_url_.getStringView().empty() &&
-      (active_request_.value().request_url_.getStringView()[0] == '/' ||
-       ((method == HTTP_OPTIONS) &&
-        active_request_.value().request_url_.getStringView()[0] == '*'))) {
-    headers.addViaMove(std::move(path), std::move(active_request_.value().request_url_));
+  auto& active_request = active_request_.value();
+  if (!active_request.request_url_.getStringView().empty() &&
+      (active_request.request_url_.getStringView()[0] == '/' ||
+       ((method == HTTP_OPTIONS) && active_request.request_url_.getStringView()[0] == '*'))) {
+    headers.addViaMove(std::move(path), std::move(active_request.request_url_));
     return;
   }
 
   // If absolute_urls and/or connect are not going be handled, copy the url and return.
   // This forces the behavior to be backwards compatible with the old codec behavior.
   if (!codec_settings_.allow_absolute_url_) {
-    headers.addViaMove(std::move(path), std::move(active_request_.value().request_url_));
+    headers.addViaMove(std::move(path), std::move(active_request.request_url_));
     return;
   }
 
   if (is_connect) {
-    headers.addViaMove(std::move(path), std::move(active_request_.value().request_url_));
+    headers.addViaMove(std::move(path), std::move(active_request.request_url_));
     return;
   }
 
   Utility::Url absolute_url;
-  if (!absolute_url.initialize(active_request_.value().request_url_.getStringView())) {
+  if (!absolute_url.initialize(active_request.request_url_.getStringView())) {
     sendProtocolError(Http1ResponseCodeDetails::get().InvalidUrl);
     throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
@@ -733,7 +733,7 @@ void ServerConnectionImpl::handlePath(RequestHeaderMap& headers, unsigned int me
   headers.setHost(absolute_url.host_and_port());
 
   headers.setPath(absolute_url.path_and_query_params());
-  active_request_.value().request_url_.clear();
+  active_request.request_url_.clear();
 }
 
 int ServerConnectionImpl::onHeadersComplete() {
@@ -741,6 +741,7 @@ int ServerConnectionImpl::onHeadersComplete() {
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
   if (active_request_.has_value()) {
+    auto& active_request = active_request_.value();
     auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
@@ -759,12 +760,12 @@ int ServerConnectionImpl::onHeadersComplete() {
 
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
-    active_request_.value().response_encoder_.isResponseToHeadRequest(parser_.method == HTTP_HEAD);
+    active_request.response_encoder_.isResponseToHeadRequest(parser_.method == HTTP_HEAD);
 
     // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
     // CONNECT
     handlePath(*headers, parser_.method);
-    ASSERT(active_request_.value().request_url_.empty());
+    ASSERT(active_request.request_url_.empty());
 
     headers->setMethod(method_string);
 
@@ -784,7 +785,7 @@ int ServerConnectionImpl::onHeadersComplete() {
     // encoding because end stream with zero body length has not yet been indicated.
     if (parser_.flags & F_CHUNKED ||
         (parser_.content_length > 0 && parser_.content_length != ULLONG_MAX) || handling_upgrade_) {
-      active_request_.value().request_decoder_->decodeHeaders(std::move(headers), false);
+      active_request.request_decoder_->decodeHeaders(std::move(headers), false);
 
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
       // so we return control to the caller.
@@ -803,8 +804,8 @@ void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
     active_request_.emplace(*this, header_key_formatter_.get(), flood_checks_);
-    active_request_.value().request_decoder_ =
-        &callbacks_.newStream(active_request_.value().response_encoder_);
+    auto& active_request = active_request_.value();
+    active_request.request_decoder_ = &callbacks_.newStream(active_request.response_encoder_);
   }
 }
 
@@ -825,17 +826,18 @@ void ServerConnectionImpl::onBody(const char* data, size_t length) {
 
 void ServerConnectionImpl::onMessageComplete() {
   if (active_request_.has_value()) {
-    active_request_.value().remote_complete_ = true;
+    auto& active_request = active_request_.value();
+    active_request.remote_complete_ = true;
     if (deferred_end_stream_headers_) {
-      active_request_.value().request_decoder_->decodeHeaders(
+      active_request.request_decoder_->decodeHeaders(
           std::move(absl::get<RequestHeaderMapPtr>(headers_or_trailers_)), true);
       deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
-      active_request_.value().request_decoder_->decodeTrailers(
+      active_request.request_decoder_->decodeTrailers(
           std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
     } else {
       Buffer::OwnedImpl buffer;
-      active_request_.value().request_decoder_->decodeData(buffer, true);
+      active_request.request_decoder_->decodeData(buffer, true);
     }
 
     // Reset to ensure no information from one requests persists to the next.
@@ -849,7 +851,6 @@ void ServerConnectionImpl::onMessageComplete() {
 }
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
-  ASSERT(active_request_);
   active_request_.value().response_encoder_.runResetCallbacks(reason);
   active_request_.reset();
 }
