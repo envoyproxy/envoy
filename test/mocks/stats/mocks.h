@@ -209,7 +209,7 @@ public:
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
   Unit unit_{Histogram::Unit::Unspecified};
-  Store* store_;
+  Store* store_{};
 
 private:
   RefcountHelper refcount_helper_;
@@ -237,7 +237,7 @@ public:
 
   bool used_;
   Unit unit_{Histogram::Unit::Unspecified};
-  Store* store_;
+  Store* store_{};
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();
 
