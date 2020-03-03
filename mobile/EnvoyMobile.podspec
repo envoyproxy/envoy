@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
     s.platform = :ios, '10.0'
     s.swift_version = '5.1'
     s.libraries = 'resolv.9', 'c++'
-    s.frameworks = 'SystemConfiguration'
+    s.frameworks = 'SystemConfiguration', 'UIKit'
     s.source = { http: "https://github.com/lyft/envoy-mobile/releases/download/v#{s.version}/envoy_ios_cocoapods.zip" }
     s.vendored_frameworks = 'Envoy.framework'
     s.source_files = 'Envoy.framework/Headers/*.h', 'Envoy.framework/Swift/*.swift'

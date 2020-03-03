@@ -2,6 +2,7 @@ package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
+/* Wrapper layer for calling into Envoy's C/++ API. */
 public interface EnvoyEngine {
   /**
    * Creates a new stream with the provided callbacks.
@@ -24,7 +25,7 @@ public interface EnvoyEngine {
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel           The log level to use when starting Envoy.
-   * @return int A status indicating if the action was successful.
+   * @return A status indicating if the action was successful.
    */
   int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
 }
