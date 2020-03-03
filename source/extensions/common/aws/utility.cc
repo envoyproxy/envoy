@@ -11,7 +11,8 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-std::map<std::string, std::string> Utility::canonicalizeHeaders(const Http::HeaderMap& headers) {
+std::map<std::string, std::string>
+Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
   std::map<std::string, std::string> out;
   headers.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {

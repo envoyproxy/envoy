@@ -673,6 +673,7 @@ TEST_F(MySQLCommandTest, MySQLTest37) {
  * Test correlated queries: INSERT, SELECT
  */
 TEST_F(MySQLCommandTest, MySQLTest38) {
+  // SPELLCHECKER(off)
   std::string table1 = "table1";
   std::string table2 = "table2";
   std::string ins_command = buildInsert("", true, table1, "");
@@ -682,6 +683,7 @@ TEST_F(MySQLCommandTest, MySQLTest38) {
   EXPECT_EQ(MYSQL_SUCCESS, encodeQuery(ins_command, result));
   expectStatementTypeAndTableAccessMap(result, hsql::StatementType::kStmtInsert,
                                        {{table1, {"insert"}}, {table2, {"select"}}});
+  // SPELLCHECKER(on)
 }
 
 /*

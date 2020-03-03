@@ -13,6 +13,7 @@
 #include "common/stats/null_gauge.h"
 #include "common/stats/store_impl.h"
 #include "common/stats/symbol_table_impl.h"
+#include "common/stats/tag_utility.h"
 #include "common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -100,18 +101,27 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override { return counters_.get(name); }
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptRef tags) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Counter& counter = counters_.get(joiner.nameWithTags());
+    return counter;
+  }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    Gauge& gauge = gauges_.get(name, import_mode);
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                   Gauge::ImportMode import_mode) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Gauge& gauge = gauges_.get(joiner.nameWithTags(), import_mode);
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
   NullCounterImpl& nullCounter() { return *null_counter_; }
   NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    Histogram& histogram = histograms_.get(name, unit);
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                           Histogram::Unit unit) override {
+    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
+    Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit);
     return histogram;
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }

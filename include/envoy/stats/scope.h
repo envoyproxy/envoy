@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/symbol_table.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
 
@@ -47,10 +48,22 @@ public:
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
+   * Creates a Counter from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterFromStatName(StatName name) PURE;
+  Counter& counterFromStatName(const StatName& name) {
+    return counterFromStatNameWithTags(name, absl::nullopt);
+  }
+  /**
+   * Creates a Counter from the stat name and tags. If tags are not provided, tag extraction
+   * will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags optionally specified tags.
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptRef tags) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterFromStatName.
@@ -60,11 +73,25 @@ public:
   virtual Counter& counter(const std::string& name) PURE;
 
   /**
+   * Creates a Gauge from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param import_mode Whether hot-restart should accumulate this value.
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) PURE;
+  Gauge& gaugeFromStatName(const StatName& name, Gauge::ImportMode import_mode) {
+    return gaugeFromStatNameWithTags(name, absl::nullopt, import_mode);
+  }
+
+  /**
+   * Creates a Gauge from the stat name and tags. If tags are not provided, tag extraction
+   * will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags optionally specified tags.
+   * @param import_mode Whether hot-restart should accumulate this value.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                           Gauge::ImportMode import_mode) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
@@ -80,11 +107,26 @@ public:
   virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
 
   /**
+   * Creates a Histogram from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param unit The unit of measurement.
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) PURE;
+  Histogram& histogramFromStatName(const StatName& name, Histogram::Unit unit) {
+    return histogramFromStatNameWithTags(name, absl::nullopt, unit);
+  }
+
+  /**
+   * Creates a Histogram from the stat name and tags. If tags are not provided, tag extraction
+   * will be performed on the name.
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @param tags optionally specified tags.
+   * @param unit The unit of measurement.
+   * @return a histogram within the scope's namespace with a particular value type.
+   */
+  virtual Histogram& histogramFromStatNameWithTags(const StatName& name,
+                                                   StatNameTagVectorOptRef tags,
+                                                   Histogram::Unit unit) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use histogramFromStatName.

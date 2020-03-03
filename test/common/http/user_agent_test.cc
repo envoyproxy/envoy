@@ -37,8 +37,9 @@ TEST(UserAgentTest, All) {
 
   {
     UserAgent ua;
-    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa iOS bbb"}}, "test.", stat_store);
-    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa iOS bbb"}}, "test.",
+                             stat_store);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
                              stat_store);
     ua.completeConnectionLength(span);
   }
@@ -56,7 +57,7 @@ TEST(UserAgentTest, All) {
 
   {
     UserAgent ua;
-    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
                              stat_store);
     ua.completeConnectionLength(span);
     ua.onConnectionDestroy(Network::ConnectionEvent::RemoteClose, true);
@@ -64,8 +65,9 @@ TEST(UserAgentTest, All) {
 
   {
     UserAgent ua;
-    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa bbb"}}, "test.", stat_store);
-    ua.initializeFromHeaders(TestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa bbb"}}, "test.",
+                             stat_store);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
                              stat_store);
     ua.completeConnectionLength(span);
     ua.onConnectionDestroy(Network::ConnectionEvent::RemoteClose, false);
@@ -73,7 +75,7 @@ TEST(UserAgentTest, All) {
 
   {
     UserAgent ua;
-    ua.initializeFromHeaders(TestHeaderMapImpl{}, "test.", stat_store);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{}, "test.", stat_store);
     ua.completeConnectionLength(span);
   }
 }

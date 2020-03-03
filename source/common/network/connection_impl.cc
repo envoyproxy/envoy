@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -54,17 +55,23 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
-  RELEASE_ASSERT(ioHandle().fd() != -1, "");
+  RELEASE_ASSERT(SOCKET_VALID(ioHandle().fd()), "");
 
   if (!connected) {
     connecting_ = true;
   }
 
+  // Libevent only supports Level trigger on Windows.
+#ifdef WIN32
+  Event::FileTriggerType trigger = Event::FileTriggerType::Level;
+#else
+  Event::FileTriggerType trigger = Event::FileTriggerType::Edge;
+#endif
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
   file_event_ = dispatcher_.createFileEvent(
-      ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+      ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); }, trigger,
+      Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
 }
@@ -205,6 +212,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   connection_stats_.reset();
 
   file_event_.reset();
+
   socket_->close();
 
   raiseEvent(close_type);
@@ -223,27 +231,39 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  sockaddr addr;
+  sockaddr_storage addr;
   socklen_t len = sizeof(addr);
-  int rc = getsockname(ioHandle().fd(), &addr, &len);
-  RELEASE_ASSERT(rc == 0, "");
 
-  if (addr.sa_family == AF_UNIX) {
+  auto os_sys_calls = Api::OsSysCallsSingleton::get();
+  Api::SysCallIntResult result =
+      os_sys_calls.getsockname(ioHandle().fd(), reinterpret_cast<struct sockaddr*>(&addr), &len);
+
+  RELEASE_ASSERT(result.rc_ == 0, "");
+
+  if (addr.ss_family == AF_UNIX) {
     return;
   }
 
   // Set NODELAY
   int new_value = enable;
-  rc = setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
-#ifdef __APPLE__
-  if (-1 == rc && errno == EINVAL) {
+  result = os_sys_calls.setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value,
+                                   sizeof(new_value));
+#if defined(__APPLE__)
+  if (SOCKET_FAILURE(result.rc_) && result.errno_ == EINVAL) {
+    // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
+    // enabled despite this result.
+    return;
+  }
+#elif defined(WIN32)
+  if (SOCKET_FAILURE(result.rc_) &&
+      (result.errno_ == WSAEWOULDBLOCK || result.errno_ == WSAEINVAL)) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #endif
 
-  RELEASE_ASSERT(0 == rc, "");
+  RELEASE_ASSERT(result.rc_ == 0, "");
 }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
@@ -562,8 +582,10 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    int rc = getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
-    ASSERT(0 == rc);
+    RELEASE_ASSERT(Api::OsSysCallsSingleton::get()
+                           .getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size)
+                           .rc_ == 0,
+                   "");
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);

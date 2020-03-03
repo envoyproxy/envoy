@@ -145,12 +145,14 @@ private:
   public:
     RedisHost(Upstream::ClusterInfoConstSharedPtr cluster, const std::string& hostname,
               Network::Address::InstanceConstSharedPtr address, RedisCluster& parent, bool master)
-        : Upstream::HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
-                             parent.lbEndpoint().load_balancing_weight().value(),
-                             parent.localityLbEndpoint().locality(),
-                             parent.lbEndpoint().endpoint().health_check_config(),
-                             parent.localityLbEndpoint().priority(),
-                             parent.lbEndpoint().health_status()),
+        : Upstream::HostImpl(
+              cluster, hostname, address,
+              // TODO(zyfjeff): Created through metadata shared pool
+              std::make_shared<envoy::config::core::v3::Metadata>(parent.lbEndpoint().metadata()),
+              parent.lbEndpoint().load_balancing_weight().value(),
+              parent.localityLbEndpoint().locality(),
+              parent.lbEndpoint().endpoint().health_check_config(),
+              parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           master_(master) {}
 
     bool isMaster() const { return master_; }

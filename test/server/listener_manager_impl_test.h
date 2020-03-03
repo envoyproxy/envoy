@@ -82,6 +82,10 @@ protected:
     local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
+    EXPECT_CALL(os_sys_calls_, getsockname)
+        .WillRepeatedly(Invoke([this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
+          return os_sys_calls_actual_.getsockname(sockfd, addr, addrlen);
+        }));
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
   }
 
@@ -219,6 +223,7 @@ protected:
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
+  Api::OsSysCallsImpl os_sys_calls_actual_;
   NiceMock<MockInstance> server_;
   NiceMock<MockListenerComponentFactory> listener_factory_;
   MockWorker* worker_ = new MockWorker();
