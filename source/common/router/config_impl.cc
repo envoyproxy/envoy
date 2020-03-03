@@ -134,6 +134,11 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
         TypeUtil::typeUrlToDescriptorFullName(retry_policy.typed_config().type_url())};
     RetryPolicyFactory* factory =
         Registry::FactoryRegistry<RetryPolicyFactory>::getFactoryByType(type);
+
+    if (factory == nullptr) {
+      throw EnvoyException(
+          fmt::format("Didn't find a registered implementation for type: '{}'", type));
+    }
     retry_policy_config_ = std::make_pair(factory, Envoy::Config::Utility::translateToFactoryConfig(
                                                        retry_policy, validation_visitor, *factory));
   }

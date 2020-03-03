@@ -1086,6 +1086,113 @@ TEST_F(RouterRetryStateImplTest, BudgetRuntimeSetOnly) {
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
 }
 
+TEST_F(RouterRetryStateImplTest, SetRetryPolicyExtensionOnly) {
+  Http::TestRequestHeaderMapImpl request_headers;
+  auto retry_policy_extension{std::make_shared<MockRetryPolicyExtension>()};
+  EXPECT_CALL(policy_, retryPolicyExtension(_)).WillRepeatedly(Return(retry_policy_extension));
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+}
+
+TEST_F(RouterRetryStateImplTest, RetryPolicyShouldRetry) {
+  auto retry_policy_extension{std::make_shared<MockRetryPolicyExtension>()};
+  EXPECT_CALL(policy_, retryPolicyExtension(_)).WillRepeatedly(Return(retry_policy_extension));
+
+  auto setup_request = [this]() {
+    Http::TestRequestHeaderMapImpl request_headers;
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+  };
+
+  auto setup_request_with_retry_header = [this]() {
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+  };
+
+  {
+    // Retry policy extension doesn't require retry response
+    // Core retry policy doesn't require retry response
+    setup_request();
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    EXPECT_CALL(*retry_policy_extension, recordResponseHeaders(_)).Times(1);
+    EXPECT_CALL(*retry_policy_extension, shouldRetry()).WillOnce(Return(false));
+    EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(response_headers, callback_));
+  }
+
+  {
+    // Retry policy extension requires retry response
+    // Core retry policy doesn't require retry response
+    setup_request();
+    expectTimerCreateAndEnable();
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    EXPECT_CALL(*retry_policy_extension, recordResponseHeaders(_)).Times(1);
+    EXPECT_CALL(*retry_policy_extension, shouldRetry()).WillOnce(Return(true));
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+  }
+
+  {
+    // Retry policy extension doesn't requires retry response
+    // Core retry policy requires retry response
+    setup_request_with_retry_header();
+    expectTimerCreateAndEnable();
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+    EXPECT_CALL(*retry_policy_extension, recordResponseHeaders(_)).Times(1);
+    EXPECT_CALL(*retry_policy_extension, shouldRetry()).WillOnce(Return(false));
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+  }
+
+  {
+    // Retry policy extension requires requires retry response
+    // Core retry policy requires retry response
+    setup_request_with_retry_header();
+    expectTimerCreateAndEnable();
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+    EXPECT_CALL(*retry_policy_extension, recordResponseHeaders(_)).Times(1);
+    EXPECT_CALL(*retry_policy_extension, shouldRetry()).WillOnce(Return(true));
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+  }
+
+  {
+    // Retry policy extension doesn't requires retry reset
+    // Core retry policy doesn't require retry reset
+    setup_request();
+    EXPECT_CALL(*retry_policy_extension, recordReset(remote_reset_)).Times(1);
+    EXPECT_CALL(*retry_policy_extension, shouldRetry()).WillOnce(Return(false));
+    EXPECT_EQ(RetryStatus::No, state_->shouldRetryReset(remote_reset_, callback_));
+  }
+
+  {
+    // Retry policy extension requires retry reset
+    // Core retry policy doesn't require retry reset
+    setup_request();
+    expectTimerCreateAndEnable();
+    EXPECT_CALL(*retry_policy_extension, recordReset(remote_reset_)).Times(1);
+    EXPECT_CALL(*retry_policy_extension, shouldRetry()).WillOnce(Return(true));
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_reset_, callback_));
+  }
+
+  {
+    // Retry policy extension doesn't require retry reset
+    // Core retry policy requires retry reset
+    setup_request_with_retry_header();
+    expectTimerCreateAndEnable();
+    EXPECT_CALL(*retry_policy_extension, recordReset(remote_reset_)).Times(1);
+    EXPECT_CALL(*retry_policy_extension, shouldRetry()).WillOnce(Return(false));
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_reset_, callback_));
+  }
+
+  {
+    // Retry policy extension requires retry reset
+    // Core retry policy requires retry reset
+    setup_request_with_retry_header();
+    expectTimerCreateAndEnable();
+    EXPECT_CALL(*retry_policy_extension, recordReset(remote_reset_)).Times(1);
+    EXPECT_CALL(*retry_policy_extension, shouldRetry()).WillOnce(Return(true));
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_reset_, callback_));
+  }
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

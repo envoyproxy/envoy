@@ -18,10 +18,16 @@ envoy_cc_test(
     deps = [":config_impl_test_lib"],
 )
 
+envoy_proto_library(
+    name = "retry_policy_proto",
+    srcs = ["retry_policy.proto"],
+)
+
 envoy_cc_test_library(
     name = "config_impl_test_lib",
     srcs = ["config_impl_test.cc"],
     deps = [
+        ":retry_policy_proto_cc_proto",
         ":route_fuzz_proto_cc_proto",
         "//source/common/config:metadata_lib",
         "//source/common/http:header_map_lib",

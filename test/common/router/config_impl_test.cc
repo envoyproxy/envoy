@@ -18,6 +18,7 @@
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 
+#include "test/common/router/retry_policy.pb.h"
 #include "test/common/router/route_fuzz.pb.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
@@ -3053,6 +3054,86 @@ virtual_hosts:
                 .retryOn());
 }
 
+TEST_F(RouteMatcherTest, RetryPolicyExtension) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_on: connect-failure
+        typed_config:
+          "@type": type.googleapis.com/test.common.router.SimpleRetryPolicy
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+  )EOF";
+
+  MockRetryPolicyFactory factory;
+  RetryPolicyExtensionSharedPtr retry_policy{std::make_shared<MockRetryPolicyExtension>()};
+
+  EXPECT_CALL(factory, createEmptyConfigProto())
+      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
+        return ProtobufTypes::MessagePtr{new test::common::router::SimpleRetryPolicy()};
+      }));
+  EXPECT_CALL(factory, createRetryPolicy(_, _)).WillRepeatedly(Return(retry_policy));
+
+  Registry::InjectFactory<RetryPolicyFactory> inject_policy_factory(factory);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .perTryTimeout());
+  EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
+                    ->retryPolicy()
+                    .numRetries());
+  EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE,
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .retryOn());
+
+  EXPECT_EQ(retry_policy, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                              ->routeEntry()
+                              ->retryPolicy()
+                              .retryPolicyExtension(genHeaders("www.lyft.com", "/foo", "GET")));
+
+  EXPECT_EQ(nullptr, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                         ->routeEntry()
+                         ->retryPolicy()
+                         .retryPolicyExtension(genHeaders("www.lyft.com", "/bar", "GET")));
+}
+
+TEST_F(RouteMatcherTest, RetryPolicyExtensionImplementationNotFound) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+      retry_policy:
+        typed_config:
+          "@type": type.googleapis.com/test.common.router.SimpleRetryPolicy
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "Didn't find a registered implementation for type: 'test.common.router.SimpleRetryPolicy'");
+}
+
 // Test route-specific retry back-off intervals.
 TEST_F(RouteMatcherTest, RetryBackOffIntervals) {
   const std::string yaml = R"EOF(
@@ -4081,7 +4162,7 @@ public:
     }
     throw EnvoyException("Cannot create a Baz when metadata is empty.");
   }
-};
+}; // namespace
 
 TEST_F(RouteMatcherTest, WeightedClusters) {
   const std::string yaml = R"EOF(

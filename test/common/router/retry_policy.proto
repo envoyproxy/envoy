@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package test.common.router;
+
+// Extension for testing retry policy.
+
+message SimpleRetryPolicy {
+}

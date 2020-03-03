@@ -132,6 +132,22 @@ public:
   absl::optional<std::chrono::milliseconds> max_interval_{};
 };
 
+class MockRetryPolicyExtension : public RetryPolicyExtension {
+public:
+  MOCK_METHOD(void, recordResponseHeaders, (const Http::HeaderMap&));
+  MOCK_METHOD(void, recordReset, (Http::StreamResetReason));
+  MOCK_METHOD(bool, shouldRetry, (), (const));
+};
+
+class MockRetryPolicyFactory : public RetryPolicyFactory {
+public:
+  MOCK_METHOD(RetryPolicyExtensionSharedPtr, createRetryPolicy,
+              (const Protobuf::Message&, const Http::HeaderMap&));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+
+  std::string name() const override { return "envoy.test_retry_policy"; }
+};
+
 class MockRetryState : public RetryState {
 public:
   MockRetryState();
