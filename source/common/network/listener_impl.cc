@@ -32,7 +32,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
 
   // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
   // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
-  // sockaddr_un associated with the client socket when starting from the server socket.
+  // `sockaddr_un` associated with the client socket when starting from the server socket.
   // We work around this by using our own name for the socket in this case.
   // Pass the 'v6only' parameter as true if the local_address is an IPv6 address. This has no effect
   // if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote address if an
