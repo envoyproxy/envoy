@@ -38,7 +38,8 @@ public:
  * Static registration for the http inspector filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(HttpInspectorConfigFactory,
-                 Server::Configuration::NamedListenerFilterConfigFactory);
+                 Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.http_inspector"};
 
 } // namespace HttpInspector
 } // namespace ListenerFilters

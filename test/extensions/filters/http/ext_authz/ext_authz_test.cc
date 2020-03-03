@@ -67,6 +67,12 @@ public:
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
   }
 
+  void prepareCheck() {
+    ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  }
+
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
@@ -82,12 +88,6 @@ public:
   Network::Address::InstanceConstSharedPtr addr_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   Http::ContextImpl http_context_;
-
-  void prepareCheck() {
-    ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  }
 };
 
 class HttpFilterTest : public HttpFilterTestBase<testing::Test> {
@@ -188,7 +188,7 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value().getStringView(),
                   std::to_string(enumToInt(Http::Code::Forbidden)));
       }));
@@ -225,7 +225,7 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.Status()->value().getStringView(),
                   std::to_string(enumToInt(Http::Code::ServiceUnavailable)));
       }));
@@ -367,7 +367,6 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
-  ;
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));

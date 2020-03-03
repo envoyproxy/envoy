@@ -106,6 +106,7 @@ public:
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
+  void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }

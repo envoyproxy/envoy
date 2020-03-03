@@ -112,7 +112,7 @@ http_filters:
     outer_init_manager_.initialize(init_watcher_);
   }
 
-  RouteConstSharedPtr route(Http::TestHeaderMapImpl headers) {
+  RouteConstSharedPtr route(Http::TestRequestHeaderMapImpl headers) {
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     headers.addCopy("x-forwarded-proto", "http");
     return rds_->config()->route(headers, stream_info, 0);
@@ -579,7 +579,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
       ProtoValidationException);
 }
 
-TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
+TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
               start(_));
@@ -588,7 +588,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
 }
 
-TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
+TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
               start(_));

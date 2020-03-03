@@ -106,7 +106,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LuaIntegrationTest,
 TEST_P(LuaIntegrationTest, CallMetadataDuringLocalReply) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -131,7 +131,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, RequestAndResponse) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -251,7 +251,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -309,7 +309,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -406,7 +406,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, ChangeRoute) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -440,7 +440,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, SurviveMultipleCalls) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |
@@ -476,7 +476,7 @@ typed_config:
 TEST_P(LuaIntegrationTest, SignatureVerification) {
   const std::string FILTER_AND_CODE =
       R"EOF(
-name: envoy.lua
+name: envoy.filters.http.lua
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
   inline_code: |

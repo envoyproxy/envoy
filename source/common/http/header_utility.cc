@@ -166,14 +166,14 @@ void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_a
       &headers);
 }
 
-bool HeaderUtility::isEnvoyInternalRequest(const HeaderMap& headers) {
+bool HeaderUtility::isEnvoyInternalRequest(const RequestHeaderMap& headers) {
   const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
   return internal_request_header != nullptr &&
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
 absl::optional<std::reference_wrapper<const absl::string_view>>
-HeaderUtility::requestHeadersValid(const HeaderMap& headers) {
+HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
       headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {

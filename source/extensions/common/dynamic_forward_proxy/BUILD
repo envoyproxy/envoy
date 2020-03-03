@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "dns_cache_interface",
     hdrs = ["dns_cache.h"],
     deps = [
+        "//include/envoy/common:backoff_strategy_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -39,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/network:dns_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:cleanup_lib",
+        "//source/common/config:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",

@@ -369,7 +369,7 @@ public:
         bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
     transport_socket->set_name("envoy.transport_sockets.tap");
     envoy::config::core::v3::TransportSocket raw_transport_socket;
-    raw_transport_socket.set_name("raw_buffer");
+    raw_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
     envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);

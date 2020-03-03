@@ -137,6 +137,17 @@ envoy_cc_test(
 )
 
 envoy_cc_fuzz_test(
+    name = "stat_merger_fuzz_test",
+    srcs = ["stat_merger_fuzz_test.cc"],
+    corpus = "stat_merger_corpus",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//test/fuzz:utility_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
     name = "symbol_table_fuzz_test",
     srcs = ["symbol_table_fuzz_test.cc"],
     corpus = "symbol_table_corpus",

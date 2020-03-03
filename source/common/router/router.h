@@ -87,7 +87,7 @@ public:
      *         invalid value. If @param target_header doesn't appear in
      *         @param headers, return a result with valid_ set to TRUE.
      */
-    static const HeaderCheckResult checkHeader(Http::HeaderMap& headers,
+    static const HeaderCheckResult checkHeader(Http::RequestHeaderMap& headers,
                                                const Http::LowerCaseString& target_header);
 
     using ParseRetryFlagsFunc = std::function<std::pair<uint32_t, bool>(absl::string_view)>;
@@ -118,7 +118,7 @@ public:
   /**
    * Set the :scheme header based on whether the underline transport is secure.
    */
-  static void setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport);
 
   /**
    * Determine whether a request should be shadowed.
@@ -140,7 +140,7 @@ public:
    * @param grpc_request tells if the request is a gRPC request.
    * @return TimeoutData for both the global and per try timeouts.
    */
-  static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
+  static TimeoutData finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& request_headers,
                                   bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
@@ -155,7 +155,7 @@ public:
    * @return HedgingParams the final parameters to use for request hedging.
    */
   static HedgingParams finalHedgingParams(const RouteEntry& route,
-                                          Http::HeaderMap& request_headers);
+                                          Http::RequestHeaderMap& request_headers);
 };
 
 /**
@@ -299,7 +299,7 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection();
   }
-  const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
+  const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
     // We only care about host selection when performing a retry, at which point we consult the
@@ -477,8 +477,8 @@ private:
     const MonotonicTime start_time_;
     // Copies of upstream headers/trailers. These are only set if upstream
     // access logging is configured.
-    Http::HeaderMapPtr upstream_headers_;
-    Http::HeaderMapPtr upstream_trailers_;
+    Http::ResponseHeaderMapPtr upstream_headers_;
+    Http::ResponseTrailerMapPtr upstream_trailers_;
     Http::MetadataMapVector downstream_metadata_map_vector_;
 
     bool calling_encode_headers_ : 1;
@@ -503,14 +503,15 @@ private:
   StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   Stats::StatName upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
-  void chargeUpstreamCode(uint64_t response_status_code, const Http::HeaderMap& response_headers,
+  void chargeUpstreamCode(uint64_t response_status_code,
+                          const Http::ResponseHeaderMap& response_headers,
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
-                                         Http::HeaderMap& request_headers,
+                                         Http::RequestHeaderMap& request_headers,
                                          const Upstream::ClusterInfo& cluster,
                                          Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                          Event::Dispatcher& dispatcher,
@@ -552,7 +553,7 @@ private:
   void sendNoHealthyUpstreamResponse();
   // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
   bool setupRetry();
-  bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request);
+  bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();
@@ -608,7 +609,7 @@ public:
 
 private:
   // Filter
-  RetryStatePtr createRetryState(const RetryPolicy& policy, Http::HeaderMap& request_headers,
+  RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;

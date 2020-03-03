@@ -26,7 +26,7 @@ static_resources:
                 decorator:
                   operation: checkAvailability
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
   - address:
       socket_address:
@@ -54,7 +54,7 @@ static_resources:
                 decorator:
                   operation: checkStock
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
   clusters:
   - name: local_service

@@ -316,8 +316,8 @@ address:
     address: 127.0.0.1
     port_value: 1234
 listener_filters:
-- name: envoy.listener.tls_inspector
-- name: envoy.listener.original_dst
+- name: envoy.filters.listener.tls_inspector
+- name: envoy.filters.listener.original_dst
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
@@ -1107,8 +1107,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  Api::OsSysCallsImpl os_syscall;
-  auto syscall_result = os_syscall.socket(AF_INET, SOCK_STREAM, 0);
+  auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
@@ -1145,8 +1144,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  Api::OsSysCallsImpl os_syscall;
-  auto syscall_result = os_syscall.socket(AF_INET, SOCK_STREAM, 0);
+  auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
@@ -1721,7 +1719,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -1767,7 +1765,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -1813,7 +1811,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -1860,7 +1858,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -1902,7 +1900,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -1946,7 +1944,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2001,7 +1999,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2057,7 +2055,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2097,7 +2095,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2141,7 +2139,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2208,7 +2206,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
-  // EXTERNAL TLS client without "http/1.1" ALPN - using 3nd filter chain.
+  // EXTERNAL TLS client without "http/1.1" ALPN - using 3rd filter chain.
   filter_chain = findFilterChain(1234, "8.8.8.8", "", "tls", {}, "4.4.4.4", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
@@ -2224,7 +2222,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2285,7 +2283,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
-  // IPv4 client connects to port 8081 - using 3nd filter chain.
+  // IPv4 client connects to port 8081 - using 3rd filter chain.
   filter_chain = findFilterChain(8081, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
@@ -2310,7 +2308,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2371,7 +2369,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
-  // IPv4 client connects to wildcard IP match - using 3nd filter chain.
+  // IPv4 client connects to wildcard IP match - using 3rd filter chain.
   filter_chain = findFilterChain(1234, "192.168.1.1", "", "tls", {}, "192.168.1.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
@@ -2396,7 +2394,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2467,7 +2465,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
   EXPECT_EQ(server_names.size(), 1);
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
-  // TLS client with wildcard SNI match - using 3nd filter chain.
+  // TLS client with wildcard SNI match - using 3rd filter chain.
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "server2.example.com", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
@@ -2478,7 +2476,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
   EXPECT_EQ(server_names.size(), 2);
   EXPECT_EQ(server_names.front(), "*.example.com");
 
-  // TLS client with wildcard SNI match - using 3nd filter chain.
+  // TLS client with wildcard SNI match - using 3rd filter chain.
   filter_chain =
       findFilterChain(1234, "127.0.0.1", "www.wildcard.com", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
@@ -2495,7 +2493,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2540,7 +2538,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2586,7 +2584,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2645,7 +2643,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2689,7 +2687,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2729,7 +2727,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2746,7 +2744,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServe
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2765,7 +2763,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2787,7 +2785,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -2809,7 +2807,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
@@ -3109,8 +3107,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
     filter_chains:
     - filter_chain_match:
       filters:
-      - name: envoy.filters.network.http_connection_manager
-        config:
+      - name: http
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: metadata_test
           route_config:
             virtual_hosts:
@@ -3125,7 +3124,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   auto context = dynamic_cast<Configuration::FactoryContext*>(&manager_->listeners().front().get());
   ASSERT_NE(nullptr, context);
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
+            Config::Metadata::metadataValue(&context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
   EXPECT_EQ(envoy::config::core::v3::INBOUND, context->direction());
 }
@@ -3136,7 +3135,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains: {}
     listener_filters:
-    - name: "envoy.listener.original_dst"
+    - name: "envoy.filters.listener.original_dst"
       config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);

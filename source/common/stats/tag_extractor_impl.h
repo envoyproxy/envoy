@@ -28,7 +28,7 @@ public:
   TagExtractorImpl(const std::string& name, const std::string& regex,
                    const std::string& substr = "");
   std::string name() const override { return name_; }
-  bool extractTag(absl::string_view tag_extracted_name, std::vector<Tag>& tags,
+  bool extractTag(absl::string_view tag_extracted_name, TagVector& tags,
                   IntervalSet<size_t>& remove_characters) const override;
   absl::string_view prefixToken() const override { return prefix_; }
 

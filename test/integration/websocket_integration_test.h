@@ -21,11 +21,10 @@ protected:
                       const Http::TestResponseHeaderMapImpl& upgrade_response_headers);
   void sendBidirectionalData();
 
-  void validateUpgradeRequestHeaders(const Http::HeaderMap& proxied_request_headers,
-                                     const Http::HeaderMap& original_request_headers);
-  void validateUpgradeResponseHeaders(const Http::HeaderMap& proxied_response_headers,
-                                      const Http::HeaderMap& original_response_headers);
-  void commonValidate(Http::HeaderMap& proxied_headers, const Http::HeaderMap& original_headers);
+  void validateUpgradeRequestHeaders(const Http::RequestHeaderMap& proxied_request_headers,
+                                     const Http::RequestHeaderMap& original_request_headers);
+  void validateUpgradeResponseHeaders(const Http::ResponseHeaderMap& proxied_response_headers,
+                                      const Http::ResponseHeaderMap& original_response_headers);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult waitForUpstreamDisconnectOrReset() {

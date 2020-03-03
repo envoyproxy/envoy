@@ -24,6 +24,7 @@ namespace Runtime {
 // problem of the bugs being found after the old code path has been removed.
 constexpr const char* runtime_features[] = {
     // Enabled
+    "envoy.reloadable_features.http1_flood_protection",
     "envoy.reloadable_features.test_feature_true",
     "envoy.reloadable_features.strict_header_validation",
     "envoy.reloadable_features.connection_header_sanitization",
@@ -32,6 +33,8 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_method_validation",
     "envoy.reloadable_features.new_http1_connection_pool_behavior",
     "envoy.reloadable_features.new_http2_connection_pool_behavior",
+    "envoy.deprecated_features.allow_deprecated_extension_names",
+    "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher",
 };
 
 // This is a section for officially sanctioned runtime features which are too

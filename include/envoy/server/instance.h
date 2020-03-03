@@ -220,6 +220,13 @@ public:
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
+   * Flush the stats sinks outside of a flushing interval.
+   * Note: stats flushing may not be synchronous.
+   * Therefore, this function may return prior to flushing taking place.
+   */
+  virtual void flushStats() PURE;
+
+  /**
    * @return ProtobufMessage::ValidationContext& validation context for configuration
    *         messages.
    */
