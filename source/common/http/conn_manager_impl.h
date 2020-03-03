@@ -745,6 +745,7 @@ private:
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
   void handleCodecException(const char* error);
+  void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type);
 
   enum class DrainState { NotDraining, Draining, Closing };
 
