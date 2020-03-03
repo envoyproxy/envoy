@@ -22,7 +22,7 @@ protected:
 
 constexpr static int32_t UPDATE_COUNT = 42;
 
-TEST_F(MetricsIntegrationTest, shouldUpdateRequestMetrics) {
+TEST_F(MetricsIntegrationTest, ShouldUpdateRequestMetrics) {
   for (int16_t api_key = 0; api_key < MessageUtilities::apiKeys(); ++api_key) {
     // given
     // when
@@ -36,7 +36,7 @@ TEST_F(MetricsIntegrationTest, shouldUpdateRequestMetrics) {
   };
 }
 
-TEST_F(MetricsIntegrationTest, shouldHandleUnparseableRequest) {
+TEST_F(MetricsIntegrationTest, ShouldHandleUnparseableRequest) {
   // given
   // when
   for (int i = 0; i < UPDATE_COUNT; ++i) {
@@ -47,7 +47,7 @@ TEST_F(MetricsIntegrationTest, shouldHandleUnparseableRequest) {
   ASSERT_EQ(scope_.counter("kafka.prefix.request.unknown").value(), UPDATE_COUNT);
 }
 
-TEST_F(MetricsIntegrationTest, shouldUpdateResponseMetrics) {
+TEST_F(MetricsIntegrationTest, ShouldUpdateResponseMetrics) {
   for (int16_t api_key = 0; api_key < MessageUtilities::apiKeys(); ++api_key) {
     // given
     // when
@@ -61,7 +61,7 @@ TEST_F(MetricsIntegrationTest, shouldUpdateResponseMetrics) {
   };
 }
 
-TEST_F(MetricsIntegrationTest, shouldHandleUnparseableResponse) {
+TEST_F(MetricsIntegrationTest, ShouldHandleUnparseableResponse) {
   // given
   // when
   for (int i = 0; i < UPDATE_COUNT; ++i) {

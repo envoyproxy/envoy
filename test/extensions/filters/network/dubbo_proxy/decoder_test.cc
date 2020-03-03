@@ -219,7 +219,7 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
   EXPECT_EQ(buffer_underflow, true);
 }
 
-TEST_F(DubboDecoderTest, decodeResponseMessage) {
+TEST_F(DubboDecoderTest, DecodeResponseMessage) {
   Buffer::OwnedImpl buffer;
   buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
 

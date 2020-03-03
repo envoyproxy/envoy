@@ -64,7 +64,7 @@ public:
   Protobuf::Map<std::string, uint64_t> empty_gauges_;
 };
 
-TEST_F(StatMergerTest, counterMerge) {
+TEST_F(StatMergerTest, CounterMerge) {
   // Child's value of the counter might already be non-zero by the first merge.
   store_.counter("draculaer").inc();
   EXPECT_EQ(1, store_.counter("draculaer").latch());
@@ -97,14 +97,14 @@ TEST_F(StatMergerTest, counterMerge) {
   EXPECT_EQ(4, store_.counter("draculaer").latch());
 }
 
-TEST_F(StatMergerTest, basicDefaultAccumulationImport) {
+TEST_F(StatMergerTest, BasicDefaultAccumulationImport) {
   Protobuf::Map<std::string, uint64_t> gauges;
   gauges["whywassixafraidofseven"] = 111;
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
   EXPECT_EQ(789, whywassixafraidofseven_.value());
 }
 
-TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
+TEST_F(StatMergerTest, MultipleImportsWithAccumulationLogic) {
   {
     Protobuf::Map<std::string, uint64_t> gauges;
     gauges["whywassixafraidofseven"] = 100;
@@ -140,7 +140,7 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
 
 // Stat names that have NoImport logic should leave the child gauge value alone upon import, even if
 // the child has that gauge undefined.
-TEST_F(StatMergerTest, exclusionsNotImported) {
+TEST_F(StatMergerTest, ExclusionsNotImported) {
   Gauge& some_sort_of_version =
       store_.gauge("some.sort.of.version", Gauge::ImportMode::NeverImport);
   some_sort_of_version.set(12345);
@@ -202,7 +202,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
 }
 
 // Targeted test of GaugeImpl::mergeImportMode().
-TEST_F(StatMergerTest, gaugeMergeImportMode) {
+TEST_F(StatMergerTest, GaugeMergeImportMode) {
   mergeTest("newgauge1", Gauge::ImportMode::Accumulate, Gauge::ImportMode::Accumulate);
   mergeTest("s1.version", Gauge::ImportMode::NeverImport, Gauge::ImportMode::NeverImport);
   mergeTest("newgauge2", Gauge::ImportMode::Uninitialized, Gauge::ImportMode::Accumulate);
@@ -329,7 +329,7 @@ protected:
   ThreadLocalStoreImpl store_{alloc_};
 };
 
-TEST_F(StatMergerThreadLocalTest, filterOutUninitializedGauges) {
+TEST_F(StatMergerThreadLocalTest, FilterOutUninitializedGauges) {
   Gauge& g1 = store_.gauge("newgauge1", Gauge::ImportMode::Uninitialized);
   Gauge& g2 = store_.gauge("newgauge2", Gauge::ImportMode::Accumulate);
   std::vector<GaugeSharedPtr> gauges = store_.gauges();
@@ -345,7 +345,7 @@ TEST_F(StatMergerThreadLocalTest, filterOutUninitializedGauges) {
 
 // When the parent sends us counters we haven't ourselves instantiated, they should be stored
 // temporarily, but then uninstantiated if hot restart ends without the child accessing them.
-TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
+TEST_F(StatMergerThreadLocalTest, NewStatFromParent) {
   {
     StatMerger stat_merger(store_);
 
@@ -375,7 +375,7 @@ TEST_F(StatMergerThreadLocalTest, newStatFromParent) {
 // Verify that if we create a stat in the child process which then gets merged
 // from the parent, that we retain the import-mode, accumulating the updated
 // value. https://github.com/envoyproxy/envoy/issues/7227
-TEST_F(StatMergerThreadLocalTest, retainImportModeAfterMerge) {
+TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
   Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::Accumulate);
   gauge.set(42);
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
@@ -394,7 +394,7 @@ TEST_F(StatMergerThreadLocalTest, retainImportModeAfterMerge) {
 // Verify that if we create a never import stat in the child process which then gets merged
 // from the parent, that we retain the import-mode, and don't accumulate the updated
 // value. https://github.com/envoyproxy/envoy/issues/7227
-TEST_F(StatMergerThreadLocalTest, retainNeverImportModeAfterMerge) {
+TEST_F(StatMergerThreadLocalTest, RetainNeverImportModeAfterMerge) {
   Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::NeverImport);
   gauge.set(42);
   EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge.importMode());

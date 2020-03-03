@@ -20,7 +20,7 @@ protected:
 
 // Tests that the macros produce something in the report that includes the categories
 // and descriptions.
-TEST_F(PerfAnnotationTest, testMacros) {
+TEST_F(PerfAnnotationTest, TestMacros) {
   PERF_OPERATION(perf);
   PERF_RECORD(perf, "alpha", "0");
   PERF_RECORD(perf, "beta", "1");
@@ -39,7 +39,7 @@ TEST_F(PerfAnnotationTest, testMacros) {
 }
 
 // More detailed report-format testing, directly using the class.
-TEST_F(PerfAnnotationTest, testFormat) {
+TEST_F(PerfAnnotationTest, TestFormat) {
   PerfAnnotationContext* context = PerfAnnotationContext::getOrCreate();
   for (int i = 0; i < 4; ++i) {
     context->record(std::chrono::microseconds{1000 + 100 * i}, "alpha", "1");

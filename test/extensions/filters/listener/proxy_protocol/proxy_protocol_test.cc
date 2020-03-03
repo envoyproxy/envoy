@@ -193,7 +193,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ProxyProtocolTest, v1Basic) {
+TEST_P(ProxyProtocolTest, V1Basic) {
   connect();
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
 
@@ -205,7 +205,7 @@ TEST_P(ProxyProtocolTest, v1Basic) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v1Minimal) {
+TEST_P(ProxyProtocolTest, V1Minimal) {
   connect();
   write("PROXY UNKNOWN\r\nmore data");
 
@@ -221,7 +221,7 @@ TEST_P(ProxyProtocolTest, v1Minimal) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2Basic) {
+TEST_P(ProxyProtocolTest, V2Basic) {
   // A well-formed ipv4/tcp message, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -250,7 +250,7 @@ TEST_P(ProxyProtocolTest, BasicV6) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2BasicV6) {
+TEST_P(ProxyProtocolTest, V2BasicV6) {
   // A well-formed ipv6/tcp message, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
                                 0x0a, 0x21, 0x22, 0x00, 0x24, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
@@ -269,7 +269,7 @@ TEST_P(ProxyProtocolTest, v2BasicV6) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2UnsupportedAF) {
+TEST_P(ProxyProtocolTest, V2UnsupportedAF) {
   // A well-formed message with an unsupported address family
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x41, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -281,7 +281,7 @@ TEST_P(ProxyProtocolTest, v2UnsupportedAF) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, errorRecv_2) {
+TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   // A well formed v4/tcp message, no extensions, but introduce an error on recv (e.g. socket close)
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -338,7 +338,7 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
+TEST_P(ProxyProtocolTest, ErrorFIONREAD_1) {
   // A well formed v4/tcp message, no extensions, but introduce an error on ioctl(...FIONREAD...)
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -387,7 +387,7 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2NotLocalOrOnBehalf) {
+TEST_P(ProxyProtocolTest, V2NotLocalOrOnBehalf) {
   // An illegal command type: neither 'local' nor 'proxy' command
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x23, 0x1f, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -399,7 +399,7 @@ TEST_P(ProxyProtocolTest, v2NotLocalOrOnBehalf) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2LocalConnection) {
+TEST_P(ProxyProtocolTest, V2LocalConnection) {
   // A 'local' connection, e.g. health-checking, no address, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
                                 0x49, 0x54, 0x0a, 0x20, 0x00, 0x00, 0x00, 'm',  'o',
@@ -418,7 +418,7 @@ TEST_P(ProxyProtocolTest, v2LocalConnection) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2LocalConnectionExtension) {
+TEST_P(ProxyProtocolTest, V2LocalConnectionExtension) {
   // A 'local' connection, e.g. health-checking, no address, 1 TLV (0x00,0x00,0x01,0xff) is present.
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x20, 0x00, 0x00, 0x04, 0x00, 0x00, 0x01, 0xff,
@@ -437,7 +437,7 @@ TEST_P(ProxyProtocolTest, v2LocalConnectionExtension) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2ShortV4) {
+TEST_P(ProxyProtocolTest, V2ShortV4) {
   // An ipv4/tcp connection that has incorrect addr-len encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
@@ -448,7 +448,7 @@ TEST_P(ProxyProtocolTest, v2ShortV4) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ShortAddrV4) {
+TEST_P(ProxyProtocolTest, V2ShortAddrV4) {
   // An ipv4/tcp connection that has insufficient header-length encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0b, 0x01, 0x02, 0x03, 0x04,
@@ -460,7 +460,7 @@ TEST_P(ProxyProtocolTest, v2ShortAddrV4) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ShortV6) {
+TEST_P(ProxyProtocolTest, V2ShortV6) {
   // An ipv6/tcp connection that has incorrect addr-len encoded
   constexpr uint8_t buffer[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x22, 0x00,
@@ -472,7 +472,7 @@ TEST_P(ProxyProtocolTest, v2ShortV6) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ShortAddrV6) {
+TEST_P(ProxyProtocolTest, V2ShortAddrV6) {
   // An ipv6/tcp connection that has insufficient header-length encoded
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
                                 0x0a, 0x21, 0x22, 0x00, 0x23, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
@@ -486,7 +486,7 @@ TEST_P(ProxyProtocolTest, v2ShortAddrV6) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2AF_UNIX) {
+TEST_P(ProxyProtocolTest, V2AF_UNIX) {
   // A well-formed AF_UNIX (0x32 in b14) connection is rejected
   constexpr uint8_t buffer[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x32, 0x00,
@@ -498,7 +498,7 @@ TEST_P(ProxyProtocolTest, v2AF_UNIX) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2BadCommand) {
+TEST_P(ProxyProtocolTest, V2BadCommand) {
   // A non local/proxy command (0x29 in b13) is rejected
   constexpr uint8_t buffer[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x29, 0x32, 0x00,
@@ -510,7 +510,7 @@ TEST_P(ProxyProtocolTest, v2BadCommand) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2WrongVersion) {
+TEST_P(ProxyProtocolTest, V2WrongVersion) {
   // A non '2' version is rejected (0x93 in b13)
   constexpr uint8_t buffer[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x93, 0x00,
@@ -521,7 +521,7 @@ TEST_P(ProxyProtocolTest, v2WrongVersion) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v1TooLong) {
+TEST_P(ProxyProtocolTest, V1TooLong) {
   constexpr uint8_t buffer[] = {' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '};
   connect(false);
   write("PROXY TCP4 1.2.3.4 2.3.4.5 100 100");
@@ -531,7 +531,7 @@ TEST_P(ProxyProtocolTest, v1TooLong) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ParseExtensions) {
+TEST_P(ProxyProtocolTest, V2ParseExtensions) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
@@ -551,7 +551,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensions) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
+TEST_P(ProxyProtocolTest, V2ParseExtensionsIoctlError) {
   // A well-formed ipv4/tcp with a TLV extension. An error is created in the ioctl(...FIONREAD...)
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04,
@@ -618,7 +618,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2ParseExtensionsFrag) {
+TEST_P(ProxyProtocolTest, V2ParseExtensionsFrag) {
   // A well-formed ipv4/tcp header with 2 TLV/extensions, these are fragmented on delivery
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
@@ -657,7 +657,7 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2Fragmented1) {
+TEST_P(ProxyProtocolTest, V2Fragmented1) {
   // A well-formed ipv4/tcp header, delivering part of the signature, then part of
   // the address, then the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -678,7 +678,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented1) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2Fragmented2) {
+TEST_P(ProxyProtocolTest, V2Fragmented2) {
   // A well-formed ipv4/tcp header, delivering all of the signature + 1, then the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -699,7 +699,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented2) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
+TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
   // A well-formed ipv4/tcp header, delivering all of the signature +1, w/ an error
   // simulated in recv() on the +1
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -763,7 +763,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
+TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   // A well-formed ipv4/tcp header, part of the signature with an error introduced
   // in recv() on the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -849,7 +849,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, v2PartialRead) {
+TEST_P(ProxyProtocolTest, V2PartialRead) {
   // A well-formed ipv4/tcp header, delivered with part of the signature,
   // part of the header, rest of header + body
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,

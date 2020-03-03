@@ -40,7 +40,7 @@ protected:
   Api::ApiPtr api_;
 };
 
-TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
+TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
@@ -48,7 +48,7 @@ TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
                EnvoyException);
 }
 
-TEST_F(ProtobufUtilityTest, convertPercentNaN) {
+TEST_F(ProtobufUtilityTest, ConvertPercentNaN) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
@@ -59,7 +59,7 @@ TEST_F(ProtobufUtilityTest, convertPercentNaN) {
 
 namespace ProtobufPercentHelper {
 
-TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
+TEST_F(ProtobufUtilityTest, EvaluateFractionalPercent) {
   { // 0/100 (default)
     envoy::type::v3::FractionalPercent percent;
     EXPECT_FALSE(evaluateFractionalPercent(percent, 0));

@@ -56,7 +56,7 @@ RequestParseResponse consumeOneByte(absl::string_view& data) {
   return RequestParseResponse::stillWaiting();
 }
 
-TEST_F(RequestCodecUnitTest, shouldDoNothingIfParserReturnsWaiting) {
+TEST_F(RequestCodecUnitTest, ShouldDoNothingIfParserReturnsWaiting) {
   // given
   putGarbageIntoBuffer();
 
@@ -77,7 +77,7 @@ TEST_F(RequestCodecUnitTest, shouldDoNothingIfParserReturnsWaiting) {
   // There were no interactions with `callback_`.
 }
 
-TEST_F(RequestCodecUnitTest, shouldUseNewParserAsResponse) {
+TEST_F(RequestCodecUnitTest, ShouldUseNewParserAsResponse) {
   // given
   putGarbageIntoBuffer();
 
@@ -104,7 +104,7 @@ TEST_F(RequestCodecUnitTest, shouldUseNewParserAsResponse) {
   // Also, there were no interactions with `callback_`.
 }
 
-TEST_F(RequestCodecUnitTest, shouldPassParsedMessageToCallback) {
+TEST_F(RequestCodecUnitTest, ShouldPassParsedMessageToCallback) {
   // given
   putGarbageIntoBuffer();
 
@@ -134,7 +134,7 @@ TEST_F(RequestCodecUnitTest, shouldPassParsedMessageToCallback) {
   // Also, `callback_` had `onMessage` invoked once with matching argument.
 }
 
-TEST_F(RequestCodecUnitTest, shouldPassParsedMessageToCallbackAndInitializeNextParser) {
+TEST_F(RequestCodecUnitTest, ShouldPassParsedMessageToCallbackAndInitializeNextParser) {
   // given
   putGarbageIntoBuffer();
 
@@ -165,7 +165,7 @@ TEST_F(RequestCodecUnitTest, shouldPassParsedMessageToCallbackAndInitializeNextP
   // Also, `callback_` had `onMessage` invoked once with matching argument.
 }
 
-TEST_F(RequestCodecUnitTest, shouldPassParseFailureDataToCallback) {
+TEST_F(RequestCodecUnitTest, ShouldPassParseFailureDataToCallback) {
   // given
   putGarbageIntoBuffer();
 

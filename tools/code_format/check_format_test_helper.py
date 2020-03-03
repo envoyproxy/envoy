@@ -218,6 +218,8 @@ def runChecks():
       "Unable to find package name for proto file: ./api/missing_package.proto")
   errors += checkUnfixableError("proto_enum_mangling.cc",
                                 "Don't use mangled Protobuf names for enum constants")
+  errors += checkUnfixableError("test_naming.cc",
+                                "Test names should be CamelCase, starting with a capital letter")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",

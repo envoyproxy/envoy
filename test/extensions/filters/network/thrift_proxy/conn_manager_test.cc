@@ -1336,7 +1336,7 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
   EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
-TEST_F(ThriftConnectionManagerTest, transportEndWhenRemoteClose) {
+TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   initializeFilter();
   writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 

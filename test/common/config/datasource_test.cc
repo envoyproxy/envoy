@@ -30,7 +30,7 @@ protected:
   Api::ApiPtr api_;
 };
 
-TEST_F(AsyncDataSourceTest, loadLocalDataSource) {
+TEST_F(AsyncDataSourceTest, LoadLocalDataSource) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -63,7 +63,7 @@ TEST_F(AsyncDataSourceTest, loadLocalDataSource) {
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceReturnFailure) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -107,7 +107,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceReturnFailure) {
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWith503) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -152,7 +152,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWith503) {
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWithEmptyBody) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -198,7 +198,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWithEmptyBody) {
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessIncorrectSha256) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -248,7 +248,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessIncorrectSha256) {
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccess) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -298,7 +298,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccess) {
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectNetworkFailure) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceExpectNetworkFailure) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -338,7 +338,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectNetworkFailure) {
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmptyExpectNetworkFailure) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmptyExpectNetworkFailure) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -375,7 +375,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmptyExpectNetworkFail
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceExpectInvalidData) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -417,7 +417,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
   EXPECT_NE(nullptr, provider.get());
 }
 
-TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {
+TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
   const std::string body = "hello world";
   std::string async_data = "non-empty";
   std::unique_ptr<Config::DataSource::RemoteAsyncDataProvider> provider;

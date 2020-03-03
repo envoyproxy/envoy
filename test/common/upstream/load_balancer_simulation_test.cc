@@ -241,31 +241,31 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 
-TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {
+TEST_F(DISABLED_SimulationTest, StrictlyEqualDistribution) {
   run({1U, 1U, 1U}, {3U, 3U, 3U}, {3U, 3U, 3U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution) {
   run({1U, 1U, 1U}, {2U, 5U, 5U}, {2U, 5U, 5U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution2) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution2) {
   run({1U, 1U, 1U}, {5U, 5U, 6U}, {5U, 5U, 6U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution3) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution3) {
   run({1U, 1U, 1U}, {10U, 10U, 10U}, {10U, 8U, 8U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution4) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution4) {
   run({20U, 20U, 21U}, {4U, 5U, 5U}, {4U, 5U, 5U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution5) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution5) {
   run({3U, 2U, 5U}, {4U, 5U, 5U}, {4U, 5U, 5U});
 }
 
-TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
+TEST_F(DISABLED_SimulationTest, UnequalZoneDistribution6) {
   run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U});
 }
 
