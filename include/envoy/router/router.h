@@ -48,7 +48,7 @@ public:
    * @param headers supplies the response headers, which may be modified during this call.
    * @param stream_info holds additional information about the request.
    */
-  virtual void finalizeResponseHeaders(Http::HeaderMap& headers,
+  virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
@@ -71,7 +71,7 @@ public:
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
    *         or an empty string otherwise.
    */
-  virtual std::string newPath(const Http::HeaderMap& headers) const PURE;
+  virtual std::string newPath(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Returns the response body to send with direct responses.
@@ -87,7 +87,7 @@ public:
    * @param headers supplies the request headers, which may be modified during this call.
    * @param insert_envoy_original_path insert x-envoy-original-path header?
    */
-  virtual void rewritePathHeader(Http::HeaderMap& headers,
+  virtual void rewritePathHeader(Http::RequestHeaderMap& headers,
                                  bool insert_envoy_original_path) const PURE;
 
   /**
@@ -156,7 +156,7 @@ public:
    *
    * @param response_header response header.
    */
-  virtual void recordResponseHeaders(const Http::HeaderMap& response_header) PURE;
+  virtual void recordResponseHeaders(const Http::ResponseHeaderMap& response_header) PURE;
 
   /**
    * Called when an upstream request failed due to a reset.
@@ -314,7 +314,7 @@ public:
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
-  virtual RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
+  virtual RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                          DoRetryCallback callback) PURE;
 
   /**
@@ -325,7 +325,7 @@ public:
    * @param response_headers supplies the response headers.
    * @return bool true if a retry would be warranted based on the retry policy.
    */
-  virtual bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers) PURE;
+  virtual bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) PURE;
 
   /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
@@ -665,7 +665,7 @@ public:
    * @param stream_info holds additional information about the request.
    * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
-  virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
+  virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       bool insert_envoy_original_path) const PURE;
 
@@ -971,7 +971,7 @@ public:
    *        allows stable choices between calls if desired.
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual RouteConstSharedPtr route(const Http::HeaderMap& headers,
+  virtual RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const PURE;
 

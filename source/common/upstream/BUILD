@@ -422,6 +422,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/filters/network/common:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/server:transport_socket_config_lib",
     ],

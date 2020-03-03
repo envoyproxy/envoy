@@ -156,7 +156,7 @@ public:
                Stats::ScopePtr&& listener_scope));
   MOCK_METHOD(Http::Code, request,
               (absl::string_view path_and_query, absl::string_view method,
-               Http::HeaderMap& response_headers, std::string& body));
+               Http::ResponseHeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
 
   NiceMock<MockConfigTracker> config_tracker_;
@@ -170,7 +170,7 @@ public:
   MOCK_METHOD(void, setEndStreamOnComplete, (bool));
   MOCK_METHOD(void, addOnDestroyCallback, (std::function<void()>));
   MOCK_METHOD(const Buffer::Instance*, getRequestBody, (), (const));
-  MOCK_METHOD(Http::HeaderMap&, getRequestHeaders, (), (const));
+  MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const));
   MOCK_METHOD(NiceMock<Http::MockStreamDecoderFilterCallbacks>&, getDecoderFilterCallbacks, (),
               (const));
 };

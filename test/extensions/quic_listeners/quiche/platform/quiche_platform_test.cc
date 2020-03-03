@@ -7,6 +7,7 @@
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_arraysize.h"
 #include "quiche/common/platform/api/quiche_endian.h"
+#include "quiche/common/platform/api/quiche_optional.h"
 #include "quiche/common/platform/api/quiche_ptr_util.h"
 #include "quiche/common/platform/api/quiche_string_piece.h"
 
@@ -26,6 +27,13 @@ TEST(QuichePlatformTest, StringPiece) {
 TEST(QuichePlatformTest, WrapUnique) {
   auto p = QuicheWrapUnique(new int(6));
   EXPECT_EQ(6, *p);
+}
+
+TEST(QuichePlatformTest, TestQuicheOptional) {
+  QuicheOptional<int32_t> maybe_a;
+  EXPECT_FALSE(maybe_a.has_value());
+  maybe_a = 1;
+  EXPECT_EQ(1, *maybe_a);
 }
 
 } // namespace quiche

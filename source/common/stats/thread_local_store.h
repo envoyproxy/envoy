@@ -6,6 +6,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
@@ -32,8 +33,8 @@ namespace Stats {
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
-                           const std::string& tag_extracted_name, const std::vector<Tag>& tags,
-                           SymbolTable& symbol_table);
+                           const std::string& tag_extracted_name,
+                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -80,7 +81,8 @@ class TlsScope;
 class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent, TlsScope& tls_scope,
-                      absl::string_view tag_extracted_name, const std::vector<Tag>& tags);
+                      absl::string_view tag_extracted_name,
+                      const StatNameTagVector& stat_name_tags);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -142,6 +144,7 @@ public:
   /**
    * @return a ThreadLocalHistogram within the scope's namespace.
    * @param name name of the histogram with scope prefix attached.
+   * @param parent the parent histogram.
    */
   virtual Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) PURE;
 };
@@ -158,22 +161,25 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override {
-    return default_scope_->counterFromStatName(name);
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptRef tags) override {
+    return default_scope_->counterFromStatNameWithTags(name, tags);
   }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromStatName(name, import_mode);
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                   Gauge::ImportMode import_mode) override {
+    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gauge(name, import_mode);
   }
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
-    return default_scope_->histogramFromStatName(name, unit);
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                           Histogram::Unit unit) override {
+    return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     return default_scope_->histogram(name, unit);
@@ -278,10 +284,13 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterFromStatName(StatName name) override;
+    Counter& counterFromStatNameWithTags(const StatName& name,
+                                         StatNameTagVectorOptRef tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
+    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                     Gauge::ImportMode import_mode) override;
+    Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                             Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
@@ -313,21 +322,25 @@ private:
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(Allocator&, StatName name,
                                                            absl::string_view tag_extracted_name,
-                                                           const std::vector<Tag>& tags)>;
+                                                           const StatNameTagVector& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
      * generating it from the parent allocator, or as a last
      * result, creating it with the heap allocator.
      *
-     * @param name the full name of the stat (not tag extracted).
+     * @param full_stat_name the full name of the stat with appended tags.
+     * @param name_no_tags the full name of the stat (not tag extracted) without appended tags.
+     * @param stat_name_tags the tags provided at creation time. If empty, tag extraction occurs.
      * @param central_cache_map a map from name to the desired object in the central cache.
      * @param make_stat a function to generate the stat object, called if it's not in cache.
      * @param tls_ref possibly null reference to a cache entry for this stat, which will be
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType& safeMakeStat(StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
+    StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
+                           const absl::optional<StatNameTagVector>& stat_name_tags,
+                           StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
@@ -366,7 +379,7 @@ private:
     absl::flat_hash_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
-  std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
+  std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);

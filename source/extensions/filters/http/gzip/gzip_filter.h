@@ -147,15 +147,15 @@ private:
   // the logic in these private member functions would be available in another class.
   friend class GzipFilterTest;
 
-  bool hasCacheControlNoTransform(Http::HeaderMap& headers) const;
-  bool isAcceptEncodingAllowed(Http::HeaderMap& headers) const;
-  bool isContentTypeAllowed(Http::HeaderMap& headers) const;
-  bool isEtagAllowed(Http::HeaderMap& headers) const;
-  bool isMinimumContentLength(Http::HeaderMap& headers) const;
-  bool isTransferEncodingAllowed(Http::HeaderMap& headers) const;
+  bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
+  bool isAcceptEncodingAllowed(Http::RequestHeaderMap& headers) const;
+  bool isContentTypeAllowed(Http::ResponseHeaderMap& headers) const;
+  bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
+  bool isMinimumContentLength(Http::ResponseHeaderMap& headers) const;
+  bool isTransferEncodingAllowed(Http::ResponseHeaderMap& headers) const;
 
-  void sanitizeEtagHeader(Http::HeaderMap& headers);
-  void insertVaryHeader(Http::HeaderMap& headers);
+  void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
+  void insertVaryHeader(Http::ResponseHeaderMap& headers);
 
   bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;

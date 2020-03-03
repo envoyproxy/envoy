@@ -52,6 +52,7 @@ envoy_cc_library(
         ":stats_lib",
         ":store_impl_lib",
         ":symbol_table_creator_lib",
+        ":tag_utility_lib",
         "//include/envoy/stats:stats_macros",
         "//source/common/stats:allocator_lib",
     ],
@@ -65,6 +66,17 @@ envoy_cc_library(
         ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "tag_utility_lib",
+    srcs = ["tag_utility.cc"],
+    hdrs = ["tag_utility.h"],
+    deps = [
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:symbol_table_interface",
     ],
 )
 
@@ -232,6 +244,7 @@ envoy_cc_library(
         ":stats_lib",
         ":stats_matcher_lib",
         ":tag_producer_lib",
+        ":tag_utility_lib",
         "//include/envoy/thread_local:thread_local_interface",
     ],
 )

@@ -120,7 +120,7 @@ private:
     ConnectionCallbackImpl connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
-    Http::HeaderMapPtr response_headers_;
+    Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
     Network::Address::InstanceConstSharedPtr local_address_;

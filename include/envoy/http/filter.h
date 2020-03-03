@@ -304,7 +304,7 @@ public:
    *
    * @return a reference to the newly created trailers map.
    */
-  virtual HeaderMap& addDecodedTrailers() PURE;
+  virtual RequestTrailerMap& addDecodedTrailers() PURE;
 
   /**
    * Create a locally generated response using the provided response_code and body_text parameters.
@@ -642,7 +642,7 @@ public:
    *
    * @return a reference to the newly created trailers map.
    */
-  virtual HeaderMap& addEncodedTrailers() PURE;
+  virtual ResponseTrailerMap& addEncodedTrailers() PURE;
 
   /**
    * Adds new metadata to be encoded.
