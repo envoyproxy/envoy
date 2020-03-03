@@ -45,8 +45,8 @@ struct AdmissionControlStats {
 class ThreadLocalController : public ThreadLocal::ThreadLocalObject {
 public:
   ThreadLocalController(TimeSource& time_source, std::chrono::seconds sampling_window);
-  void recordSuccess() { recordRequest(true); }
-  void recordFailure() { recordRequest(false); }
+  virtual void recordSuccess() { recordRequest(true); }
+  virtual void recordFailure() { recordRequest(false); }
 
   virtual uint32_t requestTotalCount() {
     maybeUpdateHistoricalData();
@@ -88,17 +88,19 @@ public:
       envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
   AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
                                TimeSource& time_source, Runtime::RandomGenerator& random,
-                               Stats::Scope& scope, ThreadLocal::SlotAllocator& tls);
+                               Stats::Scope& scope, ThreadLocal::SlotPtr&& tls);
+  virtual ~AdmissionControlFilterConfig() {}
+
+  virtual ThreadLocalController& getController() const {
+    return tls_->getTyped<ThreadLocalController>();
+  }
 
   Runtime::Loader& runtime() const { return runtime_; }
   Runtime::RandomGenerator& random() const { return random_; }
   bool filterEnabled() const { return admission_control_feature_.enabled(); }
   TimeSource& timeSource() const { return time_source_; }
   Stats::Scope& scope() const { return scope_; }
-  std::chrono::seconds samplingWindow() const { return sampling_window_; }
   double aggression() const;
-
-  ThreadLocalController& getController() const { return tls_->getTyped<ThreadLocalController>(); }
 
 private:
   Runtime::Loader& runtime_;
@@ -107,7 +109,6 @@ private:
   Stats::Scope& scope_;
   const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;
-  std::chrono::seconds sampling_window_;
   std::unique_ptr<Runtime::Double> aggression_;
 };
 

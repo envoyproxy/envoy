@@ -23,24 +23,17 @@ namespace HttpFilters {
 namespace AdmissionControl {
 
 static constexpr double defaultAggression = 2.0;
-static constexpr std::chrono::seconds defaultSamplingWindow{120};
 static constexpr std::chrono::seconds defaultHistoryGranularity{1};
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource& time_source,
-    Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotAllocator& tls)
+    Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotPtr&& tls)
     : runtime_(runtime), time_source_(time_source), random_(random), scope_(scope),
-      tls_(tls.allocateSlot()), admission_control_feature_(proto_config.enabled(), runtime_),
-      sampling_window_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, sampling_window,
-                                                  1000 * defaultSamplingWindow.count()) /
-                       1000),
+      tls_(std::move(tls)), admission_control_feature_(proto_config.enabled(), runtime_),
       aggression_(
           proto_config.has_aggression_coefficient()
               ? std::make_unique<Runtime::Double>(proto_config.aggression_coefficient(), runtime_)
               : nullptr) {
-  tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalController>(time_source_, sampling_window_);
-  });
 }
 
 double AdmissionControlFilterConfig::aggression() const {
@@ -76,14 +69,12 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
     if (status_code < 500) {
       config_->getController().recordSuccess();
       deferred_sample_task_->cancel();
+    } else {
+      deferred_sample_task_.reset();
     }
   }
   return Http::FilterHeadersStatus::Continue;
 }
-
-ThreadLocalController::ThreadLocalController(TimeSource& time_source,
-                                             std::chrono::seconds sampling_window)
-    : time_source_(time_source), sampling_window_(sampling_window) {}
 
 bool AdmissionControlFilter::shouldRejectRequest() const {
   const double total = config_->getController().requestTotalCount();
@@ -92,8 +83,13 @@ bool AdmissionControlFilter::shouldRejectRequest() const {
 
   // Choosing an accuracy of 4 significant figures for the probability.
   static constexpr uint64_t accuracy = 1e4;
-  return (accuracy * std::max(probability, 0.0)) > (config_->random().random() % accuracy);
+  auto r = config_->random().random();
+  return (accuracy * std::max(probability, 0.0)) > (r % accuracy);
 }
+
+ThreadLocalController::ThreadLocalController(TimeSource& time_source,
+                                             std::chrono::seconds sampling_window)
+    : time_source_(time_source), sampling_window_(sampling_window) {}
 
 void ThreadLocalController::maybeUpdateHistoricalData() {
   const MonotonicTime now = time_source_.monotonicTime();

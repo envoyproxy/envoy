@@ -41,8 +41,13 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlFilterConfig::AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
-    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_,
-                                                          scope_, context_.threadLocal());
+    auto tls = context_.threadLocal().allocateSlot();
+    tls->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<ThreadLocalController>(time_system_, std::chrono::seconds(10));
+    });
+    return std::make_shared<AdmissionControlFilterConfig>(
+        proto, runtime_, time_system_, random_,
+        scope_, std::move(tls));
   }
 
 protected:
@@ -60,8 +65,12 @@ public:
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
     AdmissionControlFilterConfig::AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
+    auto tls = context_.threadLocal().allocateSlot();
+    tls->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return std::make_shared<ThreadLocalController>(time_system_, std::chrono::seconds(10));
+    });
     return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_system_, random_,
-                                                          scope_, context_.threadLocal());
+                                                          scope_, std::move(tls));
   }
 
   void setupFilter(std::shared_ptr<AdmissionControlFilterConfig> config) {
@@ -211,7 +220,6 @@ aggression_coefficient:
   auto config = makeConfig(yaml);
 
   EXPECT_FALSE(config->filterEnabled());
-  EXPECT_EQ(std::chrono::seconds(1337), config->samplingWindow());
   EXPECT_EQ(4.2, config->aggression());
 }
 
@@ -226,7 +234,6 @@ enabled:
   auto config = makeConfig(yaml);
 
   EXPECT_TRUE(config->filterEnabled());
-  EXPECT_EQ(std::chrono::seconds(120), config->samplingWindow());
   EXPECT_EQ(2.0, config->aggression());
 }
 
