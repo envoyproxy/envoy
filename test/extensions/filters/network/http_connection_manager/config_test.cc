@@ -990,7 +990,7 @@ http_filters:
   )EOF";
 };
 
-TEST_F(FilterChainTest, createFilterChain) {
+TEST_F(FilterChainTest, CreateFilterChain) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(basic_config_), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
@@ -1002,7 +1002,7 @@ TEST_F(FilterChainTest, createFilterChain) {
 }
 
 // Tests where upgrades are configured on via the HCM.
-TEST_F(FilterChainTest, createUpgradeFilterChain) {
+TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
@@ -1048,7 +1048,7 @@ TEST_F(FilterChainTest, createUpgradeFilterChain) {
 }
 
 // Tests where upgrades are configured off via the HCM.
-TEST_F(FilterChainTest, createUpgradeFilterChainHCMDisabled) {
+TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
   hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
@@ -1086,7 +1086,7 @@ TEST_F(FilterChainTest, createUpgradeFilterChainHCMDisabled) {
   }
 }
 
-TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
+TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   auto websocket_config = hcm_config.add_upgrade_configs();
   websocket_config->set_upgrade_type("websocket");
@@ -1132,7 +1132,7 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
   }
 }
 
-TEST_F(FilterChainTest, createCustomUpgradeFilterChainWithRouterNotLast) {
+TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
   auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   auto websocket_config = hcm_config.add_upgrade_configs();
   websocket_config->set_upgrade_type("websocket");
@@ -1157,7 +1157,7 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChainWithRouterNotLast) {
       EnvoyException, "Error: envoy.filters.http.router must be the terminal http upgrade filter.");
 }
 
-TEST_F(FilterChainTest, invalidConfig) {
+TEST_F(FilterChainTest, InvalidConfig) {
   auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("WEBSOCKET");
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
