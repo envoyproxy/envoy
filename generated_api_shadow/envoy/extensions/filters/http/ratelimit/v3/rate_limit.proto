@@ -40,7 +40,8 @@ message RateLimit {
   // :ref:`x-envoy-internal<config_http_conn_man_headers_x-envoy-internal>` is not set or false, a
   // request is considered external. The filter defaults to *both*, and it will apply to all request
   // types.
-  string request_type = 3;
+  string request_type = 3
+      [(validate.rules).string = {in: "internal" in: "external" in: "both" in: ""}];
 
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
