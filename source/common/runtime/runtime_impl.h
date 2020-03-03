@@ -97,7 +97,6 @@ public:
   double getDouble(absl::string_view key, double default_value) const override;
   bool getBoolean(absl::string_view key, bool value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
-  bool exists(absl::string_view key) const override { return values_.contains(key); }
 
   static Entry createEntry(const std::string& value);
   static Entry createEntry(const ProtobufWkt::Value& value);

@@ -200,9 +200,9 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_FALSE(loader_->snapshot().get("invalid").has_value());
 
   // Existence checking.
-  EXPECT_EQ(true, loader_->snapshot().exists("file2"));
-  EXPECT_EQ(true, loader_->snapshot().exists("subdir.file3"));
-  EXPECT_EQ(false, loader_->snapshot().exists("invalid"));
+  EXPECT_EQ(true, loader_->snapshot().get("file2").has_value());
+  EXPECT_EQ(true, loader_->snapshot().get("subdir.file3").has_value());
+  EXPECT_EQ(false, loader_->snapshot().get("invalid").has_value());
 
   // Integer getting.
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));

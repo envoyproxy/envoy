@@ -18,9 +18,7 @@ MockSnapshot::MockSnapshot() {
   ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getDouble(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getBoolean(_, _)).WillByDefault(ReturnArg<1>());
-  static const std::string value;
-  ON_CALL(*this, get(_)).WillByDefault(Return(value));
-  ON_CALL(*this, exists(_)).WillByDefault(Return(false));
+  ON_CALL(*this, get(_)).WillByDefault(Return(absl::nullopt));
 }
 
 MockSnapshot::~MockSnapshot() = default;
