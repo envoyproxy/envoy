@@ -275,12 +275,15 @@ public:
  * Listener Filter
  */
 
-/* A mapping from a general listener filter */
+/**
+ *  A mapping from a general listener filter message without `typed_config`.
+ **/
 class ListenerFilterConfig {
 public:
   virtual ~ListenerFilterConfig() = default;
   virtual bool disabledPredicate() PURE;
 };
+
 using ListenerFilterConfigSharedPtr = std::shared_ptr<ListenerFilterConfig>;
 class ListenerFilter {
 public:
