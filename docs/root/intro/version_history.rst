@@ -32,6 +32,7 @@ Version history
   restart Envoy. The behavior will not switch until the connection pools are recreated. The new
   circuit breaker behavior is described :ref:`here <arch_overview_circuit_break>`.
 * upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`.
+* tls: added configuration to disable TLS session tickets :ref:`disable_session_tickets <envoy_api_field_auth.DownstreamTlsContext.disable_session_tickets>`
 
 1.13.0 (January 20, 2020)
 =========================
