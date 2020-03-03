@@ -119,7 +119,6 @@ public:
 
   StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine, Http::HeaderMap& headers,
                       bool end_stream, Filter& filter, FilterCallbacks& callbacks);
-  ~StreamHandleWrapper();
 
   Http::FilterHeadersStatus start(int function_ref);
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
@@ -291,7 +290,6 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
-  NoopCallbacks* noopCallbacks_;
 };
 
 /**
@@ -299,8 +297,6 @@ private:
  */
 class NoopCallbacks : public Http::AsyncClient::Callbacks {
 public:
-  NoopCallbacks();
-
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::ResponseMessagePtr&&) override {}
 
