@@ -158,8 +158,8 @@ private:
    * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
    * @param 3 (string): Body. Can be nil.
    * @param 4 (int): Timeout in milliseconds for the call.
-   * @param 5 (bool): Flag. If true, filter continues without waiting for HTTP response from
-   * upstream service. False/synchronous by default.
+   * @param 5 (bool): Optional flag. If true, filter continues without waiting for HTTP response
+   * from upstream service. False/synchronous by default.
    * @return headers (table), body (string/nil)
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCall);
