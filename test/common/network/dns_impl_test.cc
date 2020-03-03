@@ -124,7 +124,7 @@ private:
         // Get host name from query and use the name to lookup a record
         // in a host map. If the query type is of type A, then perform the lookup in
         // the hosts_a_ host map. If the query type is of type AAAA, then perform the
-        // lookup in the hosts_aaaa_ host map.
+        // lookup in the `hosts_aaaa_` host map.
         char* name;
         ASSERT_EQ(ARES_SUCCESS, ares_expand_name(question, request, size_, &name, &name_len));
         const std::list<std::string>* ips = nullptr;

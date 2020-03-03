@@ -138,6 +138,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
   // byte.
   // Any packet that doesn't belong to any of the three packet header types are dispatched
   // based on 5-tuple source/destination addresses.
+  // SPELLCHECKER(off)
   std::vector<sock_filter> filter = {
       {0x80, 0, 0, 0000000000}, //                   ld len
       {0x35, 0, 9, 0x00000009}, //                   jlt #0x9, packet_too_short
@@ -155,6 +156,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
       {0x94, 0, 0, concurrency_}, // return:         mod #socket_count
       {0x16, 0, 0, 0000000000},   //                 ret a
   };
+  // SPELLCHECKER(on)
   sock_fprog prog;
   // This option only needs to be applied once to any one of the sockets in SO_REUSEPORT socket
   // group. One of the listener will be created with this socket option.
