@@ -8,6 +8,8 @@
 
 #include "gtest/gtest.h"
 
+using Envoy::Http::HeaderValueOf;
+
 namespace Envoy {
 namespace {
 
@@ -393,6 +395,8 @@ typed_config:
 
   waitForNextUpstreamRequest();
 
+  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Path, "/"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
 
