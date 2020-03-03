@@ -1,9 +1,9 @@
-#include "common/grpc/google_grpc_stat_names.h"
+#include "common/grpc/stat_names.h"
 
 namespace Envoy {
 namespace Grpc {
 
-GoogleGrpcStatNames::GoogleGrpcStatNames(Stats::SymbolTable& symbol_table)
+StatNames::StatNames(Stats::SymbolTable& symbol_table)
     : pool_(symbol_table), streams_total_(pool_.add("streams_total")) {
   for (uint32_t i = 0; i <= Status::WellKnownGrpcStatus::MaximumKnown; ++i) {
     std::string status_str = absl::StrCat(i);

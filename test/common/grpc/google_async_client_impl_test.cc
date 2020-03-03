@@ -71,7 +71,7 @@ public:
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  GoogleGrpcStatNames stat_names_;
+  StatNames stat_names_;
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
 };
 

@@ -33,7 +33,7 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                ThreadLocal::Instance& tls, TimeSource& time_source,
-                                               Api::Api& api, const GoogleGrpcStatNames& stat_names)
+                                               Api::Api& api, const StatNames& stat_names)
     : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names) {
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
@@ -50,8 +50,7 @@ RawAsyncClientPtr AsyncClientFactoryImpl::create() {
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot, Stats::Scope& scope,
-    const envoy::config::core::v3::GrpcService& config, Api::Api& api,
-    const GoogleGrpcStatNames& stat_names)
+    const envoy::config::core::v3::GrpcService& config, Api::Api& api, const StatNames& stat_names)
     : tls_(tls), google_tls_slot_(google_tls_slot),
       scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
       config_(config), api_(api), stat_names_(stat_names) {

@@ -220,7 +220,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       subscription_factory_(local_info, main_thread_dispatcher, *this, random,
                             validation_context.dynamicValidationVisitor(), api) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-      *this, tls, time_source_, api, grpc_context.googleGrpcStatNames());
+      *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();

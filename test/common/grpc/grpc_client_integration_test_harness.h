@@ -427,7 +427,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   DispatcherHelper dispatcher_helper_{*dispatcher_};
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
-  Grpc::GoogleGrpcStatNames google_grpc_stat_names_{stats_store_->symbolTable()};
+  Grpc::StatNames google_grpc_stat_names_{stats_store_->symbolTable()};
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;

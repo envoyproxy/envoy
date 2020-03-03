@@ -9,8 +9,13 @@
 namespace Envoy {
 namespace Grpc {
 
-struct GoogleGrpcStatNames {
-  GoogleGrpcStatNames(Stats::SymbolTable& symbol_table);
+/**
+ * Captures symbolized representation for tokens used in grpc stats. These are
+ * broken out so they can be allocated early and used across all gRPC-related
+ * filters.
+ */
+struct StatNames {
+  StatNames(Stats::SymbolTable& symbol_table);
 
   Stats::StatNamePool pool_;
   Stats::StatName streams_total_;

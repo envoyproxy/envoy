@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Grpc {
 
-struct GoogleGrpcStatNames;
+struct StatNames;
 
 /**
  * Captures grpc-related structures with cardinality of one per server.
@@ -82,9 +82,9 @@ public:
                                          const RequestNames& request_names, uint64_t amount) PURE;
 
   /**
-   * @return a struct containing StatNames for google RPC stat tokens.
+   * @return a struct containing StatNames for gRPC stat tokens.
    */
-  virtual GoogleGrpcStatNames& googleGrpcStatNames() PURE;
+  virtual StatNames& statNames() PURE;
 };
 
 using ContextPtr = std::unique_ptr<Context>;

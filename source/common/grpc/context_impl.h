@@ -7,7 +7,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/hash.h"
-#include "common/grpc/google_grpc_stat_names.h"
+#include "common/grpc/stat_names.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/types/optional.h"
@@ -50,7 +50,7 @@ public:
     return protocol == Context::Protocol::Grpc ? grpc_ : grpc_web_;
   }
 
-  GoogleGrpcStatNames& googleGrpcStatNames() override { return google_grpc_stat_names_; }
+  StatNames& statNames() override { return stat_names_; }
 
 private:
   // Makes a stat name from a string, if we don't already have one for it.
@@ -74,7 +74,7 @@ private:
   const Stats::StatName request_message_count_;
   const Stats::StatName response_message_count_;
 
-  GoogleGrpcStatNames google_grpc_stat_names_;
+  StatNames stat_names_;
 };
 
 } // namespace Grpc
