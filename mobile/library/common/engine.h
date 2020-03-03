@@ -28,6 +28,13 @@ public:
 
   Http::Dispatcher& httpDispatcher();
 
+  /**
+   * Flush the stats sinks outside of a flushing interval.
+   * Note: stats flushing may not be synchronous.
+   * Therefore, this function may return prior to flushing taking place.
+   */
+  void flushStats();
+
 private:
   envoy_status_t run(std::string config, std::string log_level);
 
@@ -35,9 +42,10 @@ private:
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
   std::thread main_thread_;
-  std::unique_ptr<Envoy::Http::Dispatcher> http_dispatcher_;
-  std::unique_ptr<Envoy::MainCommon> main_common_ GUARDED_BY(mutex_);
-  Envoy::Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
+  std::unique_ptr<Http::Dispatcher> http_dispatcher_;
+  std::unique_ptr<MainCommon> main_common_ GUARDED_BY(mutex_);
+  Server::Instance* server_;
+  Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
   Event::Dispatcher* event_dispatcher_;
 };
 

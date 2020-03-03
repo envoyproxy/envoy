@@ -92,6 +92,14 @@ envoy_engine_t init_engine();
 envoy_status_t set_preferred_network(envoy_network_t network);
 
 /**
+ * Flush the stats sinks outside of a flushing interval.
+ * Note: flushing before the engine has started will result in a no-op.
+ * Note: stats flushing may not be synchronous.
+ * Therefore, this function may return prior to flushing taking place.
+ */
+void flush_stats();
+
+/**
  * External entry point for library.
  * @param engine, handle to the engine to run.
  * @param callbacks, the callbacks that will run the engine callbacks.
