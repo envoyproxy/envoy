@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/time.h"
+#include "envoy/common/pure.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -42,17 +43,28 @@ struct AdmissionControlStats {
  * The lookback window for request samples is accurate up to a hard-coded 1-second granularity.
  * TODO (tonya11en): Allow the granularity to be configurable.
  */
-class ThreadLocalController : public ThreadLocal::ThreadLocalObject {
+class ThreadLocalController {
 public:
-  ThreadLocalController(TimeSource& time_source, std::chrono::seconds sampling_window);
-  virtual void recordSuccess() { recordRequest(true); }
-  virtual void recordFailure() { recordRequest(false); }
+  virtual ~ThreadLocalController() = default;
+  virtual void recordSuccess() PURE;
+  virtual void recordFailure() PURE;
+  virtual uint32_t requestTotalCount() PURE;
+  virtual uint32_t requestSuccessCount() PURE;
+};
 
-  virtual uint32_t requestTotalCount() {
+class ThreadLocalControllerImpl : public ThreadLocalController,
+                              public ThreadLocal::ThreadLocalObject {
+public:
+  ThreadLocalControllerImpl(TimeSource& time_source, std::chrono::seconds sampling_window);
+  ~ThreadLocalControllerImpl() {}
+  virtual void recordSuccess() override { recordRequest(true); }
+  virtual void recordFailure() override { recordRequest(false); }
+
+  virtual uint32_t requestTotalCount() override {
     maybeUpdateHistoricalData();
     return global_data_.requests;
   }
-  virtual uint32_t requestSuccessCount() {
+  virtual uint32_t requestSuccessCount() override {
     maybeUpdateHistoricalData();
     return global_data_.successes;
   }
@@ -92,7 +104,7 @@ public:
   virtual ~AdmissionControlFilterConfig() {}
 
   virtual ThreadLocalController& getController() const {
-    return tls_->getTyped<ThreadLocalController>();
+    return tls_->getTyped<ThreadLocalControllerImpl>();
   }
 
   Runtime::Loader& runtime() const { return runtime_; }

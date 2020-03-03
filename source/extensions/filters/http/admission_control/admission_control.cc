@@ -87,11 +87,11 @@ bool AdmissionControlFilter::shouldRejectRequest() const {
   return (accuracy * std::max(probability, 0.0)) > (r % accuracy);
 }
 
-ThreadLocalController::ThreadLocalController(TimeSource& time_source,
+ThreadLocalControllerImpl::ThreadLocalControllerImpl(TimeSource& time_source,
                                              std::chrono::seconds sampling_window)
     : time_source_(time_source), sampling_window_(sampling_window) {}
 
-void ThreadLocalController::maybeUpdateHistoricalData() {
+void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {
   const MonotonicTime now = time_source_.monotonicTime();
 
   // Purge stale samples.
@@ -110,7 +110,7 @@ void ThreadLocalController::maybeUpdateHistoricalData() {
   }
 }
 
-void ThreadLocalController::recordRequest(const bool success) {
+void ThreadLocalControllerImpl::recordRequest(const bool success) {
   maybeUpdateHistoricalData();
 
   // The back of the deque will be the most recent samples.
