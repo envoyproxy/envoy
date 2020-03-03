@@ -65,7 +65,7 @@ protected:
   }
 };
 
-TEST_F(AsyncDataSourceTest, loadLocalDataSource) {
+TEST_F(AsyncDataSourceTest, LoadLocalDataSource) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -96,7 +96,7 @@ TEST_F(AsyncDataSourceTest, loadLocalDataSource) {
   EXPECT_EQ(async_data, "xxxxxx");
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceReturnFailure) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -135,7 +135,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceReturnFailure) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWith503) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -175,7 +175,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWith503) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWithEmptyBody) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -215,7 +215,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessWithEmptyBody) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessIncorrectSha256) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -260,7 +260,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccessIncorrectSha256) {
   EXPECT_EQ(async_data, EMPTY_STRING);
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccess) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -301,7 +301,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceSuccess) {
   EXPECT_EQ(async_data, body);
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmpty) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -336,7 +336,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmpty) {
   EXPECT_EQ(async_data, "non-empty");
 }
 
-TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {
+TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
   const std::string body = "hello world";
   std::string async_data = "non-empty";
 
@@ -379,7 +379,7 @@ TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {
   EXPECT_EQ(async_data, body);
 }
 
-TEST_F(AsyncDataSourceTest, loadRemoteDataSourceWithRetry) {
+TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(
@@ -444,7 +444,7 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceWithRetry) {
   EXPECT_EQ(async_data, body);
 }
 
-TEST_F(AsyncDataSourceTest, baseIntervalGreaterThanMaxInterval) {
+TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
   AsyncDataSourcePb config;
 
   std::string yaml = R"EOF(

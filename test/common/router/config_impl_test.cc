@@ -4859,7 +4859,7 @@ virtual_hosts:
 
 class RoutePropertyTest : public testing::Test, public ConfigImplTestBase {};
 
-TEST_F(RoutePropertyTest, excludeVHRateLimits) {
+TEST_F(RoutePropertyTest, ExcludeVHRateLimits) {
   std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
