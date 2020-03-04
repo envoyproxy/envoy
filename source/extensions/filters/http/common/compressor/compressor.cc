@@ -216,7 +216,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
           absl::EqualsIgnoreCase("q", StringUtil::trim(StringUtil::cropRight(params, "=")))) {
         auto result = absl::SimpleAtof(StringUtil::trim(q_value), &pair.second);
         if (!result) {
-          // Skip unparsable q-value.
+          // Skip not parseable q-value.
           continue;
         }
       }
