@@ -163,7 +163,7 @@ public:
   }
 
 private:
-  bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
+  const bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
 };
 
 // Serializes a number into a uint8_t array, and check that it de-serializes to

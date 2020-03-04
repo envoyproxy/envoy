@@ -205,7 +205,7 @@ private:
   }
 };
 class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
-private:
+protected:
   Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
 };
 
