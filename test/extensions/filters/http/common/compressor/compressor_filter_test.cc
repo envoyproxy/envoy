@@ -207,7 +207,7 @@ TEST_F(CompressorFilterTest, AcceptanceTestEncodingWithTrailers) {
 }
 
 // Verifies hasCacheControlNoTransform function.
-TEST_F(CompressorFilterTest, hasCacheControlNoTransform) {
+TEST_F(CompressorFilterTest, HasCacheControlNoTransform) {
   {
     Http::TestResponseHeaderMapImpl headers = {{"cache-control", "no-cache"}};
     EXPECT_FALSE(hasCacheControlNoTransform(headers));
@@ -223,7 +223,7 @@ TEST_F(CompressorFilterTest, hasCacheControlNoTransform) {
 }
 
 // Verifies that compression is skipped when cache-control header has no-transform value.
-TEST_F(CompressorFilterTest, hasCacheControlNoTransformNoCompression) {
+TEST_F(CompressorFilterTest, HasCacheControlNoTransformNoCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "test;q=1, deflate"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-transform"}});
@@ -231,20 +231,20 @@ TEST_F(CompressorFilterTest, hasCacheControlNoTransformNoCompression) {
 
 // Verifies that compression is NOT skipped when cache-control header does NOT have no-transform
 // value.
-TEST_F(CompressorFilterTest, hasCacheControlNoTransformCompression) {
+TEST_F(CompressorFilterTest, HasCacheControlNoTransformCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "test, deflate"}}, true);
   doResponseCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-cache"}}, false);
 }
 
-TEST_F(CompressorFilterTest, noAcceptEncodingHeader) {
+TEST_F(CompressorFilterTest, NoAcceptEncodingHeader) {
   doRequest({{":method", "get"}, {}}, true);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
   EXPECT_EQ(1, stats_.counter("test.test.no_accept_header").value());
 }
 
 // Verifies isAcceptEncodingAllowed function.
-TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
+TEST_F(CompressorFilterTest, IsAcceptEncodingAllowed) {
   {
     EXPECT_TRUE(isAcceptEncodingAllowed("deflate, test, br"));
     EXPECT_EQ(1, stats_.counter("test.test.header_compressor_used").value());
@@ -481,7 +481,7 @@ TEST_F(CompressorFilterTest, AcceptEncodingCompression) {
 }
 
 // Verifies isMinimumContentLength function.
-TEST_F(CompressorFilterTest, isMinimumContentLength) {
+TEST_F(CompressorFilterTest, IsMinimumContentLength) {
   {
     Http::TestResponseHeaderMapImpl headers = {{"content-length", "31"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
@@ -528,7 +528,7 @@ TEST_F(CompressorFilterTest, ContentLengthCompression) {
 }
 
 // Verifies isContentTypeAllowed function.
-TEST_F(CompressorFilterTest, isContentTypeAllowed) {
+TEST_F(CompressorFilterTest, IsContentTypeAllowed) {
 
   {
     Http::TestResponseHeaderMapImpl headers = {{"content-type", "text/html"}};
@@ -642,7 +642,7 @@ TEST_F(CompressorFilterTest, ContentTypeCompression) {
 }
 
 // Verifies sanitizeEtagHeader function.
-TEST_F(CompressorFilterTest, sanitizeEtagHeader) {
+TEST_F(CompressorFilterTest, SanitizeEtagHeader) {
   {
     std::string etag_header{R"EOF(W/"686897696a7c876b7e")EOF"};
     Http::TestResponseHeaderMapImpl headers = {{"etag", etag_header}};
@@ -663,7 +663,7 @@ TEST_F(CompressorFilterTest, sanitizeEtagHeader) {
 }
 
 // Verifies isEtagAllowed function.
-TEST_F(CompressorFilterTest, isEtagAllowed) {
+TEST_F(CompressorFilterTest, IsEtagAllowed) {
   {
     Http::TestResponseHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_TRUE(isEtagAllowed(headers));
@@ -721,7 +721,7 @@ TEST_F(CompressorFilterTest, EtagCompression) {
 }
 
 // Verifies isTransferEncodingAllowed function.
-TEST_F(CompressorFilterTest, isTransferEncodingAllowed) {
+TEST_F(CompressorFilterTest, IsTransferEncodingAllowed) {
   {
     Http::TestResponseHeaderMapImpl headers = {};
     EXPECT_TRUE(isTransferEncodingAllowed(headers));
@@ -796,7 +796,7 @@ TEST_F(CompressorFilterTest, EmptyResponse) {
 }
 
 // Verifies insertVaryHeader function.
-TEST_F(CompressorFilterTest, insertVaryHeader) {
+TEST_F(CompressorFilterTest, InsertVaryHeader) {
   {
     Http::TestResponseHeaderMapImpl headers = {};
     insertVaryHeader(headers);
