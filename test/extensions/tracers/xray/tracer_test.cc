@@ -141,7 +141,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
   Tracer tracer{span_name, std::move(broker_), server_.timeSource()};
   auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
   auto* header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_NE(header, nullptr);
@@ -154,7 +154,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
   constexpr auto span_name = "my span";
   Tracer tracer{span_name, std::move(broker_), server_.timeSource()};
   auto span = tracer.createNonSampledSpan();
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
   auto* header = request_headers.get(Http::LowerCaseString{XRayTraceHeader});
   ASSERT_NE(header, nullptr);

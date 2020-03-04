@@ -177,10 +177,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "b6e04123e801dc8204d9bcab5716ec92a510a770546fca823e6f399dc920479d",
-        strip_prefix = "jwt_verify_lib-2d8dfd2dd5b715536af2531e107bde995796f749",
-        # 2020-01-08
-        urls = ["https://github.com/google/jwt_verify_lib/archive/2d8dfd2dd5b715536af2531e107bde995796f749.tar.gz"],
+        sha256 = "d422a6eadd4bcdd0f9b122cd843a4015f8b18aebea6e1deb004bd4d401a8ef92",
+        strip_prefix = "jwt_verify_lib-40e2cc938f4bcd059a97dc6c73f59ecfa5a71bac",
+        # 2020-02-11
+        urls = ["https://github.com/google/jwt_verify_lib/archive/40e2cc938f4bcd059a97dc6c73f59ecfa5a71bac.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -270,9 +270,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/372452f3cea7ef3888eb1bedb19a041a037fd7a7.tar.gz
-        sha256 = "4993b776fe596f141366d62f09c1f8e91be9f968631477a8e8e1432f0569391c",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/372452f3cea7ef3888eb1bedb19a041a037fd7a7.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/38cc1ee6a89a4d0b52cf2a611bdc09312bcd2c5c.tar.gz
+        sha256 = "aadef7fd47d35d2a690e0238bf61cb2394a9a290023233f0a4736772a738d437",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/38cc1ee6a89a4d0b52cf2a611bdc09312bcd2c5c.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "b4eaf871d4910c599bb70eaef2eec852747989f15f26885353b7c5188a940ca8",

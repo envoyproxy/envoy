@@ -66,21 +66,21 @@ private:
  * @param headers supplies the headers to append to.
  * @param remote_address supplies the remote address to append.
  */
-void appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address);
+void appendXff(RequestHeaderMap& headers, const Network::Address::Instance& remote_address);
 
 /**
  * Append to via header.
  * @param headers supplies the headers to append to.
  * @param via supplies the via header to append.
  */
-void appendVia(HeaderMap& headers, const std::string& via);
+void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
 
 /**
  * Creates an SSL (https) redirect path based on the input host and path headers.
  * @param headers supplies the request headers.
  * @return std::string the redirect path.
  */
-std::string createSslRedirectPath(const HeaderMap& headers);
+std::string createSslRedirectPath(const RequestHeaderMap& headers);
 
 /**
  * Parse a URL into query parameters.
@@ -161,7 +161,7 @@ bool isH2UpgradeRequest(const HeaderMap& headers);
  * - Connection: Upgrade
  * - Upgrade: websocket
  */
-bool isWebSocketUpgradeRequest(const HeaderMap& headers);
+bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * @return Http2Settings An Http2Settings populated from the
@@ -228,7 +228,7 @@ struct GetLastAddressFromXffInfo {
  * @return GetLastAddressFromXffInfo information about the last address in the XFF header.
  *         @see GetLastAddressFromXffInfo for more information.
  */
-GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_headers,
+GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
                                                 uint32_t num_to_skip = 0);
 
 /**

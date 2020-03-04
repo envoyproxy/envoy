@@ -4,11 +4,13 @@
 #include <unordered_map>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/stats/histogram.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -326,6 +328,36 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   ASSERT_TRUE(found_histogram2.has_value());
   EXPECT_EQ(&h2, &found_histogram2->get());
 
+  StatNameManagedStorage tag_key("a", *symbol_table_);
+  StatNameManagedStorage tag_value("b", *symbol_table_);
+  StatNameTagVector tags{{StatName(tag_key.statName()), StatName(tag_value.statName())}};
+
+  const TagVector expectedTags = {Tag{"a", "b"}};
+
+  {
+    StatNameManagedStorage storage("c3", *symbol_table_);
+    Counter& counter = scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags);
+    EXPECT_EQ(expectedTags, counter.tags());
+    EXPECT_EQ(&counter, &scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags));
+  }
+  {
+    StatNameManagedStorage storage("g3", *symbol_table_);
+    Gauge& gauge = scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                     Gauge::ImportMode::Accumulate);
+    EXPECT_EQ(expectedTags, gauge.tags());
+    EXPECT_EQ(&gauge, &scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                         Gauge::ImportMode::Accumulate));
+  }
+  {
+    StatNameManagedStorage storage("h3", *symbol_table_);
+    Histogram& histogram = scope1->histogramFromStatNameWithTags(
+        StatName(storage.statName()), tags, Stats::Histogram::Unit::Unspecified);
+    EXPECT_EQ(expectedTags, histogram.tags());
+    EXPECT_EQ(&histogram,
+              &scope1->histogramFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                     Stats::Histogram::Unit::Unspecified));
+  }
+
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);
   scope1->deliverHistogramToSinks(h2, 200);
@@ -478,7 +510,7 @@ class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase {};
 
 TEST_F(LookupWithStatNameTest, All) {
   ScopePtr scope1 = store_->createScope("scope1.");
-  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
+  Counter& c1 = store_->Store::counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -487,7 +519,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_->Store::gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -497,7 +529,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
 
   Histogram& h1 =
-      store_->histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+      store_->Store::histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
   Histogram& h2 =
       scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
@@ -1368,7 +1400,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
     main_dispatch_block();
 
     // Here we show that the counter cleanups have finished, because the use-count is 1.
-    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
+    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", StatNameTagVector{});
     EXPECT_EQ(1, counter->use_count()) << "index=" << i;
   }
 }
@@ -1392,7 +1424,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
     // running the test: NumScopes*NumThreads*NumIters == 70000, We use a timer
     // so we don't time out on asan/tsan tests, In opt builds this test takes
     // less than a second, and in fastbuild it takes less than 5.
-    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
+    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", StatNameTagVector{});
     uint32_t use_count = counter->use_count() - 1; // Subtract off this instance.
     EXPECT_EQ((i + 1) * NumScopes * NumThreads, use_count);
   }

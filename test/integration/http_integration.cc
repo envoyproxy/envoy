@@ -331,8 +331,8 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
 }
 
 void HttpIntegrationTest::sendRequestAndVerifyResponse(
-    const Http::TestHeaderMapImpl& request_headers, const int request_size,
-    const Http::TestHeaderMapImpl& response_headers, const int response_size,
+    const Http::TestRequestHeaderMapImpl& request_headers, const int request_size,
+    const Http::TestResponseHeaderMapImpl& response_headers, const int response_size,
     const int backend_idx) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
@@ -346,13 +346,13 @@ void HttpIntegrationTest::sendRequestAndVerifyResponse(
 
 void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
                                          const std::string& response_code,
-                                         const Http::TestHeaderMapImpl& expected_headers,
+                                         const Http::TestResponseHeaderMapImpl& expected_headers,
                                          const std::string& expected_body) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response_code, response->headers().Status()->value().getStringView());
   expected_headers.iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        auto response_headers = static_cast<Http::HeaderMap*>(context);
+        auto response_headers = static_cast<Http::ResponseHeaderMap*>(context);
         const Http::HeaderEntry* entry =
             response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
         EXPECT_NE(entry, nullptr);
