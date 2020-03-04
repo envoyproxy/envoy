@@ -759,10 +759,6 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   absl::string_view host_to_resolve = host;
   absl::optional<uint16_t> port;
 
-  if (host.empty()) {
-    return {false, host_to_resolve, port};
-  }
-
   if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
     const absl::string_view string_view_host = host;
     host_to_resolve = string_view_host.substr(0, colon_pos);
@@ -787,7 +783,8 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
     // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
     // now, just do all the trimming here, but in the future we should consider whether we can
     // have unified [] handling as low as possible in the stack.
-    if (potential_ip_address.front() == '[' && potential_ip_address.back() == ']') {
+    if (!potential_ip_address.empty() && potential_ip_address.front() == '[' &&
+        potential_ip_address.back() == ']') {
       potential_ip_address.remove_prefix(1);
       potential_ip_address.remove_suffix(1);
     }
