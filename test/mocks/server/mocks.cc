@@ -195,7 +195,8 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
 MockMain::~MockMain() = default;
 
 MockServerFactoryContext::MockServerFactoryContext()
-    : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())) {
+    : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
+      grpc_context_(scope_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
@@ -208,6 +209,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
+  ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
@@ -234,6 +236,7 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
@@ -270,6 +273,14 @@ MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
 MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
 MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
+
+MockTracerFactoryContext::MockTracerFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+}
+
+MockTracerFactoryContext::~MockTracerFactoryContext() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
