@@ -1359,6 +1359,34 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidHeaders) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
+// Invalid HTTP call asynchronous flag value.
+TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidAsynchronousFlag) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+          ["set-cookie"] = { "flavor=chocolate; Path=/", "variant=chewy; Path=/" }
+        },
+        "hello world",
+        5000,
+        potato)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::err,
+                        StrEq("[string \"...\"]:3: http call asynchronous flag must be 'true', 'false', or empty")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
 // Respond right away.
 // This is also a regression test for https://github.com/envoyproxy/envoy/issues/3570 which runs
 // the request flow 2000 times and does a GC at the end to make sure we don't leak memory.
