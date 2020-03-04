@@ -43,13 +43,6 @@ public:
   MOCK_METHOD(void, onData, (Buffer::Instance & data));
 };
 
-class TestStatStore : public Stats::SymbolTableProvider, public Stats::IsolatedStoreImpl {
-public:
-  TestStatStore() : Stats::IsolatedStoreImpl(*global_symbol_table_) {}
-
-  MOCK_METHOD(void, deliverHistogramToSinks, (const Stats::Histogram& histogram, uint64_t value));
-};
-
 class TestProxyFilter : public ProxyFilter {
 public:
   using ProxyFilter::ProxyFilter;
