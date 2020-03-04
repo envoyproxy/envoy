@@ -329,8 +329,10 @@ TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
   cleanUp();
 }
 
-// Fail cleanly if a caller tries to pack more frames than the encoder has data for.
-TEST_F(MetadataEncoderDecoderTest, PackTooManyFrames) {
+using MetadataEncoderDecoderDeathTest = MetadataEncoderDecoderTest;
+
+// Crash if a caller tries to pack more frames than the encoder has data for.
+TEST_F(MetadataEncoderDecoderDeathTest, PackTooManyFrames) {
   MetadataMap metadata_map = {
       {"header_key1", std::string(5, 'a')},
       {"header_key2", std::string(5, 'b')},
@@ -350,9 +352,8 @@ TEST_F(MetadataEncoderDecoderTest, PackTooManyFrames) {
   // throw a CodecProtocolException).
   int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, 0, STREAM_ID, nullptr);
   EXPECT_EQ(0, result);
-  EXPECT_LOG_CONTAINS("error", "No payload remaining to pack into a METADATA frame.",
-                      result = nghttp2_session_send(session_));
-  EXPECT_EQ(NGHTTP2_ERR_CALLBACK_FAILURE, result);
+  EXPECT_DEATH(nghttp2_session_send(session_),
+               "No payload remaining to pack into a METADATA frame.");
 
   cleanUp();
 }

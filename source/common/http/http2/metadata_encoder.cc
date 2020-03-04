@@ -81,15 +81,13 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(const MetadataMap& metadata_
 bool MetadataEncoder::hasNextFrame() { return payload_.length() > 0; }
 
 ssize_t MetadataEncoder::packNextFramePayload(uint8_t* buf, const size_t len) {
-  if (payload_size_queue_.empty()) {
-    // nghttp2 has requested that we pack more METADATA frames than we have
-    // payload to pack. This could mean that the HTTP/2 codec has submitted too
-    // many METADATA frames to nghttp2, or it could mean that nghttp2 has called
-    // its pack_extension_callback more than once per METADATA frame the codec
-    // submitted.
-    ENVOY_LOG(error, "No payload remaining to pack into a METADATA frame.");
-    return -1;
-  }
+  // If this RELEASE_ASSERT fires, nghttp2 has requested that we pack more
+  // METADATA frames than we have payload to pack. This could mean that the
+  // HTTP/2 codec has submitted too many METADATA frames to nghttp2, or it could
+  // mean that nghttp2 has called its pack_extension_callback more than once per
+  // METADATA frame the codec submitted.
+  RELEASE_ASSERT(!payload_size_queue_.empty(),
+                 "No payload remaining to pack into a METADATA frame.");
   const uint64_t current_payload_size =
       std::min(METADATA_MAX_PAYLOAD_SIZE, payload_size_queue_.front());
 
