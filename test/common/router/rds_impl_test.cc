@@ -17,6 +17,7 @@
 
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -50,12 +51,12 @@ class RdsTestBase : public testing::Test {
 public:
   RdsTestBase() {
     // For server_factory_context
-    ON_CALL(mock_factory_context_, getServerFactoryContext())
-        .WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
-    ON_CALL(mock_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(server_factory_context_, messageValidationContext())
+        .WillByDefault(ReturnRef(validation_context_));
+    EXPECT_CALL(validation_context_, dynamicValidationVisitor())
+        .WillRepeatedly(ReturnRef(validation_visitor_));
 
-    ON_CALL(mock_factory_context_, initManager()).WillByDefault(ReturnRef(outer_init_manager_));
     ON_CALL(outer_init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
     }));
@@ -67,7 +68,8 @@ public:
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   Event::SimulatedTimeSystem time_system_;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context_;
+  NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Init::MockManager> outer_init_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
@@ -103,9 +105,9 @@ http_filters:
     )EOF";
 
     EXPECT_CALL(outer_init_manager_, add(_));
-    rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                           mock_factory_context_, "foo.",
-                                           *route_config_provider_manager_);
+    rds_ = RouteConfigProviderUtil::create(
+        parseHttpConnectionManagerFromYaml(config_yaml), server_factory_context_,
+        validation_visitor_, outer_init_manager_, "foo.", *route_config_provider_manager_);
     rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
     EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
                 start(_));
@@ -135,7 +137,8 @@ http_filters:
     )EOF";
 
   EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(config_yaml),
-                                               mock_factory_context_, "foo.",
+                                               server_factory_context_, validation_visitor_,
+                                               outer_init_manager_, "foo.",
                                                *route_config_provider_manager_),
                EnvoyException);
 }
@@ -220,7 +223,7 @@ TEST_F(RdsImplTest, Basic) {
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_json);
 
   // Make sure we don't lookup/verify clusters.
-  EXPECT_CALL(mock_factory_context_.cluster_manager_, get(Eq("bar"))).Times(0);
+  EXPECT_CALL(server_factory_context_.cluster_manager_, get(Eq("bar"))).Times(0);
   rds_callbacks_->onConfigUpdate(response2.resources(), response2.version_info());
   EXPECT_EQ("foo", route(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
@@ -297,21 +300,30 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
         envoy_grpc:
           cluster_name: xds_cluster
 )EOF";
-  EXPECT_CALL(outer_init_manager_, state()).WillOnce(Return(Init::Manager::State::Initialized));
   const auto rds =
       TestUtility::parseYaml<envoy::extensions::filters::network::http_connection_manager::v3::Rds>(
           rds_config);
   const auto route_config_provider = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds, mock_factory_context_, "stat_prefix", outer_init_manager_);
+      rds, server_factory_context_, "stat_prefix", outer_init_manager_);
   RdsRouteConfigSubscription& subscription =
       (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
-
+  init_watcher_.expectReady().Times(1); // The parent_init_target_ will call once.
+  outer_init_manager_.initialize(init_watcher_);
   std::unique_ptr<Init::ManagerImpl> noop_init_manager;
   std::unique_ptr<Cleanup> init_vhds;
   subscription.maybeCreateInitManager("version_info", noop_init_manager, init_vhds);
-
-  EXPECT_TRUE(init_vhds);
-  EXPECT_TRUE(noop_init_manager);
+  // local_init_manager_ is not ready yet as the local_init_target_ is not ready.
+  EXPECT_EQ(init_vhds, nullptr);
+  EXPECT_EQ(noop_init_manager, nullptr);
+  // Now mark local_init_target_ ready by forcing an update failure.
+  auto* rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  EnvoyException e("test");
+  rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                       &e);
+  // Now noop init manager will be created as local_init_manager_ is initialized.
+  subscription.maybeCreateInitManager("version_info", noop_init_manager, init_vhds);
+  EXPECT_NE(init_vhds, nullptr);
+  EXPECT_NE(noop_init_manager, nullptr);
 }
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
@@ -321,7 +333,7 @@ public:
     rds_.set_route_config_name("foo_route_config");
     rds_.mutable_config_source()->set_path("foo_path");
     provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(
-        rds_, mock_factory_context_, "foo_prefix.", outer_init_manager_);
+        rds_, server_factory_context_, "foo_prefix.", outer_init_manager_);
     rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -377,7 +389,8 @@ virtual_hosts:
   // Only static route.
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
-          parseRouteConfigurationFromV2Yaml(config_yaml), mock_factory_context_);
+          parseRouteConfigurationFromV2Yaml(config_yaml), server_factory_context_,
+          validation_visitor_);
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
@@ -480,7 +493,7 @@ virtual_hosts:
 
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds_, mock_factory_context_, "foo_prefix", outer_init_manager_);
+          rds_, server_factory_context_, "foo_prefix", outer_init_manager_);
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
@@ -497,7 +510,7 @@ virtual_hosts:
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderSharedPtr provider3 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager());
+          rds2, server_factory_context_, "foo_prefix", outer_init_manager_);
   EXPECT_NE(provider3, provider_);
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "provider3");
@@ -529,7 +542,7 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
 
   EXPECT_FALSE(provider_->configInfo().has_value());
 
-  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context2;
+  NiceMock<Server::Configuration::MockServerFactoryContext> mock_factory_context2;
 
   Init::WatcherImpl real_watcher("real", []() {});
   Init::ManagerImpl real_init_manager("real");
@@ -579,7 +592,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
       ProtoValidationException);
 }
 
-TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
+TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateEmpty) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
               start(_));
@@ -588,7 +601,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate({}, "");
 }
 
-TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
+TEST_F(RouteConfigProviderManagerImplTest, OnConfigUpdateWrongSize) {
   setup();
   EXPECT_CALL(*server_factory_context_.cluster_manager_.subscription_factory_.subscription_,
               start(_));
