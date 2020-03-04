@@ -55,6 +55,7 @@ protected:
         .Times(AtLeast(1))
         .WillRepeatedly(ReturnRef(cm_.async_client_));
 
+    EXPECT_CALL(*retry_timer_, disableTimer());
     if (num_retries == 1) {
       EXPECT_CALL(cm_.async_client_, send_(_, _, _)).Times(AtLeast(1)).WillRepeatedly(Invoke(func));
     } else {
@@ -467,7 +468,7 @@ TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
                                 cm_, init_manager_, config.remote(), dispatcher_, random_, true,
                                 [&](const std::string&) {}),
                             EnvoyException,
-                            "max_interval must greater than or equal to the base_interval");
+                            "max_interval must be greater than or equal to the base_interval");
 }
 
 } // namespace

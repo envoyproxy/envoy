@@ -66,7 +66,12 @@ public:
                           Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                           bool allow_empty, AsyncDataSourceCb&& callback);
 
-  ~RemoteAsyncDataProvider() override { init_target_.ready(); }
+  ~RemoteAsyncDataProvider() override {
+    init_target_.ready();
+    if (retry_timer_) {
+      retry_timer_->disableTimer();
+    }
+  }
 
   // Config::DataFetcher::RemoteDataFetcherCallback
   void onSuccess(const std::string& data) override {

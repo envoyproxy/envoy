@@ -65,7 +65,7 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
       }
 
       if (max_interval_ms < base_interval_ms) {
-        throw EnvoyException("max_interval must greater than or equal to the base_interval");
+        throw EnvoyException("max_interval must be greater than or equal to the base_interval");
       }
     }
   }
