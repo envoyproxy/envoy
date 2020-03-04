@@ -37,7 +37,6 @@
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
-using testing::ByMove;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -216,8 +215,7 @@ TEST_F(FilterChainManagerImplTest, createdFilterChainFactoryContextHasIndependen
   EXPECT_FALSE(context1->drainDecision().drainClose());
 
   // Drain filter chain 0
-  FilterChainFactoryContextImpl* context_impl_0 =
-      dynamic_cast<FilterChainFactoryContextImpl*>(context0.get());
+  auto* context_impl_0 = dynamic_cast<FilterChainFactoryContextImpl*>(context0.get());
   context_impl_0->setDraining();
 
   EXPECT_TRUE(context0->drainDecision().drainClose());

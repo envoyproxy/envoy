@@ -31,7 +31,7 @@ FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
 
 bool FilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load(std::memory_order_acquire) ||
-         parent_context_.getServerFactoryContext().drainManager().drainClose();
+         parent_context_.drainDecision().drainClose();
 }
 
 Network::DrainDecision& FilterChainFactoryContextImpl::drainDecision() { return *this; }

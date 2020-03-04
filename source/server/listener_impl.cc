@@ -176,8 +176,9 @@ XXFactoryContextImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 Stats::Scope& XXFactoryContextImpl::listenerScope() { return *listener_scope_; }
-// Must be overrided
-Network::DrainDecision& XXFactoryContextImpl::drainDecision() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+Network::DrainDecision& XXFactoryContextImpl::drainDecision() {return *this;}
+
+// Must be overridden
 Init::Manager& XXFactoryContextImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 /*
 filter_chain_manager_, watcher_ vary from plain constructor

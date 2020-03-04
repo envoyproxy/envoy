@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -84,7 +85,14 @@ private:
   absl::once_flag steal_once_;
 };
 
-enum class UpdateDecision { Update, NotSupported };
+// The decision on how to execute the listener config update.
+enum class UpdateDecision {
+  // Using fast path to update listener, less connections will be drained and closed.
+  Update,
+  // Using traditional listener update, where all the connections bind to the previous config will
+  // be drained and closed.
+  NotSupported
+};
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
@@ -93,8 +101,9 @@ enum class UpdateDecision { Update, NotSupported };
  * The immutable factory context during the intelligent listener update. The continous intelligent
  * listeners share the same XXFactoryContextImpl. With XXFactoryContext, the number of listener
  * config at runtime is restricted to 1, despite the active filter chains could spread among
+ * multiple listener configs.
  */
-class XXFactoryContextImpl final : public Configuration::FactoryContext {
+class XXFactoryContextImpl final : public Configuration::FactoryContext, public Network::DrainDecision {
 public:
   XXFactoryContextImpl(Envoy::Server::Instance& server,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -125,8 +134,10 @@ public:
   ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
-
   Stats::Scope& listenerScope() override;
+
+  // DrainDescision
+  bool drainClose() const override {return is_draining_.load(loadstd::memory_order_acquire) || server_.drainManager().drainClose(); }
 
 private:
   Envoy::Server::Instance& server_;
@@ -135,6 +146,7 @@ private:
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  std::atomic<bool> is_draining_{false};
 };
 
 class ListenerImpl;
