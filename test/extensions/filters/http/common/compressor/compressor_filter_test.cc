@@ -36,7 +36,6 @@ public:
   std::unique_ptr<Compressor::Compressor> makeCompressor() override {
     return std::make_unique<MockCompressor>();
   }
-  const std::string featureName() const override { return "test.filter_enabled"; }
 };
 
 class CompressorFilterTest : public testing::Test {
@@ -167,9 +166,15 @@ protected:
 
 // Test if Runtime Feature is Disabled
 TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("test.filter_enabled", 100))
-      .WillOnce(Return(false));
-
+  setUpFilter(R"EOF(
+{
+  "runtime_enabled": {
+    "default_value": true,
+    "runtime_key": "foo_key"
+  }
+}
+)EOF");
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, test"}}, false);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }

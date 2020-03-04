@@ -7,6 +7,7 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 
@@ -59,10 +60,9 @@ public:
   CompressorFilterConfig() = delete;
   virtual ~CompressorFilterConfig() = default;
 
-  virtual const std::string featureName() const PURE;
   virtual std::unique_ptr<Compressor::Compressor> makeCompressor() PURE;
 
-  Runtime::Loader& runtime() { return runtime_; }
+  bool enabled() const { return enabled_.enabled(); }
   const CompressorStats& stats() { return stats_; }
   const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
@@ -93,7 +93,7 @@ private:
   const bool remove_accept_encoding_header_;
 
   const CompressorStats stats_;
-  Runtime::Loader& runtime_;
+  Runtime::FeatureFlag enabled_;
   const std::string content_encoding_;
 };
 using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.filter.http.compressor.v2;
 
+import "envoy/api/v2/core/base.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
@@ -14,6 +16,7 @@ option (udpa.annotations.file_migrate).move_to_package =
 
 // [#protodoc-title: Compressor]
 
+// [#next-free-field: 6]
 message Compressor {
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
   google.protobuf.UInt32Value content_length = 1;
@@ -36,4 +39,8 @@ message Compressor {
   //    To avoid interfering with other compression filters in the same chain use this option in
   //    the filter closest to the upstream.
   bool remove_accept_encoding_header = 4;
+
+  // Runtime flag that controls whether the filter is enabled or not. If set to false, the
+  // filter will operate as a pass-through filter. If not specified, defaults to enabled.
+  api.v2.core.RuntimeFeatureFlag runtime_enabled = 5;
 }

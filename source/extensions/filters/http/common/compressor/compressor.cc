@@ -42,7 +42,7 @@ CompressorFilterConfig::CompressorFilterConfig(
       content_type_values_(contentTypeSet(compressor.content_type())),
       disable_on_etag_header_(compressor.disable_on_etag_header()),
       remove_accept_encoding_header_(compressor.remove_accept_encoding_header()),
-      stats_(generateStats(stats_prefix, scope)), runtime_(runtime),
+      stats_(generateStats(stats_prefix, scope)), enabled_(compressor.runtime_enabled(), runtime),
       content_encoding_(content_encoding) {}
 
 StringUtil::CaseUnorderedSet
@@ -68,7 +68,7 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
     accept_encoding_ = std::make_unique<std::string>(accept_encoding->value().getStringView());
   }
 
-  if (config_->runtime().snapshot().featureEnabled(config_->featureName(), 100)) {
+  if (config_->enabled()) {
     skip_compression_ = false;
     if (config_->removeAcceptEncodingHeader()) {
       headers.removeAcceptEncoding();
@@ -185,7 +185,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // "gzip" is configured to compress only "text/html" and "brotli" is configured to compress only
     // "application/javascript". Then comes a request with Accept-Encoding header "gzip;q=1,
     // br;q=.5". The corresponding response content type is "application/javascript". If "gzip" is
-    // not excluded from the decision process then it will take precedens over "brotli" and the
+    // not excluded from the decision process then it will take precedence over "brotli" and the
     // resulting response won't be compressed at all.
     if (!content_type_value.empty() && !filter_config->contentTypeValues().empty()) {
       auto iter = filter_config->contentTypeValues().find(content_type_value);
@@ -283,7 +283,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
       std::string(choice.first), CompressorFilter::EncodingDecision::HeaderStat::ValidCompressor);
 }
 
-// Check if this filter was chosen to compress. Also update the filter's stat counters releated to
+// Check if this filter was chosen to compress. Also update the filter's stat counters related to
 // the Accept-Encoding header.
 bool CompressorFilter::shouldCompress(const CompressorFilter::EncodingDecision& decision) const {
   const bool should_compress =

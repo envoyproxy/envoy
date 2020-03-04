@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.compressor.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -12,6 +14,7 @@ option java_multiple_files = true;
 
 // [#protodoc-title: Compressor]
 
+// [#next-free-field: 6]
 message Compressor {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.compressor.v2.Compressor";
@@ -37,4 +40,8 @@ message Compressor {
   //    To avoid interfering with other compression filters in the same chain use this option in
   //    the filter closest to the upstream.
   bool remove_accept_encoding_header = 4;
+
+  // Runtime flag that controls whether the filter is enabled or not. If set to false, the
+  // filter will operate as a pass-through filter. If not specified, defaults to enabled.
+  config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
 }
