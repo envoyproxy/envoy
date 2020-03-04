@@ -4,16 +4,13 @@
 
 namespace Envoy {
 
-std::string direct_response_config;
-
 class DirectResponseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public BaseIntegrationTest {
 public:
-  DirectResponseIntegrationTest() : BaseIntegrationTest(GetParam(), direct_response_config) {}
+  DirectResponseIntegrationTest() : BaseIntegrationTest(GetParam(), direct_response_config()) {}
 
-  // Called once by the gtest framework before any DirectResponseIntegrationTests are run.
-  static void SetUpTestSuite() {
-    direct_response_config = ConfigHelper::BASE_CONFIG + R"EOF(
+  static std::string direct_response_config() {
+    return ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
       - name: direct_response

@@ -26,7 +26,7 @@ public:
   }
 
 private:
-  std::string response_;
+  const std::string response_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
