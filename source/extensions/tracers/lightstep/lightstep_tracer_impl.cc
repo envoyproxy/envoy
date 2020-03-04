@@ -133,15 +133,15 @@ void LightStepDriver::TlsLightStepTracer::enableTimer() {
 }
 
 LightStepDriver::LightStepDriver(const envoy::config::trace::v3::LightstepConfig& lightstep_config,
-                                 Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+                                 Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                                  ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                                  std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
                                  PropagationMode propagation_mode, Grpc::Context& grpc_context)
-    : OpenTracingDriver{stats}, cm_{cluster_manager},
-      tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
+    : OpenTracingDriver{scope}, cm_{cluster_manager},
+      tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.lightstep."))},
       tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},
       propagation_mode_{propagation_mode}, grpc_context_(grpc_context),
-      pool_(stats.symbolTable()), request_names_{pool_.add(lightstep::CollectorServiceFullName()),
+      pool_(scope.symbolTable()), request_names_{pool_.add(lightstep::CollectorServiceFullName()),
                                                  pool_.add(lightstep::CollectorMethodName())} {
 
   Config::Utility::checkCluster(TracerNames::get().Lightstep, lightstep_config.collector_cluster(),

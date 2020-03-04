@@ -424,17 +424,19 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
 }
 
 absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) {
-  // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  static_assert(ABSL_IS_LITTLE_ENDIAN,
-                "Machines using big-endian byte order is not supported for IPv6.");
+#ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
+#else
+  return address;
+#endif
 }
 
 absl::uint128 Utility::Ip6htonl(const absl::uint128& address) {
-  // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  static_assert(ABSL_IS_LITTLE_ENDIAN,
-                "Machines using big-endian byte order is not supported for IPv6.");
+#ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
+#else
+  return address;
+#endif
 }
 
 absl::uint128 Utility::flipOrder(const absl::uint128& input) {

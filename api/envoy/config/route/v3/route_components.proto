@@ -883,6 +883,15 @@ message RouteAction {
   // :ref:`timeout <envoy_api_field_config.route.v3.RouteAction.timeout>` or its default.
   // This can be used to prevent unexpected upstream request timeouts due to potentially long
   // time gaps between gRPC request and response in gRPC streaming mode.
+  //
+  // .. note::
+  //
+  //    If a timeout is specified using :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`, it takes
+  //    precedence over `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, when
+  //    both are present. See also
+  //    :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
+  //    :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
+  //    :ref:`retry overview <arch_overview_http_routing_retry>`.
   google.protobuf.Duration max_grpc_timeout = 23;
 
   // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
