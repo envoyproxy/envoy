@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/server/instance.h"
 #include "envoy/server/tracer_config.h"
 
 namespace Envoy {
@@ -15,12 +14,12 @@ namespace Common {
 template <class ConfigProto> class FactoryBase : public Server::Configuration::TracerFactory {
 public:
   // Server::Configuration::TracerFactory
-  Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message& config,
-                                          Server::Instance& server) override {
-    return createHttpTracerTyped(
-        MessageUtil::downcastAndValidate<const ConfigProto&>(
-            config, server.messageValidationContext().staticValidationVisitor()),
-        server);
+  Tracing::HttpTracerPtr
+  createHttpTracer(const Protobuf::Message& config,
+                   Server::Configuration::TracerFactoryContext& context) override {
+    return createHttpTracerTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                     config, context.messageValidationVisitor()),
+                                 context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -33,8 +32,9 @@ protected:
   FactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  virtual Tracing::HttpTracerPtr createHttpTracerTyped(const ConfigProto& proto_config,
-                                                       Server::Instance& server) PURE;
+  virtual Tracing::HttpTracerPtr
+  createHttpTracerTyped(const ConfigProto& proto_config,
+                        Server::Configuration::TracerFactoryContext& context) PURE;
 
   const std::string name_;
 };

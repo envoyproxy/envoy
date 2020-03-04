@@ -171,6 +171,7 @@ public:
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
+  Grpc::Context& grpcContext() override { return server_.grpcContext(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }

@@ -22,6 +22,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/tracing/http_tracer_config_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -108,7 +109,10 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(configuration.http());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
-  http_tracer_ = factory.createHttpTracer(*message, server);
+
+  Tracing::TracerFactoryContextImpl factory_context(
+      server.serverFactoryContext(), server.messageValidationContext().staticValidationVisitor());
+  http_tracer_ = factory.createHttpTracer(*message, factory_context);
 }
 
 void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,

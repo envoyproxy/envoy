@@ -22,8 +22,8 @@ class TestDriver : public OpenTracingDriver {
 public:
   TestDriver(OpenTracingDriver::PropagationMode propagation_mode,
              const opentracing::mocktracer::PropagationOptions& propagation_options,
-             Stats::Store& stats)
-      : OpenTracingDriver{stats}, propagation_mode_{propagation_mode} {
+             Stats::Scope& scope)
+      : OpenTracingDriver{scope}, propagation_mode_{propagation_mode} {
     opentracing::mocktracer::MockTracerOptions options;
     auto recorder = new opentracing::mocktracer::InMemoryRecorder{};
     recorder_ = recorder;

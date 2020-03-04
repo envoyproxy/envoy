@@ -43,3 +43,13 @@ envoy_cc_library(
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "http_tracer_config_lib",
+    hdrs = [
+        "http_tracer_config_impl.h",
+    ],
+    deps = [
+        "//include/envoy/server:tracer_config_interface",
+    ],
+)

@@ -17,7 +17,7 @@ namespace Tracers {
 namespace OpenCensus {
 
 TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
     name: envoy.tracers.opencensus
@@ -29,12 +29,12 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracer) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 
 TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
     name: envoy.tracers.opencensus
@@ -67,7 +67,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.
@@ -76,7 +76,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
 }
 
 TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
     name: envoy.tracers.opencensus
@@ -107,7 +107,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
   OpenCensusTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, tracer);
 
   // Reset TraceParams back to default.

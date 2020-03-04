@@ -19,10 +19,12 @@ namespace Lightstep {
 namespace {
 
 TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
-  NiceMock<Server::MockInstance> server;
-  EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
-  ON_CALL(*server.cluster_manager_.thread_local_cluster_.cluster_.info_, features())
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
+      .WillRepeatedly(
+          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(*context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+          features())
       .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
 
   const std::string yaml_string = R"EOF(
@@ -38,7 +40,7 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   LightstepTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 

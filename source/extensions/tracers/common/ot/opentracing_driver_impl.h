@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/stats/store.h"
+#include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"
@@ -55,7 +55,7 @@ private:
  */
 class OpenTracingDriver : public Tracing::Driver, protected Logger::Loggable<Logger::Id::tracing> {
 public:
-  explicit OpenTracingDriver(Stats::Store& stats);
+  explicit OpenTracingDriver(Stats::Scope& scope);
 
   // Tracer::TracingDriver
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::RequestHeaderMap& request_headers,
