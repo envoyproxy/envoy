@@ -24,14 +24,14 @@ public:
   HotRestartingParent::Internal hot_restarting_parent_{&server_};
 };
 
-TEST_F(HotRestartingParentTest, shutdownAdmin) {
+TEST_F(HotRestartingParentTest, ShutdownAdmin) {
   EXPECT_CALL(server_, shutdownAdmin());
   EXPECT_CALL(server_, startTimeFirstEpoch()).WillOnce(Return(12345));
   HotRestartMessage message = hot_restarting_parent_.shutdownAdmin();
   EXPECT_EQ(12345, message.reply().shutdown_admin().original_start_time_unix_seconds());
 }
 
-TEST_F(HotRestartingParentTest, getListenSocketsForChildNotFound) {
+TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotFound) {
   MockListenerManager listener_manager;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
@@ -43,7 +43,7 @@ TEST_F(HotRestartingParentTest, getListenSocketsForChildNotFound) {
   EXPECT_EQ(-1, message.reply().pass_listen_socket().fd());
 }
 
-TEST_F(HotRestartingParentTest, getListenSocketsForChildNotBindPort) {
+TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotBindPort) {
   MockListenerManager listener_manager;
   Network::MockListenerConfig listener_config;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
@@ -61,7 +61,7 @@ TEST_F(HotRestartingParentTest, getListenSocketsForChildNotBindPort) {
   EXPECT_EQ(-1, message.reply().pass_listen_socket().fd());
 }
 
-TEST_F(HotRestartingParentTest, exportStatsToChild) {
+TEST_F(HotRestartingParentTest, ExportStatsToChild) {
   Stats::IsolatedStoreImpl store;
   MockListenerManager listener_manager;
   EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
@@ -149,7 +149,7 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
   }
 }
 
-TEST_F(HotRestartingParentTest, drainListeners) {
+TEST_F(HotRestartingParentTest, DrainListeners) {
   EXPECT_CALL(server_, drainListeners());
   hot_restarting_parent_.drainListeners();
 }

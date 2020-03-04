@@ -39,7 +39,7 @@ private:
 
 // Simple test which creates a connection to fake upstream client. This is to test if
 // ValidationDispatcher can call createClientConnection without crashing.
-TEST_P(ConfigValidation, createConnection) {
+TEST_P(ConfigValidation, CreateConnection) {
   Network::Address::InstanceConstSharedPtr address(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
   dispatcher_->createClientConnection(address, address, Network::Test::createRawBufferSocket(),
