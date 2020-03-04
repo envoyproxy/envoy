@@ -7,9 +7,9 @@ namespace Envoy {
 class DirectResponseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public BaseIntegrationTest {
 public:
-  DirectResponseIntegrationTest() : BaseIntegrationTest(GetParam(), direct_response_config()) {}
+  DirectResponseIntegrationTest() : BaseIntegrationTest(GetParam(), directResponseConfig()) {}
 
-  static std::string direct_response_config() {
+  static std::string directResponseConfig() {
     return ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
