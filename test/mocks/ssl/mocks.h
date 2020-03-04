@@ -110,6 +110,7 @@ public:
 
   MOCK_METHOD(bool, requireClientCertificate, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
+  MOCK_METHOD(bool, disableSessionTickets, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {
