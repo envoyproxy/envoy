@@ -218,12 +218,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_, stats_prefix_, route_config_provider_manager_);
+        config, context_.getServerFactoryContext(), context_.messageValidationVisitor(),
+        context_.initManager(), stats_prefix_, route_config_provider_manager_);
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
     scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
-        config, context_, stats_prefix_, scoped_routes_config_provider_manager_);
+        config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
+        scoped_routes_config_provider_manager_);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

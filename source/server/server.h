@@ -160,6 +160,9 @@ public:
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return server_.messageValidationContext();
+  }
   Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }

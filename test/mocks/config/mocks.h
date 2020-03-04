@@ -106,16 +106,16 @@ public:
 
   MOCK_METHOD(ConfigProviderPtr, createXdsConfigProvider,
               (const Protobuf::Message& config_source_proto,
-               Server::Configuration::FactoryContext& factory_context,
-               const std::string& stat_prefix,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               Init::Manager& init_manager, const std::string& stat_prefix,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (const Protobuf::Message& config_proto,
-               Server::Configuration::FactoryContext& factory_context,
+               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,
-               Server::Configuration::FactoryContext& factory_context,
+               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
 };
 

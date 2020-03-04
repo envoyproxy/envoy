@@ -27,7 +27,8 @@ namespace ScopedRoutesConfigProviderUtil {
 Envoy::Config::ConfigProviderPtr create(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    Server::Configuration::ServerFactoryContext& factory_context, Init::Manager& init_manager,
+    const std::string& stat_prefix,
     Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 
 } // namespace ScopedRoutesConfigProviderUtil
@@ -39,7 +40,7 @@ class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigPr
 public:
   InlineScopedRoutesConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
                                    std::string name,
-                                   Server::Configuration::FactoryContext& factory_context,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
                                    ScopedRoutesConfigProviderManager& config_provider_manager,
                                    envoy::config::core::v3::ConfigSource rds_config_source,
                                    envoy::extensions::filters::network::http_connection_manager::
@@ -95,7 +96,7 @@ public:
       const uint64_t manager_identifier, const std::string& name,
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       envoy::config::core::v3::ConfigSource rds_config_source,
       RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
@@ -170,13 +171,14 @@ private:
 
   // ScopedRouteInfo by scope name.
   ScopedRouteMap scoped_route_map_;
+
   // RdsRouteConfigProvider by scope name.
   absl::flat_hash_map<std::string, std::unique_ptr<RdsRouteConfigProviderHelper>>
       route_provider_by_scope_;
   // A map of (hash, scope-name), used to detect the key conflict between scopes.
   absl::flat_hash_map<uint64_t, std::string> scope_name_by_hash_;
   // For creating RDS subscriptions.
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
@@ -219,11 +221,11 @@ public:
   // Envoy::Config::ConfigProviderManager
   Envoy::Config::ConfigProviderPtr
   createXdsConfigProvider(const Protobuf::Message& config_source_proto,
-                          Server::Configuration::FactoryContext& factory_context,
-                          const std::string& stat_prefix,
+                          Server::Configuration::ServerFactoryContext& factory_context,
+                          Init::Manager& init_manager, const std::string& stat_prefix,
                           const Envoy::Config::ConfigProviderManager::OptionalArg& optarg) override;
   Envoy::Config::ConfigProviderPtr
-  createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::FactoryContext&,
+  createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
                              const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
     ASSERT(false,
            "SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
@@ -232,7 +234,7 @@ public:
   }
   Envoy::Config::ConfigProviderPtr createStaticConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
-      Server::Configuration::FactoryContext& factory_context,
+      Server::Configuration::ServerFactoryContext& factory_context,
       const Envoy::Config::ConfigProviderManager::OptionalArg& optarg) override;
 
   RouteConfigProviderManager& route_config_provider_manager() {

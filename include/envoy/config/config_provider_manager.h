@@ -44,6 +44,7 @@ public:
    * and Config are shared amongst all providers relying on the same config source.
    * @param config_source_proto supplies the proto containing the xDS API configuration.
    * @param factory_context is the context to use for the provider.
+   * @param init_manager is the Init::Manager to use for the provider.
    * @param stat_prefix supplies the prefix to use for statistics.
    * @param optarg supplies an optional argument with data specific to the concrete class.
    * @return ConfigProviderPtr a newly allocated dynamic config provider which shares underlying
@@ -52,8 +53,9 @@ public:
    */
   virtual ConfigProviderPtr
   createXdsConfigProvider(const Protobuf::Message& config_source_proto,
-                          Server::Configuration::FactoryContext& factory_context,
-                          const std::string& stat_prefix, const OptionalArg& optarg) PURE;
+                          Server::Configuration::ServerFactoryContext& factory_context,
+                          Init::Manager& init_manager, const std::string& stat_prefix,
+                          const OptionalArg& optarg) PURE;
 
   /**
    * Returns a ConfigProvider associated with a statically specified configuration.
@@ -64,7 +66,7 @@ public:
    */
   virtual ConfigProviderPtr
   createStaticConfigProvider(const Protobuf::Message& config_proto,
-                             Server::Configuration::FactoryContext& factory_context,
+                             Server::Configuration::ServerFactoryContext& factory_context,
                              const OptionalArg& optarg) {
     UNREFERENCED_PARAMETER(config_proto);
     UNREFERENCED_PARAMETER(factory_context);
@@ -82,7 +84,7 @@ public:
    */
   virtual ConfigProviderPtr
   createStaticConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
-                             Server::Configuration::FactoryContext& factory_context,
+                             Server::Configuration::ServerFactoryContext& factory_context,
                              const OptionalArg& optarg) {
     UNREFERENCED_PARAMETER(config_protos);
     UNREFERENCED_PARAMETER(factory_context);

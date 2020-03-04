@@ -272,6 +272,7 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
   match.stats_.total_match_count_.inc();
   ENVOY_LOG(debug, "transport socket match, socket {} selected for host with address {}",
             match.name_, dest_address ? dest_address->asString() : "empty");
+
   return match.factory_;
 }
 
@@ -631,6 +632,10 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    // Not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   Api::Api& api() override { return api_; }
 
 private:
