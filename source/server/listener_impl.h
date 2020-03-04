@@ -23,10 +23,14 @@ namespace Server {
 
 class ListenerMessageUtil {
 public:
-  // TODO(lambdai): move from ListenerImpl::ListenerImpl to here
+  // TODO(lambdai): This need to allign with the amendment in ListenerImpl::ListenerImpl where
+  // implicit listener filter chains are added.
   static envoy::config::listener::v3::Listener
   normalize(const envoy::config::listener::v3::Listener& config);
 
+  /**
+   * @return true if listener update from lhs to rhs could go through fast path.
+   */
   static bool equivalent(const envoy::config::listener::v3::Listener& lhs,
                          const envoy::config::listener::v3::Listener& rhs);
 };
@@ -85,6 +89,11 @@ enum class UpdateDecision { Update, NotSupported };
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
 
+/**
+ * The immutable factory context during the intelligent listener update. The continous intelligent
+ * listeners share the same XXFactoryContextImpl. With XXFactoryContext, the number of listener
+ * config at runtime is restricted to 1, despite the active filter chains could spread among
+ */
 class XXFactoryContextImpl final : public Configuration::FactoryContext {
 public:
   XXFactoryContextImpl(Envoy::Server::Instance& server,
@@ -211,7 +220,7 @@ public:
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash,
                ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
-  // TODO: remove unnessary
+  // TODO(lambdai): remove unnessary
   ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
@@ -239,12 +248,6 @@ public:
    */
   void diffFilterChain(const ListenerImpl& listener,
                        std::function<void(FilterChainImpl&)> callback);
-
-  /**
-   * Cancel the in place filter chain update if any. Should be called when full listener update is
-   * triggered.
-   */
-  void cancelUpdate();
 
   Init::Manager& initManager();
 

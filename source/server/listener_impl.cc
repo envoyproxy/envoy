@@ -207,7 +207,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       listener_factory_context_(std::make_shared<ListenerFactoryContextImpl>(
           origin.listener_factory_context_->xx_factory_context_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parent_factory_context(),
-                            origin.filter_chain_manager_) {
+                            initManager(), origin.filter_chain_manager_) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(config.address());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
@@ -388,7 +388,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<ListenerFactoryContextImpl>(
           parent.server_, validation_visitor, config, this, *this)),
-      filter_chain_manager_(address_, listener_factory_context_->parent_factory_context()) {
+      filter_chain_manager_(address_, listener_factory_context_->parent_factory_context(),
+                            initManager()) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(config.address());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
@@ -709,8 +710,6 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& listener,
     }
   }
 }
-
-void ListenerImpl::cancelUpdate() {}
 
 envoy::config::listener::v3::Listener
 ListenerMessageUtil::normalize(const envoy::config::listener::v3::Listener& config) {

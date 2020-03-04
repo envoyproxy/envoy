@@ -42,7 +42,8 @@ public:
 class FilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
                                       public Network::DrainDecision {
 public:
-  explicit FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context);
+  explicit FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context,
+                                         Init::Manager& init_manager);
 
   // DrainDecision
   bool drainClose() const override;
@@ -80,6 +81,7 @@ public:
 
 private:
   Configuration::FactoryContext& parent_context_;
+  Init::Manager& init_manager_;
   // atomic_flag is guaranteed to be lock free but there is no light weight load().
   std::atomic<bool> is_draining_{false};
 };
@@ -101,7 +103,6 @@ public:
   }
 
   void setDrainClose() { factory_context_->setDraining(); }
-  // TODO(lambdai): reconsider the ownership of `factory_context_`
   std::unique_ptr<FilterChainFactoryContextImpl> factory_context_;
 
 private:
@@ -166,12 +167,13 @@ public:
       std::unordered_map<envoy::config::listener::v3::FilterChain, std::shared_ptr<FilterChainImpl>,
                          MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
-                         Configuration::FactoryContext& factory_context)
-      : address_(address), parent_context_(factory_context) {}
+                         Configuration::FactoryContext& factory_context,
+                         Init::Manager& init_manager)
+      : address_(address), parent_context_(factory_context), init_manager_(init_manager) {}
 
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context,
-                         const FilterChainManagerImpl& parent_manager);
+                         Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
 
   // FilterChainFactoryContextCreator
   std::unique_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
@@ -296,6 +298,11 @@ private:
   // the origin fc_contexts_ Caution: origin_ is not legit all the time.
   // TODO(lambdai): safer usage
   const FilterChainManagerImpl* origin_{};
+
+  // For FilterChainFactoryContextCreator
+  // init manager owned by the corresponding listener. The reference is legit when building the
+  // filter chain.
+  Init::Manager& init_manager_;
 };
 } // namespace Server
 } // namespace Envoy

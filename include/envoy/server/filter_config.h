@@ -108,7 +108,7 @@ public:
   ~ServerFactoryContext() override = default;
 
   /**
-   * return DrainManager& drain manager which has life no shorter than the life of the current
+   * @return DrainManager& drain manager which has life no shorter than the life of the current
    * context.
    */
   virtual Envoy::Server::DrainManager& drainManager() PURE;

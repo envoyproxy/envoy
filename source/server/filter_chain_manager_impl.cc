@@ -26,8 +26,8 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 } // namespace
 
 FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
-    Configuration::FactoryContext& parent_context)
-    : parent_context_(parent_context) {}
+    Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
+    : parent_context_(parent_context), init_manager_(init_manager) {}
 
 bool FilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load(std::memory_order_acquire) ||
@@ -36,10 +36,7 @@ bool FilterChainFactoryContextImpl::drainClose() const {
 
 Network::DrainDecision& FilterChainFactoryContextImpl::drainDecision() { return *this; }
 
-// TODO(lambdai): init manager will be provided for each filter chain update.
-Init::Manager& FilterChainFactoryContextImpl::initManager() {
-  return parent_context_.initManager();
-}
+Init::Manager& FilterChainFactoryContextImpl::initManager() { return init_manager_; }
 
 ThreadLocal::SlotAllocator& FilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
@@ -135,8 +132,10 @@ Stats::Scope& FilterChainFactoryContextImpl::listenerScope() {
 
 FilterChainManagerImpl::FilterChainManagerImpl(
     const Network::Address::InstanceConstSharedPtr& address,
-    Configuration::FactoryContext& factory_context, const FilterChainManagerImpl& parent_manager)
-    : address_(address), parent_context_(factory_context), origin_(&parent_manager) {}
+    Configuration::FactoryContext& factory_context, Init::Manager& init_manager,
+    const FilterChainManagerImpl& parent_manager)
+    : address_(address), parent_context_(factory_context), origin_(&parent_manager),
+      init_manager_(init_manager) {}
 
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
@@ -609,9 +608,9 @@ std::shared_ptr<FilterChainImpl> FilterChainManagerImpl::findExistingFilterChain
 std::unique_ptr<Configuration::FilterChainFactoryContext>
 FilterChainManagerImpl::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
-  // TODO(lambdai): drain close should be saved in per filter chain context
+  // TODO(lambdai): add stats
   UNREFERENCED_PARAMETER(filter_chain);
-  return std::make_unique<FilterChainFactoryContextImpl>(parent_context_);
+  return std::make_unique<FilterChainFactoryContextImpl>(parent_context_, init_manager_);
 }
 
 FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
