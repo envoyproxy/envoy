@@ -469,8 +469,11 @@ TEST_P(ServerInstanceImplTest, Stats) {
 class TestWithSimTimeAndRealSymbolTables : public Event::TestUsingSimulatedTime {
 protected:
   TestWithSimTimeAndRealSymbolTables() {
-    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+    symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
   }
+
+private:
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
 };
 
 class ServerStatsTest

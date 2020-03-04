@@ -1654,6 +1654,9 @@ protected:
 
   void clearStorage() {
     pool_.clear();
+    counters_.clear();
+    gauges_.clear();
+    histograms_.clear();
     EXPECT_EQ(0, symbol_table_->numSymbols());
   }
 
