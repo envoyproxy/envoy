@@ -354,9 +354,8 @@ TEST(HeaderMapImplTest, AllInlineHeaders) {
     INLINE_REQ_RESP_HEADERS(TEST_INLINE_HEADER_FUNCS)
   }
   {
-    // No request trailer O(1) headers.
-  }
-  {
+      // No request trailer O(1) headers.
+  } {
     ResponseHeaderMapImpl header_map;
     INLINE_RESP_HEADERS(TEST_INLINE_HEADER_FUNCS)
     INLINE_REQ_RESP_HEADERS(TEST_INLINE_HEADER_FUNCS)
