@@ -48,5 +48,7 @@ envoy_cc_fuzz_test(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//test/config:utility_lib",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
     ] + envoy_all_extensions(),
 )
