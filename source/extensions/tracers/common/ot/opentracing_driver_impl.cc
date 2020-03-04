@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-#include "envoy/stats/store.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
@@ -143,8 +143,8 @@ Tracing::SpanPtr OpenTracingSpan::spawnChild(const Tracing::Config&, const std::
   return Tracing::SpanPtr{new OpenTracingSpan{driver_, std::move(ot_span)}};
 }
 
-OpenTracingDriver::OpenTracingDriver(Stats::Store& stats)
-    : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.opentracing."))} {}
+OpenTracingDriver::OpenTracingDriver(Stats::Scope& scope)
+    : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.opentracing."))} {}
 
 Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
                                               Http::RequestHeaderMap& request_headers,

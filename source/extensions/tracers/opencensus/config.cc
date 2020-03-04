@@ -17,10 +17,13 @@ namespace OpenCensus {
 OpenCensusTracerFactory::OpenCensusTracerFactory() : FactoryBase(TracerNames::get().OpenCensus) {}
 
 Tracing::HttpTracerPtr OpenCensusTracerFactory::createHttpTracerTyped(
-    const envoy::config::trace::v3::OpenCensusConfig& proto_config, Server::Instance& server) {
+    const envoy::config::trace::v3::OpenCensusConfig& proto_config,
+    Server::Configuration::TracerFactoryContext& context) {
   Tracing::DriverPtr driver =
-      std::make_unique<Driver>(proto_config, server.localInfo(), server.api());
-  return std::make_unique<Tracing::HttpTracerImpl>(std::move(driver), server.localInfo());
+      std::make_unique<Driver>(proto_config, context.serverFactoryContext().localInfo(),
+                               context.serverFactoryContext().api());
+  return std::make_unique<Tracing::HttpTracerImpl>(std::move(driver),
+                                                   context.serverFactoryContext().localInfo());
 }
 
 /**
