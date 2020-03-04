@@ -19,12 +19,14 @@ DynamicOpenTracingTracerFactory::DynamicOpenTracingTracerFactory()
     : FactoryBase(TracerNames::get().DynamicOt) {}
 
 Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
-    const envoy::config::trace::v3::DynamicOtConfig& proto_config, Server::Instance& server) {
+    const envoy::config::trace::v3::DynamicOtConfig& proto_config,
+    Server::Configuration::TracerFactoryContext& context) {
   const std::string& library = proto_config.library();
   const std::string config = MessageUtil::getJsonStringFromMessage(proto_config.config());
-  Tracing::DriverPtr dynamic_driver =
-      std::make_unique<DynamicOpenTracingDriver>(server.stats(), library, config);
-  return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver), server.localInfo());
+  Tracing::DriverPtr dynamic_driver = std::make_unique<DynamicOpenTracingDriver>(
+      context.serverFactoryContext().scope(), library, config);
+  return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver),
+                                                   context.serverFactoryContext().localInfo());
 }
 
 /**
