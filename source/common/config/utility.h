@@ -229,7 +229,7 @@ public:
         udpa::type::v1::TypedStruct typed_struct;
         MessageUtil::unpackTo(typed_config, typed_struct);
         // Not handling nested structs or typed structs in typed structs
-        type = typed_struct.type_url();
+        type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
       }
       Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
       if (factory != nullptr) {
@@ -343,14 +343,27 @@ public:
 
   /**
    * Prepares the DNS failure refresh backoff strategy given the cluster configuration.
-   * @param cluster the cluster configuration.
+   * @param config the config that contains dns refresh information.
    * @param dns_refresh_rate_ms the default DNS refresh rate.
    * @param random the random generator.
    * @return BackOffStrategyPtr for scheduling refreshes.
    */
-  static BackOffStrategyPtr
-  prepareDnsRefreshStrategy(const envoy::config::cluster::v3::Cluster& cluster,
-                            uint64_t dns_refresh_rate_ms, Runtime::RandomGenerator& random);
+  template <typename T>
+  static BackOffStrategyPtr prepareDnsRefreshStrategy(const T& config, uint64_t dns_refresh_rate_ms,
+                                                      Runtime::RandomGenerator& random) {
+    if (config.has_dns_failure_refresh_rate()) {
+      uint64_t base_interval_ms =
+          PROTOBUF_GET_MS_REQUIRED(config.dns_failure_refresh_rate(), base_interval);
+      uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config.dns_failure_refresh_rate(),
+                                                            max_interval, base_interval_ms * 10);
+      if (max_interval_ms < base_interval_ms) {
+        throw EnvoyException("dns_failure_refresh_rate must have max_interval greater than "
+                             "or equal to the base_interval");
+      }
+      return std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
+    }
+    return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
+  }
 };
 
 } // namespace Config

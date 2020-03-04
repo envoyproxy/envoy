@@ -22,11 +22,11 @@ static_resources:
                 route:
                   cluster: cluster1
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
             typed_config: {}
           codec_type: auto
     listener_filters:
-    - name: envoy.listener.original_dst
+    - name: envoy.filters.listener.original_dst
       typed_config: {}
   clusters:
   - name: cluster1

@@ -110,7 +110,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
 private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;
