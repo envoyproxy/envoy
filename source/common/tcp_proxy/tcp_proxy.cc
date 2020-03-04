@@ -456,7 +456,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
           new HttpUpstream(*upstream_callbacks_, config_->tunnelingConfig()->hostname()));
       HttpUpstream* http_upstream = static_cast<HttpUpstream*>(upstream_.get());
       upstream_handle_.reset(
-          new HttpConnectionHandle(conn_pool->newStream(http_upstream->response_decoder_, *this)));
+          new HttpConnectionHandle(conn_pool->newStream(http_upstream->responseDecoder(), *this)));
       return Network::FilterStatus::StopIteration;
     }
   }

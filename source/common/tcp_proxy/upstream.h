@@ -79,6 +79,28 @@ public:
 
   static bool isValidBytestreamResponse(const Http::HeaderMap& headers);
 
+  void doneReading();
+  void doneWriting();
+
+  // GenericUpstream
+  bool readDisable(bool disable) override;
+  void encodeData(Buffer::Instance& data, bool end_stream) override;
+  void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
+  Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
+
+  // Http::StreamCallbacks
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
+  void onAboveWriteBufferHighWatermark() override;
+  void onBelowWriteBufferLowWatermark() override;
+
+  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl);
+
+  Http::ResponseDecoder& responseDecoder() { return response_decoder_; }
+
+private:
+  void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
+
   class DecoderShim : public Http::ResponseDecoder {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
@@ -101,24 +123,6 @@ public:
   private:
     HttpUpstream& parent_;
   };
-
-  void doneReading();
-  void doneWriting();
-
-  // GenericUpstream
-  bool readDisable(bool disable) override;
-  void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
-  Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
-
-  // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason) override;
-  void onAboveWriteBufferHighWatermark() override;
-  void onBelowWriteBufferLowWatermark() override;
-
-  void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl);
-  void resetEncoder(Network::ConnectionEvent event);
 
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   DecoderShim response_decoder_;

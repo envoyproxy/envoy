@@ -70,6 +70,7 @@ bool HttpUpstream::readDisable(bool disable) {
   request_encoder_->getStream().readDisable(disable);
   return true;
 }
+
 void HttpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!request_encoder_) {
     return;
@@ -89,8 +90,8 @@ void HttpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb) {
 
 Tcp::ConnectionPool::ConnectionData*
 HttpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
-  if (event != Network::ConnectionEvent::Connected && request_encoder_) {
-    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  if (event != Network::ConnectionEvent::Connected) {
+    resetEncoder(Network::ConnectionEvent::LocalClose, false);
   }
   return nullptr;
 }
@@ -123,7 +124,7 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
   request_encoder_->encodeHeaders(*headers, false);
 }
 
-void HttpUpstream::resetEncoder(Network::ConnectionEvent event) {
+void HttpUpstream::resetEncoder(Network::ConnectionEvent event, bool inform_downstream) {
   if (!request_encoder_) {
     return;
   }
@@ -132,7 +133,9 @@ void HttpUpstream::resetEncoder(Network::ConnectionEvent event) {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
   request_encoder_ = nullptr;
-  upstream_callbacks_.onEvent(event);
+  if (inform_downstream) {
+    upstream_callbacks_.onEvent(event);
+  }
 }
 
 void HttpUpstream::doneReading() {

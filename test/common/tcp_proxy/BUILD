@@ -44,5 +44,7 @@ envoy_cc_test(
     srcs = ["upstream_test.cc"],
     deps = [
         "//source/common/tcp_proxy",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/tcp:tcp_mocks",
     ],
 )
