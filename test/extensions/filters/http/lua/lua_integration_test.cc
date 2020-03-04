@@ -392,11 +392,12 @@ typed_config:
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
   ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
   ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
+  // Sanity checking that we sent the expected data.
+  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Path, "/"));
 
   waitForNextUpstreamRequest();
 
-  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Path, "/"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
 
