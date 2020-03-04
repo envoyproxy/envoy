@@ -80,7 +80,7 @@ public:
         disable_on_etag_header: true
     )EOF"};
 
-  const std::string default_config{"name: envoy.gzip"};
+  const std::string default_config{"name: envoy.filters.http.gzip"};
 
   const uint64_t window_bits{15 | 16};
 

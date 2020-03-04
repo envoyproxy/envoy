@@ -20,7 +20,7 @@ public:
     return fmt::format(ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-        name: envoy.filters.network.http_connection_manager
+        name: http
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: metadata_test
@@ -35,7 +35,7 @@ public:
                   percentage:
                     numerator: 100
                     denominator: HUNDRED
-            - name: envoy.router
+            - name: envoy.filters.http.router
           codec_type: HTTP1
           route_config:
             virtual_hosts:

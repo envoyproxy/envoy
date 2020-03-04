@@ -123,7 +123,7 @@ public:
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
   NiceMock<Upstream::MockLoadBalancerContext> lb_context_;
-  Http::TestHeaderMapImpl downstream_headers_;
+  Http::TestRequestHeaderMapImpl downstream_headers_;
   Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks* update_callbacks_{};
   absl::flat_hash_map<std::string,
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>

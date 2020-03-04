@@ -1,0 +1,10 @@
+config {
+  name: "envoy.gzip"
+}
+data {
+  headers {
+    headers {
+      value: "\002\000"
+    }
+  }
+}

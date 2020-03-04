@@ -120,6 +120,7 @@ public:
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
                   filters, context);
             }));
+    ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
 
     try {
       main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
@@ -134,6 +135,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
+  Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;

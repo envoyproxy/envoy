@@ -88,7 +88,7 @@ AdsIntegrationTest::buildListener(const std::string& name, const std::string& ro
           port_value: 0
       filter_chains:
         filters:
-        - name: envoy.filters.network.http_connection_manager
+        - name: http
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: {}
@@ -96,7 +96,7 @@ AdsIntegrationTest::buildListener(const std::string& name, const std::string& ro
             rds:
               route_config_name: {}
               config_source: {{ ads: {{}} }}
-            http_filters: [{{ name: envoy.router }}]
+            http_filters: [{{ name: envoy.filters.http.router }}]
     )EOF",
       name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config));
 }
@@ -112,7 +112,7 @@ AdsIntegrationTest::buildRedisListener(const std::string& name, const std::strin
           port_value: 0
       filter_chains:
         filters:
-        - name: envoy.filters.network.redis_proxy
+        - name: redis
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
             settings: 

@@ -61,7 +61,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
 
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"sec-istio-auth-userinfo", ""},
   };
@@ -89,7 +89,7 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
                      .setChildSpanName("JWT Remote PubKey Fetch");
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, Eq(options))).Times(1);
 
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"sec-istio-auth-userinfo", ""},
   };
@@ -103,7 +103,7 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
 
-  auto headers = Http::TestHeaderMapImpl{{"sec-istio-auth-userinfo", ""}};
+  auto headers = Http::TestRequestHeaderMapImpl{{"sec-istio-auth-userinfo", ""}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
@@ -138,7 +138,7 @@ rules:
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer)).Times(1);
 
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
@@ -164,9 +164,11 @@ TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
           Invoke([](const Status& status) { ASSERT_EQ(status, Status::JwtAudienceNotAllowed); }))
       .WillOnce(Invoke([](const Status& status) { ASSERT_EQ(status, Status::Ok); }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   verifier_->verify(Verifier::createContext(headers, parent_span_, &mock_cb_));
-  headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
+  headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
   verifier_->verify(Verifier::createContext(headers, parent_span_, &mock_cb_));
 }
 

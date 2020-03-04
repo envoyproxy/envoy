@@ -36,7 +36,9 @@ envoy_cc_library(
         "//include/envoy/server:config_tracker_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
+        "//source/common/init:watcher_lib",
         "//source/common/protobuf",
     ],
 )
@@ -191,10 +193,13 @@ envoy_cc_library(
     hdrs = ["metadata.h"],
     deps = [
         "//include/envoy/config:typed_metadata_interface",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/registry",
+        "//include/envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/common/shared_pool:shared_pool_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
     ],

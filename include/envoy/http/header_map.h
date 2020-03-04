@@ -624,18 +624,28 @@ using HeaderMapPtr = std::unique_ptr<HeaderMap>;
 
 /**
  * Typed derived classes for all header map types.
- * TODO(mattklein123): In future changes we will be differentiating the implementation between
- *   these classes to both fix bugs and improve performance.
- * TODO(mattklein123): Virtual inheritance is currently required due to a layered implementation.
- *   Consider also removing virtual inheritance once we finish the typed header refactor.
  */
-class RequestHeaderMap : public virtual HeaderMap {};
+
+// Base class for both request and response headers.
+class RequestOrResponseHeaderMap : public virtual HeaderMap {};
+
+// Request headers.
+class RequestHeaderMap : public RequestOrResponseHeaderMap {};
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
+
+// Request trailers.
 class RequestTrailerMap : public virtual HeaderMap {};
 using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
-class ResponseHeaderMap : public virtual HeaderMap {};
+
+// Base class for both response headers and trailers.
+class ResponseHeaderOrTrailerMap : public virtual HeaderMap {};
+
+// Response headers.
+class ResponseHeaderMap : public RequestOrResponseHeaderMap, public ResponseHeaderOrTrailerMap {};
 using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
-class ResponseTrailerMap : public virtual HeaderMap {};
+
+// Response trailers.
+class ResponseTrailerMap : public virtual HeaderMap, public ResponseHeaderOrTrailerMap {};
 using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
 
 /**
@@ -650,7 +660,7 @@ class HeaderMatcher {
 public:
   virtual ~HeaderMatcher() = default;
 
-  /*
+  /**
    * Check whether header matcher matches any headers in a given HeaderMap.
    */
   virtual bool matchesHeaders(const HeaderMap& headers) const PURE;

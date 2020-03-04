@@ -288,6 +288,16 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 }
 
+// Test that the deprecated extension name still functions.
+TEST(IpTaggingFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.ip_tagging";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace
 } // namespace IpTagging
 } // namespace HttpFilters

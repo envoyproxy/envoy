@@ -62,7 +62,7 @@ The following is a YAML example of the above recommendation.
           address: 0.0.0.0
           port_value: 443
       listener_filters:
-      - name: "envoy.listener.tls_inspector"
+      - name: "envoy.filters.listener.tls_inspector"
         typed_config: {}
       per_connection_buffer_limit_bytes: 32768 # 32 KiB
       filter_chains:

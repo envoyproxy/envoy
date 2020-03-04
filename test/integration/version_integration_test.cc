@@ -24,17 +24,17 @@ const char ExampleIpTaggingConfig[] = R"EOF(
           - {address_prefix: 1.2.3.4, prefix_len: 32}
 )EOF";
 
-// envoy.ip_tagging from v2 Struct config.
+// envoy.filters.http.ip_tagging from v2 Struct config.
 TEST_P(VersionIntegrationTest, DEPRECATED_FEATURE_TEST(IpTaggingV2StaticStructConfig)) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
-  name: envoy.ip_tagging
+  name: envoy.filters.http.ip_tagging
   config:
   )EOF",
                                         ExampleIpTaggingConfig));
   initialize();
 }
 
-// envoy.ip_tagging from v2 TypedStruct config.
+// envoy.filters.http.ip_tagging from v2 TypedStruct config.
 TEST_P(VersionIntegrationTest, IpTaggingV2StaticTypedStructConfig) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
 name: ip_tagging
@@ -47,7 +47,7 @@ typed_config:
   initialize();
 }
 
-// envoy.ip_tagging from v3 TypedStruct config.
+// envoy.filters.http.ip_tagging from v3 TypedStruct config.
 TEST_P(VersionIntegrationTest, IpTaggingV3StaticTypedStructConfig) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
 name: ip_tagging
@@ -60,7 +60,7 @@ typed_config:
   initialize();
 }
 
-// envoy.ip_tagging from v2 typed Any config.
+// envoy.filters.http.ip_tagging from v2 typed Any config.
 TEST_P(VersionIntegrationTest, IpTaggingV2StaticTypedConfig) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
   name: ip_tagging
@@ -71,7 +71,7 @@ TEST_P(VersionIntegrationTest, IpTaggingV2StaticTypedConfig) {
   initialize();
 }
 
-// envoy.ip_tagging from v3 typed Any config.
+// envoy.filters.http.ip_tagging from v3 typed Any config.
 TEST_P(VersionIntegrationTest, IpTaggingV3StaticTypedConfig) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
   name: ip_tagging

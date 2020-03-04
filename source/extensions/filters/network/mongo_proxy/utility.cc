@@ -46,7 +46,10 @@ std::string QueryMessageInfo::parseCollection(const std::string& full_collection
 int32_t QueryMessageInfo::parseMaxTime(const QueryMessage& query) {
   const Bson::Field* field = query.query()->find("$maxTimeMS");
   if (!field) {
-    return 0;
+    field = query.query()->find("maxTimeMS");
+    if (!field) {
+      return 0;
+    }
   }
 
   if (field->type() == Bson::Field::Type::Int32) {

@@ -35,11 +35,11 @@ public:
   }
 
   void setup() {
-    Http::TestHeaderMapImpl headers;
+    Http::TestRequestHeaderMapImpl headers;
     setup(headers);
   }
 
-  void setup(Http::HeaderMap& request_headers) {
+  void setup(Http::RequestHeaderMap& request_headers) {
     state_ = RetryStateImpl::create(policy_, request_headers, cluster_, runtime_, random_,
                                     dispatcher_, Upstream::ResourcePriority::Default);
   }
@@ -973,11 +973,11 @@ TEST_F(RouterRetryStateImplTest, NoPreferredOverLimitExceeded) {
                                                  {"x-envoy-max-retries", "1"}};
   setup(request_headers);
 
-  Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
+  Http::TestResponseHeaderMapImpl bad_response_headers{{":status", "503"}};
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(bad_response_headers, callback_));
 
-  Http::TestHeaderMapImpl good_response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl good_response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(good_response_headers, callback_));
 }
 

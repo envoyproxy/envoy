@@ -54,8 +54,11 @@ expects a cluster name match of "instant-server".::
       random_value: ...,
       ssl: ...,
       runtime: ...,
-      - additional_headers:
-          key: ...,
+      additional_request_headers:
+        - key: ...,
+          value: ...
+      additional_response_headers:
+        - key: ...,
           value: ...
     validate:
       cluster_name: ...,
@@ -64,9 +67,12 @@ expects a cluster name match of "instant-server".::
       host_rewrite: ...,
       path_rewrite: ...,
       path_redirect: ...,
-      - header_fields:
-        key: ...,
-        value: ...
+      request_header_fields:
+        - key: ...,
+          value: ...
+      response_header_fields:
+        - key: ...,
+          value: ...
 
 test_name
   *(required, string)* The name of a test object.
@@ -109,7 +115,7 @@ input
     Only a random_value lesser than the fractional percentage defined on the route entry enables the
     route.
 
-  additional_headers
+  additional_request_headers, additional_response_headers
     *(optional, array)*  Additional headers to be added as input for route determination. The "authority",
     "path", "method", "x-forwarded-proto", and "x-envoy-internal" fields are specified by the other config
     options and should not be set here.
@@ -143,7 +149,7 @@ validate
   path_redirect
     *(optional, string)* Match the returned redirect path.
 
-  header_fields
+  request_header_fields, response_header_fields
     *(optional, array)*  Match the listed header fields. Examples header fields include the "path", "cookie",
     and "date" fields. The header fields are checked after all other test cases. Thus, the header fields checked
     will be those of the redirected or rewritten routes when applicable.
@@ -161,7 +167,7 @@ The router check tool will report route coverage at the end of a successful test
 
 .. code:: bash
 
-  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ...
   Current route coverage: 0.0744863
 
 This reporting can be leveraged to enforce a minimum coverage percentage by using
@@ -170,7 +176,7 @@ run will fail.
 
 .. code:: bash
 
-  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --fail-under 8
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --fail-under 8
   Current route coverage: 7.44863%
   Failed to meet coverage requirement: 8%
 
@@ -183,6 +189,6 @@ fields that could be tested.
 
 .. code:: bash
 
-  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --useproto --f 7 --covall
+  > bazel-bin/test/tools/router_check/router_check_tool --config-path ... --test-path ... --f 7 --covall
   Current route coverage: 6.2948%
   Failed to meet coverage requirement: 7%
