@@ -143,7 +143,8 @@ public:
 class MockRetryPolicyFactory : public RetryPolicyFactory {
 public:
   MOCK_METHOD(RetryPolicyExtensionSharedPtr, createRetryPolicy,
-              (const Protobuf::Message&, const Http::RequestHeaderMap&));
+              (const Protobuf::Message&, const Http::RequestHeaderMap&,
+               ProtobufMessage::ValidationVisitor&));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
 
   std::string name() const override { return "envoy.test_retry_policy"; }

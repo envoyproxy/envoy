@@ -3202,7 +3202,7 @@ virtual_hosts:
       .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
         return ProtobufTypes::MessagePtr{new test::common::router::SimpleRetryPolicy()};
       }));
-  EXPECT_CALL(factory, createRetryPolicy(_, _)).WillRepeatedly(Return(retry_policy));
+  EXPECT_CALL(factory, createRetryPolicy(_, _, _)).WillRepeatedly(Return(retry_policy));
 
   Registry::InjectFactory<RetryPolicyFactory> inject_policy_factory(factory);
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);

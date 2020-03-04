@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package envoy.extensions.retry_policy.conditional_retry.v3;
+
+import "envoy/config/route/v3/route_components.proto";
+
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.retry_policy.conditional_retry.v3";
+option java_outer_classname = "ConditionalRetryProto";
+option java_multiple_files = true;
+
+// [#protodoc-title: Conditional Retry Policy]
+// [#extension: envoy.retry_policy.conditional_retry]
+
+message ConditionalRetry {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.retry_policy.conditional_retry.v2.ConditionalRetry";
+
+  message RetryCondition {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.retry_policy.conditional_retry.v2.ConditionalRetry.RetryCondition";
+
+    // HTTP headers which must be present in the request for retries to be
+    // attempted.
+    config.route.v3.HeaderMatcher request_header = 1;
+
+    // Specifies the conditions under which retry takes place. These are the
+    // same
+    // conditions documented for
+    // :ref:`config_http_filters_router_x-envoy-retry-on` and
+    // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
+    string retry_on = 2;
+
+    // HTTP status codes that should trigger a retry in addition to those
+    // specified by retry_on.
+    repeated uint32 retriable_status_codes = 3;
+  }
+
+  // Specifies multiple retry conditions and retry policy under each condition.
+  // For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   retry_conditions:
+  //   - request_header:
+  //       name: ":method"
+  //       exact_match: "GET"
+  //     retry_on: "connect-failure, retriable-status-codes"
+  //     retriable_status_codes: [400, 404, 503]
+  //   - request_header:
+  //       name: ":method"
+  //       exact_match: "POST"
+  //     retry_on: "connect-failure"
+  //
+  // The above configuration shows how to configure different retry policies for
+  // different HTTP request methods.
+  repeated RetryCondition retry_conditions = 1;
+}

@@ -171,8 +171,8 @@ RetryPolicyImpl::retryPolicyExtension(const Http::RequestHeaderMap& request_head
     return nullptr;
   }
 
-  return retry_policy_config_.first->createRetryPolicy(*retry_policy_config_.second,
-                                                       request_header);
+  return retry_policy_config_.first->createRetryPolicy(*retry_policy_config_.second, request_header,
+                                                       *validation_visitor_);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,

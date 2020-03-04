@@ -275,8 +275,8 @@ public:
   virtual ~RetryPolicyFactory() = default;
 
   virtual RetryPolicyExtensionSharedPtr
-  createRetryPolicy(const Protobuf::Message& config,
-                    const Http::RequestHeaderMap& request_header) PURE;
+  createRetryPolicy(const Protobuf::Message& config, const Http::RequestHeaderMap& request_header,
+                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.retry_policy"; }
 };
