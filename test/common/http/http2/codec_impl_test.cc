@@ -711,7 +711,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  TestHeaderMapImpl expected_headers;
+  TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -811,7 +811,7 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  TestHeaderMapImpl expected_headers;
+  TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   request_encoder_->encodeHeaders(request_headers, false);
@@ -870,7 +870,7 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  TestHeaderMapImpl expected_headers;
+  TestRequestHeaderMapImpl expected_headers;
   HttpTestUtility::addDefaultHeaders(expected_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   request_encoder_->encodeHeaders(request_headers, false);

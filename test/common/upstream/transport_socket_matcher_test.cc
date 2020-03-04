@@ -84,7 +84,7 @@ public:
   }
 
   void validate(const envoy::config::core::v3::Metadata& metadata, const std::string& expected) {
-    auto& factory = matcher_->resolve(metadata).factory_;
+    auto& factory = matcher_->resolve(&metadata).factory_;
     const auto& config_factory = dynamic_cast<const FakeTransportSocketFactory&>(factory);
     EXPECT_EQ(expected, config_factory.id());
   }

@@ -194,6 +194,7 @@ void InstanceImpl::updateServerStats() {
   server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
                                        parent_stats.parent_memory_allocated_);
   server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+  server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
   server_stats_->parent_connections_.set(parent_stats.parent_connections_);
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);

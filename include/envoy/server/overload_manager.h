@@ -91,7 +91,7 @@ public:
 
   /**
    * Register a callback to be invoked when the specified overload action changes state
-   * (ie. becomes activated or inactivated). Must be called before the start method is called.
+   * (i.e., becomes activated or inactivated). Must be called before the start method is called.
    * @param action const std::string& the name of the overload action to register for
    * @param dispatcher Event::Dispatcher& the dispatcher on which callbacks will be posted
    * @param callback OverloadActionCb the callback to post when the overload action

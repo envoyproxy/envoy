@@ -65,9 +65,9 @@ public:
   void encodeResetStream();
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
   void readDisable(bool disable);
-  const Http::HeaderMap& headers() { return *headers_; }
+  const Http::RequestHeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
-  const Http::HeaderMapPtr& trailers() { return trailers_; }
+  const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
   bool receivedData() { return received_data_; }
 
   ABSL_MUST_USE_RESULT
@@ -176,14 +176,14 @@ public:
   }
 
 protected:
-  Http::HeaderMapPtr headers_;
+  Http::RequestHeaderMapPtr headers_;
 
 private:
   FakeHttpConnection& parent_;
   Http::ResponseEncoder& encoder_;
   Thread::MutexBasicLockable lock_;
   Thread::CondVar decoder_event_;
-  Http::HeaderMapPtr trailers_;
+  Http::RequestTrailerMapPtr trailers_;
   bool end_stream_{};
   Buffer::OwnedImpl body_;
   bool saw_reset_{};

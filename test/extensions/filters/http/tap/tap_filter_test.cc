@@ -28,12 +28,12 @@ public:
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
 public:
-  MOCK_METHOD(void, onRequestHeaders, (const Http::HeaderMap& headers));
+  MOCK_METHOD(void, onRequestHeaders, (const Http::RequestHeaderMap& headers));
   MOCK_METHOD(void, onRequestBody, (const Buffer::Instance& data));
-  MOCK_METHOD(void, onRequestTrailers, (const Http::HeaderMap& headers));
-  MOCK_METHOD(void, onResponseHeaders, (const Http::HeaderMap& headers));
+  MOCK_METHOD(void, onRequestTrailers, (const Http::RequestTrailerMap& headers));
+  MOCK_METHOD(void, onResponseHeaders, (const Http::ResponseHeaderMap& headers));
   MOCK_METHOD(void, onResponseBody, (const Buffer::Instance& data));
-  MOCK_METHOD(void, onResponseTrailers, (const Http::HeaderMap& headers));
+  MOCK_METHOD(void, onResponseTrailers, (const Http::ResponseTrailerMap& headers));
   MOCK_METHOD(bool, onDestroyLog, ());
 };
 
