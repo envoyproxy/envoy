@@ -37,7 +37,7 @@ A minimal fully static bootstrap config is provided below:
                 - match: { prefix: "/" }
                   route: { cluster: some_service }
             http_filters:
-            - name: envoy.router
+            - name: envoy.filters.http.router
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -89,7 +89,7 @@ on 127.0.0.1:5678 is provided below:
                 - match: { prefix: "/" }
                   route: { cluster: some_service }
             http_filters:
-            - name: envoy.router
+            - name: envoy.filters.http.router
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -229,7 +229,7 @@ The management server could respond to LDS requests with:
                   envoy_grpc:
                     cluster_name: xds_cluster
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
 
 The management server could respond to RDS requests with:
 

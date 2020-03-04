@@ -26,7 +26,9 @@ namespace Http1 {
 /**
  * All stats for the HTTP/1 codec. @see stats_macros.h
  */
-#define ALL_HTTP1_CODEC_STATS(COUNTER) COUNTER(metadata_not_supported_error)
+#define ALL_HTTP1_CODEC_STATS(COUNTER)                                                             \
+  COUNTER(metadata_not_supported_error)                                                            \
+  COUNTER(response_flood)
 
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
@@ -65,7 +67,7 @@ public:
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
   void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
-  void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
+  void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, bool end_stream);
   void encodeTrailersBase(const HeaderMap& headers);
 
   static const std::string CRLF;
@@ -110,8 +112,11 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-      : StreamEncoderImpl(connection, header_key_formatter) {}
+  using FloodChecks = std::function<void()>;
+
+  ResponseEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
+                      FloodChecks& flood_checks)
+      : StreamEncoderImpl(connection, header_key_formatter), flood_checks_(flood_checks) {}
 
   bool startedResponse() { return started_response_; }
 
@@ -121,6 +126,7 @@ public:
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
 private:
+  FloodChecks& flood_checks_;
   bool started_response_{};
 };
 
@@ -173,7 +179,7 @@ public:
   /**
    * Flush all pending output from encoding.
    */
-  void flushOutput();
+  void flushOutput(bool end_encode = false);
 
   void addToBuffer(absl::string_view data);
   void addCharToBuffer(char c);
@@ -186,6 +192,7 @@ public:
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
   virtual bool supports_http_10() { return false; }
   bool maybeDirectDispatch(Buffer::Instance& data);
+  virtual void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return enable_trailers_; }
 
@@ -328,6 +335,7 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
+  using FloodChecks = std::function<void()>;
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
                        ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
@@ -339,8 +347,9 @@ private:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter)
-        : response_encoder_(connection, header_key_formatter) {}
+    ActiveRequest(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
+                  FloodChecks& flood_checks)
+        : response_encoder_(connection, header_key_formatter, flood_checks) {}
 
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};
@@ -388,9 +397,21 @@ private:
     }
   }
 
+  void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
+  void maybeAddSentinelBufferFragment(Buffer::WatermarkBuffer& output_buffer) override;
+  void doFloodProtectionChecks() const;
+
   ServerConnectionCallbacks& callbacks_;
+  std::function<void()> flood_checks_{[&]() { this->doFloodProtectionChecks(); }};
   std::unique_ptr<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
+  const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
+  uint32_t outbound_responses_{};
+  // This defaults to 2, which functionally disables pipelining. If any users
+  // of Envoy wish to enable pipelining (which is dangerous and ill supported)
+  // we could make this configurable.
+  uint32_t max_outbound_responses_{};
+  bool flood_protection_{};
   // TODO(mattklein123): This should be a member of ActiveRequest but this change needs dedicated
   // thought as some of the reset and no header code paths make this difficult. Headers are
   // populated on message begin. Trailers are populated on the first parsed trailer field (if

@@ -329,8 +329,9 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a local error reply.
 TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
-  config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.addFilter(
+      "{ name: envoy.filters.http.grpc_http1_bridge, typed_config: { \"@type\": "
+      "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
 
   initialize();
@@ -489,7 +490,7 @@ TEST_P(IntegrationTest, Http09Enabled) {
   EXPECT_THAT(response, HasSubstr("connection: close"));
   EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 
-  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
@@ -508,7 +509,7 @@ TEST_P(IntegrationTest, Http10Enabled) {
   EXPECT_THAT(response, HasSubstr("connection: close"));
   EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 
-  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
@@ -534,7 +535,7 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
                                 &response, true);
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
 
-  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
@@ -565,7 +566,7 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndLwsNoContentLength) {
   EXPECT_THAT(response, Not(HasSubstr("content-length:")));
   EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 
-  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+  std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
@@ -576,7 +577,7 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndContentLengthAndLws) {
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
   reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
-      ->setResponseHeaders(std::make_unique<Http::TestHeaderMapImpl>(
+      ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
           Http::TestHeaderMapImpl({{":status", "200"}, {"content-length", "10"}})));
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -968,7 +969,7 @@ TEST_P(IntegrationTest, ViaAppendWith100Continue) {
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   // This test will trigger an early 413 Payload Too Large response due to buffer limits being
   // exceeded. The following filter is needed since the router filter will never trigger a 413.
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
@@ -1003,7 +1004,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
 // Test configuration of the delayed close timeout on downstream HTTP/1.1 connections. A value of 0
 // disables delayed close processing.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
@@ -1039,7 +1040,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
 TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
@@ -1174,6 +1175,55 @@ TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
   EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
                Network::Test::getLoopbackAddressString(GetParam()).c_str());
+}
+
+// Send continuous pipelined requests while not reading responses, to check
+// HTTP/1.1 response flood protection.
+TEST_P(IntegrationTest, TestFlood) {
+  initialize();
+
+  // Set up a raw connection to easily send requests without reading responses.
+  Network::ClientConnectionPtr raw_connection = makeClientConnection(lookupPort("http"));
+  raw_connection->connect();
+
+  // Read disable so responses will queue up.
+  uint32_t bytes_to_send = 0;
+  raw_connection->readDisable(true);
+  // Track locally queued bytes, to make sure the outbound client queue doesn't back up.
+  raw_connection->addBytesSentCallback([&](uint64_t bytes) { bytes_to_send -= bytes; });
+
+  // Keep sending requests until flood protection kicks in and kills the connection.
+  while (raw_connection->state() == Network::Connection::State::Open) {
+    // These requests are missing the host header, so will provoke an internally generated error
+    // response from Envoy.
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\n\r\n");
+    bytes_to_send += buffer.length();
+    raw_connection->write(buffer, false);
+    // Loop until all bytes are sent.
+    while (bytes_to_send > 0 && raw_connection->state() == Network::Connection::State::Open) {
+      raw_connection->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  // Verify the connection was closed due to flood protection.
+  EXPECT_EQ(1, test_server_->counter("http1.response_flood")->value());
+}
+
+// Make sure flood protection doesn't kick in with many requests sent serially.
+TEST_P(IntegrationTest, TestManyBadRequests) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl bad_request{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}};
+
+  for (int i = 0; i < 1; ++i) {
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(bad_request);
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_THAT(response->headers(), HttpStatusIs("400"));
+  }
+  EXPECT_EQ(0, test_server_->counter("http1.response_flood")->value());
 }
 
 } // namespace Envoy

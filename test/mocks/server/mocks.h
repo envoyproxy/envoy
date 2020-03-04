@@ -156,7 +156,7 @@ public:
                Stats::ScopePtr&& listener_scope));
   MOCK_METHOD(Http::Code, request,
               (absl::string_view path_and_query, absl::string_view method,
-               Http::HeaderMap& response_headers, std::string& body));
+               Http::ResponseHeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
 
   NiceMock<MockConfigTracker> config_tracker_;
@@ -170,7 +170,7 @@ public:
   MOCK_METHOD(void, setEndStreamOnComplete, (bool));
   MOCK_METHOD(void, addOnDestroyCallback, (std::function<void()>));
   MOCK_METHOD(const Buffer::Instance*, getRequestBody, (), (const));
-  MOCK_METHOD(Http::HeaderMap&, getRequestHeaders, (), (const));
+  MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const));
   MOCK_METHOD(NiceMock<Http::MockStreamDecoderFilterCallbacks>&, getDecoderFilterCallbacks, (),
               (const));
 };
@@ -406,6 +406,7 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
+  MOCK_METHOD(void, flushStats, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
@@ -485,6 +486,7 @@ public:
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
@@ -496,6 +498,7 @@ public:
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
@@ -533,6 +536,7 @@ public:
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
@@ -552,6 +556,7 @@ public:
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
+  testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
