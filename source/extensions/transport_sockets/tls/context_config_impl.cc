@@ -377,7 +377,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       disable_session_tickets_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, disable_session_tickets, false)) {
 
-  if (disable_session_tickets_ & session_ticket_keys_provider_ != nullptr) {
+  if (disable_session_tickets_ && session_ticket_keys_provider_ != nullptr) {
     throw EnvoyException(
         fmt::format("TLS session tickets have been disabled, but either session_ticket_keys or "
                     "session_ticket_keys_sds_secret_config has been set"));
