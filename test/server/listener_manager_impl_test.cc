@@ -17,6 +17,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
+#include "common/init/manager_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/utility.h"
@@ -25,6 +26,7 @@
 #include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/mocks/init/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -33,13 +35,15 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
-using testing::AtLeast;
-using testing::InSequence;
-using testing::Throw;
-
 namespace Envoy {
 namespace Server {
 namespace {
+
+using testing::AtLeast;
+using testing::InSequence;
+using testing::Return;
+using testing::ReturnRef;
+using testing::Throw;
 
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
@@ -671,6 +675,120 @@ filter_chains:
   checkStats(1, 0, 0, 0, 1, 0);
 
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// Tests that when listener tears down, server's initManager is notified.
+TEST_F(ListenerManagerImplTest, ListenerTeardownNotifiesServerInitManager) {
+  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
+
+  InSequence s;
+
+  auto* lds_api = new MockLdsApi();
+  EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
+  envoy::config::core::v3::ConfigSource lds_config;
+  manager_->createLdsApi(lds_config);
+
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
+  checkConfigDump(R"EOF(
+static_listeners:
+)EOF");
+
+  const std::string listener_foo_yaml = R"EOF(
+name: "foo"
+address:
+  socket_address:
+    address: "127.0.0.1"
+    port_value: 1234
+filter_chains: {}
+  )EOF";
+
+  Init::ManagerImpl server_init_mgr("server-init-manager");
+  Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
+  { // Add and remove a listener before starting workers.
+    ListenerHandle* listener_foo = expectListenerCreate(true, true);
+    EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+    EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml),
+                                              "version1", true));
+    checkStats(1, 0, 0, 0, 1, 0);
+
+    EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version1"));
+    checkConfigDump(R"EOF(
+version_info: version1
+static_listeners:
+dynamic_listeners:
+  - name: foo
+    warming_state:
+      version_info: version1
+      listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
+        name: foo
+        address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1234
+        filter_chains: {}
+      last_updated:
+        seconds: 1001001001
+        nanos: 1000000
+)EOF");
+    EXPECT_CALL(listener_foo->target_, initialize()).Times(1);
+    server_init_mgr.initialize(server_init_watcher);
+    // Since listener_foo->target_ is not ready, the listener's listener_init_target will not be
+    // ready until the destruction happens.
+    server_init_watcher.expectReady().Times(1);
+    EXPECT_CALL(*listener_foo, onDestroy());
+    EXPECT_TRUE(manager_->removeListener("foo"));
+  }
+  // Listener foo's listener_init_target_ is the only target added to server_init_mgr.
+  EXPECT_EQ(server_init_mgr.state(), Init::Manager::State::Initialized);
+
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
+  checkConfigDump(R"EOF(
+static_listeners:
+)EOF");
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
+  // initialized, as no target will be added to it.
+  time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
+  EXPECT_CALL(server_, initManager()).Times(0); // No target added to server init manager.
+  server_init_watcher.expectReady().Times(0);
+  {
+    ListenerHandle* listener_foo2 = expectListenerCreate(true, true);
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+    // Version 2 listener will be initialized by listener manager directly.
+    EXPECT_CALL(listener_foo2->target_, initialize()).Times(1);
+    EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml),
+                                              "version2", true));
+    // Version2 is in warming list as listener_foo2->target_ is not ready yet.
+    checkStats(/*added=*/2, 0, /*removed=*/1, /*warming=*/1, 0, 0);
+    EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version2"));
+    checkConfigDump(R"EOF(
+  version_info: version2
+  static_listeners:
+  dynamic_listeners:
+    - name: foo
+      warming_state:
+        version_info: version2
+        listener:
+          "@type": type.googleapis.com/envoy.api.v2.Listener
+          name: foo
+          address:
+            socket_address:
+              address: 127.0.0.1
+              port_value: 1234
+          filter_chains: {}
+        last_updated:
+          seconds: 2002002002
+          nanos: 2000000
+  )EOF");
+    // Delete foo-listener again.
+    EXPECT_CALL(*listener_foo2, onDestroy());
+    EXPECT_TRUE(manager_->removeListener("foo"));
+  }
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {

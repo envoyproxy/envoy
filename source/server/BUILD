@@ -322,6 +322,7 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
+        "//source/common/init:target_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",

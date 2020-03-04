@@ -486,6 +486,7 @@ public:
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
@@ -497,6 +498,7 @@ public:
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
@@ -534,6 +536,7 @@ public:
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
@@ -553,6 +556,7 @@ public:
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
+  testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
