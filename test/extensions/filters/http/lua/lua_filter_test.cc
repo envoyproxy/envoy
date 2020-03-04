@@ -1382,8 +1382,8 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidAsynchronousFlag) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_,
-              scriptLog(spdlog::level::err,
-                        StrEq("[string \"...\"]:3: http call asynchronous flag must be 'true', 'false', or empty")));
+              scriptLog(spdlog::level::err, StrEq("[string \"...\"]:3: http call asynchronous flag "
+                                                  "must be 'true', 'false', or empty")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
