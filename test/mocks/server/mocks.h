@@ -638,8 +638,7 @@ public:
   MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
-  std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
-      server_factory_context_;
+  testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
 };
 
 } // namespace Configuration

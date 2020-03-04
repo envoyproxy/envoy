@@ -94,7 +94,7 @@ TEST_F(XRayDriverTest, NoXRayTracerHeader) {
 
 TEST_F(XRayDriverTest, EmptySegmentNameDefaultToClusterName) {
   const std::string cluster_name = "FooBar";
-  EXPECT_CALL(context_.server_factory_context_->local_info_, clusterName())
+  EXPECT_CALL(context_.server_factory_context_.local_info_, clusterName())
       .WillRepeatedly(ReturnRef(cluster_name));
   XRayConfiguration config{"" /*daemon_endpoint*/, "", "" /*sampling_rules*/};
   Driver driver(config, context_);

@@ -272,10 +272,8 @@ MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
 MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
 
-MockTracerFactoryContext::MockTracerFactoryContext()
-    : server_factory_context_(
-          std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()) {
-  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
+MockTracerFactoryContext::MockTracerFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }

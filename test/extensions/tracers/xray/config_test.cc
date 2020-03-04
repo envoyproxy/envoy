@@ -54,7 +54,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
   EXPECT_CALL(file_system, fileReadToEnd("rules.json"))
       .WillRepeatedly(Throw(EnvoyException("failed to open file.")));
   EXPECT_CALL(api, fileSystem()).WillRepeatedly(ReturnRef(file_system));
-  EXPECT_CALL(*context.server_factory_context_, api()).WillRepeatedly(ReturnRef(api));
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(ReturnRef(api));
 
   const std::string yaml_string = R"EOF(
   http:
