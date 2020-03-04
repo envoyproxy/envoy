@@ -111,6 +111,11 @@ public:
 class ServerFactoryContext : public virtual CommonFactoryContext {
 public:
   ~ServerFactoryContext() override = default;
+
+  /**
+   * @return the server-wide grpc context.
+   */
+  virtual Grpc::Context& grpcContext() PURE;
 };
 
 /**

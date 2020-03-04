@@ -165,11 +165,6 @@ public:
   virtual void onEncodeComplete() PURE;
 
   /**
-   * Called when headers are encoded.
-   */
-  virtual void onEncodeHeaders(const HeaderMap& headers) PURE;
-
-  /**
    * Called when resetStream() has been called on an active stream. In HTTP/1.1 the only
    * valid operation after this point is for the connection to get blown away, but we will not
    * fire any more callbacks in case some stack has to unwind.
@@ -231,7 +226,8 @@ protected:
 private:
   enum class HeaderParsingState { Field, Value, Done };
 
-  virtual HeaderMap& headers() PURE;
+  virtual HeaderMap& headersOrTrailers() PURE;
+  virtual RequestOrResponseHeaderMap& requestOrResponseHeaders() PURE;
   virtual void allocHeaders() PURE;
   virtual void maybeAllocTrailers() PURE;
 
@@ -305,7 +301,7 @@ private:
   /**
    * Send a protocol error response to remote.
    */
-  virtual void sendProtocolError(absl::string_view details = "") PURE;
+  virtual void sendProtocolError(absl::string_view details) PURE;
 
   /**
    * Called when output_buffer_ or the underlying connection go from below a low watermark to over
@@ -365,11 +361,10 @@ private:
    * @param headers the request's headers
    * @throws CodecProtocolException on an invalid url in the request line
    */
-  void handlePath(HeaderMap& headers, unsigned int method);
+  void handlePath(RequestHeaderMap& headers, unsigned int method);
 
   // ConnectionImpl
   void onEncodeComplete() override;
-  void onEncodeHeaders(const HeaderMap&) override {}
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete() override;
@@ -379,12 +374,15 @@ private:
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
-  HeaderMap& headers() override {
+  HeaderMap& headersOrTrailers() override {
     if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
       return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
     } else {
       return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
     }
+  }
+  RequestOrResponseHeaderMap& requestOrResponseHeaders() override {
+    return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
@@ -403,7 +401,7 @@ private:
 
   ServerConnectionCallbacks& callbacks_;
   std::function<void()> flood_checks_{[&]() { this->doFloodProtectionChecks(); }};
-  std::unique_ptr<ActiveRequest> active_request_;
+  absl::optional<ActiveRequest> active_request_;
   Http1Settings codec_settings_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
@@ -434,17 +432,18 @@ public:
 
 private:
   struct PendingResponse {
-    PendingResponse(ResponseDecoder* decoder) : decoder_(decoder) {}
+    PendingResponse(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter,
+                    ResponseDecoder* decoder)
+        : encoder_(connection, header_key_formatter), decoder_(decoder) {}
 
+    RequestEncoderImpl encoder_;
     ResponseDecoder* decoder_;
-    bool head_request_{};
   };
 
   bool cannotHaveBody();
 
   // ConnectionImpl
   void onEncodeComplete() override {}
-  void onEncodeHeaders(const HeaderMap& headers) override;
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete() override;
@@ -454,12 +453,15 @@ private:
   void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
-  HeaderMap& headers() override {
+  HeaderMap& headersOrTrailers() override {
     if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
       return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     } else {
       return *absl::get<ResponseTrailerMapPtr>(headers_or_trailers_);
     }
+  }
+  RequestOrResponseHeaderMap& requestOrResponseHeaders() override {
+    return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
   }
   void allocHeaders() override {
     ASSERT(nullptr == absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
@@ -473,8 +475,7 @@ private:
     }
   }
 
-  std::unique_ptr<RequestEncoderImpl> request_encoder_;
-  std::list<PendingResponse> pending_responses_;
+  absl::optional<PendingResponse> pending_response_;
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
   // TODO(mattklein123): This should be a member of PendingResponse but this change needs dedicated
