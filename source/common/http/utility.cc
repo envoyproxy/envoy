@@ -758,7 +758,6 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   const auto colon_pos = host.rfind(':');
   absl::string_view host_to_resolve = host;
   absl::optional<uint16_t> port;
-
   if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
     const absl::string_view string_view_host = host;
     host_to_resolve = string_view_host.substr(0, colon_pos);
