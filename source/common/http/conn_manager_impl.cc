@@ -182,7 +182,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose() {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay);
+    doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt);
   }
 }
 
@@ -278,13 +278,10 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 void ConnectionManagerImpl::handleCodecException(const char* error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
 
-  // In the protocol error case, we need to reset all streams now. The connection might stick around
-  // long enough for a pending stream to come back and try to encode.
-  resetAllStreams(StreamInfo::ResponseFlag::DownstreamProtocolError);
-
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
   // GOAWAY.
-  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay);
+  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay,
+                    StreamInfo::ResponseFlag::DownstreamProtocolError);
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
@@ -426,14 +423,19 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
     // a local connection close, so we still guard against that here. A better solution would be to
     // have some type of "pre-close" callback that we could hook for cleanup that would get called
-    // regardless of where local close is invoked from. Note that this will cause this method to
-    // get called twice in the common local close cases, but the method protects against that.
-    doConnectionClose(absl::nullopt);
+    // regardless of where local close is invoked from.
+    // NOTE: that this will cause doConnectionClose() to get called twice in the common local close
+    // cases, but the method protects against that.
+    // NOTE: In the case where a local close comes from outside the filter, this will cause any
+    // stream closures to increment remote close stats. We should do better here in the future,
+    // via the pre-close callback mentioned above.
+    doConnectionClose(absl::nullopt, absl::nullopt);
   }
 }
 
 void ConnectionManagerImpl::doConnectionClose(
-    absl::optional<Network::ConnectionCloseType> close_type) {
+    absl::optional<Network::ConnectionCloseType> close_type,
+    absl::optional<StreamInfo::ResponseFlag> response_flag) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
     connection_idle_timer_.reset();
@@ -462,7 +464,10 @@ void ConnectionManagerImpl::doConnectionClose(
 
     stats_.named_.downstream_cx_destroy_active_rq_.inc();
     user_agent_.onConnectionDestroy(event, true);
-    resetAllStreams(absl::nullopt);
+    // Note that resetAllStreams() does not actually write anything to the wire. It just resets
+    // all upstream streams and their filter stacks. Thus, there are no issues around recursive
+    // entry.
+    resetAllStreams(response_flag);
   }
 
   if (close_type.has_value()) {
@@ -481,7 +486,7 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite);
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
@@ -492,7 +497,7 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
   stats_.named_.downstream_cx_max_duration_reached_.inc();
   if (!codec_) {
     // Attempt to write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite);
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
