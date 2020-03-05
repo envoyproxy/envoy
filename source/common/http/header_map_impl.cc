@@ -476,7 +476,7 @@ void HeaderMapImpl::iterateReverse(ConstIterateCb cb, void* context) const {
 HeaderMap::Lookup HeaderMapImpl::lookup(const LowerCaseString& key,
                                         const HeaderEntry** entry) const {
   // The accessor callbacks for predefined inline headers take a HeaderMapImpl& as an argument;
-  // even though we don't make any modifications, we need to cast_cast in order to use the
+  // even though we don't make any modifications, we need to const_cast in order to use the
   // accessor.
   //
   // Making this work without const_cast would require managing an additional const accessor
