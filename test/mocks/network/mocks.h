@@ -467,5 +467,12 @@ public:
               (BalancedConnectionHandler & current_handler));
 };
 
+class MockDrainingFilterChains : public DrainingFilterChains {
+public:
+  MockDrainingFilterChains();
+  ~MockDrainingFilterChains() override;
+  MOCK_METHOD(uint64_t, getDrainingListenerTag, (), (const));
+  MOCK_METHOD(const std::list<const FilterChain*>&, getDrainingFilterChains, (), (const));
+};
 } // namespace Network
 } // namespace Envoy

@@ -1,5 +1,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
+#include "envoy/network/filter.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 
@@ -797,7 +798,58 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilterThrowsException) {
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
+  /*
+   * AddTcpListener
+   * AddTcpListener (overridden)
+   * new connection with old filter chain
+   * new connection with new filter chain
+   */
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
+  InSequence s;
+  uint64_t listener_tag = 1;
+  Network::ListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  Network::MockConnection* server_connection = new NiceMock<Network::MockConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(server_connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   
+  EXPECT_EQ(1UL, handler_->numConnections());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
+  EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
+
+  Network::MockDrainingFilterChains mock_draining_filter_chains;
+  EXPECT_CALL(mock_draining_filter_chains, getDrainingListenerTag).WillOnce(Return(listener_tag));
+  const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
+  EXPECT_CALL(mock_draining_filter_chains, getDrainingFilterChains)
+      .WillOnce(ReturnRef(filter_chains));
+
+  // The completition callback is scheduled
+  handler_->removeFilterChains(mock_draining_filter_chains,
+                               []() { ENVOY_LOG(debug, "removed filter chains"); });
+  // Trigger the deletion if any.
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(0UL, handler_->numConnections());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  EXPECT_CALL(*listener, onDestroy());
+  handler_.reset();
 }
 } // namespace
 } // namespace Server
