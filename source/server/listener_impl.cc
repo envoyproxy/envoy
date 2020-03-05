@@ -65,7 +65,6 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& facto
   if (socket_ && local_address_->ip() && local_address_->ip()->port() == 0) {
     local_address_ = socket_->localAddress();
   }
-
   ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
             local_address_->asString());
 }
@@ -126,8 +125,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
-                           uint32_t concurrency)
+                           uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       filter_chain_manager_(address_, *this),
       global_scope_(parent_.server_.stats().createScope("")),
@@ -139,10 +137,23 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
-      workers_started_(workers_started), hash_(hash), validation_visitor_(validation_visitor),
-      dynamic_init_manager_(fmt::format("Listener {}", name)),
-      init_watcher_(std::make_unique<Init::WatcherImpl>(
-          "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
+      workers_started_(workers_started), hash_(hash),
+      validation_visitor_(
+          added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
+                         : parent_.server_.messageValidationContext().staticValidationVisitor()),
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
+                          [this] {
+                            if (workers_started_) {
+                              parent_.onListenerWarmed(*this);
+                            } else {
+                              // Notify Server that this listener is
+                              // ready.
+                              listener_init_target_.ready();
+                            }
+                          }),
+      listener_init_target_(fmt::format("Listener-init-target {}", name),
+                            [this]() { dynamic_init_manager_.initialize(local_init_watcher_); }),
+      dynamic_init_manager_(fmt::format("Listener-local-init-manager {}", name)),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
@@ -226,8 +237,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
-  transport_factory_context.setInitManager(initManager());
+      parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
+  transport_factory_context.setInitManager(dynamic_init_manager_);
   // The init manager is a little messy. Will refactor when filter chain manager could accept
   // network filter chain update.
   // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
@@ -304,15 +315,14 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
-}
 
-ListenerImpl::~ListenerImpl() {
-  // The filter factories may have pending initialize actions (like in the case of RDS). Those
-  // actions will fire in the destructor to avoid blocking initial server startup. If we are using
-  // a local init manager we should block the notification from trying to move us from warming to
-  // active. This is done here explicitly by resetting the watcher and then clearing the factory
-  // vector for clarity.
-  init_watcher_.reset();
+  if (!workers_started_) {
+    // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
+    // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
+    // listener constructor so that this listener's children entities could register their targets
+    // with their parent's initManager.
+    parent_.server_.initManager().add(listener_init_target_);
+  }
 }
 
 AccessLog::AccessLogManager& ListenerImpl::accessLogManager() {
@@ -345,6 +355,9 @@ envoy::config::core::v3::TrafficDirection ListenerImpl::direction() const {
 TimeSource& ListenerImpl::timeSource() { return api().timeSource(); }
 
 const Network::ListenerConfig& ListenerImpl::listenerConfig() const { return *this; }
+ProtobufMessage::ValidationContext& ListenerImpl::messageValidationContext() {
+  return getServerFactoryContext().messageValidationContext();
+}
 ProtobufMessage::ValidationVisitor& ListenerImpl::messageValidationVisitor() {
   return validation_visitor_;
 }
@@ -395,18 +408,22 @@ void ListenerImpl::initialize() {
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // by resetting the watcher.
   if (workers_started_) {
-    dynamic_init_manager_.initialize(*init_watcher_);
+    ENVOY_LOG_MISC(debug, "Initialize listener {} local-init-manager.", name_);
+    // If workers_started_ is true, dynamic_init_manager_ should be initialized by listener manager
+    // directly.
+    dynamic_init_manager_.initialize(local_init_watcher_);
   }
 }
 
-Init::Manager& ListenerImpl::initManager() {
-  // See initialize() for why we choose different init managers to return.
-  if (workers_started_) {
-    return dynamic_init_manager_;
-  } else {
-    return parent_.server_.initManager();
+ListenerImpl::~ListenerImpl() {
+  if (!workers_started_) {
+    // We need to remove the listener_init_target_ handle from parent's initManager(), to unblock
+    // parent's initManager to get ready().
+    listener_init_target_.ready();
   }
 }
+
+Init::Manager& ListenerImpl::initManager() { return dynamic_init_manager_; }
 
 void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory) {
   ASSERT(!socket_factory_);

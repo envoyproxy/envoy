@@ -73,8 +73,7 @@ public:
     MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
     mem_block.appendOne(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
-      const StatName name = names[i];
-      mem_block.appendData(absl::MakeSpan(name.sizeAndData(), name.size()));
+      SymbolTableImpl::Encoding::appendToMemBlock(names[i], mem_block);
     }
 
     // This assertion double-checks the arithmetic where we computed

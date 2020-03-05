@@ -1632,13 +1632,15 @@ protected:
 
   void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
     Stats::StatNameManagedStorage storage(name, *symbol_table_);
-    counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
+    Stats::StatName stat_name = storage.statName();
+    counters_.push_back(alloc_.makeCounter(stat_name, stat_name, cluster_tags));
   }
 
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
     Stats::StatNameManagedStorage storage(name, *symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
-                                       Stats::Gauge::ImportMode::Accumulate));
+    Stats::StatName stat_name = storage.statName();
+    gauges_.push_back(
+        alloc_.makeGauge(stat_name, stat_name, cluster_tags, Stats::Gauge::ImportMode::Accumulate));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
@@ -1654,6 +1656,9 @@ protected:
 
   void clearStorage() {
     pool_.clear();
+    counters_.clear();
+    gauges_.clear();
+    histograms_.clear();
     EXPECT_EQ(0, symbol_table_->numSymbols());
   }
 
