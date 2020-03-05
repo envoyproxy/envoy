@@ -27,6 +27,7 @@ envoy_cc_test(
     srcs = ["isolated_store_impl_test.cc"],
     deps = [
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:symbol_table_creator_lib",
     ],
 )
 

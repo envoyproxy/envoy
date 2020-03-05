@@ -173,6 +173,16 @@ void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_blo
   mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
 }
 
+void SymbolTableImpl::Encoding::appendToMemBlock(StatName stat_name,
+                                                 MemBlockBuilder<uint8_t>& mem_block) {
+  const uint8_t* data = stat_name.dataIncludingSize();
+  if (data == nullptr) {
+    mem_block.appendOne(0);
+  } else {
+    mem_block.appendData(absl::MakeSpan(data, stat_name.size()));
+  }
+}
+
 SymbolTableImpl::SymbolTableImpl()
     // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
     : next_symbol_(FirstValidSymbol), monotonic_counter_(FirstValidSymbol) {}
@@ -516,7 +526,9 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
 SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
-    num_bytes += stat_name.dataSize();
+    if (!stat_name.empty()) {
+      num_bytes += stat_name.dataSize();
+    }
   }
   MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
@@ -543,8 +555,8 @@ void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names, St
   mem_block.appendOne(num_names);
   for (uint32_t i = 0; i < num_names; ++i) {
     const StatName stat_name = names[i];
+    Encoding::appendToMemBlock(stat_name, mem_block);
     incRefCount(stat_name);
-    mem_block.appendData(absl::MakeSpan(stat_name.sizeAndData(), stat_name.size()));
   }
 
   // This assertion double-checks the arithmetic where we computed

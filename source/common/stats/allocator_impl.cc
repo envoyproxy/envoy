@@ -49,7 +49,7 @@ void AllocatorImpl::debugPrint() {
 // wasted in the alignment padding next to flags_.
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
-  StatsSharedImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
+  StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
                   const StatNameTagVector& stat_name_tags)
       : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
         alloc_(alloc) {}
@@ -121,7 +121,7 @@ protected:
 
 class CounterImpl : public StatsSharedImpl<Counter> {
 public:
-  CounterImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
+  CounterImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
               const StatNameTagVector& stat_name_tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
 
@@ -149,7 +149,7 @@ private:
 
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
-  GaugeImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
+  GaugeImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
             const StatNameTagVector& stat_name_tags, ImportMode import_mode)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
     switch (import_mode) {
@@ -228,7 +228,7 @@ public:
   }
 };
 
-CounterSharedPtr AllocatorImpl::makeCounter(StatName name, absl::string_view tag_extracted_name,
+CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,
                                             const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
@@ -241,7 +241,7 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, absl::string_view tag
   return counter;
 }
 
-GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_extracted_name,
+GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_name,
                                         const StatNameTagVector& stat_name_tags,
                                         Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);

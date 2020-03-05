@@ -35,7 +35,7 @@ public:
    * @return CounterSharedPtr a counter, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
+  virtual CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
                                        const StatNameTagVector& stat_name_tags) PURE;
 
   /**
@@ -45,7 +45,7 @@ public:
    * @return GaugeSharedPtr a gauge, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
+  virtual GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
                                    const StatNameTagVector& stat_name_tags,
                                    Gauge::ImportMode import_mode) PURE;
 
