@@ -89,8 +89,8 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   // other. This is achieved by exploiting per-request data objects StreamInfo::FilterState: upon
   // setting up a CompressorFilter, the new instance registers itself in the filter state. Then in
   // the method isAcceptEncodingAllowed() the first filter is making a decision which encoder needs
-  // to be used for a request, with e.g. "Accept-Encoding: br;q=0.75, gzip;q=0.5", and caches it in
-  // the state. All other compression filters in the sequence use the cached decision.
+  // to be used for a request, with e.g. "Accept-Encoding: deflate;q=0.75, gzip;q=0.5", and caches
+  // it in the state. All other compression filters in the sequence use the cached decision.
   const StreamInfo::FilterStateSharedPtr& filter_state = callbacks.streamInfo().filterState();
   if (filter_state->hasData<CompressorRegistry>(key)) {
     CompressorRegistry& registry = filter_state->getDataMutable<CompressorRegistry>(key);
@@ -181,12 +181,12 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // A compressor filter may be limited to compress certain Content-Types. If the response's
     // content type doesn't match the list of content types this filter is enabled for then
     // it must be excluded from the decision process.
-    // For example, there are two compressor filters in the chain e.g. "gzip" and "brotli".
-    // "gzip" is configured to compress only "text/html" and "brotli" is configured to compress only
-    // "application/javascript". Then comes a request with Accept-Encoding header "gzip;q=1,
-    // br;q=.5". The corresponding response content type is "application/javascript". If "gzip" is
-    // not excluded from the decision process then it will take precedence over "brotli" and the
-    // resulting response won't be compressed at all.
+    // For example, there are two compressor filters in the chain e.g. "gzip" and "deflate".
+    // "gzip" is configured to compress only "text/html" and "deflate" is configured to compress
+    // only "application/javascript". Then comes a request with Accept-Encoding header
+    // "gzip;q=1,deflate;q=.5". The corresponding response content type is "application/javascript".
+    // If "gzip" is not excluded from the decision process then it will take precedence over
+    // "deflate" and the resulting response won't be compressed at all.
     if (!content_type_value.empty() && !filter_config->contentTypeValues().empty()) {
       auto iter = filter_config->contentTypeValues().find(content_type_value);
       if (iter == filter_config->contentTypeValues().end()) {
