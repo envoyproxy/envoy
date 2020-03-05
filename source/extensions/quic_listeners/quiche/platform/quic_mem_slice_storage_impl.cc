@@ -18,7 +18,7 @@ namespace quic {
 // Buffer::OwnedImpl allocates memory on its own. Investigate if a customized
 // QuicBufferAllocator can improve cache hit.
 QuicMemSliceStorageImpl::QuicMemSliceStorageImpl(const iovec* iov, int iov_count,
-                                                 QuicBufferAllocator* /*allocator*/,
+                                                 QuicBufferAllocator* allocator,
                                                  const QuicByteCount max_slice_len) {
   if (iov == nullptr) {
     return;
@@ -30,19 +30,10 @@ QuicMemSliceStorageImpl::QuicMemSliceStorageImpl(const iovec* iov, int iov_count
   size_t io_offset = 0;
   while (io_offset < write_len) {
     size_t slice_len = std::min(write_len - io_offset, max_slice_len);
-    Envoy::Buffer::RawSlice slice;
-    // Populate a temporary buffer instance and then move it to |buffer_|. This is necessary because
-    // consecutive reserve/commit can return addresses in same slice which violates the restriction
-    // of |max_slice_len| when ToSpan() is called.
-    Envoy::Buffer::OwnedImpl buffer;
-    uint16_t num_slice = buffer.reserve(slice_len, &slice, 1);
-    ASSERT(num_slice == 1);
-    QuicUtils::CopyToBuffer(iov, iov_count, io_offset, slice_len, static_cast<char*>(slice.mem_));
+    quic::QuicUniqueBufferPtr buffer = quic::MakeUniqueBuffer(allocator, slice_len);
+    QuicUtils::CopyToBuffer(iov, iov_count, io_offset, slice_len, buffer.get());
+    mem_slices_.emplace_back(std::move(buffer), slice_len);
     io_offset += slice_len;
-    // OwnedImpl may return a slice longer than needed, trim it to requested length.
-    slice.len_ = slice_len;
-    buffer.commit(&slice, num_slice);
-    buffer_.move(buffer);
   }
 }
 

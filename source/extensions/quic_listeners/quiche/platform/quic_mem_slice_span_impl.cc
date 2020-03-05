@@ -11,11 +11,15 @@
 namespace quic {
 
 quiche::QuicheStringPiece QuicMemSliceSpanImpl::GetData(size_t index) {
-  uint64_t num_slices = buffer_->getRawSlices(nullptr, 0);
-  ASSERT(num_slices > index);
-  absl::FixedArray<Envoy::Buffer::RawSlice> slices(num_slices);
-  buffer_->getRawSlices(slices.begin(), num_slices);
-  return {reinterpret_cast<char*>(slices[index].mem_), slices[index].len_};
+  if (buffer_ != nullptr) {
+    uint64_t num_slices = buffer_->getRawSlices(nullptr, 0);
+    ASSERT(num_slices > index);
+    absl::FixedArray<Envoy::Buffer::RawSlice> slices(num_slices);
+    buffer_->getRawSlices(slices.begin(), num_slices);
+    return {reinterpret_cast<char*>(slices[index].mem_), slices[index].len_};
+  }
+  ASSERT(span_.size() > index);
+  return {span_[index].data(), span_[index].length()};
 }
 
 } // namespace quic

@@ -20,26 +20,29 @@ public:
   QuicMemSliceStorageImpl(const iovec* iov, int iov_count, QuicBufferAllocator* allocator,
                           const QuicByteCount max_slice_len);
 
-  QuicMemSliceStorageImpl(const QuicMemSliceStorageImpl& other) { buffer_.add(other.buffer_); }
+  QuicMemSliceStorageImpl(const QuicMemSliceStorageImpl& other) { *this = other; }
 
   QuicMemSliceStorageImpl& operator=(const QuicMemSliceStorageImpl& other) {
     if (this != &other) {
-      if (buffer_.length() > 0) {
-        buffer_.drain(buffer_.length());
+      for (auto& mem_slice : other.mem_slices_) {
+        Envoy::Buffer::OwnedImpl buffer;
+        buffer.add(mem_slice.data(), mem_slice.length());
+        mem_slices_.emplace_back(buffer, mem_slice.length());
       }
-      buffer_.add(other.buffer_);
     }
     return *this;
   }
   QuicMemSliceStorageImpl(QuicMemSliceStorageImpl&& other) = default;
   QuicMemSliceStorageImpl& operator=(QuicMemSliceStorageImpl&& other) = default;
 
-  QuicMemSliceSpan ToSpan() { return QuicMemSliceSpan(QuicMemSliceSpanImpl(buffer_)); }
+  QuicMemSliceSpan ToSpan() {
+    return QuicMemSliceSpan(QuicMemSliceSpanImpl(absl::Span<quic::QuicMemSliceImpl>(mem_slices_)));
+  }
 
-  void Append(QuicMemSliceImpl mem_slice) { buffer_.move(mem_slice.single_slice_buffer()); }
+  void Append(QuicMemSliceImpl mem_slice) { mem_slices_.push_back(std::move(mem_slice)); }
 
 private:
-  Envoy::Buffer::OwnedImpl buffer_;
+  std::vector<quic::QuicMemSliceImpl> mem_slices_;
 };
 
 } // namespace quic
