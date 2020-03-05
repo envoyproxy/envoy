@@ -92,12 +92,11 @@ public:
   bool featureEnabled(absl::string_view key,
                       const envoy::type::v3::FractionalPercent& default_value,
                       uint64_t random_value) const override;
-  const std::string& get(absl::string_view key, const std::string& default_value) const override;
+  ConstStringOptRef get(absl::string_view key) const override;
   uint64_t getInteger(absl::string_view key, uint64_t default_value) const override;
   double getDouble(absl::string_view key, double default_value) const override;
   bool getBoolean(absl::string_view key, bool value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
-  bool exists(absl::string_view key) const override { return values_.contains(key); }
 
   static Entry createEntry(const std::string& value);
   static Entry createEntry(const ProtobufWkt::Value& value);

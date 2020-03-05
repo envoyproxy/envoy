@@ -268,7 +268,7 @@ envoy_cc_library(
     name = "tracer_config_interface",
     hdrs = ["tracer_config.h"],
     deps = [
-        ":instance_interface",
+        ":filter_config_interface",
         "//include/envoy/config:typed_config_interface",
         "//source/common/protobuf",
     ],

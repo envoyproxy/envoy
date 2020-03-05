@@ -165,7 +165,7 @@ TEST_F(DiskLoaderImplTest, EmptyKeyTest) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
 
-  EXPECT_EQ("default", loader_->snapshot().get("", "default"));
+  EXPECT_FALSE(loader_->snapshot().get("").has_value());
   EXPECT_EQ(11, loader_->snapshot().getInteger("", 11));
   EXPECT_EQ(1.1, loader_->snapshot().getDouble("", 1.1));
   EXPECT_EQ(false, loader_->snapshot().featureEnabled("", 0));
@@ -195,14 +195,14 @@ TEST_F(DiskLoaderImplTest, All) {
   run("test/common/runtime/test_data/current", "envoy_override");
 
   // Basic string getting.
-  EXPECT_EQ("world", loader_->snapshot().get("file2", ""));
-  EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3", ""));
-  EXPECT_EQ("", loader_->snapshot().get("invalid", ""));
+  EXPECT_EQ("world", loader_->snapshot().get("file2").value().get());
+  EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3").value().get());
+  EXPECT_FALSE(loader_->snapshot().get("invalid").has_value());
 
   // Existence checking.
-  EXPECT_EQ(true, loader_->snapshot().exists("file2"));
-  EXPECT_EQ(true, loader_->snapshot().exists("subdir.file3"));
-  EXPECT_EQ(false, loader_->snapshot().exists("invalid"));
+  EXPECT_EQ(true, loader_->snapshot().get("file2").has_value());
+  EXPECT_EQ(true, loader_->snapshot().get("subdir.file3").has_value());
+  EXPECT_EQ(false, loader_->snapshot().get("invalid").has_value());
 
   // Integer getting.
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));
@@ -256,8 +256,8 @@ TEST_F(DiskLoaderImplTest, All) {
   // Files with comments.
   EXPECT_EQ(123UL, loader_->snapshot().getInteger("file5", 1));
   EXPECT_EQ(2.718, loader_->snapshot().getDouble("file_with_double_comment", 1.1));
-  EXPECT_EQ("/home#about-us", loader_->snapshot().get("file6", ""));
-  EXPECT_EQ("", loader_->snapshot().get("file7", ""));
+  EXPECT_EQ("/home#about-us", loader_->snapshot().get("file6").value().get());
+  EXPECT_EQ("", loader_->snapshot().get("file7").value().get());
 
   // Feature enablement.
   EXPECT_CALL(generator_, random()).WillOnce(Return(1));
@@ -307,7 +307,7 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_TRUE(loader_->snapshot().featureEnabled("file4", 1, 122, 300));
 
   // Overrides from override dir
-  EXPECT_EQ("hello override", loader_->snapshot().get("file1", ""));
+  EXPECT_EQ("hello override", loader_->snapshot().get("file1").value().get());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -372,7 +372,7 @@ TEST_F(DiskLoaderImplTest, OverrideFolderDoesNotExist) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
 
-  EXPECT_EQ("hello", loader_->snapshot().get("file1", ""));
+  EXPECT_EQ("hello", loader_->snapshot().get("file1").value().get());
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
@@ -428,12 +428,12 @@ void testNewOverrides(Loader& loader, Stats::Store& store) {
 
   // New string.
   loader.mergeValues({{"foo", "bar"}});
-  EXPECT_EQ("bar", loader.snapshot().get("foo", ""));
+  EXPECT_EQ("bar", loader.snapshot().get("foo").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove new string.
   loader.mergeValues({{"foo", ""}});
-  EXPECT_EQ("", loader.snapshot().get("foo", ""));
+  EXPECT_FALSE(loader.snapshot().get("foo").has_value());
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // New integer.
@@ -466,12 +466,12 @@ TEST_F(DiskLoaderImplTest, MergeValues) {
 
   // Override string
   loader_->mergeValues({{"file2", "new world"}});
-  EXPECT_EQ("new world", loader_->snapshot().get("file2", ""));
+  EXPECT_EQ("new world", loader_->snapshot().get("file2").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden string
   loader_->mergeValues({{"file2", ""}});
-  EXPECT_EQ("world", loader_->snapshot().get("file2", ""));
+  EXPECT_EQ("world", loader_->snapshot().get("file2").value().get());
   EXPECT_EQ(0, admin_overrides_active.value());
 
   // Override integer
@@ -496,12 +496,12 @@ TEST_F(DiskLoaderImplTest, MergeValues) {
 
   // Override override string
   loader_->mergeValues({{"file1", "hello overridden override"}});
-  EXPECT_EQ("hello overridden override", loader_->snapshot().get("file1", ""));
+  EXPECT_EQ("hello overridden override", loader_->snapshot().get("file1").value().get());
   EXPECT_EQ(1, admin_overrides_active.value());
 
   // Remove overridden override string
   loader_->mergeValues({{"file1", ""}});
-  EXPECT_EQ("hello override", loader_->snapshot().get("file1", ""));
+  EXPECT_EQ("hello override", loader_->snapshot().get("file1").value().get());
   EXPECT_EQ(0, admin_overrides_active.value());
   EXPECT_EQ(0, store_.gauge("runtime.admin_overrides_active", Stats::Gauge::ImportMode::NeverImport)
                    .value());
@@ -520,25 +520,25 @@ TEST_F(DiskLoaderImplTest, LayersOverride) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
   // Disk overrides bootstrap.
-  EXPECT_EQ("world", loader_->snapshot().get("file2", ""));
-  EXPECT_EQ("thing", loader_->snapshot().get("some", ""));
-  EXPECT_EQ("thang", loader_->snapshot().get("other", ""));
+  EXPECT_EQ("world", loader_->snapshot().get("file2").value().get());
+  EXPECT_EQ("thing", loader_->snapshot().get("some").value().get());
+  EXPECT_EQ("thang", loader_->snapshot().get("other").value().get());
   // Admin overrides disk and bootstrap.
   loader_->mergeValues({{"file2", "pluto"}, {"some", "day soon"}});
-  EXPECT_EQ("pluto", loader_->snapshot().get("file2", ""));
-  EXPECT_EQ("day soon", loader_->snapshot().get("some", ""));
-  EXPECT_EQ("thang", loader_->snapshot().get("other", ""));
+  EXPECT_EQ("pluto", loader_->snapshot().get("file2").value().get());
+  EXPECT_EQ("day soon", loader_->snapshot().get("some").value().get());
+  EXPECT_EQ("thang", loader_->snapshot().get("other").value().get());
   // Admin overrides stick over filesystem updates.
-  EXPECT_EQ("Layer cake", loader_->snapshot().get("file14", ""));
-  EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15", ""));
+  EXPECT_EQ("Layer cake", loader_->snapshot().get("file14").value().get());
+  EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15").value().get());
   loader_->mergeValues({{"file14", "Mega layer cake"}});
-  EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14", ""));
-  EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15", ""));
+  EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14").value().get());
+  EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15").value().get());
   write("test/common/runtime/test_data/current/envoy/file14", "Sad cake");
   write("test/common/runtime/test_data/current/envoy/file15", "Happy cake");
   updateDiskLayer(0);
-  EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14", ""));
-  EXPECT_EQ("Happy cake", loader_->snapshot().get("file15", ""));
+  EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14").value().get());
+  EXPECT_EQ("Happy cake", loader_->snapshot().get("file15").value().get());
 }
 
 // Validate that multiple admin layers leads to a configuration load failure.
@@ -587,7 +587,7 @@ protected:
 
 TEST_F(StaticLoaderImplTest, All) {
   setup();
-  EXPECT_EQ("", loader_->snapshot().get("foo", ""));
+  EXPECT_FALSE(loader_->snapshot().get("foo").has_value());
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("foo", 1));
   EXPECT_EQ(1.1, loader_->snapshot().getDouble("foo", 1.1));
   EXPECT_CALL(generator_, random()).WillOnce(Return(49));
@@ -624,13 +624,15 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
     empty: {}
     file_with_words: "some words"
     file_with_double: 23.2
+    bool_as_int0: 0
+    bool_as_int1: 1
   )EOF");
   setup();
 
   // Basic string getting.
-  EXPECT_EQ("world", loader_->snapshot().get("file2", ""));
-  EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3", ""));
-  EXPECT_EQ("", loader_->snapshot().get("invalid", ""));
+  EXPECT_EQ("world", loader_->snapshot().get("file2").value().get());
+  EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3").value().get());
+  EXPECT_FALSE(loader_->snapshot().get("invalid").has_value());
 
   // Integer getting.
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));
@@ -652,6 +654,20 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(false, snapshot->getBoolean("file13", true));
   EXPECT_EQ(false, snapshot->getBoolean("file13", false));
+
+  EXPECT_EQ(0, snapshot->getInteger("bool_as_int0", 333));
+  EXPECT_EQ(1, snapshot->getInteger("bool_as_int1", 333));
+
+  EXPECT_EQ(false, snapshot->getBoolean("bool_as_int0", true));
+  EXPECT_EQ(false, snapshot->getBoolean("bool_as_int0", false));
+  EXPECT_EQ(true, snapshot->getBoolean("bool_as_int1", false));
+  EXPECT_EQ(true, snapshot->getBoolean("bool_as_int1", true));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", false));
+  EXPECT_EQ(true, snapshot->getBoolean("file11", true));
+
+  // Test that a double value is not parsed as a boolean even though integers are fine.
+  EXPECT_EQ(true, snapshot->getBoolean("file_with_double", true));
+  EXPECT_EQ(false, snapshot->getBoolean("file_with_double", false));
 
   // Not a boolean. Expect the default.
   EXPECT_EQ(true, snapshot->getBoolean("file1", true));
@@ -714,7 +730,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(17, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(19, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
@@ -725,7 +741,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
 
   // Set up foo -> bar
   loader_->mergeValues({{"foo", "bar"}});
-  EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo", ""));
+  EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo").value().get());
   const Snapshot* original_snapshot_pointer = loader_->threadsafeSnapshot().get();
 
   // Now set up a test thread which verifies foo -> bar
@@ -740,7 +756,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   auto thread = Thread::threadFactoryForTest().createThread([&]() {
     {
       Thread::LockGuard lock(mutex);
-      EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo", ""));
+      EXPECT_EQ("bar", loader_->threadsafeSnapshot()->get("foo").value().get());
       read_bar = true;
       original_thread_snapshot_pointer = loader_->threadsafeSnapshot().get();
       EXPECT_EQ(original_thread_snapshot_pointer, loader_->threadsafeSnapshot().get());
@@ -752,7 +768,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
       if (!updated_eep) {
         foo_changed.wait(mutex);
       }
-      EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo", ""));
+      EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo").value().get());
     }
   });
 
@@ -768,7 +784,7 @@ TEST_F(StaticLoaderImplTest, RuntimeFromNonWorkerThreads) {
   {
     Thread::LockGuard lock(mutex);
     foo_changed.notifyOne();
-    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo", ""));
+    EXPECT_EQ("eep", loader_->threadsafeSnapshot()->get("foo").value().get());
   }
 
   thread->join();
@@ -872,9 +888,9 @@ public:
     // Validate that the layer name is set properly for dynamic layers.
     EXPECT_EQ(layers_[0], loader_->snapshot().getLayers()[1]->name());
 
-    EXPECT_EQ("whatevs", loader_->snapshot().get("foo", ""));
-    EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-    EXPECT_EQ("", loader_->snapshot().get("baz", ""));
+    EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
+    EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+    EXPECT_FALSE(loader_->snapshot().get("baz").has_value());
 
     EXPECT_EQ(0, store_.counter("runtime.load_error").value());
     EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -971,9 +987,9 @@ TEST_F(RtdsLoaderImplTest, WrongResourceName) {
   EXPECT_THROW_WITH_MESSAGE(rtds_callbacks_[0]->onConfigUpdate(resources, ""), EnvoyException,
                             "Unexpected RTDS runtime (expecting some_resource): other_resource");
 
-  EXPECT_EQ("whatevs", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-  EXPECT_EQ("", loader_->snapshot().get("baz", ""));
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_FALSE(loader_->snapshot().get("baz").has_value());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
@@ -994,9 +1010,9 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_CALL(init_watcher_, ready());
   doOnConfigUpdateVerifyNoThrow(runtime);
 
-  EXPECT_EQ("bar", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-  EXPECT_EQ("meh", loader_->snapshot().get("baz", ""));
+  EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("meh", loader_->snapshot().get("baz").value().get());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
@@ -1010,9 +1026,9 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   )EOF");
   doOnConfigUpdateVerifyNoThrow(runtime);
 
-  EXPECT_EQ("whatevs", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-  EXPECT_EQ("saz", loader_->snapshot().get("baz", ""));
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("saz", loader_->snapshot().get("baz").value().get());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
@@ -1033,9 +1049,9 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
   EXPECT_CALL(init_watcher_, ready());
   doDeltaOnConfigUpdateVerifyNoThrow(runtime);
 
-  EXPECT_EQ("bar", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-  EXPECT_EQ("meh", loader_->snapshot().get("baz", ""));
+  EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("meh", loader_->snapshot().get("baz").value().get());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
@@ -1049,9 +1065,9 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
   )EOF");
   doDeltaOnConfigUpdateVerifyNoThrow(runtime);
 
-  EXPECT_EQ("whatevs", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-  EXPECT_EQ("saz", loader_->snapshot().get("baz", ""));
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("saz", loader_->snapshot().get("baz").value().get());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
@@ -1064,9 +1080,9 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
   addLayer("another_resource");
   setup();
 
-  EXPECT_EQ("whatevs", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-  EXPECT_EQ("", loader_->snapshot().get("baz", ""));
+  EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_FALSE(loader_->snapshot().get("baz").has_value());
 
   auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_resource
@@ -1077,9 +1093,9 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
   EXPECT_CALL(init_watcher_, ready()).Times(2);
   doOnConfigUpdateVerifyNoThrow(runtime, 0);
 
-  EXPECT_EQ("bar", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-  EXPECT_EQ("meh", loader_->snapshot().get("baz", ""));
+  EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("meh", loader_->snapshot().get("baz").value().get());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
@@ -1095,9 +1111,9 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
 
   // Unlike in OnConfigUpdateSuccess, foo latches onto bar as the some_resource
   // layer still applies.
-  EXPECT_EQ("bar", loader_->snapshot().get("foo", ""));
-  EXPECT_EQ("yar", loader_->snapshot().get("bar", ""));
-  EXPECT_EQ("saz", loader_->snapshot().get("baz", ""));
+  EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
+  EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
+  EXPECT_EQ("saz", loader_->snapshot().get("baz").value().get());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());

@@ -99,7 +99,7 @@ static_resources:
 const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-        name: envoy.filters.network.tcp_proxy
+        name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.tcp_proxy.v2.TcpProxy
           stat_prefix: tcp_stats
@@ -109,7 +109,7 @@ const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
 const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-        name: envoy.filters.network.http_connection_manager
+        name: http
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
@@ -143,7 +143,7 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
       transport_socket:
         name: envoy.transport_sockets.quic
       filters:
-        name: envoy.filters.network.http_connection_manager
+        name: http
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
@@ -151,7 +151,7 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
             name: envoy.filters.http.router
           codec_type: HTTP3
           access_log:
-            name: envoy.file_access_log
+            name: file_access_log
             filter:
               not_health_check_filter:  {}
             typed_config:
@@ -173,7 +173,7 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
 
 const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
     R"EOF(
-name: envoy.filters.http.buffer
+name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 5242880
@@ -181,7 +181,7 @@ typed_config:
 
 const std::string ConfigHelper::SMALL_BUFFER_FILTER =
     R"EOF(
-name: envoy.filters.http.buffer
+name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 1024
@@ -189,7 +189,7 @@ typed_config:
 
 const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
     R"EOF(
-name: envoy.filters.http.health_check
+name: health_check
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
@@ -197,7 +197,7 @@ typed_config:
 
 const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =
     R"EOF(
-name: envoy.filters.http.squash
+name: squash
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.squash.v2.Squash
   cluster: squash
@@ -258,7 +258,7 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.filters.network.http_connection_manager
+        name: http
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
@@ -575,7 +575,7 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     cluster->mutable_per_connection_buffer_limit_bytes()->set_value(upstream_buffer_limit);
   }
 
-  auto filter = getFilterFromListener("envoy.filters.network.http_connection_manager");
+  auto filter = getFilterFromListener("http");
   if (filter) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         hcm_config;
@@ -684,7 +684,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 }
 
 bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view format) {
-  if (getFilterFromListener("envoy.filters.network.http_connection_manager") == nullptr) {
+  if (getFilterFromListener("http") == nullptr) {
     return false;
   }
   // Replace /dev/null with a real path for the file access log.
@@ -775,7 +775,7 @@ void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_filter = getFilterFromListener("envoy.filters.network.http_connection_manager");
+  auto* hcm_filter = getFilterFromListener("http");
   if (hcm_filter) {
     auto* config = hcm_filter->mutable_typed_config();
     hcm = MessageUtil::anyConvert<
@@ -790,8 +790,7 @@ void ConfigHelper::storeHttpConnectionManager(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         hcm) {
   RELEASE_ASSERT(!finalized_, "");
-  auto* hcm_config_any = getFilterFromListener("envoy.filters.network.http_connection_manager")
-                             ->mutable_typed_config();
+  auto* hcm_config_any = getFilterFromListener("http")->mutable_typed_config();
 
   hcm_config_any->PackFrom(hcm);
 }
@@ -828,7 +827,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
 }
 
 void ConfigHelper::setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames) {
-  auto filter = getFilterFromListener("envoy.filters.network.http_connection_manager");
+  auto filter = getFilterFromListener("http");
   if (filter) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
         hcm_config;

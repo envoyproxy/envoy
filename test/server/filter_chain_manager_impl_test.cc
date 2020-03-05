@@ -111,7 +111,7 @@ public:
       filter_chain_match:
         destination_port: 10000
       transport_socket:
-        name: envoy.transport_sockets.tls
+        name: tls
         typed_config:
           "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
           common_tls_context:

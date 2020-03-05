@@ -25,6 +25,7 @@ using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -626,6 +627,92 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
 
+TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  Buffer::OwnedImpl local_buffer;
+  // Read a request and send a response, without draining the response from the
+  // connection buffer. The first two should not cause problems.
+  for (int i = 0; i < 2; ++i) {
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](Http::ResponseEncoder& encoder, bool) -> Http::RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+    codec_->dispatch(buffer);
+    EXPECT_EQ(0U, buffer.length());
+
+    // In most tests the write output is serialized to a buffer here it is
+    // ignored to build up queued "end connection" sentinels.
+    EXPECT_CALL(connection_, write(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
+          // Move the response out of data while preserving the buffer fragment sentinels.
+          local_buffer.move(data);
+        }));
+
+    TestResponseHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+  }
+
+  // Trying to shove a third response in the queue should trigger flood protection.
+  {
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](Http::ResponseEncoder& encoder, bool) -> Http::RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+    codec_->dispatch(buffer);
+
+    TestResponseHeaderMapImpl headers{{":status", "200"}};
+    EXPECT_THROW_WITH_MESSAGE(response_encoder->encodeHeaders(headers, true), FrameFloodException,
+                              "Too many responses queued.");
+    EXPECT_EQ(1, store_.counter("http1.response_flood").value());
+  }
+}
+
+TEST_F(Http1ServerConnectionImplTest, FloodProtectionOff) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http1_flood_protection", "false"}});
+  initialize();
+
+  NiceMock<MockRequestDecoder> decoder;
+  Buffer::OwnedImpl local_buffer;
+  // With flood protection off, many responses can be queued up.
+  for (int i = 0; i < 4; ++i) {
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](Http::ResponseEncoder& encoder, bool) -> Http::RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+    codec_->dispatch(buffer);
+    EXPECT_EQ(0U, buffer.length());
+
+    // In most tests the write output is serialized to a buffer here it is
+    // ignored to build up queued "end connection" sentinels.
+    EXPECT_CALL(connection_, write(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
+          // Move the response out of data while preserving the buffer fragment sentinels.
+          local_buffer.move(data);
+        }));
+
+    TestResponseHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+  }
+}
+
 TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   initialize();
 
@@ -979,7 +1066,13 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
   EXPECT_EQ(0U, buffer.length());
 
   std::string output;
-  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+  ON_CALL(connection_, write(_, _)).WillByDefault(Invoke([&output](Buffer::Instance& data, bool) {
+    // Verify that individual writes into the codec's output buffer were coalesced into a single
+    // slice
+    ASSERT_EQ(1, data.getRawSlices(nullptr, 0));
+    output.append(data.toString());
+    data.drain(data.length());
+  }));
 
   TestResponseHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, false);
@@ -1155,7 +1248,7 @@ TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2cCloseEtc) {
   TestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
                                      {":path", "/"},
                                      {":method", "GET"},
-                                     {"connection", "Close,Etc"}};
+                                     {"connection", "Close"}};
   Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: "
                            "Upgrade, Close, HTTP2-Settings, Etc\r\nUpgrade: h2c\r\nHTTP2-Settings: "
                            "token64\r\nHost: bah\r\n\r\n");
@@ -1341,7 +1434,7 @@ TEST_F(Http1ClientConnectionImplTest, Reset) {
   request_encoder.getStream().resetStream(StreamResetReason::LocalReset);
 }
 
-// Verify that we correctly enable reads on the connection when the final pipeline response is
+// Verify that we correctly enable reads on the connection when the final response is
 // received.
 TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
   initialize();
@@ -1352,23 +1445,11 @@ TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
-  // 1st pipeline request.
+  // Request.
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   request_encoder->encodeHeaders(headers, true);
   EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
   output.clear();
-
-  // 2nd pipeline request.
-  request_encoder = &codec_->newStream(response_decoder);
-  request_encoder->encodeHeaders(headers, false);
-  Buffer::OwnedImpl empty;
-  request_encoder->encodeData(empty, true);
-  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n", output);
-
-  // 1st response.
-  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
-  Buffer::OwnedImpl response("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
-  codec_->dispatch(response);
 
   // Simulate the underlying connection being backed up. Ensure that it is
   // read-enabled when the final response completes.
@@ -1378,10 +1459,10 @@ TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
       .WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, readDisable(false));
 
-  // 2nd response.
+  // Response.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
-  Buffer::OwnedImpl response2("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
-  codec_->dispatch(response2);
+  Buffer::OwnedImpl response("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
+  codec_->dispatch(response);
 }
 
 TEST_F(Http1ClientConnectionImplTest, PrematureResponse) {
