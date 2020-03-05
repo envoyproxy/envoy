@@ -19,7 +19,7 @@ TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
       {"d", "d_value"}, {"f", "f_value"}, {"b", "b_value"},
       {"e", "e_value"}, {"c", "c_value"}, {"a", "a_value"},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  const auto map = Utility::canonicalizeHeaders(headers, "service");
   EXPECT_THAT(map, ElementsAre(Pair("a", "a_value"), Pair("b", "b_value"), Pair("c", "c_value"),
                                Pair("d", "d_value"), Pair("e", "e_value"), Pair("f", "f_value")));
 }
@@ -31,7 +31,7 @@ TEST(UtilityTest, CanonicalizeHeadersSkippingPseudoHeaders) {
       {":method", "GET"},
       {"normal", "normal_value"},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  const auto map = Utility::canonicalizeHeaders(headers, "service");
   EXPECT_THAT(map, ElementsAre(Pair("normal", "normal_value")));
 }
 
@@ -42,7 +42,7 @@ TEST(UtilityTest, CanonicalizeHeadersJoiningDuplicatesWithCommas) {
       {"a", "a_value2"},
       {"a", "a_value3"},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  const auto map = Utility::canonicalizeHeaders(headers, "service");
   EXPECT_THAT(map, ElementsAre(Pair("a", "a_value1,a_value2,a_value3")));
 }
 
@@ -51,7 +51,7 @@ TEST(UtilityTest, CanonicalizeHeadersAuthorityToHost) {
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "authority_value"},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  const auto map = Utility::canonicalizeHeaders(headers, "service");
   EXPECT_THAT(map, ElementsAre(Pair("host", "authority_value")));
 }
 
@@ -60,13 +60,13 @@ TEST(UtilityTest, CanonicalizeHeadersRemovingDefaultPortsFromHost) {
   Http::TestRequestHeaderMapImpl headers_port80{
       {":authority", "example.com:80"},
   };
-  const auto map_port80 = Utility::canonicalizeHeaders(headers_port80);
+  const auto map_port80 = Utility::canonicalizeHeaders(headers_port80, "service");
   EXPECT_THAT(map_port80, ElementsAre(Pair("host", "example.com")));
 
   Http::TestRequestHeaderMapImpl headers_port443{
       {":authority", "example.com:443"},
   };
-  const auto map_port443 = Utility::canonicalizeHeaders(headers_port443);
+  const auto map_port443 = Utility::canonicalizeHeaders(headers_port443, "service");
   EXPECT_THAT(map_port443, ElementsAre(Pair("host", "example.com")));
 }
 
@@ -78,10 +78,25 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
       {"internal", "internal    value"},
       {"all", "    all    value    "},
   };
-  const auto map = Utility::canonicalizeHeaders(headers);
+  const auto map = Utility::canonicalizeHeaders(headers, "service");
   EXPECT_THAT(map,
               ElementsAre(Pair("all", "all value"), Pair("internal", "internal value"),
                           Pair("leading", "leading value"), Pair("trailing", "trailing value")));
+}
+
+// For S3 everything except host, content-type and x-amzn-* is ignored
+TEST(UtilityTest, CanonicalizeHeadersS3) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":authority", "example.com"},
+      {"x-forwarded-for", "1.2.3.4"},
+      {"x-amz-date", "20130708T220855Z"},
+      {"x-amz-content-sha256", "e3b0c44..."},
+  };
+  const auto map = Utility::canonicalizeHeaders(headers, "s3");
+  // Note: they will be sorted.
+  EXPECT_THAT(map,
+              ElementsAre(Pair("host", "example.com"), Pair("x-amz-content-sha256", "e3b0c44..."),
+                          Pair("x-amz-date", "20130708T220855Z")));
 }
 
 // Verify the format of a minimalist canonical request

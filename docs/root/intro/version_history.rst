@@ -7,6 +7,7 @@ Version history
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
+* aws_request_signing: a few fixes so that it works with S3.
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.

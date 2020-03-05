@@ -3,6 +3,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "curl/curl.h"
 
@@ -12,11 +13,17 @@ namespace Common {
 namespace Aws {
 
 std::map<std::string, std::string>
-Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
-  std::map<std::string, std::string> out;
+Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
+                             const std::string& service_name) {
+  std::pair<std::map<std::string, std::string>, const std::string*> ctxt = {{}, &service_name};
+
   headers.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
-        auto* map = static_cast<std::map<std::string, std::string>*>(context);
+        auto* pair =
+            static_cast<std::pair<std::map<std::string, std::string>, const std::string*>*>(
+                context);
+        auto& map = pair->first;
+
         // Skip empty headers
         if (entry.key().empty() || entry.value().empty()) {
           return Http::HeaderMap::Iterate::Continue;
@@ -25,19 +32,27 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
         if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
           return Http::HeaderMap::Iterate::Continue;
         }
+        // For S3, we restrict the headers even further to avoid  headers that might mutate
+        // when in transit (e.g.: x-forwarded-for, internal headers, etc).
+        if (*pair->second == "s3") {
+          const auto key = entry.key().getStringView();
+          if (key != Http::Headers::get().ContentType.get() && !absl::StartsWith(key, "x-amz-")) {
+            return Http::HeaderMap::Iterate::Continue;
+          }
+        }
         std::string value(entry.value().getStringView());
         // Remove leading, trailing, and deduplicate repeated ascii spaces
         absl::RemoveExtraAsciiWhitespace(&value);
-        const auto iter = map->find(std::string(entry.key().getStringView()));
+        const auto iter = map.find(std::string(entry.key().getStringView()));
         // If the entry already exists, append the new value to the end
-        if (iter != map->end()) {
+        if (iter != map.end()) {
           iter->second += fmt::format(",{}", value);
         } else {
-          map->emplace(std::string(entry.key().getStringView()), value);
+          map.emplace(std::string(entry.key().getStringView()), value);
         }
         return Http::HeaderMap::Iterate::Continue;
       },
-      &out);
+      &ctxt);
   // The AWS SDK has a quirk where it removes "default ports" (80, 443) from the host headers
   // Additionally, we canonicalize the :authority header as "host"
   // TODO(lavignes): This may need to be tweaked to canonicalize :authority for HTTP/2 requests
@@ -47,12 +62,12 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
     const auto parts = StringUtil::splitToken(value, ":");
     if (parts.size() > 1 && (parts[1] == "80" || parts[1] == "443")) {
       // Has default port, so use only the host part
-      out.emplace(Http::Headers::get().HostLegacy.get(), std::string(parts[0]));
+      ctxt.first.emplace(Http::Headers::get().HostLegacy.get(), std::string(parts[0]));
     } else {
-      out.emplace(Http::Headers::get().HostLegacy.get(), std::string(value));
+      ctxt.first.emplace(Http::Headers::get().HostLegacy.get(), std::string(value));
     }
   }
-  return out;
+  return ctxt.first;
 }
 
 std::string
