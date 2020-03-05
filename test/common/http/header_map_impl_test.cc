@@ -889,9 +889,10 @@ TEST(HeaderMapImplTest, Get) {
     auto headers = createHeaderMap<TestHeaderMapImpl>(
         {{Headers::get().Path, "/"}, {LowerCaseString("hello"), "world"}});
     // There is not HeaderMap method to set a header and copy both the key and value.
-    headers->setReferenceKey(LowerCaseString(":path"), "/new_path");
+    const LowerCaseString path(":path");
+    headers->setReferenceKey(path, "/new_path");
     EXPECT_EQ("/new_path", headers->get(LowerCaseString(":path"))->value().getStringView());
-    LowerCaseString foo("hello");
+    const LowerCaseString foo("hello");
     headers->setReferenceKey(foo, "world2");
     EXPECT_EQ("world2", headers->get(foo)->value().getStringView());
     EXPECT_EQ(nullptr, headers->get(LowerCaseString("foo")));
