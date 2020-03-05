@@ -75,6 +75,11 @@ absl::optional<Arn> Filter::calculateRouteArn() {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
+  if (!settings_.payloadPassthrough()) {
+    skip_ = true;
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   auto route_arn = calculateRouteArn();
   if (route_arn.has_value()) {
     auto cluster_info_ptr = decoder_callbacks_->clusterInfo();
