@@ -56,6 +56,12 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
+   * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
+
+  /**
    * @return RandomGenerator& the random generator for the server.
    */
   virtual Envoy::Runtime::RandomGenerator& random() PURE;
@@ -105,6 +111,11 @@ public:
 class ServerFactoryContext : public virtual CommonFactoryContext {
 public:
   ~ServerFactoryContext() override = default;
+
+  /**
+   * @return the server-wide grpc context.
+   */
+  virtual Grpc::Context& grpcContext() PURE;
 };
 
 /**
