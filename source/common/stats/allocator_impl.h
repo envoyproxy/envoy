@@ -23,9 +23,9 @@ public:
   ~AllocatorImpl() override;
 
   // Allocator
-  CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
+  CounterSharedPtr makeCounter(StatName name, StatName tag_extracted_name,
                                const StatNameTagVector& stat_name_tags) override;
-  GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
+  GaugeSharedPtr makeGauge(StatName name, StatName tag_extracted_name,
                            const StatNameTagVector& stat_name_tags,
                            Gauge::ImportMode import_mode) override;
   SymbolTable& symbolTable() override { return symbol_table_; }

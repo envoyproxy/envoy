@@ -14,7 +14,7 @@ MetricHelper::~MetricHelper() {
   ASSERT(!stat_names_.populated());
 }
 
-MetricHelper::MetricHelper(StatName name, absl::string_view tag_extracted_name,
+MetricHelper::MetricHelper(StatName name, StatName tag_extracted_name,
                            const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table) {
   // Encode all the names and tags into transient storage so we can count the
   // required bytes. 2 is added to account for the name and tag_extracted_name,
@@ -23,8 +23,7 @@ MetricHelper::MetricHelper(StatName name, absl::string_view tag_extracted_name,
   const uint32_t num_names = 2 + 2 * stat_name_tags.size();
   absl::FixedArray<StatName> names(num_names);
   names[0] = name;
-  StatNameManagedStorage storage(tag_extracted_name, symbol_table);
-  names[1] = storage.statName();
+  names[1] = tag_extracted_name;
   int index = 1;
   for (auto& stat_name_tag : stat_name_tags) {
     names[++index] = stat_name_tag.first;
