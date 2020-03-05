@@ -132,6 +132,7 @@ envoy_cc_test(
         "//source/common/http/http2:metadata_decoder_lib",
         "//source/common/http/http2:metadata_encoder_lib",
         "//source/common/runtime:runtime_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )

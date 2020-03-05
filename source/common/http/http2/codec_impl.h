@@ -159,7 +159,7 @@ protected:
                                nghttp2_data_provider* provider) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
-    void submitMetadata();
+    void submitMetadata(uint8_t flags);
     virtual StreamDecoder& decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;

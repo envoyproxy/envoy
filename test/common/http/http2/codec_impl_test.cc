@@ -625,6 +625,35 @@ TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map_vector), EnvoyException,
                             "The user callback function failed");
 }
+
+// Encode response metadata while dispatching request data from the client, so
+// that nghttp2 can't fill the metadata frames' payloads until dispatching
+// is finished.
+TEST_P(Http2CodecImplTest, EncodeMetadataWhileDispatchingTest) {
+  allow_metadata_ = true;
+  initialize();
+
+  MetadataMapVector metadata_map_vector;
+  const int size = 10;
+  for (int i = 0; i < size; i++) {
+    MetadataMap metadata_map = {
+        {"header_key1", "header_value1"},
+        {"header_key2", "header_value2"},
+        {"header_key3", "header_value3"},
+        {"header_key4", "header_value4"},
+    };
+    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  }
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    response_encoder_->encodeMetadata(metadata_map_vector);
+  }));
+  EXPECT_CALL(response_decoder_, decodeMetadata_(_)).Times(size);
+  request_encoder_->encodeHeaders(request_headers, true);
+}
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
 TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
