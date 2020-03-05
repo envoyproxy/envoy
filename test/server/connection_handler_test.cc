@@ -796,6 +796,9 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilterThrowsException) {
   }
 }
 
+TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
+  
+}
 } // namespace
 } // namespace Server
 } // namespace Envoy

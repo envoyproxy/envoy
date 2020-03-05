@@ -125,13 +125,14 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 
 XXFactoryContextImpl::XXFactoryContextImpl(Envoy::Server::Instance& server,
                                            ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           const envoy::config::listener::v3::Listener& config)
+                                           const envoy::config::listener::v3::Listener& config,
+                                           DrainManagerPtr drain_manager)
     : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
       global_scope_(server.stats().createScope("")),
       // Not ideal
       listener_scope_(server_.stats().createScope(fmt::format(
           "listener.{}.", Network::Address::resolveProtoAddress(config.address())->asString()))),
-      validation_visitor_(validation_visitor) {}
+      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)){}
 
 AccessLog::AccessLogManager& XXFactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -177,6 +178,7 @@ XXFactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 Stats::Scope& XXFactoryContextImpl::listenerScope() { return *listener_scope_; }
 Network::DrainDecision& XXFactoryContextImpl::drainDecision() {return *this;}
+Server::DrainManager& XXFactoryContextImpl::drainManager() {return *drain_manager_;}
 
 // Must be overridden
 Init::Manager& XXFactoryContextImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -200,7 +202,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       dynamic_init_manager_(fmt::format("Listener {}", name)),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
           "ListenerImpl", [this] { parent_.onIntelligentListenerWarmed(*this); })),
-      local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
+      //local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
@@ -382,13 +384,13 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       dynamic_init_manager_(fmt::format("Listener {}", name)),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
           "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
-      local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
+      //local_drain_manager_(),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<ListenerFactoryContextImpl>(
-          parent.server_, validation_visitor, config, this, *this)),
+          parent.server_, validation_visitor, config, this, *this, parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parent_factory_context(),
                             initManager()) {
   Network::Address::SocketType socket_type =
@@ -561,7 +563,7 @@ Upstream::ClusterManager& ListenerFactoryContextImpl::clusterManager() {
 Event::Dispatcher& ListenerFactoryContextImpl::dispatcher() {
   return xx_factory_context_->dispatcher();
 }
-Network::DrainDecision& ListenerFactoryContextImpl::drainDecision() { return listener_impl_; }
+Network::DrainDecision& ListenerFactoryContextImpl::drainDecision() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 Grpc::Context& ListenerFactoryContextImpl::grpcContext() {
   return xx_factory_context_->grpcContext();
 }
@@ -640,13 +642,6 @@ void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManage
                                                 Network::UdpReadFilterCallbacks& callbacks) {
   Configuration::FilterChainUtility::buildUdpFilterChain(manager, callbacks,
                                                          udp_listener_filter_factories_);
-}
-
-bool ListenerImpl::drainClose() const {
-  // When a listener is draining, the "drain close" decision is the union of the per-listener drain
-  // manager and the server wide drain manager. This allows individual listeners to be drained and
-  // removed independently of a server-wide drain event (e.g., /healthcheck/fail or hot restart).
-  return local_drain_manager_->drainClose() || parent_.server_.drainManager().drainClose();
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

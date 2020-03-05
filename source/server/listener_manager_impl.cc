@@ -779,7 +779,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
   // TODO(lambdai): only partial functionality is adopted. Consider split functionality?
   // 1. Filter chain doesn't query the listener's drain close decision
   // 2. the completion callback is used to execute the resouce clean up.
-  draining_group->draining_listener_->localDrainManager().startDrainSequence(
+  draining_group->startDrainSequence(server_.options().drainTime(), server_.dispatcher(),
       [this, draining_group]() -> void {
         draining_group->draining_listener_->debugLog(
             absl::StrCat("removing draining filter chains from listener ",

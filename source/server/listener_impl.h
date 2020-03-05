@@ -107,7 +107,8 @@ class XXFactoryContextImpl final : public Configuration::FactoryContext, public 
 public:
   XXFactoryContextImpl(Envoy::Server::Instance& server,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
-                       const envoy::config::listener::v3::Listener& config);
+                       const envoy::config::listener::v3::Listener& config,
+                       Server::DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
@@ -137,7 +138,8 @@ public:
   Stats::Scope& listenerScope() override;
 
   // DrainDescision
-  bool drainClose() const override {return is_draining_.load(loadstd::memory_order_acquire) || server_.drainManager().drainClose(); }
+  bool drainClose() const override {return drain_manager_->drainClose() || server_.drainManager().drainClose(); }
+  Server::DrainManager& drainManager();
 
 private:
   Envoy::Server::Instance& server_;
@@ -146,19 +148,21 @@ private:
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  std::atomic<bool> is_draining_{false};
+  const Server::DrainManagerPtr drain_manager_;
 };
 
 class ListenerImpl;
+// TODO(lambdai): refactor: ListenerFactroyContext provides very small value since the listener filter chain lifetime is different from network filter chain.
 class ListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
 public:
   ListenerFactoryContextImpl(Envoy::Server::Instance& server,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              const envoy::config::listener::v3::Listener& config_message,
                              const Network::ListenerConfig* listener_config,
-                             ListenerImpl& listener_impl)
+                             ListenerImpl& listener_impl,
+                             DrainManagerPtr drain_manager)
       : xx_factory_context_(
-            std::make_shared<XXFactoryContextImpl>(server, validation_visitor, config_message)),
+            std::make_shared<XXFactoryContextImpl>(server, validation_visitor, config_message, std::move(drain_manager))),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
   ListenerFactoryContextImpl(std::shared_ptr<XXFactoryContextImpl> xx_factory_context,
                              const Network::ListenerConfig* listener_config,
@@ -212,7 +216,6 @@ private:
  * Maps proto config to runtime config for a listener with a network filter chain.
  */
 class ListenerImpl : public Network::ListenerConfig,
-                     public Network::DrainDecision,
                      public Network::FilterChainFactory,
                      Logger::Loggable<Logger::Id::config> {
 public:
@@ -284,7 +287,7 @@ public:
   const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
-  DrainManager& localDrainManager() const { return *local_drain_manager_; }
+  DrainManager& localDrainManager() const { return listener_factory_context_->xx_factory_context_->drainManager(); }
   void setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
@@ -325,8 +328,6 @@ public:
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
-  // Network::DrainDecision
-  bool drainClose() const override;
 
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection,
@@ -370,7 +371,6 @@ private:
   std::unique_ptr<Init::WatcherImpl> init_watcher_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
-  DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
