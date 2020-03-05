@@ -243,7 +243,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   options->emplace_back(std::move(option));
   EXPECT_THROW_WITH_REGEX(std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
                                                                listen_socket_, listener_config_,
-                                                               quic_config_, options),
+                                                               quic_config_, options, enabled_flag()),
                           EnvoyException, "Failed to apply socket options.");
 }
 
