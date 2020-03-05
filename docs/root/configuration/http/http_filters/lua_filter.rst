@@ -233,13 +233,16 @@ httpCall()
 
 .. code-block:: lua
 
-  headers, body = handle:httpCall(cluster, headers, body, timeout)
+  headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
 
-Makes an HTTP call to an upstream host. Envoy will yield the script until the call completes or
-has an error. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
+Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
 the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
 data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
+
+*asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
+regardless of response success or failure. If this is set to false, or not set, Envoy will yield the script
+until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.

@@ -15,6 +15,79 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
+namespace {
+// Okay to return non-const reference because this doesn't ever get changed.
+NoopCallbacks& noopCallbacks() {
+  static NoopCallbacks* callbacks = new NoopCallbacks();
+  return *callbacks;
+}
+
+void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index) {
+  // Build a header map to make the request. We iterate through the provided table to do this and
+  // check that we are getting strings.
+  lua_pushnil(state);
+  while (lua_next(state, table_index) != 0) {
+    // Uses 'key' (at index -2) and 'value' (at index -1).
+    const char* key = luaL_checkstring(state, -2);
+    // Check if the current value is a table, we iterate through the table and add each element of
+    // it as a header entry value for the current key.
+    if (lua_istable(state, -1)) {
+      lua_pushnil(state);
+      while (lua_next(state, -2) != 0) {
+        const char* value = luaL_checkstring(state, -1);
+        headers.addCopy(Http::LowerCaseString(key), value);
+        lua_pop(state, 1);
+      }
+    } else {
+      const char* value = luaL_checkstring(state, -1);
+      headers.addCopy(Http::LowerCaseString(key), value);
+    }
+    // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
+    // it can push the next key/value pair onto the stack.
+    lua_pop(state, 1);
+  }
+}
+
+Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
+                                         Http::AsyncClient::Callbacks& callbacks) {
+  const std::string cluster = luaL_checkstring(state, 2);
+  luaL_checktype(state, 3, LUA_TTABLE);
+  size_t body_size;
+  const char* body = luaL_optlstring(state, 4, nullptr, &body_size);
+  int timeout_ms = luaL_checkint(state, 5);
+  if (timeout_ms < 0) {
+    luaL_error(state, "http call timeout must be >= 0");
+  }
+
+  if (filter.clusterManager().get(cluster) == nullptr) {
+    luaL_error(state, "http call cluster invalid. Must be configured");
+  }
+
+  auto headers = std::make_unique<Http::RequestHeaderMapImpl>();
+  buildHeadersFromTable(*headers, state, 3);
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(headers)));
+
+  // Check that we were provided certain headers.
+  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
+      message->headers().Host() == nullptr) {
+    luaL_error(state, "http call headers must include ':path', ':method', and ':authority'");
+  }
+
+  if (body != nullptr) {
+    message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
+    message->headers().setContentLength(body_size);
+  }
+
+  absl::optional<std::chrono::milliseconds> timeout;
+  if (timeout_ms > 0) {
+    timeout = std::chrono::milliseconds(timeout_ms);
+  }
+
+  return filter.clusterManager().httpAsyncClientForCluster(cluster).send(
+      std::move(message), callbacks, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+}
+} // namespace
+
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::HeaderMap& headers, bool end_stream, Filter& filter,
                                          FilterCallbacks& callbacks)
@@ -138,71 +211,23 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   return lua_yield(state, 0);
 }
 
-void StreamHandleWrapper::buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state,
-                                                int table_index) {
-  // Build a header map to make the request. We iterate through the provided table to do this and
-  // check that we are getting strings.
-  lua_pushnil(state);
-  while (lua_next(state, table_index) != 0) {
-    // Uses 'key' (at index -2) and 'value' (at index -1).
-    const char* key = luaL_checkstring(state, -2);
-    // Check if the current value is a table, we iterate through the table and add each element of
-    // it as a header entry value for the current key.
-    if (lua_istable(state, -1)) {
-      lua_pushnil(state);
-      while (lua_next(state, -2) != 0) {
-        const char* value = luaL_checkstring(state, -1);
-        headers.addCopy(Http::LowerCaseString(key), value);
-        lua_pop(state, 1);
-      }
-    } else {
-      const char* value = luaL_checkstring(state, -1);
-      headers.addCopy(Http::LowerCaseString(key), value);
-    }
-    // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
-    // it can push the next key/value pair onto the stack.
-    lua_pop(state, 1);
-  }
-}
-
 int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
-  const std::string cluster = luaL_checkstring(state, 2);
-  luaL_checktype(state, 3, LUA_TTABLE);
-  size_t body_size;
-  const char* body = luaL_optlstring(state, 4, nullptr, &body_size);
-  int timeout_ms = luaL_checkint(state, 5);
-  if (timeout_ms < 0) {
-    return luaL_error(state, "http call timeout must be >= 0");
+  const int async_flag_index = 6;
+  if (!lua_isnone(state, async_flag_index) && !lua_isboolean(state, async_flag_index)) {
+    luaL_error(state, "http call asynchronous flag must be 'true', 'false', or empty");
   }
 
-  if (filter_.clusterManager().get(cluster) == nullptr) {
-    return luaL_error(state, "http call cluster invalid. Must be configured");
+  if (lua_toboolean(state, async_flag_index)) {
+    return luaHttpCallAsynchronous(state);
+  } else {
+    return luaHttpCallSynchronous(state);
   }
+}
 
-  auto headers = std::make_unique<Http::RequestHeaderMapImpl>();
-  buildHeadersFromTable(*headers, state, 3);
-  Http::RequestMessagePtr message(new Http::RequestMessageImpl(std::move(headers)));
-
-  // Check that we were provided certain headers.
-  if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
-      message->headers().Host() == nullptr) {
-    return luaL_error(state, "http call headers must include ':path', ':method', and ':authority'");
-  }
-
-  if (body != nullptr) {
-    message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
-    message->headers().setContentLength(body_size);
-  }
-
-  absl::optional<std::chrono::milliseconds> timeout;
-  if (timeout_ms > 0) {
-    timeout = std::chrono::milliseconds(timeout_ms);
-  }
-
-  http_request_ = filter_.clusterManager().httpAsyncClientForCluster(cluster).send(
-      std::move(message), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
+int StreamHandleWrapper::luaHttpCallSynchronous(lua_State* state) {
+  http_request_ = makeHttpCall(state, filter_, *this);
   if (http_request_) {
     state_ = State::HttpCall;
     return lua_yield(state, 0);
@@ -211,6 +236,11 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
     ASSERT(lua_gettop(state) >= 2);
     return 2;
   }
+}
+
+int StreamHandleWrapper::luaHttpCallAsynchronous(lua_State* state) {
+  makeHttpCall(state, filter_, noopCallbacks());
+  return 0;
 }
 
 void StreamHandleWrapper::onSuccess(Http::ResponseMessagePtr&& response) {
