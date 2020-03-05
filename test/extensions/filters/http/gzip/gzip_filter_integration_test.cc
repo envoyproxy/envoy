@@ -66,7 +66,7 @@ public:
   }
 
   const std::string full_config{R"EOF(
-      name: envoy.filters.http.gzip
+      name: gzip
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.http.gzip.v2.Gzip
         memory_level: 3

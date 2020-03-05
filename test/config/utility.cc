@@ -151,7 +151,7 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
             name: envoy.filters.http.router
           codec_type: HTTP3
           access_log:
-            name: envoy.file_access_log
+            name: file_access_log
             filter:
               not_health_check_filter:  {}
             typed_config:
@@ -173,7 +173,7 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
 
 const std::string ConfigHelper::DEFAULT_BUFFER_FILTER =
     R"EOF(
-name: envoy.filters.http.buffer
+name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 5242880
@@ -181,7 +181,7 @@ typed_config:
 
 const std::string ConfigHelper::SMALL_BUFFER_FILTER =
     R"EOF(
-name: envoy.filters.http.buffer
+name: buffer
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 1024
@@ -189,7 +189,7 @@ typed_config:
 
 const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
     R"EOF(
-name: envoy.filters.http.health_check
+name: health_check
 typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
@@ -197,7 +197,7 @@ typed_config:
 
 const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =
     R"EOF(
-name: envoy.filters.http.squash
+name: squash
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.squash.v2.Squash
   cluster: squash

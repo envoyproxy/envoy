@@ -44,7 +44,6 @@ public:
                     - not_id:
                         any: true
        -  name: envoy.filters.network.echo
-          config:
 )EOF";
   }
 
