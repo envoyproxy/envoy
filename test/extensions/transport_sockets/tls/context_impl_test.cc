@@ -685,10 +685,10 @@ TEST_F(SslServerContextImplTicketTest, SessionTicketsDisabledAndSdsKeyIsConfigur
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
-    - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittestcert.pem"
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittestkey.pem"
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
   disable_session_tickets: true
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
