@@ -58,7 +58,7 @@ private:
   std::thread main_thread_;
   std::unique_ptr<Http::Dispatcher> http_dispatcher_;
   std::unique_ptr<MainCommon> main_common_ GUARDED_BY(mutex_);
-  Server::Instance* server_;
+  Server::Instance* server_{};
   Server::ServerLifecycleNotifier::HandlePtr postinit_callback_handler_;
   Event::Dispatcher* event_dispatcher_;
 };
