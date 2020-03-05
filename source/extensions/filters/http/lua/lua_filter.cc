@@ -214,12 +214,12 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
-  const int asyncFlagIndex = 6;
-  if (!lua_isnone(state, asyncFlagIndex) && !lua_isboolean(state, asyncFlagIndex)) {
+  const int async_flag_index = 6;
+  if (!lua_isnone(state, async_flag_index) && !lua_isboolean(state, async_flag_index)) {
     luaL_error(state, "http call asynchronous flag must be 'true', 'false', or empty");
   }
 
-  if (lua_toboolean(state, asyncFlagIndex)) {
+  if (lua_toboolean(state, async_flag_index)) {
     return luaHttpCallAsynchronous(state);
   } else {
     return luaHttpCallSynchronous(state);

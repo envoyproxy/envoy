@@ -86,8 +86,6 @@ public:
 
 class Filter;
 
-class NoopCallbacks;
-
 /**
  * A wrapper for a currently running request/response. This is the primary handle passed to Lua.
  * The script interacts with Envoy entirely through this handle.
@@ -299,7 +297,6 @@ class NoopCallbacks : public Http::AsyncClient::Callbacks {
 public:
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::ResponseMessagePtr&&) override {}
-
   void onFailure(Http::AsyncClient::FailureReason) override {}
 };
 
