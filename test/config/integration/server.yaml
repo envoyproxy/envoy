@@ -42,7 +42,7 @@ static_resources:
           codec_type: http1
           stat_prefix: router
           http_filters:
-          - name: envoy.filters.http.health_check
+          - name: health
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
               pass_through_mode: false
@@ -155,14 +155,14 @@ dynamic_resources: {}
 cluster_manager: {}
 flags_path: "/invalid_flags"
 stats_sinks:
-- name: envoy.stat_sinks.statsd
+- name: local_stats
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     address:
       socket_address:
         address: {{ ip_loopback_address }}
         port_value: 8125
-- name: envoy.stat_sinks.statsd
+- name: tcp_stats
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd
