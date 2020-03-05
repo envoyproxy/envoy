@@ -21,7 +21,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config,
                                        Network::Socket::OptionsSharedPtr options,
-																			 const envoy::config::core::v3::RuntimeFeatureFlag enabled)
+                                       const envoy::config::core::v3::RuntimeFeatureFlag enabled)
     : ActiveQuicListener(dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
                          quic_config, std::move(options), enabled) {}
@@ -32,7 +32,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ListenerConfig& listener_config,
                                        const quic::QuicConfig& quic_config,
                                        Network::Socket::OptionsSharedPtr options,
-																			 const envoy::config::core::v3::RuntimeFeatureFlag enabled)
+                                       const envoy::config::core::v3::RuntimeFeatureFlag enabled)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket), enabled_(enabled, Runtime::LoaderSingleton::get()) {
@@ -197,7 +197,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
   }
 #endif
   return std::make_unique<ActiveQuicListener>(disptacher, parent, config, quic_config_,
-                                              std::move(options));
+                                              std::move(options), enabled_);
 }
 
 } // namespace Quic

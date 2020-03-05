@@ -68,8 +68,9 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
 
-    quic_listener_ = std::make_unique<ActiveQuicListener>(
-        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, nullptr, enabled_flag());
+    quic_listener_ = std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
+                                                          listen_socket_, listener_config_,
+                                                          quic_config_, nullptr, enabled_flag());
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 
@@ -301,14 +302,14 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabled) {
   EnvoyQuicDispatcher* const envoy_quic_dispatcher =
       ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
-  // quic::QuicBufferedPacketStore* const buffered_packets =
-  //     quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
+  quic::QuicBufferedPacketStore* const buffered_packets =
+      quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
   EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true)).WillRepeatedly(Return(false));
   SendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   // if listener was enabled, there should have been session created for active connection
   EXPECT_TRUE(envoy_quic_dispatcher->session_map().empty());
-  // EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(1)));
+  EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(1)));
   ReadFromClientSockets();
 }
 
