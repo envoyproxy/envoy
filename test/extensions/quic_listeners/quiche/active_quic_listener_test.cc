@@ -206,8 +206,6 @@ default_value: true
     return enabled_proto;
   }
 
-  virtual bool enabled() const { return true; }
-
   Network::Address::IpVersion version_;
   Event::SimulatedTimeSystemHelper simulated_time_system_;
   Api::ApiPtr api_;
