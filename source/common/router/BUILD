@@ -254,8 +254,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "router_lib",
-    srcs = ["router.cc"],
-    hdrs = ["router.h"],
+    srcs = [
+        "router.cc",
+        "upstream_request.cc",
+    ],
+    hdrs = [
+        "router.h",
+        "upstream_request.h",
+    ],
     deps = [
         ":config_lib",
         ":debug_config_lib",
