@@ -18,6 +18,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
+# compressor used by http compression filters
+/*/extensions/filters/http/common/compressor @gsagula @rojkov @dio
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
 # grpc_http1_reverse_bridge http filter extension
