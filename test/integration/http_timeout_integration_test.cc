@@ -15,12 +15,12 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
-      Http::TestHeaderMapImpl{{":method", "POST"},
-                              {":path", "/test/long/url"},
-                              {":scheme", "http"},
-                              {":authority", "host"},
-                              {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-upstream-rq-timeout-ms", "500"}});
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "500"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -55,13 +55,13 @@ TEST_P(HttpTimeoutIntegrationTest, UseTimeoutSetByEgressEnvoy) {
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
-      Http::TestHeaderMapImpl{{":method", "POST"},
-                              {":path", "/test/long/url"},
-                              {":scheme", "http"},
-                              {":authority", "host"},
-                              {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-upstream-rq-timeout-ms", "500"},
-                              {"x-envoy-expected-rq-timeout-ms", "300"}});
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "500"},
+                                     {"x-envoy-expected-rq-timeout-ms", "300"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -97,12 +97,12 @@ TEST_P(HttpTimeoutIntegrationTest, DeriveTimeoutInIngressEnvoy) {
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
-      Http::TestHeaderMapImpl{{":method", "POST"},
-                              {":path", "/test/long/url"},
-                              {":scheme", "http"},
-                              {":authority", "host"},
-                              {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-upstream-rq-timeout-ms", "500"}});
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "500"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -138,13 +138,13 @@ TEST_P(HttpTimeoutIntegrationTest, IgnoreTimeoutSetByEgressEnvoy) {
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
-      Http::TestHeaderMapImpl{{":method", "POST"},
-                              {":path", "/test/long/url"},
-                              {":scheme", "http"},
-                              {":authority", "host"},
-                              {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-upstream-rq-timeout-ms", "500"},
-                              {"x-envoy-expected-rq-timeout-ms", "600"}});
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "500"},
+                                     {"x-envoy-expected-rq-timeout-ms", "600"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -179,15 +179,13 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutAfterHeadersBeforeBodyResetsUpst
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-forwarded-for", "10.0.0.1"},
-                                          {"x-envoy-upstream-rq-timeout-ms", "100"}};
-  std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
-      codec_client_->startRequest(request_headers);
-
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                 {"x-envoy-upstream-rq-timeout-ms", "100"}};
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -200,7 +198,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeoutAfterHeadersBeforeBodyResetsUpst
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Respond with headers, not end of stream.
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, false);
 
   response->waitForHeaders();
@@ -227,14 +225,14 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
-      Http::TestHeaderMapImpl{{":method", "POST"},
-                              {":path", "/test/long/url"},
-                              {":scheme", "http"},
-                              {":authority", "host"},
-                              {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-retry-on", "5xx"},
-                              {"x-envoy-upstream-rq-timeout-ms", "500"},
-                              {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}});
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "500"},
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -276,15 +274,15 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto encoder_decoder = codec_client_->startRequest(
-      Http::TestHeaderMapImpl{{":method", "POST"},
-                              {":path", "/test/long/url"},
-                              {":scheme", "http"},
-                              {":authority", "host"},
-                              {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-retry-on", "5xx"},
-                              {"x-envoy-hedge-on-per-try-timeout", "true"},
-                              {"x-envoy-upstream-rq-timeout-ms", "500"},
-                              {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}});
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"},
+                                     {"x-envoy-hedge-on-per-try-timeout", "true"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "500"},
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -308,7 +306,7 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
   // Encode 200 response headers for the first (timed out) request.
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
   response->waitForHeaders();
@@ -370,15 +368,15 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
-                                          {":path", "/test/long/url"},
-                                          {":scheme", "http"},
-                                          {":authority", "host"},
-                                          {"x-forwarded-for", "10.0.0.1"},
-                                          {"x-envoy-retry-on", "5xx"},
-                                          {"x-envoy-hedge-on-per-try-timeout", "true"},
-                                          {"x-envoy-upstream-rq-timeout-ms", "5000"},
-                                          {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                 {"x-envoy-retry-on", "5xx"},
+                                                 {"x-envoy-hedge-on-per-try-timeout", "true"},
+                                                 {"x-envoy-upstream-rq-timeout-ms", "5000"},
+                                                 {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}};
   auto encoder_decoder = codec_client_->startRequest(request_headers);
 
   auto response = std::move(encoder_decoder.second);
@@ -404,7 +402,7 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
   ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
-  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   if (first_request_wins) {
     // Encode 200 response headers for the first (timed out) request.
     upstream_request_->encodeHeaders(response_headers, response_size == 0);

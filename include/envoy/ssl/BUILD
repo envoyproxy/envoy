@@ -57,6 +57,14 @@ envoy_cc_library(
     hdrs = ["certificate_validation_context_config.h"],
     deps = [
         "//source/common/common:matchers_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "ssl_socket_extended_info_interface",
+    hdrs = ["ssl_socket_extended_info.h"],
+    deps = [
     ],
 )

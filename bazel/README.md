@@ -449,6 +449,8 @@ The following optional features can be enabled on the Bazel build command-line:
   Otherwise, the linker will fail to resolve symbols that are included via the `linktamp` rule, which is only available to binary targets.
   This is being tracked as a feature in: https://github.com/envoyproxy/envoy/issues/6859.
 * Process logging for Android applications can be enabled with `--define logger=android`.
+* Excluding assertions for known issues with `--define disable_known_issue_asserts=true`.
+  A KNOWN_ISSUE_ASSERT is an assertion that should pass (like all assertions), but sometimes fails for some as-yet unidentified or unresolved reason. Because it is known to potentially fail, it can be compiled out even when DEBUG is true, when this flag is set. This allows Envoy to be run in production with assertions generally enabled, without crashing for known issues. KNOWN_ISSUE_ASSERT should only be used for newly-discovered issues that represent benign violations of expectations.
 
 ## Disabling extensions
 
@@ -618,10 +620,10 @@ export BUILDIFIER_BIN="/usr/bin/buildifier"
 Once this is set up, you can run clang-format without docker:
 
 ```shell
-./tools/check_format.py check
-./tools/check_spelling.sh check
-./tools/check_format.py fix
-./tools/check_spelling.sh fix
+./tools/code_format/check_format.py check
+./tools/spelling/check_spelling.sh check
+./tools/code_format/check_format.py fix
+./tools/spelling/check_spelling.sh fix
 ```
 
 # Advanced caching setup

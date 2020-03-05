@@ -331,6 +331,7 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
     if (!headers_finalized_) {
       tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                                true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
       headers_finalized_ = true;
     }
 
@@ -362,6 +363,7 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
     if (!headers_finalized_) {
       tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                                true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
       headers_finalized_ = true;
     }
 
@@ -387,8 +389,16 @@ bool RouterCheckTool::compareRewriteHost(
 
 bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->directResponseEntry() != nullptr) {
-    tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.headers_, true);
+    if (!headers_finalized_) {
+      tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.headers_, true);
+      tool_config.route_->directResponseEntry()->finalizeResponseHeaders(*tool_config.headers_,
+                                                                         stream_info);
+      headers_finalized_ = true;
+    }
+
     actual = tool_config.route_->directResponseEntry()->newPath(*tool_config.headers_);
   }
 
@@ -436,8 +446,13 @@ bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const st
                                                 factory_context_->dispatcher().timeSource());
   stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
-                                                             true);
+    if (!headers_finalized_) {
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
+                                                               true);
+      tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.headers_, stream_info);
+      headers_finalized_ = true;
+    }
+
     actual = tool_config.headers_->get_(field);
   }
   return compareResults(actual, expected, "custom_header");
@@ -483,10 +498,10 @@ void RouterCheckTool::printResults() {
 
 // The Mock for runtime value checks.
 // This is a simple implementation to mimic the actual runtime checks in Snapshot.featureEnabled
-bool RouterCheckTool::runtimeMock(const std::string& key,
+bool RouterCheckTool::runtimeMock(absl::string_view key,
                                   const envoy::type::v3::FractionalPercent& default_value,
                                   uint64_t random_value) {
-  return !active_runtime_.empty() && active_runtime_.compare(key) == 0 &&
+  return !active_runtime_.empty() && key.compare(active_runtime_) == 0 &&
          ProtobufPercentHelper::evaluateFractionalPercent(default_value, random_value);
 }
 

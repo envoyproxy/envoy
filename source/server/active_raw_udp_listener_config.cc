@@ -14,7 +14,7 @@ namespace Server {
 Network::ConnectionHandler::ActiveListenerPtr
 ActiveRawUdpListenerFactory::createActiveUdpListener(Network::ConnectionHandler& parent,
                                                      Event::Dispatcher& dispatcher,
-                                                     Network::ListenerConfig& config) const {
+                                                     Network::ListenerConfig& config) {
   return std::make_unique<ActiveUdpListener>(parent, dispatcher, config);
 }
 
@@ -24,7 +24,7 @@ ProtobufTypes::MessagePtr ActiveRawUdpListenerConfigFactory::createEmptyConfigPr
 
 Network::ActiveUdpListenerFactoryPtr
 ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
-    const Protobuf::Message& /*message*/) {
+    const Protobuf::Message& /*message*/, uint32_t /*concurrency*/) {
   return std::make_unique<Server::ActiveRawUdpListenerFactory>();
 }
 

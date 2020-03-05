@@ -52,20 +52,23 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
     : engine_(Filters::Common::RBAC::createEngine(per_route_config.rbac())),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(per_route_config.rbac())) {}
 
-Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
-                                                                      bool) {
-  ENVOY_LOG(debug,
-            "checking request: remoteAddress: {}, localAddress: {}, ssl: {}, headers: {}, "
-            "dynamicMetadata: {}",
-            callbacks_->connection()->remoteAddress()->asString(),
-            callbacks_->connection()->localAddress()->asString(),
-            callbacks_->connection()->ssl()
-                ? "uriSanPeerCertificate: " +
-                      absl::StrJoin(callbacks_->connection()->ssl()->uriSanPeerCertificate(), ",") +
-                      ", subjectPeerCertificate: " +
-                      callbacks_->connection()->ssl()->subjectPeerCertificate()
-                : "none",
-            headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
+Http::FilterHeadersStatus
+RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  ENVOY_LOG(
+      debug,
+      "checking request: remoteAddress: {}, localAddress: {}, ssl: {}, headers: {}, "
+      "dynamicMetadata: {}",
+      callbacks_->connection()->remoteAddress()->asString(),
+      callbacks_->connection()->localAddress()->asString(),
+      callbacks_->connection()->ssl()
+          ? "uriSanPeerCertificate: " +
+                absl::StrJoin(callbacks_->connection()->ssl()->uriSanPeerCertificate(), ",") +
+                ", dnsSanPeerCertificate: " +
+                absl::StrJoin(callbacks_->connection()->ssl()->dnsSansPeerCertificate(), ",") +
+                ", subjectPeerCertificate: " +
+                callbacks_->connection()->ssl()->subjectPeerCertificate()
+          : "none",
+      headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 
   std::string effective_policy_id;
   const auto shadow_engine =

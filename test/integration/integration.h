@@ -33,7 +33,7 @@ namespace Envoy {
 /**
  * Stream decoder wrapper used during integration testing.
  */
-class IntegrationStreamDecoder : public Http::StreamDecoder, public Http::StreamCallbacks {
+class IntegrationStreamDecoder : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   IntegrationStreamDecoder(Event::Dispatcher& dispatcher);
 
@@ -57,11 +57,13 @@ public:
   void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder
-  void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
-  void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
-  void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
+
+  // Http::ResponseDecoder
+  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,

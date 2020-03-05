@@ -17,7 +17,7 @@ namespace quic {
 // TODO(danzh)Note that |allocator| is not used to allocate memory currently, instead,
 // Buffer::OwnedImpl allocates memory on its own. Investigate if a customized
 // QuicBufferAllocator can improve cache hit.
-QuicMemSliceStorageImpl::QuicMemSliceStorageImpl(const struct iovec* iov, int iov_count,
+QuicMemSliceStorageImpl::QuicMemSliceStorageImpl(const iovec* iov, int iov_count,
                                                  QuicBufferAllocator* /*allocator*/,
                                                  const QuicByteCount max_slice_len) {
   if (iov == nullptr) {

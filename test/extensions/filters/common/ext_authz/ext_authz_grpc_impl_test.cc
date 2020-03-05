@@ -82,7 +82,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
@@ -106,7 +106,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
@@ -129,7 +129,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
@@ -153,7 +153,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
@@ -180,7 +180,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   expectCallSend(request);
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));

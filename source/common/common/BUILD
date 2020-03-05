@@ -210,6 +210,7 @@ envoy_cc_library(
         "//include/envoy/common:matchers_interface",
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/http:path_utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
@@ -380,12 +381,6 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
     ],
-)
-
-envoy_cc_library(
-    name = "to_lower_table_lib",
-    srcs = ["to_lower_table.cc"],
-    hdrs = ["to_lower_table.h"],
 )
 
 envoy_cc_library(

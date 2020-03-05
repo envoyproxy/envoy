@@ -4,25 +4,15 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                SubscriptionCallbacks& callbacks,
-                                               const LocalInfo::LocalInfo& local_info,
-                                               std::chrono::milliseconds init_fetch_timeout,
-                                               Event::Dispatcher& dispatcher)
-    : type_url_(std::move(type_url)), callbacks_(callbacks), local_info_(local_info),
-      init_fetch_timeout_(init_fetch_timeout) {
-  if (init_fetch_timeout_.count() > 0 && !init_fetch_timeout_timer_) {
-    init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
-      ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
-      callbacks_.onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr);
-    });
-    init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
-  }
-}
+                                               const LocalInfo::LocalInfo& local_info)
+    : type_url_(std::move(type_url)), callbacks_(callbacks), local_info_(local_info) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                                         const std::set<std::string>& cur_removed) {
@@ -68,7 +58,6 @@ UpdateAck DeltaSubscriptionState::handleResponse(
 
 void DeltaSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
-  disableInitFetchTimeoutTimer();
   absl::flat_hash_set<std::string> names_added_removed;
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
@@ -117,8 +106,7 @@ void DeltaSubscriptionState::handleGoodResponse(
 void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
   // Note that error_detail being set is what indicates that a DeltaDiscoveryRequest is a NACK.
   ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
-  ack.error_detail_.set_message(e.what());
-  disableInitFetchTimeoutTimer();
+  ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
   callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
@@ -170,13 +158,6 @@ DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
     request.mutable_error_detail()->CopyFrom(ack.error_detail_);
   }
   return request;
-}
-
-void DeltaSubscriptionState::disableInitFetchTimeoutTimer() {
-  if (init_fetch_timeout_timer_) {
-    init_fetch_timeout_timer_->disableTimer();
-    init_fetch_timeout_timer_.reset();
-  }
 }
 
 void DeltaSubscriptionState::setResourceVersion(const std::string& resource_name,

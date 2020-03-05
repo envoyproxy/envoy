@@ -329,7 +329,7 @@ TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(request_headers, Protocol::Http2));
   EXPECT_FALSE(request_headers.has(Headers::get().Via));
@@ -345,7 +345,7 @@ TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
-  TestHeaderMapImpl request_headers;
+  TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(request_headers, Protocol::Http2));
   EXPECT_EQ("foo", request_headers.get_(Headers::get().Via));
@@ -697,7 +697,7 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   TestHeaderMapImpl response_headers{
       {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "custom_value"}};
-  TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
+  TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
@@ -709,7 +709,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
 
 // Make sure we don't remove connection headers on all Upgrade responses.
 TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketResponses) {
-  TestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
+  TestRequestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
   TestHeaderMapImpl response_headers{
       {"connection", "upgrade"}, {"transfer-encoding", "foo"}, {"upgrade", "bar"}};
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
@@ -724,7 +724,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRes
 TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
   // Test clearing non-upgrade request and response headers
   {
-    TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
+    TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
     TestHeaderMapImpl response_headers{
         {"connection", "foo"}, {"transfer-encoding", "bar"}, {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
@@ -737,7 +737,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
 
   // Test with the request headers not valid upgrade headers
   {
-    TestHeaderMapImpl request_headers{{"upgrade", "foo"}};
+    TestRequestHeaderMapImpl request_headers{{"upgrade", "foo"}};
     TestHeaderMapImpl response_headers{{"connection", "upgrade"},
                                        {"transfer-encoding", "eep"},
                                        {"upgrade", "foo"},
@@ -753,7 +753,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
 
   // Test with the response headers not valid upgrade headers
   {
-    TestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
+    TestRequestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
     TestHeaderMapImpl response_headers{{"transfer-encoding", "foo"}, {"upgrade", "bar"}};
     EXPECT_TRUE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
@@ -767,8 +767,8 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
 // Test that we correctly return x-request-id if we were requested to force a trace.
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestHeaderMapImpl response_headers;
-  TestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
-                                    {"x-envoy-force-trace", "true"}};
+  TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
+                                           {"x-envoy-force-trace", "true"}};
 
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
@@ -1069,7 +1069,8 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
-  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(UuidTraceStatus::Sampled,
@@ -1086,7 +1087,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
-  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(UuidTraceStatus::Sampled,
@@ -1110,7 +1112,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
   EXPECT_CALL(tracingConfig, getRandomSampling()).WillRepeatedly(ReturnRef(percent));
   EXPECT_CALL(tracingConfig, getOverallSampling()).WillRepeatedly(ReturnRef(percent));
 
-  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(UuidTraceStatus::NoTrace,
@@ -1129,7 +1132,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
       .WillOnce(Return(true));
 
   // The x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
-  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(UuidTraceStatus::Forced,
@@ -1147,7 +1151,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(false));
 
-  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(UuidTraceStatus::NoTrace,
@@ -1164,7 +1169,7 @@ TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
@@ -1187,7 +1192,7 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenClientSamplingNotSetAndGlobalSet
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
 
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
@@ -1234,7 +1239,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
 
 // Forced, global on, broken uuid.
 TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
-  Http::TestHeaderMapImpl request_headers{{"x-envoy-force-trace", "true"}, {"x-request-id", "bb"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-force-trace", "true"},
+                                                 {"x-request-id", "bb"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
   EXPECT_EQ(UuidTraceStatus::NoTrace,
@@ -1242,9 +1248,9 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
-  Http::TestHeaderMapImpl request_headers{{}};
-  Http::TestHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
-                                           {"proxy-connection", "proxy-header"}};
+  Http::TestRequestHeaderMapImpl request_headers{{}};
+  Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
+                                                   {"proxy-connection", "proxy-header"}};
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
   EXPECT_EQ(UuidTraceStatus::NoTrace,
@@ -1257,10 +1263,10 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 // maybeNormalizePath() does nothing by default.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/../a");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(original_headers, header_map);
 }
@@ -1268,10 +1274,10 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
 // maybeNormalizePath() leaves already normal paths alone.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(original_headers, header_map);
 }
@@ -1279,10 +1285,10 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
 // maybeNormalizePath() normalizes relative paths.
 TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/../abc");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
@@ -1291,10 +1297,10 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
 TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(false));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz///abc");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz///abc");
 }
@@ -1303,10 +1309,10 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
 TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz///abc");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/abc");
 }
@@ -1315,10 +1321,10 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
 TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
-  HeaderMapImpl original_headers;
+  TestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/..//abc");
 
-  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  TestHeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.Path()->value().getStringView(), "/xyz/../abc");
 }

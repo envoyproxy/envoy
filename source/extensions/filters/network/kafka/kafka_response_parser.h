@@ -5,6 +5,7 @@
 
 #include "extensions/filters/network/kafka/kafka_response.h"
 #include "extensions/filters/network/kafka/parser.h"
+#include "extensions/filters/network/kafka/tagged_fields.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,6 +20,11 @@ using ResponseParserSharedPtr = std::shared_ptr<ResponseParser>;
  * Context that is shared between parsers that are handling the same single message.
  */
 struct ResponseContext {
+
+  /**
+   * Whether the 'api_key_' & 'api_version_' fields have been initialized.
+   */
+  bool api_info_set_ = false;
 
   /**
    * Api key of response that's being parsed.
@@ -41,6 +47,11 @@ struct ResponseContext {
   int32_t correlation_id_;
 
   /**
+   * Response's tagged fields.
+   */
+  TaggedFields tagged_fields_;
+
+  /**
    * Bytes left to consume.
    */
   uint32_t& remaining() { return remaining_response_size_; }
@@ -48,7 +59,9 @@ struct ResponseContext {
   /**
    * Returns data needed for construction of parse failure message.
    */
-  const ResponseMetadata asFailureData() const { return {api_key_, api_version_, correlation_id_}; }
+  const ResponseMetadata asFailureData() const {
+    return {api_key_, api_version_, correlation_id_, tagged_fields_};
+  }
 };
 
 using ResponseContextSharedPtr = std::shared_ptr<ResponseContext>;
@@ -119,6 +132,7 @@ private:
 
   Int32Deserializer length_deserializer_;
   Int32Deserializer correlation_id_deserializer_;
+  TaggedFieldsDeserializer tagged_fields_deserializer_;
 };
 
 /**
@@ -166,7 +180,7 @@ public:
       if (0 == context_->remaining_response_size_) {
         // After a successful parse, there should be nothing left - we have consumed all the bytes.
         const ResponseMetadata metadata = {context_->api_key_, context_->api_version_,
-                                           context_->correlation_id_};
+                                           context_->correlation_id_, context_->tagged_fields_};
         const AbstractResponseSharedPtr response =
             std::make_shared<Response<ResponseType>>(metadata, deserializer_.get());
         return ResponseParseResponse::parsedMessage(response);

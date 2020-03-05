@@ -180,7 +180,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
             udp_config.udp_listener_name());
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
-    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
+    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
   }
 
   if (!config.listener_filters().empty()) {

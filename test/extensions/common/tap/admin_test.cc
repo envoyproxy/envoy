@@ -40,7 +40,7 @@ public:
   Event::MockDispatcher main_thread_dispatcher_;
   std::unique_ptr<AdminHandler> handler_;
   Server::Admin::HandlerCb cb_;
-  Http::TestHeaderMapImpl response_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
   Buffer::OwnedImpl response_;
   Server::MockAdminStream admin_stream_;
 

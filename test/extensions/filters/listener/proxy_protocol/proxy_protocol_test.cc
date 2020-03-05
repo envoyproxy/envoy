@@ -82,7 +82,7 @@ public:
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -173,6 +173,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
@@ -182,7 +183,6 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
-  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.
@@ -291,23 +291,23 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, unsigned long int request, void* argp) {
         const int rc = ::ioctl(fd, request, argp);
         return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::writev(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
   }));
@@ -329,17 +329,17 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
   EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::writev(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
   }));
@@ -525,7 +525,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
 
   EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, unsigned long int request, void* argp) {
         int x = ::ioctl(fd, request, argp);
         if (x == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
           return Api::SysCallIntResult{-1, errno};
@@ -536,24 +536,24 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, void* buf, size_t len, int flags) {
         const ssize_t rc = ::recv(fd, buf, len, flags);
         return Api::SysCallSizeResult{rc, errno};
       }));
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::writev(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
   }));
@@ -659,7 +659,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, void* buf, size_t len, int flags) {
         const ssize_t rc = ::recv(fd, buf, len, flags);
         return Api::SysCallSizeResult{rc, errno};
       }));
@@ -669,23 +669,23 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
 
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, unsigned long int request, void* argp) {
         const int rc = ::ioctl(fd, request, argp);
         return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::writev(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
   }));
@@ -708,7 +708,7 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, void* buf, size_t len, int flags) {
         const ssize_t rc = ::recv(fd, buf, len, flags);
         return Api::SysCallSizeResult{rc, errno};
       }));
@@ -718,23 +718,23 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
 
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, unsigned long int request, void* argp) {
         const int rc = ::ioctl(fd, request, argp);
         return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::writev(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+      .WillRepeatedly(Invoke([](os_fd_t fd, const iovec* iov, int iovcnt) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](os_fd_t fd) {
     const int rc = ::close(fd);
     return Api::SysCallIntResult{rc, errno};
   }));
@@ -946,7 +946,7 @@ public:
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -1006,6 +1006,7 @@ public:
   Network::MockListenSocketFactory socket_factory_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
@@ -1015,7 +1016,6 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
-  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.

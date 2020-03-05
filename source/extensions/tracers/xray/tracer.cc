@@ -169,11 +169,15 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
   constexpr auto SpanStatus = "status";
   constexpr auto SpanUserAgent = "user_agent";
   constexpr auto SpanUrl = "url";
+  constexpr auto SpanClientIp = "client_ip";
+  constexpr auto SpanXForwardedFor = "x_forwarded_for";
+
   constexpr auto HttpUrl = "http.url";
   constexpr auto HttpMethod = "http.method";
   constexpr auto HttpStatusCode = "http.status_code";
   constexpr auto HttpUserAgent = "user_agent";
   constexpr auto HttpResponseSize = "response_size";
+  constexpr auto PeerAddress = "peer.address";
 
   if (name.empty() || value.empty()) {
     return;
@@ -189,6 +193,11 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
     http_response_annotations_.emplace(SpanStatus, value);
   } else if (name == HttpResponseSize) {
     http_response_annotations_.emplace(SpanContentLength, value);
+  } else if (name == PeerAddress) {
+    http_request_annotations_.emplace(SpanClientIp, value);
+    // In this case, PeerAddress refers to the client's actual IP address, not
+    // the address specified in the the HTTP X-Forwarded-For header.
+    http_request_annotations_.emplace(SpanXForwardedFor, "false");
   } else {
     custom_annotations_.emplace(name, value);
   }

@@ -50,7 +50,8 @@ public:
   ProxyFilter(const ProxyFilterConfigSharedPtr& config) : config_(config) {}
 
   // Http::PassThroughDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   void onDestroy() override;
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks

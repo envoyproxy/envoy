@@ -45,9 +45,9 @@ public:
     result = request_stream->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
     if (body.empty()) {
-      request_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", status}}, true);
+      request_stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", status}}, true);
     } else {
-      request_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", status}}, false);
+      request_stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", status}}, false);
       Buffer::OwnedImpl responseBuffer(body);
       request_stream->encodeData(responseBuffer, true);
     }
@@ -62,10 +62,10 @@ public:
   FakeStreamPtr sendSquashOk(const std::string& body) { return sendSquash("200", body); }
 
   IntegrationStreamDecoderPtr sendDebugRequest(IntegrationCodecClientPtr& codec_client) {
-    Http::TestHeaderMapImpl headers{{":method", "GET"},
-                                    {":authority", "www.solo.io"},
-                                    {"x-squash-debug", "true"},
-                                    {":path", "/getsomething"}};
+    Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                           {":authority", "www.solo.io"},
+                                           {"x-squash-debug", "true"},
+                                           {":path", "/getsomething"}};
     return codec_client->makeHeaderOnlyRequest(headers);
   }
 

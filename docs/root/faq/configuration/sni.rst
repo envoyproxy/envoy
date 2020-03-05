@@ -1,7 +1,7 @@
 .. _faq_how_to_setup_sni:
 
-How do I configure SNI?
-=======================
+How do I configure SNI for listeners?
+=====================================
 
 `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ is only supported in the :ref:`v2
 configuration/API <config_overview>`.
@@ -32,7 +32,7 @@ The following is a YAML example of the above requirement.
           - certificate_chain: { filename: "example_com_cert.pem" }
             private_key: { filename: "example_com_key.pem" }
     filters:
-    - name: envoy.http_connection_manager
+    - name: envoy.filters.network.http_connection_manager
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         stat_prefix: ingress_http
@@ -54,7 +54,7 @@ The following is a YAML example of the above requirement.
           - certificate_chain: { filename: "api_example_com_cert.pem" }
             private_key: { filename: "api_example_com_key.pem" }
     filters:
-    - name: envoy.http_connection_manager
+    - name: envoy.filters.network.http_connection_manager
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         stat_prefix: ingress_http
@@ -65,3 +65,14 @@ The following is a YAML example of the above requirement.
             routes:
             - match: { prefix: "/" }
               route: { cluster: service_foo }
+
+
+How do I configure SNI for clusters?
+====================================
+
+For clusters, a fixed SNI can be set in `UpstreamTlsContext <envoy_api_field_auth.UpstreamTlsContext.sni>`_.
+To derive SNI from HTTP `host` or `:authority` header, turn on
+`auto_sni <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_sni>`_ to override the fixed SNI in
+`UpstreamTlsContext`. If upstream will present certificates with the hostname in SAN, turn on
+`auto_san_validation <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>`_ too.
+It still needs a trust CA in validation context in `UpstreamTlsContext` for trust anchor.

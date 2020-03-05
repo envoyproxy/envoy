@@ -8,16 +8,16 @@
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/utility.h"
 
 #include "server/options_impl.h"
 
-#include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
+#include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #if defined(__linux__)
@@ -223,6 +223,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
+  EXPECT_EQ(spdlog::level::warn, options->logLevel());
   EXPECT_FALSE(options->hotRestartDisabled());
   EXPECT_FALSE(options->cpusetThreadsEnabled());
 
@@ -305,10 +306,16 @@ TEST_F(OptionsImplTest, InvalidComponent) {
                           "error: invalid component specified 'blah'");
 }
 
-TEST_F(OptionsImplTest, InvalidLogLevel) {
+TEST_F(OptionsImplTest, InvalidComponentLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:blah,connection:trace"),
                           MalformedArgvException, "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, ComponentLogLevelContainsBlank) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:,connection:trace"),
+                          MalformedArgvException, "error: invalid log level specified ''");
 }
 
 TEST_F(OptionsImplTest, InvalidComponentLogLevelStructure) {
@@ -322,6 +329,26 @@ TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream"), MalformedArgvException,
                           "component log level not correctly specified 'upstream'");
+}
+
+TEST_F(OptionsImplTest, InvalidLogLevel) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -l blah"), MalformedArgvException,
+                          "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, ValidLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -l critical");
+  EXPECT_EQ(spdlog::level::level_enum::critical, options->logLevel());
+}
+
+TEST_F(OptionsImplTest, WarnIsValidLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -l warn");
+  EXPECT_EQ(spdlog::level::level_enum::warn, options->logLevel());
+}
+
+TEST_F(OptionsImplTest, AllowedLogLevels) {
+  EXPECT_EQ("[trace][debug][info][warning|warn][error][critical][off]",
+            OptionsImpl::allowedLogLevels());
 }
 
 // Test that the test constructor comes up with the same default values as the main constructor.
@@ -526,17 +553,17 @@ TEST(DisableExtensions, IsDisabled) {
 }
 
 TEST(FactoryByTypeTest, EarlierVersionConfigType) {
-  envoy::config::filter::http::ip_tagging::v2::IPTagging v2_config;
+  envoy::config::filter::http::buffer::v2::Buffer v2_config;
   auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v2_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().IpTagging);
+  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
 
-  envoy::extensions::filters::http::ip_tagging::v3::IPTagging v3_config;
+  envoy::extensions::filters::http::buffer::v3::Buffer v3_config;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v3_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().IpTagging);
+  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
 
   ProtobufWkt::Any non_api_type;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::

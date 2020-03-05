@@ -7,7 +7,7 @@ static_resources:
     reuse_port: {{ reuse_port }}
     filter_chains:
     - filters:
-      - name: envoy.http_connection_manager
+      - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           drain_timeout: 5s
@@ -50,7 +50,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
           access_log:
-          - name: envoy.file_access_log
+          - name: accesslog
             typed_config:
               "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
               path: /dev/null
@@ -75,7 +75,7 @@ static_resources:
         port_value: 0
     filter_chains:
     - filters:
-      - name: envoy.redis_proxy
+      - name: envoy.filters.network.redis_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           settings:
@@ -155,14 +155,14 @@ dynamic_resources: {}
 cluster_manager: {}
 flags_path: "/invalid_flags"
 stats_sinks:
-- name: envoy.statsd
+- name: envoy.stat_sinks.statsd
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     address:
       socket_address:
         address: {{ ip_loopback_address }}
         port_value: 8125
-- name: envoy.statsd
+- name: envoy.stat_sinks.statsd
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd

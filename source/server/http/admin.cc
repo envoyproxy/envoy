@@ -46,6 +46,7 @@
 #include "common/http/headers.h"
 #include "common/json/json_loader.h"
 #include "common/memory/stats.h"
+#include "common/memory/utils.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
@@ -317,7 +318,8 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
 
-Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                     bool end_stream) {
   request_headers_ = &headers;
   if (end_stream) {
     onComplete();
@@ -340,7 +342,7 @@ Http::FilterDataStatus AdminFilter::decodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::RequestTrailerMap&) {
   onComplete();
   return Http::FilterTrailersStatus::StopIteration;
 }
@@ -483,6 +485,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
         host_status.set_hostname(host->hostname());
+        host_status.mutable_locality()->MergeFrom(host->locality());
 
         for (const auto& named_counter : host->counters()) {
           auto& metric = *host_status.add_stats();
@@ -1341,7 +1344,7 @@ void AdminFilter::onComplete() {
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
-  Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
+  Http::ResponseHeaderMapPtr header_map{new Http::ResponseHeaderMapImpl};
   RELEASE_ASSERT(request_headers_, "");
   Http::Code code = parent_.runCallback(path, *header_map, response, *this);
   populateFallbackResponseHeaders(code, *header_map);
@@ -1491,6 +1494,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
         }
       }
       code = handler.handler_(path_and_query, response_headers, response, admin_stream);
+      Memory::Utils::tryShrinkHeap();
       break;
     }
   }
@@ -1616,7 +1620,7 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::HeaderMap& response_headers, std::string& body) {
   AdminFilter filter(*this);
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   request_headers.setMethod(method);
   filter.decodeHeaders(request_headers, false);
   Buffer::OwnedImpl response;

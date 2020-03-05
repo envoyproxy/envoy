@@ -3508,7 +3508,7 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
   // route may be called early in some edge cases and "x-forwarded-proto" will not be set.
-  Http::TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
+  Http::TestRequestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
   EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
@@ -4183,7 +4183,7 @@ virtual_hosts:
     EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
 
-    Http::TestHeaderMapImpl response_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
     route_entry->finalizeResponseHeaders(response_headers, stream_info);
     EXPECT_EQ(response_headers, Http::TestHeaderMapImpl{});
@@ -4990,6 +4990,7 @@ virtual_hosts:
       cluster: foo
     decorator:
       operation: myFoo
+      propagate: false
   - match:
       prefix: "/bar"
     route:
@@ -5004,6 +5005,7 @@ virtual_hosts:
     Tracing::MockSpan span;
     EXPECT_CALL(span, setOperation(Eq("myFoo")));
     route->decorator()->apply(span);
+    EXPECT_EQ(false, route->decorator()->propagate());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
@@ -5957,6 +5959,18 @@ virtual_hosts:
         route:
           cluster: server_peer-cert-not-presented
       - match:
+          prefix: "/peer-validated-cert-test"
+          tls_context:
+            validated: true
+        route:
+          cluster: server_peer-cert-validated
+      - match:
+          prefix: "/peer-validated-cert-test"
+          tls_context:
+            validated: false
+        route:
+          cluster: server_peer-cert-not-validated
+      - match:
           prefix: "/peer-cert-no-tls-context-match"
         route:
           cluster: server_peer-cert-no-tls-context-match
@@ -5972,6 +5986,7 @@ virtual_hosts:
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(true));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-test", "GET");
@@ -5983,6 +5998,7 @@ virtual_hosts:
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(false));
+    EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(true));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/peer-cert-test", "GET");
@@ -5994,6 +6010,7 @@ virtual_hosts:
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(false));
+    EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(true));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
     Http::TestHeaderMapImpl headers =
@@ -6006,6 +6023,59 @@ virtual_hosts:
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(true));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
+    EXPECT_EQ("server_peer-cert-no-tls-context-match",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(true));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-validated-cert-test", "GET");
+    EXPECT_EQ("server_peer-cert-validated",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(false));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-validated-cert-test", "GET");
+    EXPECT_EQ("server_peer-cert-not-validated",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(false));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
+
+    Http::TestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/peer-cert-no-tls-context-match", "GET");
+    EXPECT_EQ("server_peer-cert-no-tls-context-match",
+              config.route(headers, stream_info, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, peerCertificatePresented()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*connection_info, peerCertificateValidated()).WillRepeatedly(Return(true));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
 
     Http::TestHeaderMapImpl headers =

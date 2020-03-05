@@ -164,8 +164,8 @@ protected:
 
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
-        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
+        stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
@@ -183,8 +183,8 @@ protected:
     init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
-        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
+        stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
@@ -644,9 +644,9 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
+  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo", ""));
   // This should access via the override/some_service overlay.
-  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz", ""));
   EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
@@ -655,7 +655,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
 TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string response_body;
   EXPECT_EQ(Http::Code::OK,
             server_->admin().request("/runtime", "GET", response_headers, response_body));
@@ -860,12 +860,12 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   EXPECT_THROW_WITH_MESSAGE(
-      server_.reset(new InstanceImpl(
-          *init_manager_, options_, time_system_,
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
+      server_.reset(new InstanceImpl(*init_manager_, options_, time_system_,
+                                     std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                                     hooks_, restart_, stats_store_, fakelock_, component_factory_,
+                                     std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(),
+                                     *thread_local_, Thread::threadFactoryForTest(),
+                                     Filesystem::fileSystemForTest(), nullptr)),
       EnvoyException,
       "At least one of --config-path or --config-yaml or Options::configProto() should be "
       "non-empty");

@@ -257,7 +257,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
   healthcheckEndpoints();
 
   // Endpoint responds to the health check
-  host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   host_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
@@ -328,7 +328,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
   healthcheckEndpoints();
 
   // Endpoint responds to the health check
-  host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, false);
   host_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
@@ -473,9 +473,9 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   healthcheckEndpoints("anna");
 
   // Endpoints respond to the health check
-  host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, false);
   host_stream_->encodeData(1024, true);
-  host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   host2_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
@@ -525,9 +525,9 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   healthcheckEndpoints("anna");
 
   // Endpoint responds to the health check
-  host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, false);
   host_stream_->encodeData(1024, true);
-  host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   host2_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
@@ -588,9 +588,9 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   healthcheckEndpoints("cat");
 
   // Endpoint responds to the health check
-  host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, false);
   host_stream_->encodeData(1024, true);
-  host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   host2_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
@@ -632,7 +632,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   healthcheckEndpoints();
 
   // Endpoint responds to the health check
-  host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   host_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
@@ -678,7 +678,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
 
   // Endpoint responds to the health check
-  host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
+  host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, false);
   host2_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives

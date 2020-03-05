@@ -56,7 +56,7 @@ public:
 };
 
 TEST_F(BufferFilterTest, HeaderOnlyRequest) {
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, true));
 }
 
@@ -68,7 +68,7 @@ TEST_F(BufferFilterTest, TestMetadata) {
 TEST_F(BufferFilterTest, RequestWithData) {
   InSequence s;
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data1("hello");
@@ -81,7 +81,7 @@ TEST_F(BufferFilterTest, RequestWithData) {
 TEST_F(BufferFilterTest, TxResetAfterEndStream) {
   InSequence s;
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data1("hello");
@@ -98,7 +98,7 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
 TEST_F(BufferFilterTest, ContentLengthPopulation) {
   InSequence s;
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data1("hello");
@@ -113,14 +113,14 @@ TEST_F(BufferFilterTest, ContentLengthPopulation) {
 TEST_F(BufferFilterTest, ContentLengthPopulationInTrailers) {
   InSequence s;
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data1("hello");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
   ASSERT_EQ(headers.ContentLength(), nullptr);
 
-  Http::TestHeaderMapImpl trailers;
+  Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(trailers));
   ASSERT_NE(headers.ContentLength(), nullptr);
   EXPECT_EQ(headers.ContentLength()->value().getStringView(), "5");
@@ -129,7 +129,7 @@ TEST_F(BufferFilterTest, ContentLengthPopulationInTrailers) {
 TEST_F(BufferFilterTest, ContentLengthPopulationAlreadyPresent) {
   InSequence s;
 
-  Http::TestHeaderMapImpl headers{{"content-length", "3"}};
+  Http::TestRequestHeaderMapImpl headers{{"content-length", "3"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data("foo");
@@ -150,7 +150,7 @@ TEST_F(BufferFilterTest, RouteConfigOverride) {
 
   EXPECT_CALL(callbacks_, setDecoderBufferLimit(123ULL));
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   filter_.onDestroy();
@@ -165,7 +165,7 @@ TEST_F(BufferFilterTest, VHostConfigOverride) {
 
   EXPECT_CALL(callbacks_, setDecoderBufferLimit(789ULL));
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
   filter_.onDestroy();
 }
@@ -176,7 +176,7 @@ TEST_F(BufferFilterTest, RouteDisabledConfigOverride) {
   BufferFilterSettings vhost_settings(vhost_cfg);
   routeLocalConfig(nullptr, &vhost_settings);
 
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
   Buffer::OwnedImpl data1("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data1, false));

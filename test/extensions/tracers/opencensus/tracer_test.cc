@@ -103,10 +103,11 @@ TEST(OpenCensusTracerTest, Span) {
   registerSpanCatcher();
   OpenCensusConfig oc_config;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
+  std::unique_ptr<Tracing::Driver> driver(
+      new OpenCensus::Driver(oc_config, local_info, *Api::createApiForTest()));
 
   NiceMock<Tracing::MockConfig> config;
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   const std::string operation_name{"my_operation_1"};
   SystemTime start_time;
@@ -192,9 +193,10 @@ void testIncomingHeaders(
   oc_config.add_outgoing_trace_context(OpenCensusConfig::TRACE_CONTEXT);
   oc_config.add_outgoing_trace_context(OpenCensusConfig::GRPC_TRACE_BIN);
   oc_config.add_outgoing_trace_context(OpenCensusConfig::CLOUD_TRACE_CONTEXT);
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
+  std::unique_ptr<Tracing::Driver> driver(
+      new OpenCensus::Driver(oc_config, local_info, *Api::createApiForTest()));
   NiceMock<Tracing::MockConfig> config;
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"},
       {":method", "GET"},
       {"x-request-id", "foo"},
@@ -279,7 +281,8 @@ namespace {
 int SamplerTestHelper(const OpenCensusConfig& oc_config) {
   registerSpanCatcher();
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config, local_info));
+  std::unique_ptr<Tracing::Driver> driver(
+      new OpenCensus::Driver(oc_config, local_info, *Api::createApiForTest()));
   auto span = ::opencensus::trace::Span::StartSpan("test_span");
   span.End();
   // Retrieve SpanData from the OpenCensus trace exporter.
