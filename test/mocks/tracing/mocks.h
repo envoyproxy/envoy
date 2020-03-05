@@ -88,7 +88,7 @@ public:
   ~MockHttpTracerManager() override;
 
   MOCK_METHOD(HttpTracerSharedPtr, getOrCreateHttpTracer,
-              (const envoy::config::trace::v3::Tracing&));
+              (const envoy::config::trace::v3::Tracing_Http*));
 };
 
 } // namespace Tracing

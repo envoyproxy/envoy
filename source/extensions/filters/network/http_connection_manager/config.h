@@ -161,6 +161,14 @@ private:
                 int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
                 bool& is_terminal);
 
+  /**
+   * Determines what tracing provider to use for a given `envoy.http_connection_manager`
+   * filter instance.
+   */
+  const envoy::config::trace::v3::Tracing_Http* getPerFilterTracerConfig(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          filter_config);
+
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;

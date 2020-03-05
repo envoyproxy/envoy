@@ -20,7 +20,7 @@ public:
    * @return HttpTracerSharedPtr.
    */
   virtual HttpTracerSharedPtr
-  getOrCreateHttpTracer(const envoy::config::trace::v3::Tracing& config) PURE;
+  getOrCreateHttpTracer(const envoy::config::trace::v3::Tracing_Http* config) PURE;
 };
 
 using HttpTracerManagerSharedPtr = std::shared_ptr<HttpTracerManager>;

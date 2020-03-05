@@ -18,7 +18,7 @@ public:
 
   // HttpTracerManager
   HttpTracerSharedPtr
-  getOrCreateHttpTracer(const envoy::config::trace::v3::Tracing& config) override;
+  getOrCreateHttpTracer(const envoy::config::trace::v3::Tracing_Http* config) override;
 
 private:
   Server::Configuration::TracerFactoryContextPtr factory_context_;

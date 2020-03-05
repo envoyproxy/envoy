@@ -290,11 +290,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_tracing()) {
-    // at the moment, it is not yet possible to define tracing provider as part of
-    // `envoy.http_connection_manager` config.
-    // therefore, we always fallback to the server-wide default tracing provider.
-    http_tracer_ =
-        http_tracer_manager.getOrCreateHttpTracer(context_.httpContext().defaultTracingConfig());
+    http_tracer_ = http_tracer_manager.getOrCreateHttpTracer(getPerFilterTracerConfig(config));
 
     const auto& tracing_config = config.tracing();
 
@@ -532,6 +528,22 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
+}
+
+/**
+ * Determines what tracing provider to use for a given `envoy.http_connection_manager`
+ * filter instance.
+ */
+const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPerFilterTracerConfig(
+    const envoy::extensions::filters::network::http_connection_manager::v3::
+        HttpConnectionManager&) {
+  // at the moment, it is not yet possible to define tracing provider as part of
+  // `envoy.http_connection_manager` config.
+  // therefore, we always fallback to using the default server-wide tracing provider.
+  if (context_.httpContext().defaultTracingConfig().has_http()) {
+    return &context_.httpContext().defaultTracingConfig().http();
+  }
+  return nullptr;
 }
 
 std::function<Http::ApiListenerPtr()>
