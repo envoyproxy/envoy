@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/envoyproxy/envoy/examples/load_reporting_service/server"
+	"github.com/envoyproxy/envoy/examples/load-reporting-service/server"
 	gcpLoadStats "github.com/envoyproxy/go-control-plane/envoy/service/load_stats/v2"
 	"google.golang.org/grpc"
 )
