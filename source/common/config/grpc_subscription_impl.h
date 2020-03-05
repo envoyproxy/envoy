@@ -25,18 +25,23 @@ public:
   void start(const std::set<std::string>& resource_names) override;
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
-  // Config::SubscriptionCallbacks
+  // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  virtual void onConfigUpdate(
+
+  void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
       const std::string& system_version_info) override;
-  void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
-                            const EnvoyException* e) override;
+
+  void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
+
   std::string resourceName(const ProtobufWkt::Any& resource) override;
 
   GrpcMuxSharedPtr grpcMux() { return grpc_mux_; }
+
+  void pause();
+  void resume();
 
 private:
   void disableInitFetchTimeoutTimer();
@@ -45,8 +50,10 @@ private:
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   const std::string type_url_;
-  GrpcMuxWatchPtr watch_{};
+  GrpcMuxWatchPtr watch_;
   Event::Dispatcher& dispatcher_;
+  // NOTE: if another subscription of the same type_url has already been started, this value will be
+  // ignored in favor of the other subscription's.
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
   const bool is_aggregated_;

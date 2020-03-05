@@ -104,9 +104,11 @@ public:
   Counter& counter(const std::string& name) override;
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatName(StatName name) override;
-  Gauge& gaugeFromStatName(StatName name, Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override;
+  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags) override;
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                   Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+                                           Histogram::Unit unit) override;
 
   // New APIs available for tests.
   CounterOptConstRef findCounterByString(const std::string& name) const;
@@ -154,9 +156,14 @@ private:
 
 class SymbolTableCreatorTestPeer {
 public:
-  static void setUseFakeSymbolTables(bool use_fakes) {
+  ~SymbolTableCreatorTestPeer() { SymbolTableCreator::setUseFakeSymbolTables(save_use_fakes_); }
+
+  void setUseFakeSymbolTables(bool use_fakes) {
     SymbolTableCreator::setUseFakeSymbolTables(use_fakes);
   }
+
+private:
+  const bool save_use_fakes_{SymbolTableCreator::useFakeSymbolTables()};
 };
 
 // Serializes a number into a uint8_t array, and check that it de-serializes to

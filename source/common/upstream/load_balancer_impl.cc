@@ -280,11 +280,12 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
 void LoadBalancerBase::recalculateLoadInTotalPanic() {
   // First calculate total number of hosts across all priorities regardless
   // whether they are healthy or not.
-  const uint32_t total_hosts_count = std::accumulate(
-      priority_set_.hostSetsPerPriority().begin(), priority_set_.hostSetsPerPriority().end(), 0,
-      [](size_t acc, const std::unique_ptr<Envoy::Upstream::HostSet>& host_set) {
-        return acc + host_set->hosts().size();
-      });
+  const uint32_t total_hosts_count =
+      std::accumulate(priority_set_.hostSetsPerPriority().begin(),
+                      priority_set_.hostSetsPerPriority().end(), static_cast<size_t>(0),
+                      [](size_t acc, const std::unique_ptr<Envoy::Upstream::HostSet>& host_set) {
+                        return acc + host_set->hosts().size();
+                      });
 
   if (0 == total_hosts_count) {
     // Backend is empty, but load must be distributed somewhere.

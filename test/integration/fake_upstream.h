@@ -43,11 +43,11 @@ class FakeHttpConnection;
 /**
  * Provides a fake HTTP stream for integration testing.
  */
-class FakeStream : public Http::StreamDecoder,
+class FakeStream : public Http::RequestDecoder,
                    public Http::StreamCallbacks,
                    Logger::Loggable<Logger::Id::testing> {
 public:
-  FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+  FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
              Event::TestTimeSystem& time_system);
 
   uint64_t bodyLength() { return body_.length(); }
@@ -56,17 +56,17 @@ public:
     Thread::LockGuard lock(lock_);
     return end_stream_;
   }
-  void encode100ContinueHeaders(const Http::HeaderMapImpl& headers);
-  void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
+  void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers);
+  void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
   void encodeData(absl::string_view data, bool end_stream);
-  void encodeTrailers(const Http::HeaderMapImpl& trailers);
+  void encodeTrailers(const Http::HeaderMap& trailers);
   void encodeResetStream();
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
-  const Http::HeaderMap& headers() { return *headers_; }
+  const Http::RequestHeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
-  const Http::HeaderMapPtr& trailers() { return trailers_; }
+  const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
   bool receivedData() { return received_data_; }
 
   ABSL_MUST_USE_RESULT
@@ -152,11 +152,12 @@ public:
   }
 
   // Http::StreamDecoder
-  void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
-  void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
-  void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
+
+  // Http::RequestDecoder
+  void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -174,14 +175,14 @@ public:
   }
 
 protected:
-  Http::HeaderMapPtr headers_;
+  Http::RequestHeaderMapPtr headers_;
 
 private:
   FakeHttpConnection& parent_;
-  Http::StreamEncoder& encoder_;
+  Http::ResponseEncoder& encoder_;
   Thread::MutexBasicLockable lock_;
   Thread::CondVar decoder_event_;
-  Http::HeaderMapPtr trailers_;
+  Http::RequestTrailerMapPtr trailers_;
   bool end_stream_{};
   Buffer::OwnedImpl body_;
   bool saw_reset_{};
@@ -430,7 +431,7 @@ public:
                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Http::ServerConnectionCallbacks
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
+  Http::RequestDecoder& newStream(Http::ResponseEncoder& response_encoder, bool) override;
   void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:

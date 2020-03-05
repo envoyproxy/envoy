@@ -23,7 +23,7 @@ A minimal fully static bootstrap config is provided below:
         socket_address: { address: 127.0.0.1, port_value: 10000 }
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
@@ -37,7 +37,7 @@ A minimal fully static bootstrap config is provided below:
                 - match: { prefix: "/" }
                   route: { cluster: some_service }
             http_filters:
-            - name: envoy.router
+            - name: envoy.filters.http.router
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -75,7 +75,7 @@ on 127.0.0.1:5678 is provided below:
         socket_address: { address: 127.0.0.1, port_value: 10000 }
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
@@ -89,7 +89,7 @@ on 127.0.0.1:5678 is provided below:
                 - match: { prefix: "/" }
                   route: { cluster: some_service }
             http_filters:
-            - name: envoy.router
+            - name: envoy.filters.http.router
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -215,7 +215,7 @@ The management server could respond to LDS requests with:
         port_value: 10000
     filter_chains:
     - filters:
-      - name: envoy.http_connection_manager
+      - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
@@ -229,7 +229,7 @@ The management server could respond to LDS requests with:
                   envoy_grpc:
                     cluster_name: xds_cluster
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
 
 The management server could respond to RDS requests with:
 

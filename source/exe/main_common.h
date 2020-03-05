@@ -48,7 +48,7 @@ public:
   Server::Instance* server() { return server_.get(); }
 
   using AdminRequestFn =
-      std::function<void(const Http::HeaderMap& response_headers, absl::string_view body)>;
+      std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
 
   // Makes an admin-console request by path, calling handler() when complete.
   // The caller can initiate this from any thread, but it posts the request

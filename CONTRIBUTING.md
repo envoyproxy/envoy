@@ -69,18 +69,6 @@ versioning guidelines:
   it is expected the multi-phase warn-by-default/fail-by-default is sufficient to warn users to move
   away from deprecated features.
 
-# Release cadence
-
-* Currently we are targeting approximately quarterly official releases. We may change this based
-  on customer demand.
-* In general, master is assumed to be release candidate quality at all times for documented
-  features. For undocumented or clearly under development features, use caution or ask about
-  current status when running master. Lyft runs master in production, typically deploying every
-  few days.
-* Note that we currently do not provide binary packages (RPM, etc.). Organizations are expected to
-  build Envoy from source. This may change in the future if we get resources for maintaining
-  packages.
-
 # Submitting a PR
 
 * Fork the repo.

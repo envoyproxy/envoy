@@ -20,7 +20,7 @@ const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 
-AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                                    AutonomousUpstream& upstream, bool allow_incomplete_streams)
     : FakeStream(parent, encoder, upstream.timeSystem()), upstream_(upstream),
       allow_incomplete_streams_(allow_incomplete_streams) {}
@@ -69,8 +69,8 @@ AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shar
                          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT),
       upstream_(upstream) {}
 
-Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,
-                                                         bool) {
+Http::RequestDecoder& AutonomousHttpConnection::newStream(Http::ResponseEncoder& response_encoder,
+                                                          bool) {
   auto stream =
       new AutonomousStream(*this, response_encoder, upstream_, upstream_.allow_incomplete_streams_);
   streams_.push_back(FakeStreamPtr{stream});
@@ -101,16 +101,16 @@ void AutonomousUpstream::createUdpListenerFilterChain(Network::UdpListenerFilter
 
 void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
   Thread::LockGuard lock(headers_lock_);
-  last_request_headers_ = std::make_unique<Http::TestHeaderMapImpl>(headers);
+  last_request_headers_ = std::make_unique<Http::TestRequestHeaderMapImpl>(headers);
 }
 
-std::unique_ptr<Http::TestHeaderMapImpl> AutonomousUpstream::lastRequestHeaders() {
+std::unique_ptr<Http::TestRequestHeaderMapImpl> AutonomousUpstream::lastRequestHeaders() {
   Thread::LockGuard lock(headers_lock_);
   return std::move(last_request_headers_);
 }
 
 void AutonomousUpstream::setResponseHeaders(
-    std::unique_ptr<Http::TestHeaderMapImpl>&& response_headers) {
+    std::unique_ptr<Http::TestResponseHeaderMapImpl>&& response_headers) {
   Thread::LockGuard lock(headers_lock_);
   response_headers_ = std::move(response_headers);
 }

@@ -130,7 +130,7 @@ public:
    * @return factory pointer if listening on UDP socket, otherwise return
    * nullptr.
    */
-  virtual const ActiveUdpListenerFactory* udpListenerFactory() PURE;
+  virtual ActiveUdpListenerFactory* udpListenerFactory() PURE;
 
   /**
    * @return traffic direction of the listener.

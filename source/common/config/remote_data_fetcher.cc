@@ -30,7 +30,7 @@ void RemoteDataFetcher::cancel() {
 }
 
 void RemoteDataFetcher::fetch() {
-  Http::MessagePtr message = Http::Utility::prepareHeaders(uri_);
+  Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   ENVOY_LOG(debug, "fetch remote data from [uri = {}]: start", uri_.uri());
   request_ = cm_.httpAsyncClientForCluster(uri_.cluster())
@@ -39,7 +39,7 @@ void RemoteDataFetcher::fetch() {
                            DurationUtil::durationToMilliseconds(uri_.timeout()))));
 }
 
-void RemoteDataFetcher::onSuccess(Http::MessagePtr&& response) {
+void RemoteDataFetcher::onSuccess(Http::ResponseMessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: success", uri_.uri());

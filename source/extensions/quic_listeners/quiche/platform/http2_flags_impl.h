@@ -12,3 +12,7 @@
 
 #define SetHttp2ReloadableFlagImpl(flag, value)                                                    \
   quiche::FLAGS_http2_reloadable_flag_##flag->SetValue(value)
+
+#define HTTP2_CODE_COUNT_N_IMPL(flag, instance, total)                                             \
+  do {                                                                                             \
+  } while (0)

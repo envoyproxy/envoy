@@ -29,12 +29,14 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/filters/http/common/utility.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/match.h"
@@ -57,7 +59,7 @@ convertInternalRedirectAction(const envoy::config::route::v3::RouteAction& route
 
 } // namespace
 
-std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
+std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
@@ -188,7 +190,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
-    : operation_(decorator.operation()) {}
+    : operation_(decorator.operation()),
+      propagate_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(decorator, propagate, true)) {}
 
 void DecoratorImpl::apply(Tracing::Span& span) const {
   if (!operation_.empty()) {
@@ -197,6 +200,8 @@ void DecoratorImpl::apply(Tracing::Span& span) const {
 }
 
 const std::string& DecoratorImpl::getOperation() const { return operation_; }
+
+bool DecoratorImpl::propagate() const { return propagate_; }
 
 RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing) {
   if (!tracing.has_client_sampling()) {
@@ -375,6 +380,15 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
   }
+
+  if (route.route().has_regex_rewrite()) {
+    if (!prefix_rewrite_.empty()) {
+      throw EnvoyException("Cannot specify both prefix_rewrite and regex_rewrite");
+    }
+    auto rewrite_spec = route.route().regex_rewrite();
+    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_substitution_ = rewrite_spec.substitution();
+  }
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
@@ -399,10 +413,16 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
     matches &= criteria.presented().value() == peer_presented;
   }
 
+  if (criteria.validated().has_value()) {
+    const bool peer_validated = stream_info.downstreamSslConnection() &&
+                                stream_info.downstreamSslConnection()->peerCertificateValidated();
+    matches &= criteria.validated().value() == peer_validated;
+  }
+
   return matches;
 }
 
-bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
+bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const {
   bool matches = true;
@@ -437,7 +457,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
+void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
@@ -466,12 +486,12 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 
   // Handle path rewrite
-  if (!getPathRewrite().empty()) {
+  if (!getPathRewrite().empty() || regex_rewrite_ != nullptr) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
 
-void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
+void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
     // Append user-specified request headers from most to least specific: route-level headers,
@@ -501,11 +521,19 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
   return runtime;
 }
 
-void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
+// finalizePathHeaders does the "standard" path rewriting, meaning that it
+// handles the "prefix_rewrite" and "regex_rewrite" route actions, only one of
+// which can be specified. The "matched_path" argument applies only to the
+// prefix rewriting, and describes the portion of the path (excluding query
+// parameters) that should be replaced by the rewrite. A "regex_rewrite"
+// applies to the entire path (excluding query parameters), regardless of what
+// portion was matched.
+void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
   const auto& rewrite = getPathRewrite();
-  if (rewrite.empty()) {
+  if (rewrite.empty() && regex_rewrite_ == nullptr) {
+    // There are no rewrites configured. Just return.
     return;
   }
 
@@ -513,12 +541,24 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   if (insert_envoy_original_path) {
     headers.setEnvoyOriginalPath(path);
   }
-  ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
-                         : absl::StartsWithIgnoreCase(path, matched_path));
-  headers.setPath(path.replace(0, matched_path.size(), rewrite));
+
+  if (!rewrite.empty()) {
+    ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                           : absl::StartsWithIgnoreCase(path, matched_path));
+    headers.setPath(path.replace(0, matched_path.size(), rewrite));
+    return;
+  }
+
+  if (regex_rewrite_ != nullptr) {
+    // Replace the entire path, but preserve the query parameters
+    auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+    headers.setPath(path.replace(
+        0, just_path.size(), regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_)));
+    return;
+  }
 }
 
-absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,
+absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHeaderMap& headers,
                                                          absl::string_view new_scheme,
                                                          absl::string_view new_port) const {
 
@@ -557,7 +597,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& 
   return request_host;
 }
 
-std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
+std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
   absl::string_view final_scheme;
@@ -789,21 +829,19 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator),
-      prefix_(route.match().prefix()) {}
+    : RouteEntryImplBase(vhost, route, factory_context, validator), prefix_(route.match().prefix()),
+      path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
 
-void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
   finalizePathHeader(headers, prefix_, insert_envoy_original_path);
 }
 
-RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
+RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      (case_sensitive_
-           ? absl::StartsWith(headers.Path()->value().getStringView(), prefix_)
-           : absl::StartsWithIgnoreCase(headers.Path()->value().getStringView(), prefix_))) {
+      path_matcher_->match(headers.Path()->value().getStringView())) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -813,38 +851,20 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator), path_(route.match().path()) {}
+    : RouteEntryImplBase(vhost, route, factory_context, validator), path_(route.match().path()),
+      path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_)) {}
 
-void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
   finalizePathHeader(headers, path_, insert_envoy_original_path);
 }
 
-RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
+RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
-  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    const Http::HeaderString& path = headers.Path()->value();
-    absl::string_view query_string = Http::Utility::findQueryStringStart(path);
-    size_t compare_length = path.size();
-    if (query_string.length() > 0) {
-      compare_length = compare_length - query_string.length();
-    }
-
-    if (compare_length != path_.size()) {
-      return nullptr;
-    }
-
-    const absl::string_view path_section = path.getStringView().substr(0, compare_length);
-    if (case_sensitive_) {
-      if (absl::string_view(path_) == path_section) {
-        return clusterEntry(headers, random_value);
-      }
-    } else {
-      if (absl::EqualsIgnoreCase(path_, path_section)) {
-        return clusterEntry(headers, random_value);
-      }
-    }
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
+      path_matcher_->match(headers.Path()->value().getStringView())) {
+    return clusterEntry(headers, random_value);
   }
 
   return nullptr;
@@ -855,6 +875,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, factory_context, validator) {
+  // TODO(yangminzhu): Use PathMatcher once hidden_envoy_deprecated_regex is removed.
   if (route.match().path_specifier_case() ==
       envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
     regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
@@ -868,26 +889,23 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
   }
 }
 
-absl::string_view RegexRouteEntryImpl::pathOnly(const Http::HeaderMap& headers) const {
-  const Http::HeaderString& path = headers.Path()->value();
-  const absl::string_view query_string = Http::Utility::findQueryStringStart(path);
-  const size_t path_string_length = path.size() - query_string.length();
-  return path.getStringView().substr(0, path_string_length);
-}
-
-void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                             bool insert_envoy_original_path) const {
+  const absl::string_view path =
+      Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(regex_->match(pathOnly(headers)));
-  finalizePathHeader(headers, pathOnly(headers), insert_envoy_original_path);
+  ASSERT(regex_->match(path));
+  finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
-RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
+RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    if (regex_->match(pathOnly(headers))) {
+    const absl::string_view path =
+        Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
+    if (regex_->match(path)) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -1015,7 +1033,7 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
     const std::string& host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
     RouteMatcher::SubstringFunction substring_function) const {
   // We do a longest wildcard match against the host that's passed in
-  // (e.g. foo-bar.baz.com should match *-bar.baz.com before matching *.baz.com for suffix
+  // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
   // wildcards). This is done by scanning the length => wildcards map looking for every wildcard
   // whose size is < length.
   for (const auto& iter : wildcard_virtual_hosts) {
@@ -1067,7 +1085,7 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   }
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
+RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHeaderMap& headers,
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          uint64_t random_value) const {
   // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
@@ -1097,7 +1115,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
   return nullptr;
 }
 
-const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& headers) const {
+const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
   // Fast path the case where we only have a default virtual host.
   if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
       wildcard_virtual_host_prefixes_.empty()) {
@@ -1136,7 +1154,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   return default_virtual_host_.get();
 }
 
-RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,
+RouteConstSharedPtr RouteMatcher::route(const Http::RequestHeaderMap& headers,
                                         const StreamInfo::StreamInfo& stream_info,
                                         uint64_t random_value) const {
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
@@ -1213,18 +1231,26 @@ PerFilterConfigs::PerFilterConfigs(
   }
 
   for (const auto& it : typed_configs) {
+    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
+    const auto& name =
+        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+
     auto object = createRouteSpecificFilterConfig(
-        it.first, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
+        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
     if (object != nullptr) {
-      configs_[it.first] = std::move(object);
+      configs_[name] = std::move(object);
     }
   }
 
   for (const auto& it : configs) {
-    auto object = createRouteSpecificFilterConfig(it.first, ProtobufWkt::Any::default_instance(),
+    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
+    const auto& name =
+        Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
+
+    auto object = createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(),
                                                   it.second, factory_context, validator);
     if (object != nullptr) {
-      configs_[it.first] = std::move(object);
+      configs_[name] = std::move(object);
     }
   }
 }

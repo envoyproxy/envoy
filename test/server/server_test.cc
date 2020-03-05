@@ -164,8 +164,8 @@ protected:
 
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
-        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
+        stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
@@ -183,8 +183,8 @@ protected:
     init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
         *init_manager_, options_, time_system_,
-        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
+        stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
 
@@ -469,18 +469,49 @@ TEST_P(ServerInstanceImplTest, Stats) {
 class TestWithSimTimeAndRealSymbolTables : public Event::TestUsingSimulatedTime {
 protected:
   TestWithSimTimeAndRealSymbolTables() {
-    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+    symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
   }
+
+private:
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
 };
 
-class ServerStatsTest : public TestWithSimTimeAndRealSymbolTables, public ServerInstanceImplTest {
+class ServerStatsTest
+    : public TestWithSimTimeAndRealSymbolTables,
+      public ServerInstanceImplTestBase,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 protected:
+  ServerStatsTest() {
+    version_ = std::get<0>(GetParam());
+    manual_flush_ = std::get<1>(GetParam());
+  }
+
   void flushStats() {
-    // Default flush interval is 5 seconds.
-    simTime().sleep(std::chrono::seconds(6));
+    if (manual_flush_) {
+      server_->flushStats();
+    } else {
+      // Default flush interval is 5 seconds.
+      simTime().sleep(std::chrono::seconds(6));
+    }
     server_->dispatcher().run(Event::Dispatcher::RunType::Block);
   }
+
+  bool manual_flush_;
 };
+
+std::string ipFlushingModeTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return fmt::format(
+      "{}_{}",
+      TestUtility::ipTestParamsToString(
+          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+      std::get<1>(params.param) ? "with_manual_flush" : "with_time_based_flush");
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsFlushingMode, ServerStatsTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipFlushingModeTestParamsToString);
 
 TEST_P(ServerStatsTest, FlushStats) {
   initialize("test/server/test_data/server/empty_bootstrap.yaml");
@@ -504,10 +535,6 @@ TEST_P(ServerStatsTest, FlushStats) {
   flushStats();
   EXPECT_EQ(recent_lookups.value(), strobed_recent_lookups);
 }
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, ServerStatsTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
@@ -644,9 +671,9 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
+  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
-  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
   EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
@@ -655,7 +682,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
 TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  Http::TestHeaderMapImpl response_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
   std::string response_body;
   EXPECT_EQ(Http::Code::OK,
             server_->admin().request("/runtime", "GET", response_headers, response_body));
@@ -860,12 +887,12 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
   EXPECT_THROW_WITH_MESSAGE(
-      server_.reset(new InstanceImpl(
-          *init_manager_, options_, time_system_,
-          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
-          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr)),
+      server_.reset(new InstanceImpl(*init_manager_, options_, time_system_,
+                                     std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                                     hooks_, restart_, stats_store_, fakelock_, component_factory_,
+                                     std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(),
+                                     *thread_local_, Thread::threadFactoryForTest(),
+                                     Filesystem::fileSystemForTest(), nullptr)),
       EnvoyException,
       "At least one of --config-path or --config-yaml or Options::configProto() should be "
       "non-empty");
@@ -1063,11 +1090,13 @@ TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
 
 // Validate that disabled extension is reflected in the list of Node extensions.
 TEST_P(ServerInstanceImplTest, DisabledExtension) {
-  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.buffer"});
+  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.filters.http.buffer"});
   initialize("test/server/test_data/server/node_bootstrap.yaml");
   bool disabled_filter_found = false;
   for (const auto& extension : server_->localInfo().node().extensions()) {
-    if (extension.category() == "envoy.filters.http" && extension.name() == "envoy.buffer") {
+    // TODO(zuercher): remove envoy.buffer when old-style name deprecation is completed.
+    if (extension.category() == "envoy.filters.http" &&
+        (extension.name() == "envoy.filters.http.buffer" || extension.name() == "envoy.buffer")) {
       ASSERT_TRUE(extension.disabled());
       disabled_filter_found = true;
     } else {

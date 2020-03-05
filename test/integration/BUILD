@@ -830,6 +830,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "sds_generic_secret_integration_test",
+    srcs = [
+        "sds_generic_secret_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//include/envoy/registry",
+        "//source/common/grpc:common_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "tcp_proxy_integration_test",
     srcs = [
         "tcp_proxy_integration_test.cc",
@@ -995,6 +1011,29 @@ envoy_cc_test(
     name = "scoped_rds_integration_test",
     srcs = [
         "scoped_rds_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "listener_lds_integration_test",
+    srcs = [
+        "listener_lds_integration_test.cc",
     ],
     deps = [
         ":http_integration_lib",

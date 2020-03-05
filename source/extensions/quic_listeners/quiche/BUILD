@@ -18,6 +18,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "@com_googlesource_quiche//:quic_core_alarm_interface_lib",
+        "@com_googlesource_quiche//:quic_core_clock_lib",
     ],
 )
 

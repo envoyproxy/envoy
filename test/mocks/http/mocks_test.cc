@@ -52,7 +52,7 @@ TEST(HeaderValueOfTest, LowerCaseString) {
 }
 
 TEST(HttpStatusIsTest, CheckStatus) {
-  TestHeaderMapImpl header_map;
+  TestResponseHeaderMapImpl header_map;
   const auto status_matcher = HttpStatusIs(200);
 
   EXPECT_THAT(header_map, Not(status_matcher));

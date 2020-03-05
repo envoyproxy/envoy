@@ -10,7 +10,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace OriginalDst {
 
-Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(int fd) {
+Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(os_fd_t fd) {
   return Network::Utility::getOriginalDst(fd);
 }
 

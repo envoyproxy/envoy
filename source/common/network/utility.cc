@@ -339,7 +339,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
+Address::InstanceConstSharedPtr Utility::getOriginalDst(os_fd_t fd) {
 #ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
@@ -424,17 +424,19 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
 }
 
 absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) {
-  // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  static_assert(ABSL_IS_LITTLE_ENDIAN,
-                "Machines using big-endian byte order is not supported for IPv6.");
+#ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
+#else
+  return address;
+#endif
 }
 
 absl::uint128 Utility::Ip6htonl(const absl::uint128& address) {
-  // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  static_assert(ABSL_IS_LITTLE_ENDIAN,
-                "Machines using big-endian byte order is not supported for IPv6.");
+#ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
+#else
+  return address;
+#endif
 }
 
 absl::uint128 Utility::flipOrder(const absl::uint128& input) {

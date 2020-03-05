@@ -36,7 +36,7 @@ public:
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
   bool hasActiveConnections() const override;
-  ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
+  ConnectionPool::Cancellable* newStream(ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
 
@@ -88,7 +88,7 @@ protected:
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
-  void newClientStream(Http::StreamDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
+  void newClientStream(ResponseDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
   void onUpstreamReady();
 
   Event::Dispatcher& dispatcher_;

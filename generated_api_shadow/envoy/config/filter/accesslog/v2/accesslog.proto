@@ -23,9 +23,9 @@ message AccessLog {
   // The name of the access log implementation to instantiate. The name must
   // match a statically registered access log. Current built-in loggers include:
   //
-  // #. "envoy.file_access_log"
-  // #. "envoy.http_grpc_access_log"
-  // #. "envoy.tcp_grpc_access_log"
+  // #. "envoy.access_loggers.file"
+  // #. "envoy.access_loggers.http_grpc"
+  // #. "envoy.access_loggers.tcp_grpc"
   string name = 1;
 
   // Filter which is used to determine if the access log needs to be written.
@@ -34,11 +34,11 @@ message AccessLog {
   // Custom configuration that depends on the access log being instantiated. Built-in
   // configurations include:
   //
-  // #. "envoy.file_access_log": :ref:`FileAccessLog
+  // #. "envoy.access_loggers.file": :ref:`FileAccessLog
   //    <envoy_api_msg_config.accesslog.v2.FileAccessLog>`
-  // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
+  // #. "envoy.access_loggers.http_grpc": :ref:`HttpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
-  // #. "envoy.tcp_grpc_access_log": :ref:`TcpGrpcAccessLogConfig
+  // #. "envoy.access_loggers.tcp_grpc": :ref:`TcpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v2.TcpGrpcAccessLogConfig>`
   oneof config_type {
     google.protobuf.Struct config = 3 [deprecated = true];

@@ -43,7 +43,7 @@ protected:
     // ConnPoolImpl::ActiveClient
     bool hasActiveRequests() const override;
     bool closingWithIncompleteRequest() const override;
-    StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) override;
+    RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override;
 
     // CodecClientCallbacks
     void onStreamDestroy() override { parent().onStreamDestroy(*this); }

@@ -171,7 +171,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
 
   // Wait for the first HC and verify the host is healthy. This should warm the initial cluster.
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
@@ -197,7 +197,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
 
   // Respond with a health check. This will cause the previous cluster to be destroyed inline as
   // part of processing the response.
-  upstream_request->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
 
@@ -221,7 +221,7 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
 
   // Wait for the first HC and verify the host is healthy.
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
@@ -233,7 +233,7 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   // Fail HC and verify the host is gone.
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(
-      Http::TestHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
+      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 0);
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
@@ -254,7 +254,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
   // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
   // The other endpoint should still be excluded.
   waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
@@ -277,7 +277,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
   // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
   // The other endpoint should still be excluded.
   waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());

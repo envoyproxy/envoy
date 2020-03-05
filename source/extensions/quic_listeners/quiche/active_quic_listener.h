@@ -1,12 +1,11 @@
 #pragma once
 
-#include <iostream>
-
 #include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
 #include "envoy/runtime/runtime.h"
 
+#include "common/network/socket_option_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_protos.h"
 
@@ -28,12 +27,14 @@ public:
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     const envoy::config::core::v3::RuntimeFeatureFlag enabled);
+                     Network::Socket::OptionsSharedPtr options,
+										 const envoy::config::core::v3::RuntimeFeatureFlag enabled);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::SocketSharedPtr listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     const envoy::config::core::v3::RuntimeFeatureFlag enabled);
+                     Network::Socket::OptionsSharedPtr options,
+										 const envoy::config::core::v3::RuntimeFeatureFlag enabled);
 
   ~ActiveQuicListener() override;
 
@@ -56,6 +57,7 @@ public:
 
 private:
   friend class ActiveQuicListenerPeer;
+
   Network::UdpListenerPtr udp_listener_;
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;
@@ -69,40 +71,24 @@ private:
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 
 // A factory to create ActiveQuicListener based on given config.
-class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory {
+class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
+                                  Logger::Loggable<Logger::Id::quic> {
 public:
-  ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config)
-      : enabled_(config.enabled()) {
-    uint64_t idle_network_timeout_ms =
-        config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
-                                  : 300000;
-    quic_config_.SetIdleNetworkTimeout(
-        quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms),
-        quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
-    int32_t max_time_before_crypto_handshake_ms =
-        config.has_crypto_handshake_timeout()
-            ? DurationUtil::durationToMilliseconds(config.crypto_handshake_timeout())
-            : 20000;
-    quic_config_.set_max_time_before_crypto_handshake(
-        quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
-    int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
-    quic_config_.SetMaxIncomingBidirectionalStreamsToSend(max_streams);
-    quic_config_.SetMaxIncomingUnidirectionalStreamsToSend(max_streams);
-  }
+  ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
+                            uint32_t concurrency);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveListenerPtr
-  createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                          Network::ListenerConfig& config) const override {
-    return std::make_unique<ActiveQuicListener>(dispatcher, parent, config, quic_config_, enabled_);
-  }
+  createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
+                          Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
 
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
   quic::QuicConfig quic_config_;
-  envoy::config::core::v3::RuntimeFeatureFlag enabled_;
+  const uint32_t concurrency_;
+  absl::once_flag install_bpf_once_;
 };
 
 } // namespace Quic

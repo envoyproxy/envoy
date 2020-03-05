@@ -40,7 +40,8 @@ public:
  * Static registration for the TLS inspector filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(TlsInspectorConfigFactory,
-                 Server::Configuration::NamedListenerFilterConfigFactory);
+                 Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.tls_inspector"};
 
 } // namespace TlsInspector
 } // namespace ListenerFilters
