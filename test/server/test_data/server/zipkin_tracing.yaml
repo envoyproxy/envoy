@@ -4,7 +4,7 @@ static_resources:
     connect_timeout: 1s
 tracing:
   http:
-    name: envoy.tracers.zipkin
+    name: zipkin
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: zipkin

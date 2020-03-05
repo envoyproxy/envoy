@@ -277,7 +277,7 @@ api_config_source:
   - google_grpc:
       call_credentials:
       - from_plugin:
-          name: envoy.grpc_credentials.file_based_metadata
+          name: file_based_metadata
           typed_config:
             "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig
       stat_prefix: sdsstat

@@ -24,7 +24,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.xray
+    name: xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
       daemon_endpoint:
@@ -58,7 +58,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.xray
+    name: xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
       daemon_endpoint:
@@ -84,7 +84,7 @@ TEST(XRayTracerConfigTest, ProtocolNotUDPThrows) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.xray
+    name: xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
       daemon_endpoint:
@@ -109,7 +109,7 @@ TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.xray
+    name: xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
       daemon_endpoint:

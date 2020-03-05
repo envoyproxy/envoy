@@ -29,8 +29,9 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.datadog
-    config:
+    name: datadog
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.DatadogConfig
       collector_cluster: fake_cluster
       service_name: fake_file
    )EOF";

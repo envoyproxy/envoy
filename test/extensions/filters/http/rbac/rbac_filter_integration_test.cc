@@ -11,7 +11,7 @@ namespace Envoy {
 namespace {
 
 const std::string RBAC_CONFIG = R"EOF(
-name: envoy.filters.http.rbac
+name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
   rules:
@@ -24,7 +24,7 @@ typed_config:
 )EOF";
 
 const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
-name: envoy.filters.http.rbac
+name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
   rules:
@@ -37,7 +37,7 @@ typed_config:
 )EOF";
 
 const std::string RBAC_CONFIG_WITH_PATH_EXACT_MATCH = R"EOF(
-name: envoy.filters.http.rbac
+name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
   rules:
@@ -51,7 +51,7 @@ typed_config:
 )EOF";
 
 const std::string RBAC_CONFIG_WITH_PATH_IGNORE_CASE_MATCH = R"EOF(
-name: envoy.filters.http.rbac
+name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
   rules:

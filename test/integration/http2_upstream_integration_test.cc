@@ -328,7 +328,7 @@ TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
             TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.
         const std::string yaml_string = R"EOF(
-name: envoy.filters.http.router
+name: router
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:
@@ -453,7 +453,7 @@ TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
             TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.
         const std::string yaml_string = R"EOF(
-name: envoy.filters.http.router
+name: router
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
   upstream_log:

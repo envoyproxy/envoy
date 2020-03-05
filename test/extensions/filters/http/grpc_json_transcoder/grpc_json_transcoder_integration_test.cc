@@ -36,7 +36,7 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     const std::string filter =
         R"EOF(
-            name: envoy.filters.http.grpc_json_transcoder
+            name: grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
               proto_descriptor : "{}"
@@ -337,7 +337,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
   const std::string filter =
       R"EOF(
-            name: envoy.filters.http.grpc_json_transcoder
+            name: grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
               proto_descriptor : "{}"
@@ -361,7 +361,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
   const std::string filter =
       R"EOF(
-            name: envoy.filters.http.grpc_json_transcoder
+            name: grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
               proto_descriptor: "{}"
@@ -386,7 +386,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
   const std::string filter =
       R"EOF(
-            name: envoy.filters.http.grpc_json_transcoder
+            name: grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
               proto_descriptor: "{}"
@@ -411,7 +411,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
   const std::string filter =
       R"EOF(
-            name: envoy.filters.http.grpc_json_transcoder
+            name: grpc_json_transcoder
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
               proto_descriptor: "{}"

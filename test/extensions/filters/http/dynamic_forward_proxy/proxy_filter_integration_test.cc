@@ -33,7 +33,7 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
 
     const std::string filter = fmt::format(R"EOF(
-name: envoy.filters.http.dynamic_forward_proxy
+name: dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
   dns_cache_config:

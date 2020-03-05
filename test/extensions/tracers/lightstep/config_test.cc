@@ -29,8 +29,9 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.lightstep
-    config:
+    name: lightstep
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
       collector_cluster: fake_cluster
       access_token_file: fake_file
    )EOF";
