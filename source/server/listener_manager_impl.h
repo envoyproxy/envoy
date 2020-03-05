@@ -139,12 +139,12 @@ struct DrainingFilterChains : public Network::DrainingFilterChains {
   virtual const std::list<const Network::FilterChain*>& getDrainingFilterChains() const override {
     return draining_filter_chains_;
   }
-  void startDrainSequence(std::chrono::seconds drain_time, Event::Dispatcher& dispatcher, std::function<void()> completion) {
+  void startDrainSequence(std::chrono::seconds drain_time, Event::Dispatcher& dispatcher,
+                          std::function<void()> completion) {
     drain_sequence_completion_ = completion;
     ASSERT(!drain_timer_);
-    
-    drain_timer_ = dispatcher.createTimer(
-        [this]() -> void { drain_sequence_completion_(); });
+
+    drain_timer_ = dispatcher.createTimer([this]() -> void { drain_sequence_completion_(); });
     drain_timer_->enableTimer(drain_time);
   }
 

@@ -103,7 +103,8 @@ enum class UpdateDecision {
  * config at runtime is restricted to 1, despite the active filter chains could spread among
  * multiple listener configs.
  */
-class XXFactoryContextImpl final : public Configuration::FactoryContext, public Network::DrainDecision {
+class XXFactoryContextImpl final : public Configuration::FactoryContext,
+                                   public Network::DrainDecision {
 public:
   XXFactoryContextImpl(Envoy::Server::Instance& server,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -138,7 +139,9 @@ public:
   Stats::Scope& listenerScope() override;
 
   // DrainDescision
-  bool drainClose() const override {return drain_manager_->drainClose() || server_.drainManager().drainClose(); }
+  bool drainClose() const override {
+    return drain_manager_->drainClose() || server_.drainManager().drainClose();
+  }
   Server::DrainManager& drainManager();
 
 private:
@@ -152,17 +155,17 @@ private:
 };
 
 class ListenerImpl;
-// TODO(lambdai): refactor: ListenerFactroyContext provides very small value since the listener filter chain lifetime is different from network filter chain.
+// TODO(lambdai): refactor: ListenerFactroyContext provides very small value since the listener
+// filter chain lifetime is different from network filter chain.
 class ListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
 public:
   ListenerFactoryContextImpl(Envoy::Server::Instance& server,
                              ProtobufMessage::ValidationVisitor& validation_visitor,
                              const envoy::config::listener::v3::Listener& config_message,
                              const Network::ListenerConfig* listener_config,
-                             ListenerImpl& listener_impl,
-                             DrainManagerPtr drain_manager)
-      : xx_factory_context_(
-            std::make_shared<XXFactoryContextImpl>(server, validation_visitor, config_message, std::move(drain_manager))),
+                             ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
+      : xx_factory_context_(std::make_shared<XXFactoryContextImpl>(
+            server, validation_visitor, config_message, std::move(drain_manager))),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
   ListenerFactoryContextImpl(std::shared_ptr<XXFactoryContextImpl> xx_factory_context,
                              const Network::ListenerConfig* listener_config,
@@ -287,7 +290,9 @@ public:
   const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
-  DrainManager& localDrainManager() const { return listener_factory_context_->xx_factory_context_->drainManager(); }
+  DrainManager& localDrainManager() const {
+    return listener_factory_context_->xx_factory_context_->drainManager();
+  }
   void setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }

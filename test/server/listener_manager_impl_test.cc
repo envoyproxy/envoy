@@ -41,7 +41,11 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-#define CHECKSTATS(...) { SCOPED_TRACE("HERE"); checkStats(__VA_ARGS__); }
+#define CHECKSTATS(...)                                                                            \
+  {                                                                                                \
+    SCOPED_TRACE("HERE");                                                                          \
+    checkStats(__VA_ARGS__);                                                                       \
+  }
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
   ListenerManagerImplWithDispatcherStatsTest() { enable_dispatcher_stats_ = true; }
@@ -3481,7 +3485,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
 
   NiceMock<Network::MockAddressResolver> mock_resolver;
   EXPECT_CALL(mock_resolver, resolve(_))
-      .Times(2).WillRepeatedly(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
+      .Times(2)
+      .WillRepeatedly(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
 
   Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
 

@@ -132,7 +132,7 @@ XXFactoryContextImpl::XXFactoryContextImpl(Envoy::Server::Instance& server,
       // Not ideal
       listener_scope_(server_.stats().createScope(fmt::format(
           "listener.{}.", Network::Address::resolveProtoAddress(config.address())->asString()))),
-      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)){}
+      validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
 
 AccessLog::AccessLogManager& XXFactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
@@ -177,8 +177,8 @@ XXFactoryContextImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
 Stats::Scope& XXFactoryContextImpl::listenerScope() { return *listener_scope_; }
-Network::DrainDecision& XXFactoryContextImpl::drainDecision() {return *this;}
-Server::DrainManager& XXFactoryContextImpl::drainManager() {return *drain_manager_;}
+Network::DrainDecision& XXFactoryContextImpl::drainDecision() { return *this; }
+Server::DrainManager& XXFactoryContextImpl::drainManager() { return *drain_manager_; }
 
 // Must be overridden
 Init::Manager& XXFactoryContextImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -202,7 +202,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
       dynamic_init_manager_(fmt::format("Listener {}", name)),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
           "ListenerImpl", [this] { parent_.onIntelligentListenerWarmed(*this); })),
-      //local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
+      // local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
@@ -384,13 +384,14 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       dynamic_init_manager_(fmt::format("Listener {}", name)),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
           "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
-      //local_drain_manager_(),
+      // local_drain_manager_(),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<ListenerFactoryContextImpl>(
-          parent.server_, validation_visitor, config, this, *this, parent.factory_.createDrainManager(config.drain_type()))),
+          parent.server_, validation_visitor, config, this, *this,
+          parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parent_factory_context(),
                             initManager()) {
   Network::Address::SocketType socket_type =
@@ -563,7 +564,9 @@ Upstream::ClusterManager& ListenerFactoryContextImpl::clusterManager() {
 Event::Dispatcher& ListenerFactoryContextImpl::dispatcher() {
   return xx_factory_context_->dispatcher();
 }
-Network::DrainDecision& ListenerFactoryContextImpl::drainDecision() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+Network::DrainDecision& ListenerFactoryContextImpl::drainDecision() {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 Grpc::Context& ListenerFactoryContextImpl::grpcContext() {
   return xx_factory_context_->grpcContext();
 }
