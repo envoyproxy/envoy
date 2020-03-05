@@ -1052,8 +1052,9 @@ TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
   EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
 
   // Override via runtime and expect successful retry.
-  EXPECT_CALL(cluster_.runtime_.snapshot_, exists("fake_clusterretry_budget.budget_percent"))
-      .WillRepeatedly(Return(true));
+  std::string value("100");
+  EXPECT_CALL(cluster_.runtime_.snapshot_, get("fake_clusterretry_budget.budget_percent"))
+      .WillRepeatedly(Return(value));
   EXPECT_CALL(cluster_.runtime_.snapshot_, getDouble("fake_clusterretry_budget.budget_percent", _))
       .WillRepeatedly(Return(100.0));
 
@@ -1067,10 +1068,11 @@ TEST_F(RouterRetryStateImplTest, BudgetRuntimeSetOnly) {
   cluster_.resetResourceManager(0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */,
                                 0 /* conn_pool */);
 
-  EXPECT_CALL(cluster_.runtime_.snapshot_, exists("fake_clusterretry_budget.min_retry_concurrency"))
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(cluster_.runtime_.snapshot_, exists("fake_clusterretry_budget.budget_percent"))
-      .WillRepeatedly(Return(true));
+  std::string value("20");
+  EXPECT_CALL(cluster_.runtime_.snapshot_, get("fake_clusterretry_budget.min_retry_concurrency"))
+      .WillRepeatedly(Return(value));
+  EXPECT_CALL(cluster_.runtime_.snapshot_, get("fake_clusterretry_budget.budget_percent"))
+      .WillRepeatedly(Return(value));
   EXPECT_CALL(cluster_.runtime_.snapshot_, getDouble("fake_clusterretry_budget.budget_percent", _))
       .WillRepeatedly(Return(20.0));
 

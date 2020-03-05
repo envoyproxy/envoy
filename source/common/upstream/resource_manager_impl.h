@@ -165,8 +165,8 @@ private:
 
   private:
     bool useRetryBudget() const {
-      return runtime_.snapshot().exists(budget_percent_key_) ||
-             runtime_.snapshot().exists(min_retry_concurrency_key_) || budget_percent_ ||
+      return runtime_.snapshot().get(budget_percent_key_).has_value() ||
+             runtime_.snapshot().get(min_retry_concurrency_key_).has_value() || budget_percent_ ||
              min_retry_concurrency_;
     }
 
