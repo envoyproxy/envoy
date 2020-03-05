@@ -15,7 +15,7 @@ namespace Grpc {
  * filters.
  */
 struct StatNames {
-  StatNames(Stats::SymbolTable& symbol_table);
+  explicit StatNames(Stats::SymbolTable& symbol_table);
 
   Stats::StatNamePool pool_;
   Stats::StatName streams_total_;

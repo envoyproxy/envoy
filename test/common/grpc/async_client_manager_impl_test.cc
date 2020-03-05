@@ -21,14 +21,15 @@ namespace {
 class AsyncClientManagerImplTest : public testing::Test {
 public:
   AsyncClientManagerImplTest()
-      : api_(Api::createApiForTest()),
-        async_client_manager_(cm_, tls_, test_time_.timeSystem(), *api_, scope_.symbolTable()) {}
+      : api_(Api::createApiForTest()), stat_names_(scope_.symbolTable()),
+        async_client_manager_(cm_, tls_, test_time_.timeSystem(), *api_, stat_names_) {}
 
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::MockStore scope_;
   DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
+  StatNames stat_names_;
   AsyncClientManagerImpl async_client_manager_;
 };
 
