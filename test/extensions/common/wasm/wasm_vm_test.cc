@@ -2,7 +2,7 @@
 
 #include "common/stats/isolated_store_impl.h"
 
-#include "extensions/common/wasm/null/null_vm_plugin.h"
+#include "include/proxy-wasm/null_vm_plugin.h"
 #include "extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
@@ -11,6 +11,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using proxy_wasm::WasmCallVoid;
+using proxy_wasm::WasmCallWord;
 using testing::HasSubstr;
 using testing::Return;
 
@@ -20,7 +22,7 @@ namespace Common {
 namespace Wasm {
 namespace {
 
-class TestNullVmPlugin : public Null::NullVmPlugin {
+class TestNullVmPlugin : public proxy_wasm::NullVmPlugin {
 public:
   TestNullVmPlugin() = default;
   ~TestNullVmPlugin() override = default;
@@ -28,22 +30,13 @@ public:
   MOCK_METHOD(void, start, ());
 };
 
-class PluginFactory : public Null::NullVmPluginFactory {
-public:
-  PluginFactory() = default;
-
-  std::string name() const override { return "test_null_vm_plugin"; }
-  std::unique_ptr<Null::NullVmPlugin> create() const override;
-};
-
 TestNullVmPlugin* test_null_vm_plugin_ = nullptr;
-Envoy::Registry::RegisterFactory<PluginFactory, Null::NullVmPluginFactory> register_;
 
-std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
-  auto result = std::make_unique<TestNullVmPlugin>();
-  test_null_vm_plugin_ = result.get();
-  return result;
-}
+proxy_wasm::RegisterNullVmPluginFactory register_test_null_vm_plugin("test_null_vm_plugin", []() {
+  auto plugin = std::make_unique<TestNullVmPlugin>();
+  test_null_vm_plugin_ = plugin.get();
+  return plugin;
+});
 
 class BaseVmTest : public testing::Test {
 public:
@@ -55,12 +48,12 @@ protected:
 };
 
 TEST_F(BaseVmTest, NoRuntime) {
-  EXPECT_THROW_WITH_MESSAGE(createWasmVm("", scope_), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(createWasmVm("", scope_), WasmException,
                             "Failed to create WASM VM with unspecified runtime.");
 }
 
 TEST_F(BaseVmTest, BadRuntime) {
-  EXPECT_THROW_WITH_MESSAGE(createWasmVm("envoy.wasm.runtime.invalid", scope_), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(createWasmVm("envoy.wasm.runtime.invalid", scope_), WasmException,
                             "Failed to create WASM VM using envoy.wasm.runtime.invalid runtime. "
                             "Envoy was compiled without support for it.");
 }
@@ -68,7 +61,7 @@ TEST_F(BaseVmTest, BadRuntime) {
 TEST_F(BaseVmTest, NullVmStartup) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null", scope_);
   EXPECT_TRUE(wasm_vm != nullptr);
-  EXPECT_TRUE(wasm_vm->runtime() == "envoy.wasm.runtime.null");
+  EXPECT_TRUE(wasm_vm->runtime() == "null");
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::InstantiatedModule);
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
@@ -149,7 +142,7 @@ TEST_P(WasmVmTest, V8BadCode) {
 TEST_P(WasmVmTest, V8Code) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
-  EXPECT_TRUE(wasm_vm->runtime() == "envoy.wasm.runtime.v8");
+  EXPECT_TRUE(wasm_vm->runtime() == "v8");
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
@@ -175,21 +168,21 @@ TEST_P(WasmVmTest, V8BadHostFunctions) {
   EXPECT_TRUE(wasm_vm->load(code, GetParam()));
 
   wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
-  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmException,
                             "Failed to load WASM module due to a missing import: env.pong");
 
   wasm_vm->registerCallback("env", "pong", &bad_pong1, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong1));
-  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmException,
                             "Failed to load WASM module due to an import type mismatch: env.pong, "
                             "want: i32 -> void, but host exports: void -> void");
 
   wasm_vm->registerCallback("env", "pong", &bad_pong2, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong2));
-  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmException,
                             "Failed to load WASM module due to an import type mismatch: env.pong, "
                             "want: i32 -> void, but host exports: i32 -> i32");
 
   wasm_vm->registerCallback("env", "pong", &bad_pong3, CONVERT_FUNCTION_WORD_TO_UINT32(bad_pong3));
-  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmException,
                             "Failed to load WASM module due to an import type mismatch: env.pong, "
                             "want: i32 -> void, but host exports: f64 -> f64");
 }
@@ -215,10 +208,10 @@ TEST_P(WasmVmTest, V8BadModuleFunctions) {
   wasm_vm->getFunction("nonexistent", &sum);
   EXPECT_TRUE(sum == nullptr);
 
-  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("ping", &sum), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("ping", &sum), WasmException,
                             "Bad function signature for: ping");
 
-  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("sum", &ping), WasmVmException,
+  EXPECT_THROW_WITH_MESSAGE(wasm_vm->getFunction("sum", &ping), WasmException,
                             "Bad function signature for: sum");
 }
 

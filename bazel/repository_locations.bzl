@@ -319,4 +319,14 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "kafka-python-2.0.0",
         urls = ["https://github.com/dpkp/kafka-python/archive/2.0.0.tar.gz"],
     ),
+    proxy_wasm_cpp_sdk = dict(
+        sha256 = "14f66f67e8f37ec81d28d7f5307be4407d206ac5f0daaf6d22fa5536797bcac1",
+        strip_prefix = "proxy-wasm-cpp-sdk-31f1fc5b7e09f231fa532d2d296e479a113c3e10",
+        urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/31f1fc5b7e09f231fa532d2d296e479a113c3e10.tar.gz"],
+    ),
+    proxy_wasm_cpp_host = dict(
+        sha256 = "d1fb98a40b38b99393b56b3509dac5f01a769512aebc86dcc37782ba29549517",
+        strip_prefix = "proxy-wasm-cpp-host-8c33ecf3784b00d0bc6b88bbe9de6d4e51239f88",
+        urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/8c33ecf3784b00d0bc6b88bbe9de6d4e51239f88.tar.gz"],
+    ),
 )

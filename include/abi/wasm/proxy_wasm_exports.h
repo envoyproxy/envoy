@@ -28,7 +28,7 @@
  * Called when the VM starts by the first plugin to use the VM.
  * @param root_context_id is an identifier for one or more related plugins.
  * @param vm_configuration_size is the size of any configuration available via
- * proxy_get_configuration during the lifetime of this call.
+ * proxy_get_buffer_bytes() during the lifetime of this call.
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
 enum class WasmOnVmStartResult : uint32_t {
@@ -44,7 +44,7 @@ extern "C" WasmOnVmStartResult proxy_on_vm_start(uint32_t root_context_id,
  * configuration.
  * @param root_context_id is a unique identifier for the configuration verification context.
  * @param configuration_size is the size of any configuration available via
- * proxy_get_configuration().
+ * proxy_get_buffer_bytes().
  * @return non-zero on success and zero on failure (i.e. bad configuration).
  */
 enum class WasmOnValidateConfigurationResult : uint32_t {
@@ -57,7 +57,7 @@ proxy_validate_configuration(uint32_t root_context_id, uint32_t configuration_si
  * Called when a plugin loads or when plugin configuration changes dynamically.
  * @param root_context_id is an identifier for one or more related plugins.
  * @param plugin_configuration_size is the size of any configuration available via
- * proxy_get_configuration().
+ * proxy_get_buffer_bytes().
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
 enum class WasmOnConfigureResult : uint32_t {
@@ -73,7 +73,7 @@ extern "C" WasmOnConfigureResult proxy_on_configure(uint32_t root_context_id,
  * Called when a request, stream or other ephemeral context is created.
  * @param context_id is an identifier of the ephemeral context.
  * @param configuration_size is the size of any configuration available via
- * proxy_get_configuration().
+ * proxy_get_buffer_bytes().
  */
 extern "C" void proxy_on_context_create(uint32_t context_id, uint32_t root_context_id);
 

@@ -146,6 +146,8 @@ def envoy_dependencies(skip_targets = []):
     _io_opentracing_cpp()
     _net_zlib()
     _upb()
+    _proxy_wasm_cpp_sdk()
+    _proxy_wasm_cpp_host()
     _repository_impl("com_googlesource_code_re2")
     _com_google_cel_cpp()
     _repository_impl("bazel_toolchains")
@@ -739,6 +741,16 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
+    )
+
+def _proxy_wasm_cpp_sdk():
+    _repository_impl(
+        name = "proxy_wasm_cpp_host",
+    )
+
+def _proxy_wasm_cpp_host():
+    _repository_impl(
+        name = "proxy_wasm_cpp_sdk",
     )
 
 def _kafka_deps():

@@ -1,0 +1,6 @@
+DOCKER_SDK=/external_sdk
+
+all: test_cpp.wasm
+	chown ${uid}.${gid} *.wasm
+
+include ${DOCKER_SDK}/Makefile.base

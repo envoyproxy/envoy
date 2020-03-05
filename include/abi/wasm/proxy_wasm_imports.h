@@ -15,23 +15,25 @@
 // Configuration and Status
 
 /**
- * Called from the VM to get any configuration. Valid only when in proxy_on_start() (where it will
- * return a VM configuration), proxy_on_configure() (where it will return a plugin configuration) or
- * in proxy_validate_configuration() (where it will return a VM configuration before
- * proxy_on_start() has been called and a plugin configuration after).
+ * Called from the VM to get bytes from a buffer (e.g. a vm or plugin configuration).
  * @param start is the offset of the first byte to retrieve.
  * @param length is the number of the bytes to retrieve. If start + length exceeds the number of
  * bytes available then configuration_size will be set to the number of bytes returned.
- * @param configuration_ptr a pointer to a location which will be filled with either nullptr (if no
- * configuration is available) or a pointer to a allocated block containing the configuration
+ * @param ptr a pointer to a location which will be filled with either nullptr (if no
+ * data is available) or a pointer to a allocated block containing the configuration
  * bytes.
- * @param configuration_size a pointer to a location containing the size (or zero) of any returned
- * configuration byte block.
- * @return a WasmResult: OK, InvalidMemoryAccess. Note: if OK is returned  *configuration_ptr may
+ * @param size a pointer to a location containing the size (or zero) of any returned
+ * byte block.
+ * @return a WasmResult: OK, InvalidArgument, InvalidMemoryAccess. Note: if OK is returned *ptr may
  * be nullptr.
  */
-extern "C" WasmResult proxy_get_configuration((uint32_t start, uint32_t length,
-      const char** configuration_ptr, size_t* configuration_size);
+enum class WasmBufferType : int32_t {
+  VmConfiguration = 0,
+  PluginConfiguration = 1,
+  MAX = 2,
+};
+extern "C" WasmResult proxy_get_buffer_bytes(WasmBufferType type, uint32_t start, uint32_t length,
+                                             const char** ptr, size_t* size);
 
 // Logging
 //
