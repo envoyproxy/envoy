@@ -82,18 +82,18 @@ public:
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptRef tags) override {
+                                       StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->counterFromStatNameWithTags(name, tags);
   }
 
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
 
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatNameWithTags(name, tags, unit);
@@ -146,7 +146,7 @@ class TestIsolatedStoreImpl : public StoreRoot {
 public:
   // Stats::Scope
   Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptRef tags) override {
+                                       StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
@@ -159,7 +159,7 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
     return store_.gaugeFromStatNameWithTags(name, tags, import_mode);
@@ -168,7 +168,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name, import_mode);
   }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatNameWithTags(name, tags, unit);

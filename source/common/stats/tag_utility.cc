@@ -7,7 +7,7 @@ namespace Stats {
 namespace TagUtility {
 
 TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatName stat_name,
-                                     StatNameTagVectorOptRef stat_name_tags,
+                                     StatNameTagVectorOptConstRef stat_name_tags,
                                      SymbolTable& symbol_table) {
   prefix_storage_ = symbol_table.join({prefix, stat_name});
   tag_extracted_name_ = StatName(prefix_storage_.get());
@@ -21,7 +21,8 @@ TagStatNameJoiner::TagStatNameJoiner(StatName prefix, StatName stat_name,
   }
 }
 
-TagStatNameJoiner::TagStatNameJoiner(StatName stat_name, StatNameTagVectorOptRef stat_name_tags,
+TagStatNameJoiner::TagStatNameJoiner(StatName stat_name,
+                                     StatNameTagVectorOptConstRef stat_name_tags,
                                      SymbolTable& symbol_table) {
   tag_extracted_name_ = stat_name;
 

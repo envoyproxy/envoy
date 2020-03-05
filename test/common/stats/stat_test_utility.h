@@ -104,10 +104,11 @@ public:
   Counter& counter(const std::string& name) override;
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags) override;
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override;
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
 
   // New APIs available for tests.

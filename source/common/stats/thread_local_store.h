@@ -160,7 +160,7 @@ public:
 
   // Stats::Scope
   Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptRef tags) override {
+                                       StatNameTagVectorOptConstRef tags) override {
     return default_scope_->counterFromStatNameWithTags(name, tags);
   }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
@@ -168,14 +168,14 @@ public:
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
   }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) override {
     return default_scope_->gauge(name, import_mode);
   }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
     return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
   }
@@ -283,11 +283,12 @@ private:
 
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
-                                         StatNameTagVectorOptRef tags) override;
+                                         StatNameTagVectorOptConstRef tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+    Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                      Gauge::ImportMode import_mode) override;
-    Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptRef tags,
+    Histogram& histogramFromStatNameWithTags(const StatName& name,
+                                             StatNameTagVectorOptConstRef tags,
                                              Histogram::Unit unit) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     ScopePtr createScope(const std::string& name) override {
