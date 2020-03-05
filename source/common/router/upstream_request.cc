@@ -460,7 +460,7 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   // (downstream_end_stream_) then enabling reads is a noop.
   // This assert condition must be true because
   // parent_.upstream_requests_.size() can only be greater than 1 in the
-  // case of a pertry-timeout with hedge_on_per_try_timeout enabled, and
+  // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
   // the per try timeout timer is started only after downstream_end_stream_
   // is true.
   ASSERT(parent_.upstream_requests_.size() == 1 || parent_.downstream_end_stream_);
