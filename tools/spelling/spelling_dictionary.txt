@@ -119,6 +119,7 @@ GRPC
 GTEST
 GURL
 Grabbit
+Hashable
 HC
 HCM
 HDS
