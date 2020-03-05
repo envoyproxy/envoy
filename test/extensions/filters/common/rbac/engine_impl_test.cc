@@ -27,7 +27,7 @@ namespace {
 void checkEngine(
     const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
-    const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
+    const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::RequestHeaderMapImpl(),
     const envoy::config::core::v3::Metadata& metadata = envoy::config::core::v3::Metadata(),
     std::string* policy_id = nullptr) {
   NiceMock<StreamInfo::MockStreamInfo> info;
@@ -280,7 +280,7 @@ TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
-  Envoy::Http::HeaderMapImpl headers;
+  Envoy::Http::RequestHeaderMapImpl headers;
   Envoy::Http::LowerCaseString key("foo");
   std::string value = "bar";
   headers.setReference(key, value);
@@ -321,7 +321,7 @@ TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
-  Envoy::Http::HeaderMapImpl headers;
+  Envoy::Http::RequestHeaderMapImpl headers;
 
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::config::core::v3::Metadata metadata;

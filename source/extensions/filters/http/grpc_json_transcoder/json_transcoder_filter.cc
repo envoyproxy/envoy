@@ -257,7 +257,7 @@ bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
 bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_status_; }
 
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
-    const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
+    const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) {
   if (Grpc::Common::hasGrpcContentType(headers)) {
@@ -540,9 +540,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   return Http::FilterDataStatus::Continue;
 }
 
-// TODO(mattklein123): In future header refactor changes the HeaderMap interface will not have
-// all of the O(1) headers so we will have to refactor this further.
-void JsonTranscoderFilter::doTrailers(Http::HeaderMap& headers_or_trailers) {
+void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
   if (error_ || !transcoder_) {
     return;
   }
@@ -714,8 +712,8 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage() {
   content_type_.clear();
 }
 
-void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
-                                                           Buffer::Instance& data) {
+void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
+    Http::ResponseHeaderMap& response_headers, Buffer::Instance& data) {
   std::vector<Grpc::Frame> frames;
   decoder_.decode(data, frames);
   if (frames.empty()) {
@@ -739,7 +737,7 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
 }
 
 bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
-                                                  Http::HeaderMap& trailers) {
+                                                  Http::ResponseHeaderOrTrailerMap& trailers) {
   if (!config_.convertGrpcStatus()) {
     return false;
   }

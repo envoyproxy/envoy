@@ -243,7 +243,9 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
   {
     // dns_failure_refresh_rate not set.
     envoy::config::cluster::v3::Cluster cluster;
-    BackOffStrategyPtr strategy = Utility::prepareDnsRefreshStrategy(cluster, 5000, random);
+    BackOffStrategyPtr strategy =
+        Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(cluster, 5000,
+                                                                                random);
     EXPECT_NE(nullptr, dynamic_cast<FixedBackOffStrategy*>(strategy.get()));
   }
 
@@ -252,7 +254,9 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
     envoy::config::cluster::v3::Cluster cluster;
     cluster.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
     cluster.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(10);
-    BackOffStrategyPtr strategy = Utility::prepareDnsRefreshStrategy(cluster, 5000, random);
+    BackOffStrategyPtr strategy =
+        Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(cluster, 5000,
+                                                                                random);
     EXPECT_NE(nullptr, dynamic_cast<JitteredBackOffStrategy*>(strategy.get()));
   }
 
@@ -261,9 +265,10 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
     envoy::config::cluster::v3::Cluster cluster;
     cluster.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
     cluster.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(2);
-    EXPECT_THROW_WITH_REGEX(Utility::prepareDnsRefreshStrategy(cluster, 5000, random),
+    EXPECT_THROW_WITH_REGEX(Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
+                                cluster, 5000, random),
                             EnvoyException,
-                            "cluster.dns_failure_refresh_rate must have max_interval greater than "
+                            "dns_failure_refresh_rate must have max_interval greater than "
                             "or equal to the base_interval");
   }
 }

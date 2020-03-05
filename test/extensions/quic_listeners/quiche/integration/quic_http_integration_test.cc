@@ -193,7 +193,7 @@ TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
 
 // Tests that a connection idle times out after 1s and starts delayed close.
 TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+  config_helper_.addFilter("{ name: envoy.filters.http.dynamo, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(

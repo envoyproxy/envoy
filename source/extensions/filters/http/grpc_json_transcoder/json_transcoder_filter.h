@@ -73,7 +73,8 @@ public:
    * @return status whether the Transcoder instance are successfully created or not
    */
   ProtobufUtil::Status
-  createTranscoder(const Http::HeaderMap& headers, Protobuf::io::ZeroCopyInputStream& request_input,
+  createTranscoder(const Http::RequestHeaderMap& headers,
+                   Protobuf::io::ZeroCopyInputStream& request_input,
                    google::grpc::transcoding::TranscoderInputStream& response_input,
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
                    MethodInfoSharedPtr& method_info);
@@ -161,9 +162,12 @@ private:
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
   void createHttpBodyEnvelope(Buffer::Instance& data, uint64_t content_length);
   void maybeSendHttpBodyRequestMessage();
-  void buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers, Buffer::Instance& data);
-  bool maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status, Http::HeaderMap& trailers);
-  void doTrailers(Http::HeaderMap& headers_or_trailers);
+  void buildResponseFromHttpBodyOutput(Http::ResponseHeaderMap& response_headers,
+                                       Buffer::Instance& data);
+  bool maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
+                              Http::ResponseHeaderOrTrailerMap& trailers);
+  bool hasHttpBodyAsOutputType();
+  void doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers);
 
   JsonTranscoderConfig& config_;
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
@@ -172,7 +176,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
   MethodInfoSharedPtr method_;
-  Http::HeaderMap* response_headers_{nullptr};
+  Http::ResponseHeaderMap* response_headers_{nullptr};
   Grpc::Decoder decoder_;
 
   Buffer::OwnedImpl request_prefix_;

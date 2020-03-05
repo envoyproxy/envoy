@@ -26,7 +26,7 @@ namespace {
 
 class MockMatcher : public Matcher {
 public:
-  MOCK_METHOD(bool, matches, (const Http::HeaderMap& headers), (const));
+  MOCK_METHOD(bool, matches, (const Http::RequestHeaderMap& headers), (const));
 };
 
 JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
@@ -42,7 +42,7 @@ public:
   }
 
   MOCK_METHOD(const Verifier*, findVerifier,
-              (const Http::HeaderMap& headers, const StreamInfo::FilterState& filter_state),
+              (const Http::RequestHeaderMap& headers, const StreamInfo::FilterState& filter_state),
               (const));
   MOCK_METHOD(bool, bypassCorsPreflightRequest, (), (const));
   MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
