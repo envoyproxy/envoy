@@ -778,7 +778,8 @@ TEST(HttpUtility, CheckIsIpAddress) {
       std::make_tuple(false, "example.com:8000", "example.com", 8000),
       std::make_tuple(false, "example.com:abc", "example.com:abc", absl::nullopt),
       std::make_tuple(false, "localhost:10000", "localhost", 10000),
-      std::make_tuple(false, "localhost", "localhost", absl::nullopt)};
+      std::make_tuple(false, "localhost", "localhost", absl::nullopt),
+      std::make_tuple(false, "", "", absl::nullopt)};
 
   for (const auto& pattern : patterns) {
     bool status_pattern = std::get<0>(pattern);
