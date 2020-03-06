@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package envoy.type.v3;
+package envoy.type.grpc.v3;
 
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.type.v3";
-option java_outer_classname = "HttpStatusProto";
+option java_package = "io.envoyproxy.envoy.type.grpc.v3";
+option java_outer_classname = "GrpcStatusProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: GRPC status codes]
@@ -35,7 +35,7 @@ enum Status {
 
 // GRPC status.
 message GrpcStatus {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.type.GrpcStatus";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.grpc.GrpcStatus";
 
   // Supplies GRPC response code.
   Status status = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];

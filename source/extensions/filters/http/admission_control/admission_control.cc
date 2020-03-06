@@ -113,7 +113,6 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   if (end_stream) {
-    const uint64_t http_status_code = Http::Utility::getResponseStatus(headers);
     if (config_->response_evaluator()->isSuccess(headers)) {
       config_->getController().recordSuccess();
       ASSERT(deferred_record_failure_);

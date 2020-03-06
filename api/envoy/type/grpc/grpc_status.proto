@@ -1,12 +1,14 @@
 syntax = "proto3";
 
-package envoy.type;
+package envoy.type.grpc;
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.type";
-option java_outer_classname = "HttpStatusProto";
+option java_package = "io.envoyproxy.envoy.type.grpc";
+option java_outer_classname = "GrpcStatusProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.type.grpc.v3";
 
 // [#protodoc-title: GRPC status codes]
 

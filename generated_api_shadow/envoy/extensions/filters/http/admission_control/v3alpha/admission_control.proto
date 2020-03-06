@@ -3,10 +3,13 @@ syntax = "proto3";
 package envoy.extensions.filters.http.admission_control.v3alpha;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/type/grpc/v3/grpc_status.proto";
+import "envoy/type/v3/http_status.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+import "google/rpc/status.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -25,13 +28,35 @@ message AdmissionControl {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.admission_control.v2alpha.AdmissionControl";
 
+  // Default method of specifying what constitutes a successful request. All status codes that
+  // indicate a successful request must be explicitly specified if not relying on the default
+  // values.
+  message DefaultSuccessCriteria {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.admission_control.v2alpha.AdmissionControl."
+        "DefaultSuccessCriteria";
+
+    // HTTP status codes to consider as request successes. If unspecified, defaults to "200".
+    repeated type.v3.HttpStatus http_status = 1;
+
+    // GRPC status codes to consider as request successes. If unspecified, defaults to "OK".
+    repeated type.grpc.v3.GrpcStatus grpc_status = 2;
+  }
+
   // If set to false, the admission control filter will operate as a pass-through filter. If the
   // message is unspecified, the filter will be enabled.
   config.core.v3.RuntimeFeatureFlag enabled = 1;
 
+  // Defines how a request is considered a success/failure.
+  oneof success_criteria {
+    option (validate.required) = true;
+
+    DefaultSuccessCriteria default_success_criteria = 2;
+  }
+
   // The time window over which the success rate is calculated. The window is rounded to the nearest
   // second. Defaults to 120s.
-  google.protobuf.Duration sampling_window = 2;
+  google.protobuf.Duration sampling_window = 3;
 
   // Rejection probability is defined by the formula::
   //
@@ -41,5 +66,5 @@ message AdmissionControl {
   // the success rate drops. Lower values will cause throttling to kick in at higher success rates
   // and result in more aggressive throttling. Any values less than 1.0, will be set to 1.0. If the
   // message is unspecified, the coefficient is 2.0.
-  config.core.v3.RuntimeDouble aggression_coefficient = 3;
+  config.core.v3.RuntimeDouble aggression_coefficient = 4;
 }

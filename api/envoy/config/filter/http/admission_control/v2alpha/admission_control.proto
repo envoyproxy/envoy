@@ -3,12 +3,13 @@ syntax = "proto3";
 package envoy.config.filter.http.admission_control.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/grpc/grpc_status.proto";
 import "envoy/type/http_status.proto";
 
-import "google/rpc/status.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+import "google/rpc/status.proto";
 
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
@@ -33,7 +34,7 @@ message AdmissionControl {
     repeated type.HttpStatus http_status = 1;
 
     // GRPC status codes to consider as request successes. If unspecified, defaults to "OK".
-    repeated type.GrpcStatus grpc_status = 2;
+    repeated type.grpc.GrpcStatus grpc_status = 2;
   }
 
   // If set to false, the admission control filter will operate as a pass-through filter. If the
@@ -42,6 +43,8 @@ message AdmissionControl {
 
   // Defines how a request is considered a success/failure.
   oneof success_criteria {
+    option (validate.required) = true;
+
     DefaultSuccessCriteria default_success_criteria = 2;
   }
 

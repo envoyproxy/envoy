@@ -136,7 +136,7 @@ public:
   TimeSource& timeSource() const { return time_source_; }
   Stats::Scope& scope() const { return scope_; }
   double aggression() const;
-  std::unique_ptr<ResponseEvaluator> response_evaluator() const { return response_evaluator_; }
+  std::shared_ptr<ResponseEvaluator> response_evaluator() const { return response_evaluator_; }
 
 private:
   Runtime::Loader& runtime_;
@@ -146,7 +146,7 @@ private:
   const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;
   std::unique_ptr<Runtime::Double> aggression_;
-  std::unique_ptr<ResponseEvaluator> response_evaluator_;
+  std::shared_ptr<ResponseEvaluator> response_evaluator_;
 };
 
 using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;

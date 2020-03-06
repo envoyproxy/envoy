@@ -3,10 +3,13 @@ syntax = "proto3";
 package envoy.config.filter.http.admission_control.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/grpc/grpc_status.proto";
+import "envoy/type/http_status.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+import "google/rpc/status.proto";
 
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
@@ -23,13 +26,31 @@ option (udpa.annotations.file_migrate).move_to_package =
 // [#extension: envoy.filters.http.admission_control]
 
 message AdmissionControl {
+  // Default method of specifying what constitutes a successful request. All status codes that
+  // indicate a successful request must be explicitly specified if not relying on the default
+  // values.
+  message DefaultSuccessCriteria {
+    // HTTP status codes to consider as request successes. If unspecified, defaults to "200".
+    repeated type.HttpStatus http_status = 1;
+
+    // GRPC status codes to consider as request successes. If unspecified, defaults to "OK".
+    repeated type.grpc.GrpcStatus grpc_status = 2;
+  }
+
   // If set to false, the admission control filter will operate as a pass-through filter. If the
   // message is unspecified, the filter will be enabled.
   api.v2.core.RuntimeFeatureFlag enabled = 1;
 
+  // Defines how a request is considered a success/failure.
+  oneof success_criteria {
+    option (validate.required) = true;
+
+    DefaultSuccessCriteria default_success_criteria = 2;
+  }
+
   // The time window over which the success rate is calculated. The window is rounded to the nearest
   // second. Defaults to 120s.
-  google.protobuf.Duration sampling_window = 2;
+  google.protobuf.Duration sampling_window = 3;
 
   // Rejection probability is defined by the formula::
   //
@@ -39,5 +60,5 @@ message AdmissionControl {
   // the success rate drops. Lower values will cause throttling to kick in at higher success rates
   // and result in more aggressive throttling. Any values less than 1.0, will be set to 1.0. If the
   // message is unspecified, the coefficient is 2.0.
-  api.v2.core.RuntimeDouble aggression_coefficient = 3;
+  api.v2.core.RuntimeDouble aggression_coefficient = 4;
 }

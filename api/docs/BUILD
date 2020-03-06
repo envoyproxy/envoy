@@ -120,6 +120,7 @@ proto_library(
         "//envoy/service/tap/v2alpha:pkg",
         "//envoy/service/trace/v2:pkg",
         "//envoy/type:pkg",
+        "//envoy/type/grpc:pkg",
         "//envoy/type/matcher:pkg",
         "//envoy/type/metadata/v2:pkg",
         "//envoy/type/tracing/v2:pkg",
