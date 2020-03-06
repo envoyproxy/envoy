@@ -44,7 +44,7 @@ class GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterTestBase() : api_(Api::createApiForTest()) {}
   ~GrpcJsonTranscoderFilterTestBase() {
-    TestEnvironment::removePath("envoy_test/proto.descriptor");
+    TestEnvironment::removePath(TestEnvironment::temporaryPath("envoy_test/proto.descriptor"));
   }
 
   Api::ApiPtr api_;
