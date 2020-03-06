@@ -1371,6 +1371,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+per_connection_buffer_limit_bytes: 999    
 filter_chains:
 - filters:
   - name: fake
@@ -1582,10 +1583,9 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+per_connection_buffer_limit_bytes: 999
 filter_chains:
-- filters:
-  - name: fake
-    config: {}
+- filters: []
   )EOF";
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
