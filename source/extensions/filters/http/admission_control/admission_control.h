@@ -14,6 +14,8 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/cleanup.h"
+#include "common/grpc/common.h"
+#include "common/grpc/status.h"
 #include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
@@ -91,13 +93,34 @@ private:
   std::chrono::seconds sampling_window_;
 };
 
+using AdmissionControlProto =
+    envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
+
+/**
+ * Determines of a request was successful based on response headers.
+ */
+class ResponseEvaluator {
+public:
+  virtual ~ResponseEvaluator() = default;
+  virtual bool isSuccess(Http::ResponseHeaderMap& headers) const PURE;
+};
+
+class DefaultResponseEvaluator : public ResponseEvaluator {
+public:
+  DefaultResponseEvaluator(AdmissionControlProto::DefaultSuccessCriteria success_criteria);
+  virtual bool isSuccess(Http::ResponseHeaderMap& headers) const;
+
+private:
+  // Status codes that determine a successful response.
+  std::unordered_set<uint64_t> http_status_codes_;
+  std::unordered_set<int64_t> grpc_status_codes_;
+};
+
 /**
  * Configuration for the admission control filter.
  */
 class AdmissionControlFilterConfig {
 public:
-  using AdmissionControlProto =
-      envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
   AdmissionControlFilterConfig(const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
                                TimeSource& time_source, Runtime::RandomGenerator& random,
                                Stats::Scope& scope, ThreadLocal::SlotPtr&& tls);
@@ -122,6 +145,7 @@ private:
   const ThreadLocal::SlotPtr tls_;
   Runtime::FeatureFlag admission_control_feature_;
   std::unique_ptr<Runtime::Double> aggression_;
+  std::unique_ptr<ResponseEvaluator> response_evaluator_;
 };
 
 using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;

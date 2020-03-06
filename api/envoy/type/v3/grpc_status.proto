@@ -40,4 +40,3 @@ message GrpcStatus {
   // Supplies GRPC response code.
   Status status = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
 }
-

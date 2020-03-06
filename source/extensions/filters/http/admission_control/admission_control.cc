@@ -6,12 +6,15 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/enum_to_int.h"
+#include "common/grpc/common.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -22,6 +25,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
+using GrpcStatus = Grpc::Status::GrpcStatus;
 static constexpr double defaultAggression = 2.0;
 static constexpr std::chrono::seconds defaultHistoryGranularity{1};
 
@@ -33,10 +37,54 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       aggression_(
           proto_config.has_aggression_coefficient()
               ? std::make_unique<Runtime::Double>(proto_config.aggression_coefficient(), runtime_)
-              : nullptr) {}
+              : nullptr) {
+  switch (proto_config.success_criteria_case()) {
+  case AdmissionControlProto::SuccessCriteriaCase::kDefaultSuccessCriteria:
+    response_evaluator_ =
+        std::make_unique<DefaultResponseEvaluator>(proto_config.default_success_criteria());
+    break;
+  case AdmissionControlProto::SuccessCriteriaCase::SUCCESS_CRITERIA_NOT_SET:
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
 
 double AdmissionControlFilterConfig::aggression() const {
   return std::max<double>(1.0, aggression_ ? aggression_->value() : defaultAggression);
+}
+
+DefaultResponseEvaluator::DefaultResponseEvaluator(
+    AdmissionControlProto::DefaultSuccessCriteria success_criteria) {
+  // HTTP status.
+  if (success_criteria.has_http_status()) {
+    for (const auto& status : success_criteria.http_status()) {
+      const auto status_code = PROTOBUF_GET_WRAPPED_REQUIRED(status, code)
+                                   http_status_codes_.emplace(enumToInt(status_code));
+    }
+  } else {
+    http_status_codes_.emplace(enumToInt(Http::Code::OK));
+  }
+
+  // GRPC status.
+  if (success_criteria.has_grpc_status()) {
+    for (const auto& status : success_criteria.grpc_status()) {
+      const auto status_code = PROTOBUF_GET_WRAPPED_REQUIRED(status, code)
+                                   grpc_status_codes_.emplace(enumToSignedInt(status_code));
+    }
+  } else {
+    grpc_status_codes_.emplace(enumToSignedInt(Grpc::Status::WellKnownGrpcStatus::Ok));
+  }
+}
+
+bool DefaultResponseEvaluator::isSuccess(Http::ResponseHeaderMap& headers) const {
+  if (Grpc::Common::hasGrpcContentType(headers)) {
+    // The HTTP status code is meaningless if the request has a GRPC content type.
+    absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
+    return grpc_status && grpc_status_codes_.count(enumToSignedInt(grpc_status.value())) > 0;
+  }
+
+  const uint64_t http_status = Http::Utility::getResponseStatus(headers);
+  return http_status_codes_.count(enumToInt(http_status)) > 0;
 }
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
@@ -49,6 +97,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     return Http::FilterHeadersStatus::Continue;
   }
 
+  DefaultResponseEvaluator(AdmissionControlProto::DefaultSuccessCriteria success_criteria);
   if (shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
                                        "denied by admission control");
@@ -65,8 +114,8 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                                 bool end_stream) {
   if (end_stream) {
-    const uint64_t status_code = Http::Utility::getResponseStatus(headers);
-    if (status_code < 500) {
+    const uint64_t http_status_code = Http::Utility::getResponseStatus(headers);
+    if (response_evaluator_->isSuccess(headers)) {
       config_->getController().recordSuccess();
       ASSERT(deferred_record_failure_);
       deferred_record_failure_->cancel();
