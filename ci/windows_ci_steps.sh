@@ -1,4 +1,4 @@
-# No hashbang here because this script is intended for Windows
+#!/usr/bin/bash.exe
 
 set -e
 
@@ -13,13 +13,12 @@ df -h
 
 . "$(dirname "$0")"/setup_cache.sh
 
-# TODO(dio): Put in windows/.bazelrc.
-export PATH="/c/Program Files (x86)/Windows Kits/10/bin/10.0.17763.0/x64":$PATH
-
-BAZEL_STARTUP_OPTIONS="--bazelrc=windows/.bazelrc"
-BAZEL_BUILD_OPTIONS="--show_task_finish --verbose_failures \
+BAZEL_STARTUP_OPTIONS="--noworkspace_rc --bazelrc=windows/.bazelrc --output_base=c:/_eb"
+BAZEL_BUILD_OPTIONS="-c fastbuild --config=msvc-cl --show_task_finish --verbose_failures \
   --test_output=all ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
-bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //bazel/foreign_cc:nghttp2 //bazel/foreign_cc:event //bazel/foreign_cc:yaml
+bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //bazel/... --build_tag_filters=-skip_on_windows
 
-bazel ${BAZEL_STARTUP_OPTIONS} test ${BAZEL_BUILD_OPTIONS} @envoy_api_canonical//test/build/...
+bazel ${BAZEL_STARTUP_OPTIONS} build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static
+
+# bazel ${BAZEL_STARTUP_OPTIONS} test ${BAZEL_BUILD_OPTIONS} //test/... --test_tag_filters=-skip_on_windows --build_tests_only --test_summary=terse --test_output=errors
