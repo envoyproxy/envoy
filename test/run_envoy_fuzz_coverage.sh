@@ -33,6 +33,7 @@ done
 
 # Now run each fuzz target in parallel for 60 seconds.
 pids=""
+TEMP_CORPORA=""
 echo "Running fuzz targets..."
 for t in ${FUZZ_TARGETS}
 do
@@ -42,13 +43,15 @@ do
   ORIGINAL_CORPUS=$(dirname ${ORIGINAL_CORPUS})
   # Create temp directory in target's corpus
   CORPUS_DIR=$(mktemp -d -p $(pwd)/${ORIGINAL_CORPUS:2})
+  TEMP_CORPORA+="${CORPUS_DIR} "
   # Run fuzzing process.
   TARGET_BINARY="${t/://}"
-  bazel-bin/${TARGET_BINARY:2}_with_libfuzzer -max_total_time=60 -merge=1 ${CORPUS_DIR} $(pwd)${ORIGINAL_CORPUS:1} &
+  bazel-bin/${TARGET_BINARY:2}_with_libfuzzer -max_total_time=60 ${CORPUS_DIR} $(pwd)${ORIGINAL_CORPUS:1} &
   pids="$pids $!"
 done
 
-# Wait for background process to run. Why does the binary return success before 60 seconds? TODO.
+# Wait for background process to run.
+# TODO? Processes will still run in background if user ctrl-c.
 for pid in $pids; do
   wait ${pid}
   if [ $? -eq 0 ]; then
@@ -70,7 +73,7 @@ do
   ORIGINAL_CORPUS=${ORIGINAL_CORPUS/://}
   ORIGINAL_CORPUS=$(dirname ${ORIGINAL_CORPUS})
   BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
-    -c fastbuild --instrumentation_filter=//source/...,//include/... \
+    --instrumentation_filter=//source/...,//include/... \
     --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=streamed \
     --test_env=HEAPCHECK= "${t}_with_libfuzzer" --test_arg=$(pwd)${ORIGINAL_CORPUS:1} --test_arg=-runs=0
   TARGET_BINARY="${t/://}"
@@ -98,6 +101,13 @@ sed -i -e 's|>proc/self/cwd/|>|g' "${COVERAGE_DIR}/index.html"
 sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/index.html"
 
 [[ -z "${ENVOY_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_COVERAGE_DIR}"
+
+# Clean up...
+for corpus in ${TEMP_CORPORA}
+do
+  rm -rf $corpus
+done
+
 
 if [ "$VALIDATE_COVERAGE" == "true" ]
 then
