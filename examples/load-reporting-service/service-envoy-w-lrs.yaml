@@ -23,7 +23,7 @@ static_resources:
                 route:
                   cluster: local_service
           http_filters:
-          - name: envoy.filters.http.router
+          - name: envoy.router
             typed_config: {}
   clusters:
   - name: local_service
