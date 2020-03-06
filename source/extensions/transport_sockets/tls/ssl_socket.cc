@@ -503,6 +503,14 @@ const std::string& SslSocketInfo::tlsVersion() const {
   return cached_tls_version_;
 }
 
+absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view extension_name) const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return absl::nullopt;
+  }
+  return Utility::getX509ExtensionValue(*cert, extension_name);
+}
+
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
 const std::string& SslSocketInfo::serialNumberPeerCertificate() const {
