@@ -471,6 +471,25 @@ TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
                             "max_interval must be greater than or equal to the base_interval");
 }
 
+TEST_F(AsyncDataSourceTest, BaseIntervalTest) {
+  AsyncDataSourcePb config;
+
+  std::string yaml = R"EOF(
+    remote:
+      http_uri:
+        uri: https://example.com/data
+        cluster: cluster_1
+      sha256:
+        xxx
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.0001s
+        num_retries: 3
+  )EOF";
+  TestUtility::loadFromYaml(yaml, config);
+  EXPECT_TRUE(config.has_remote());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
