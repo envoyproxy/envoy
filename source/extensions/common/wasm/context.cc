@@ -88,7 +88,6 @@ WasmResult Context::log(uint64_t level, absl::string_view message) {
 WasmResult Context::getProperty(absl::string_view path, std::string* result) {
   if (path.size() == 15 && !memcmp(reinterpret_cast<const void*>(&*path.begin()),
                                    reinterpret_cast<const void*>("plugin_root_id\0"), 15)) {
-    std::cerr << "returning " << root_id() << "\n";
     *result = std::string(root_id());
     return WasmResult::Ok;
   }
