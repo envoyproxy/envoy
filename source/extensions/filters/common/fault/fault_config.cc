@@ -11,16 +11,18 @@ namespace Filters {
 namespace Common {
 namespace Fault {
 
-FaultAbortConfig:: FaultAbortConfig(
-  const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config)
-     : percentage_(abort_config.percentage()) {
+FaultAbortConfig::FaultAbortConfig(
+    const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config)
+    : percentage_(abort_config.percentage()) {
   switch (abort_config.error_type_case()) {
-    case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
-      provider_ = std::make_unique<FixedAbortProvider>(abort_config.http_status());
-    case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
-      provider_ = std::make_unique<HeaderAbortProvider>();
-    case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
+    provider_ = std::make_unique<FixedAbortProvider>(abort_config.http_status());
+    break;
+  case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
+    provider_ = std::make_unique<HeaderAbortProvider>();
+    break;
+  case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

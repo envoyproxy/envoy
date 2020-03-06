@@ -40,10 +40,9 @@ private:
   public:
     virtual ~AbortProvider() = default;
 
-    // Return the HTTP status code to use. Optionally passed an HTTP header that may contain the HTTP status code
-    // depending on the provider implementation.
-    virtual absl::optional<uint64_t>
-    statusCode(const Http::HeaderEntry* header) const PURE;
+    // Return the HTTP status code to use. Optionally passed an HTTP header that may contain the
+    // HTTP status code depending on the provider implementation.
+    virtual absl::optional<uint64_t> statusCode(const Http::HeaderEntry* header) const PURE;
   };
 
   // Delay provider that uses a fixed delay.
@@ -64,8 +63,7 @@ private:
   class HeaderAbortProvider : public AbortProvider {
   public:
     // AbortProvider
-    absl::optional<uint64_t>
-    statusCode(const Http::HeaderEntry* header) const override;
+    absl::optional<uint64_t> statusCode(const Http::HeaderEntry* header) const override;
   };
 
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;
