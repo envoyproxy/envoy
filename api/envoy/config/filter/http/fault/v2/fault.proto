@@ -23,11 +23,16 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filte
 message FaultAbort {
   reserved 1;
 
+  message HeaderAbort {
+  }
+
   oneof error_type {
     option (validate.required) = true;
 
     // HTTP status code to use to abort the HTTP request.
     uint32 http_status = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+
+    HeaderAbort header_abort = 3;
   }
 
   // The percentage of requests/operations/connections that will be aborted with the error code
