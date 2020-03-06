@@ -37,7 +37,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.opencensus
+    name: opencensus
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
       trace_config:
@@ -79,7 +79,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerGrpc) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.opencensus
+    name: opencensus
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
       trace_config:

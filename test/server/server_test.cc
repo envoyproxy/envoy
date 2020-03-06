@@ -469,8 +469,11 @@ TEST_P(ServerInstanceImplTest, Stats) {
 class TestWithSimTimeAndRealSymbolTables : public Event::TestUsingSimulatedTime {
 protected:
   TestWithSimTimeAndRealSymbolTables() {
-    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+    symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
   }
+
+private:
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
 };
 
 class ServerStatsTest
@@ -668,9 +671,9 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo", ""));
+  EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
-  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz", ""));
+  EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
   EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
