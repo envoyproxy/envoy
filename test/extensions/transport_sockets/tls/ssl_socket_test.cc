@@ -23,12 +23,12 @@
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/test_data/ca_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/extensions_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/password_protected_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns2_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_uri_cert_info.h"
-#include "test/extensions/transport_sockets/tls/test_data/extensions_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
@@ -401,8 +401,6 @@ void testUtil(const TestUtilOptions& options) {
       for (const auto& expected_extension : options.expectedX509Extensions()) {
         const auto& result = server_connection->ssl()->x509Extension(expected_extension.first);
         EXPECT_EQ(expected_extension.second, result);
-        // Ensure we cache the result.
-        EXPECT_EQ(&result, &server_connection->ssl()->x509Extension(expected_extension.first));
       }
       // By default, the session is not created with session resumption. The
       // client should see a session ID but the server should not.

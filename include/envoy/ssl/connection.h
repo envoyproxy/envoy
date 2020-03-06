@@ -132,13 +132,15 @@ public:
   virtual const std::string& tlsVersion() const PURE;
 
   /**
-   * Retrieves the value of a specific X.509 extension from the peer cert, if a peer cert exists
-   * and it contains the specified extension.
+   * Retrieves the contents of the ASN.1 object stored as an X.509 extension from the peer cert, if
+   * a peer cert exists and it contains the specified extension.
+   *
+   * Note: This is used out of tree, check with @snowp before removing.
    * @param extension_name name of extension to look up
-   * @return absl::optional<std::string> the value of the extension, if it exists.
+   * @return absl::optional<std::string> the raw octets of the extension ASN.1 object, if it
+   * exists. The raw octets of the ASN.1 value are returned
    */
-  virtual const absl::optional<std::string>&
-  x509Extension(absl::string_view extension_name) const PURE;
+  virtual absl::optional<std::string> x509Extension(absl::string_view extension_name) const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

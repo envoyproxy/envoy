@@ -75,7 +75,7 @@ public:
   uint16_t ciphersuiteId() const override;
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
-  const absl::optional<std::string>& x509Extension(absl::string_view extension_name) const override;
+  absl::optional<std::string> x509Extension(absl::string_view extension_name) const override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 
@@ -96,7 +96,6 @@ private:
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
-  mutable absl::node_hash_map<std::string, absl::optional<std::string>> cached_x509_extensions_;
 };
 
 class SslSocket : public Network::TransportSocket,

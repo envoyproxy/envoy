@@ -503,23 +503,12 @@ const std::string& SslSocketInfo::tlsVersion() const {
   return cached_tls_version_;
 }
 
-const absl::optional<std::string>&
-SslSocketInfo::x509Extension(absl::string_view extension_name) const {
-  auto itr = cached_x509_extensions_.find(extension_name);
-  if (itr != cached_x509_extensions_.end()) {
-    return itr->second;
-  }
-
+absl::optional<std::string> SslSocketInfo::x509Extension(absl::string_view extension_name) const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    ASSERT(cached_x509_extensions_.find(extension_name) == cached_x509_extensions_.end());
-    cached_x509_extensions_[extension_name] = absl::nullopt;
-    return cached_x509_extensions_[extension_name];
+    return absl::nullopt;
   }
-
-  ASSERT(cached_x509_extensions_.find(extension_name) == cached_x509_extensions_.end());
-  cached_x509_extensions_[extension_name] = Utility::getX509ExtensionValue(*cert, extension_name);
-  return cached_x509_extensions_[extension_name];
+  return Utility::getX509ExtensionValue(*cert, extension_name);
 }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
