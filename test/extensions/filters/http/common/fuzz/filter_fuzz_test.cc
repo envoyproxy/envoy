@@ -86,7 +86,7 @@ public:
     }
     ENVOY_LOG_MISC(debug, "Decoding headers: {} ", data.headers().DebugString());
     const auto& headersStatus = filter->decodeHeaders(headers, end_stream);
-    if (headersStatus != Http::FilterHeadersStatus::Continue ||
+    if (headersStatus != Http::FilterHeadersStatus::Continue &&
         headersStatus != Http::FilterHeadersStatus::StopIteration) {
       return;
     }
