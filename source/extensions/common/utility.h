@@ -43,9 +43,37 @@ public:
   }
 
   /**
-   * Checks the status of deprecated extension and either generates a log message or throws.
+   * Checks the status of deprecated extension names and generates a log message.
+   *
+   * @param extension_type absl::string_view that contains the extension type, for logging
+   * @param deprecated_name absl::string_view that contains the deprecated name, for logging
+   * @param canonical_name absl::string_view that contains the canonical name, for logging
+   * @param runtime Runtime::Loader used to determine if deprecated extension names are allowed.
+   * @return true if deprecated extensions are allowed, false otherwise.
+   */
+  static bool
+  allowDeprecatedExtensionName(absl::string_view extension_type, absl::string_view deprecated_name,
+                               absl::string_view canonical_name,
+                               Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting()) {
+    auto status = deprecatedExtensionNameStatus(runtime);
+
+    if (status == Status::Warn) {
+      ENVOY_LOG_MISC(warn, "{}", message(extension_type, deprecated_name, canonical_name));
+      return true;
+    }
+
+    ENVOY_LOG_MISC(warn, "{}", fatalMessage(extension_type, deprecated_name, canonical_name));
+    return false;
+  }
+
+  /**
+   * Checks the status of deprecated extension names and either generates a log message or throws.
    * The passed strings are used only to generate the log or exception message.
    *
+   * @param extension_type absl::string_view that contains the extension type, for logging
+   * @param deprecated_name absl::string_view that contains the deprecated name, for logging
+   * @param canonical_name absl::string_view that contains the canonical name, for logging
+   * @param runtime Runtime::Loader used to determine if deprecated extension names are allowed.
    * @throw EnvoyException if the use of deprecated extension names is not allowed.
    */
   static void
@@ -54,16 +82,28 @@ public:
                                Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting()) {
     auto status = deprecatedExtensionNameStatus(runtime);
 
-    std::string err = fmt::format(
+    if (status == Status::Warn) {
+      ENVOY_LOG_MISC(warn, "{}", message(extension_type, deprecated_name, canonical_name));
+      return;
+    }
+
+    throw EnvoyException(fatalMessage(extension_type, deprecated_name, canonical_name));
+  }
+
+private:
+  static std::string message(absl::string_view extension_type, absl::string_view deprecated_name,
+                             absl::string_view canonical_name) {
+    return fmt::format(
         "Using deprecated {} extension name '{}' for '{}'. This name will be removed from Envoy "
         "soon. Please see "
         "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details.",
         extension_type, deprecated_name, canonical_name);
+  }
 
-    if (status == Status::Warn) {
-      ENVOY_LOG_MISC(warn, "{}", err);
-      return;
-    }
+  static std::string fatalMessage(absl::string_view extension_type,
+                                  absl::string_view deprecated_name,
+                                  absl::string_view canonical_name) {
+    std::string err = message(extension_type, deprecated_name, canonical_name);
 
     const char fatal_error[] =
         " If continued use of this filter name is absolutely necessary, see "
@@ -71,7 +111,7 @@ public:
         "#using-runtime-overrides-for-deprecated-features for how to apply a temporary and "
         "highly discouraged override.";
 
-    throw EnvoyException(err + fatal_error);
+    return err + fatal_error;
   }
 };
 

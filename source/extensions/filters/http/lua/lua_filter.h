@@ -5,6 +5,7 @@
 
 #include "common/crypto/utility.h"
 
+#include "extensions/common/utility.h"
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -15,17 +16,37 @@ namespace HttpFilters {
 namespace Lua {
 
 namespace {
+const std::string DEPRECATED_LUA_NAME = "envoy.lua";
+
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
     return ProtobufWkt::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->routeEntry()->metadata();
-  const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
-  if (filter_it == metadata.filter_metadata().end()) {
-    return ProtobufWkt::Struct::default_instance();
+
+  {
+    const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
+    if (filter_it != metadata.filter_metadata().end()) {
+      return filter_it->second;
+    }
   }
-  return filter_it->second;
+
+  // TODO(zuercher): Remove this block when deprecated filter names are removed.
+  {
+    const auto& filter_it = metadata.filter_metadata().find(DEPRECATED_LUA_NAME);
+    if (filter_it != metadata.filter_metadata().end()) {
+      // Use the non-throwing check here because this happens at request time.
+      if (Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
+              "http filter", DEPRECATED_LUA_NAME,
+              Extensions::HttpFilters::HttpFilterNames::get().Lua)) {
+        return filter_it->second;
+      }
+    }
+  }
+
+  return ProtobufWkt::Struct::default_instance();
 }
+
 } // namespace
 
 /**

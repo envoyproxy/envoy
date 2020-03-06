@@ -1619,6 +1619,40 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+// Test that the deprecated filter name works for metadata.
+TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDeprecatedName)) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["prop"])
+      request_handle:logTrace(request_handle:metadata():get("baz.bat")["name"])
+      request_handle:logTrace(request_handle:metadata():get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.lua:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupMetadata(METADATA);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("baz")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bat")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
 // No available metadata on route.
 TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoRoute) {
   const std::string SCRIPT{R"EOF(
