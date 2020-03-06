@@ -557,8 +557,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   const uint32_t num_packets_per_mmsg_call = 16u;
   const uint32_t num_slices_per_packet = 1u;
   absl::FixedArray<Buffer::InstancePtr> buffers(num_packets_per_mmsg_call);
-  absl::FixedArray<absl::FixedArray<Buffer::RawSlice>> slices(
-      num_packets_per_mmsg_call, absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
+  RawSliceArrays slices(num_packets_per_mmsg_call,
+                        absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
   for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
     buffers[i] = std::make_unique<Buffer::OwnedImpl>();
     const uint64_t num_slices = buffers[i]->reserve(udp_packet_processor.maxPacketSize(),

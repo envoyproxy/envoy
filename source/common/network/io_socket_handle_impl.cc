@@ -145,8 +145,25 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   }
 }
 
+Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
+                                                            socklen_t ss_len, os_fd_t fd) {
+  try {
+    // Set v6only to false so that mapped-v6 address can be normalize to v4
+    // address. Though dual stack may be disabled, it's still okay to assume the
+    // address is from a dual stack socket. This is because mapped-v6 address
+    // must come from a dual stack socket. An actual v6 address can come from
+    // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
+    // address and the socket is actually v6 only, the returned address will be
+    // regarded as a v6 address from dual stack socket. However, this address is not going to be
+    // used to create socket. Wrong knowledge of dual stack support won't hurt.
+    return Address::addressFromSockAddr(ss, ss_len, /*v6only=*/false);
+  } catch (const EnvoyException& e) {
+    PANIC(fmt::format("Invalid address for fd: {}, error: {}", fd, e.what()));
+  }
+}
+
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
-                                                             uint32_t self_port) {
+                                                             uint32_t self_port, os_fd_t fd) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
     auto info = reinterpret_cast<const in6_pktinfo*>(CMSG_DATA(&cmsg));
     sockaddr_storage ss;
@@ -155,7 +172,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv6_addr->sin6_family = AF_INET6;
     ipv6_addr->sin6_addr = info->ipi6_addr;
     ipv6_addr->sin6_port = htons(self_port);
-    return Address::addressFromSockAddr(ss, sizeof(sockaddr_in6), /*v6only=*/false);
+    return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
   }
 #ifndef IP_RECVDSTADDR
   if (cmsg.cmsg_type == IP_PKTINFO) {
@@ -175,7 +192,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
         *addr;
 #endif
     ipv4_addr->sin_port = htons(self_port);
-    return Address::addressFromSockAddr(ss, sizeof(sockaddr_in), /*v6only=*/false);
+    return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
   }
   return nullptr;
 }
@@ -231,35 +248,18 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                  fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
-  try {
-    // Set v6only to false so that mapped-v6 address can be normalize to v4
-    // address. Though dual stack may be disabled, it's still okay to assume the
-    // address is from a dual stack socket. This is because mapped-v6 address
-    // must come from a dual stack socket. An actual v6 address can come from
-    // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
-    // address and the socket is actually v6 only, the returned address will be
-    // regarded as a v6 address from dual stack socket. However, this address is not going to be
-    // used to create socket. Wrong knowledge of dual stack support won't hurt.
-    output.msg_[0].peer_address_ =
-        Address::addressFromSockAddr(peer_addr, hdr.msg_namelen, /*v6only=*/false);
-  } catch (const EnvoyException& e) {
-    PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", fd_, e.what()));
-  }
+  output.msg_[0].peer_address_ = getAddressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
 
   if (hdr.msg_controllen > 0) {
     // Get overflow, local address from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
       if (output.msg_[0].local_address_ == nullptr) {
-        try {
-          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-          if (addr != nullptr) {
-            // This is a IP packet info message.
-            output.msg_[0].local_address_ = std::move(addr);
-            continue;
-          }
-        } catch (const EnvoyException& e) {
-          PANIC(fmt::format("Invalid destination address for fd: {}, error: {}", fd_, e.what()));
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port, fd_);
+        if (addr != nullptr) {
+          // This is a IP packet info message.
+          output.msg_[0].local_address_ = std::move(addr);
+          continue;
         }
       }
       if (output.dropped_packets_ != nullptr) {
@@ -333,33 +333,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
-    try {
-      // Set v6only to false so that mapped-v6 address can be normalize to v4
-      // address. Though dual stack may be disabled, it's still okay to assume the
-      // address is from a dual stack socket. This is because mapped-v6 address
-      // must come from a dual stack socket. An actual v6 address can come from
-      // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
-      // address and the socket is actually v6 only, the returned address will be
-      // regarded as a v6 address from dual stack socket. However, this address is not going to be
-      // used to create socket. Wrong knowledge of dual stack support won't hurt.
-      output.msg_[i].peer_address_ =
-          Address::addressFromSockAddr(raw_addresses[i], hdr.msg_namelen, /*v6only=*/false);
-    } catch (const EnvoyException& e) {
-      PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", fd_, e.what()));
-    }
-
+    output.msg_[i].peer_address_ =
+        getAddressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_);
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-        try {
-          Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-          if (addr != nullptr) {
-            // This is a IP packet info message.
-            output.msg_[i].local_address_ = std::move(addr);
-            break;
-          }
-        } catch (const EnvoyException& e) {
-          PANIC(fmt::format("Invalid destination address for fd: {}, error: {}", fd_, e.what()));
+        Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port, fd_);
+        if (addr != nullptr) {
+          // This is a IP packet info message.
+          output.msg_[i].local_address_ = std::move(addr);
+          break;
         }
       }
     }
