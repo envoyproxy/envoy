@@ -88,6 +88,7 @@ func (s *server) SendResponse(cluster string, upstreamClusters []string, frequen
 	s.mu.Lock()
 	// Check whether any Node from given Cluster is connected or not.
 	clusterDetails, exist := s.lrsCache[cluster]
+	s.mu.Unlock()
 	if !exist {
 		log.Printf("Cannot send response as cluster `%s` because is not connected", cluster)
 		return
@@ -106,5 +107,4 @@ func (s *server) SendResponse(cluster string, upstreamClusters []string, frequen
 			log.Panicf("Unable to send response to cluster %s node %s due to err: %s", nodeDetails.node.Cluster, nodeId, err)
 		}
 	}
-	s.mu.Unlock()
 }
