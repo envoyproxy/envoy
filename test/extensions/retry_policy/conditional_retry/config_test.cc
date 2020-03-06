@@ -1,5 +1,6 @@
-#include "extensions/retry_policy/conditional_retry/config.h"
 #include "envoy/registry/registry.h"
+
+#include "extensions/retry_policy/conditional_retry/config.h"
 
 #include "test/test_common/utility.h"
 

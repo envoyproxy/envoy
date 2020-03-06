@@ -1,11 +1,12 @@
 #include "extensions/retry_policy/conditional_retry/config.h"
-#include "extensions/retry_policy/conditional_retry/conditional_retry.h"
 
 #include "envoy/extensions/retry_policy/conditional_retry/v3/conditional_retry.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/http/header_utility.h"
 #include "common/router/retry_state_impl.h"
+
+#include "extensions/retry_policy/conditional_retry/conditional_retry.h"
 
 namespace Envoy {
 namespace Extensions {
