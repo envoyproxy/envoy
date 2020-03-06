@@ -1,9 +1,9 @@
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "common/common/assert.h"
+#include "common/network/address_impl.h"
 
 #include "absl/strings/str_join.h"
-#include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,12 +91,45 @@ std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
   }
   for (const GENERAL_NAME* san : san_names.get()) {
     if (san->type == type) {
-      ASN1_STRING* str = san->d.dNSName;
-      const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
-      subject_alt_names.push_back(std::string(dns_name));
+      subject_alt_names.push_back(generalNameAsString(san));
     }
   }
   return subject_alt_names;
+}
+
+std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
+  std::string san;
+  switch (general_name->type) {
+  case GEN_DNS: {
+    ASN1_STRING* str = general_name->d.dNSName;
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    break;
+  }
+  case GEN_URI: {
+    ASN1_STRING* str = general_name->d.uniformResourceIdentifier;
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    break;
+  }
+  case GEN_IPADD: {
+    if (general_name->d.ip->length == 4) {
+      sockaddr_in sin;
+      sin.sin_port = 0;
+      sin.sin_family = AF_INET;
+      memcpy(&sin.sin_addr, general_name->d.ip->data, sizeof(sin.sin_addr));
+      Network::Address::Ipv4Instance addr(&sin);
+      san = addr.ip()->addressAsString();
+    } else if (general_name->d.ip->length == 16) {
+      sockaddr_in6 sin6;
+      sin6.sin6_port = 0;
+      sin6.sin6_family = AF_INET6;
+      memcpy(&sin6.sin6_addr, general_name->d.ip->data, sizeof(sin6.sin6_addr));
+      Network::Address::Ipv6Instance addr(sin6);
+      san = addr.ip()->addressAsString();
+    }
+    break;
+  }
+  }
+  return san;
 }
 
 std::string Utility::getIssuerFromCertificate(X509& cert) {
