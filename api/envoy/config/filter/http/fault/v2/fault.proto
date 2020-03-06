@@ -21,10 +21,10 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filte
 // [#extension: envoy.filters.http.fault]
 
 message FaultAbort {
-  reserved 1;
-
   message HeaderAbort {
   }
+
+  reserved 1;
 
   oneof error_type {
     option (validate.required) = true;
