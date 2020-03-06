@@ -36,7 +36,9 @@ envoy_cc_library(
         "//include/envoy/server:config_tracker_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
+        "//source/common/init:watcher_lib",
         "//source/common/protobuf",
     ],
 )
