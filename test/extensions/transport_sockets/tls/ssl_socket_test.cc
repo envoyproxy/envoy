@@ -28,6 +28,7 @@
 #include "test/extensions/transport_sockets/tls/test_data/san_dns2_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_uri_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/extensions_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
 #include "test/mocks/buffer/mocks.h"
@@ -1410,18 +1411,18 @@ TEST_P(SslSocketTest, X509Extensions) {
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_key.pem"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/extensions_key.pem"
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -1430,8 +1431,9 @@ TEST_P(SslSocketTest, X509Extensions) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
   testUtil(test_options.addExpected509Extension("1.2.3.4.5.6.7.8", absl::make_optional("Something"))
-               .setExpectedSerialNumber(TEST_CA_CERT_SERIAL)
-               .addExpected509Extension("1.2.3.4", absl::nullopt));
+               .addExpected509Extension("1.2.3.4.5.6.7.9", "\x1\x1\xFF")
+               .addExpected509Extension("1.2.3.4", absl::nullopt)
+               .setExpectedSerialNumber(TEST_EXTENSIONS_CERT_SERIAL));
 }
 
 // By default, expired certificates are not permitted.
