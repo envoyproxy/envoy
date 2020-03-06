@@ -84,7 +84,7 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
                           Pair("leading", "leading value"), Pair("trailing", "trailing value")));
 }
 
-// For S3 everything except host, content-type and x-amzn-* is ignored
+// For S3 there is a small subset of headers that are canonical.
 TEST(UtilityTest, CanonicalizeHeadersS3) {
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "example.com"},
