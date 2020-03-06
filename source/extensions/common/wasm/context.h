@@ -40,7 +40,7 @@ class Buffer : public proxy_wasm::BufferInterface {
 public:
   Buffer() {}
 
-  // Add additional wrappped types here.
+  // Add additional wrapped types here.
   Buffer* set(absl::string_view data) {
     data_ = data;
     return this;
