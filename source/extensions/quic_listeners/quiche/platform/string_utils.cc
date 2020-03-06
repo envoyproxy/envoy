@@ -88,7 +88,7 @@ bool HexDecodeToUInt32(absl::string_view data, uint32_t* out) {
 
   std::string byte_string = absl::HexStringToBytes(data_padded);
 
-  RELEASE_ASSERT(byte_string.size() == 4u, "padded dtat is not 4 byte long.");
+  RELEASE_ASSERT(byte_string.size() == 4u, "padded data is not 4 byte long.");
   uint32_t bytes;
   memcpy(&bytes, byte_string.data(), byte_string.length());
   *out = ntohl(bytes);
