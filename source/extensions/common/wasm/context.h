@@ -87,9 +87,9 @@ public:
 
   void error(absl::string_view message) override;
 
-  //
-  // General Callbacks.
-  //
+  /**
+   * General Callbacks.
+   */
   WasmResult log(uint64_t level, absl::string_view message) override;
   uint64_t getCurrentTimeNanoseconds() override;
 

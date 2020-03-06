@@ -97,26 +97,31 @@ WasmResult Context::getProperty(absl::string_view path, std::string* result) {
 
 WasmResult Context::defineMetric(MetricType type, absl::string_view name, uint32_t* metric_id_ptr) {
   auto stat_name = wasm()->stat_name_set_->add(name);
-  if (type == MetricType::Counter) {
+  switch (type) {
+  case MetricType::Counter: {
     auto id = wasm_->nextCounterMetricId();
     auto c = &wasm()->scope_->counterFromStatName(stat_name);
     wasm()->counters_.emplace(id, c);
     *metric_id_ptr = id;
     return WasmResult::Ok;
-  } else if (type == MetricType::Gauge) {
+  }
+  case MetricType::Gauge: {
     auto id = wasm()->nextGaugeMetricId();
     auto g = &wasm()->scope_->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::Accumulate);
     wasm()->gauges_.emplace(id, g);
     *metric_id_ptr = id;
     return WasmResult::Ok;
-  } else if (type == MetricType::Histogram) {
+  }
+  case MetricType::Histogram: {
     auto id = wasm()->nextHistogramMetricId();
     auto h = &wasm()->scope_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
     wasm()->histograms_.emplace(id, h);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
-  return WasmResult::BadArgument;
+  default:
+    return WasmResult::BadArgument;
+  }
 }
 
 WasmResult Context::incrementMetric(uint32_t metric_id, int64_t offset) {
