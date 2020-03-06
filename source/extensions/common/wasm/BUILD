@@ -25,7 +25,6 @@ envoy_cc_library(
         "@proxy_wasm_cpp_sdk//:common_lib",
         "//source/common/common:assert_lib",
         "//source/common/stats:stats_lib",
-        #"//source/extensions/common/wasm/v8:v8_lib",
     ],
 )
 
