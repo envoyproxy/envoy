@@ -54,15 +54,9 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     if (source.retry_policy().has_retry_back_off()) {
       base_interval_ms =
           PROTOBUF_GET_MS_REQUIRED(source.retry_policy().retry_back_off(), base_interval);
-      if (base_interval_ms < 1) {
-        base_interval_ms = 1;
-      }
 
       max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(source.retry_policy().retry_back_off(),
                                                    max_interval, base_interval_ms * 10);
-      if (max_interval_ms < 1) {
-        max_interval_ms = 1;
-      }
 
       if (max_interval_ms < base_interval_ms) {
         throw EnvoyException("max_interval must be greater than or equal to the base_interval");

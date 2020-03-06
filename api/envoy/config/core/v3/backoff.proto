@@ -23,7 +23,7 @@ message BackoffStrategy {
   // <envoy_api_field_config.core.v3.BackoffStrategy.max_interval>`.
   google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
     required: true
-    gte {seconds: 1000000}
+    gte {nanos: 1000000}
   }];
 
   // Specifies the maximum interval between retries. This parameter is optional,

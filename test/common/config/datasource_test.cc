@@ -1,4 +1,5 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/base.pb.validate.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
@@ -479,6 +480,7 @@ TEST_F(AsyncDataSourceTest, BaseIntervalTest) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         xxx
       retry_policy:
@@ -486,8 +488,7 @@ TEST_F(AsyncDataSourceTest, BaseIntervalTest) {
           base_interval: 0.0001s
         num_retries: 3
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
-  EXPECT_TRUE(config.has_remote());
+  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, config), EnvoyException);
 }
 
 } // namespace
