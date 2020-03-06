@@ -24,6 +24,10 @@ std::atomic<bool>& deprecatedNameLogged() {
   MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<bool>, false);
 }
 
+// Checks if deprecated metadata names are allowed. On the first check only it will log either
+// a warning (indicating the name should be updated) or an error (the feature is off and the
+// name is not allowed). When warning, the deprecated feature stat is incremented. Subsequent
+// checks do not log since this check is done in potentially high-volume request paths.
 bool allowDeprecatedMetadataName() {
   if (!deprecatedNameLogged().exchange(true)) {
     // Have not logged yet, so use the logging test.
