@@ -3498,6 +3498,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "http2_platform_api_test",
+    size = "small",
     srcs = [
         "quiche/http2/platform/api/http2_string_utils_test.cc",
         "quiche/http2/test_tools/http2_random_test.cc",
@@ -3512,6 +3513,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "spdy_platform_api_test",
+    size = "small",
     srcs = ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
     repository = "@envoy",
     tags = ["nofips"],
@@ -3563,6 +3565,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "quic_platform_api_test",
+    size = "small",
     srcs = [
         "quiche/quic/platform/api/quic_containers_test.cc",
         "quiche/quic/platform/api/quic_mem_slice_span_test.cc",

@@ -92,7 +92,7 @@ if [[ $# -gt 1 ]]; then
   shift
   TEST_TARGETS=$*
 else
-  TEST_TARGETS=//test/...
+  TEST_TARGETS="//test/... $(bazel query ${BAZEL_QUERY_OPTIONS} "attr('size', 'small', '@com_googlesource_quiche//:all')" | grep "^@com_googlesource_quiche")"
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
