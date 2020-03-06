@@ -56,20 +56,18 @@ double AdmissionControlFilterConfig::aggression() const {
 DefaultResponseEvaluator::DefaultResponseEvaluator(
     AdmissionControlProto::DefaultSuccessCriteria success_criteria) {
   // HTTP status.
-  if (success_criteria.has_http_status()) {
+  if (success_criteria.http_status_size() > 0) {
     for (const auto& status : success_criteria.http_status()) {
-      const auto status_code = PROTOBUF_GET_WRAPPED_REQUIRED(status, code)
-                                   http_status_codes_.emplace(enumToInt(status_code));
+      http_status_codes_.emplace(enumToInt(status.code()));
     }
   } else {
     http_status_codes_.emplace(enumToInt(Http::Code::OK));
   }
 
   // GRPC status.
-  if (success_criteria.has_grpc_status()) {
+  if (success_criteria.grpc_status_size() > 0) {
     for (const auto& status : success_criteria.grpc_status()) {
-      const auto status_code = PROTOBUF_GET_WRAPPED_REQUIRED(status, code)
-                                   grpc_status_codes_.emplace(enumToSignedInt(status_code));
+      grpc_status_codes_.emplace(enumToSignedInt(status.status()));
     }
   } else {
     grpc_status_codes_.emplace(enumToSignedInt(Grpc::Status::WellKnownGrpcStatus::Ok));
