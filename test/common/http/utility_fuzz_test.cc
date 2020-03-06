@@ -5,8 +5,6 @@
 #include "test/fuzz/utility.h"
 #include "test/test_common/utility.h"
 
-//#include "common/http/header_map_impl.h"
-
 namespace Envoy {
 namespace Fuzz {
 namespace {
