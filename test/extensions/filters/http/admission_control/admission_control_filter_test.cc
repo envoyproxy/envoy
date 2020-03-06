@@ -179,9 +179,19 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
             filter_->decodeHeaders(request_headers, true));
 }
 
-// Verify only 5xx codes count as errors.
+// TODO (tonya11en) more tests around logic of specifying error codes. Still WIP.
+
 TEST_F(AdmissionControlTest, ErrorCodes) {
-  auto config = makeConfig(default_yaml_);
+  const std::string yaml = R"EOF(
+default_success_criteria:
+  http_status:
+    - code: OK
+    - code: MovedPermanently
+  grpc_status:
+)EOF";
+
+  auto config = makeConfig(yaml);
+  setupFilter(config);
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
@@ -191,6 +201,11 @@ TEST_F(AdmissionControlTest, ErrorCodes) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordSuccess());
   sampleCustomRequest("200");
+
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_CALL(controller_, recordSuccess());
+  sampleCustomRequest("301");
 
   setupFilter(config);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
