@@ -67,7 +67,7 @@ api_listener:
         domains: "*"
       name: route_config_0
     http_filters:
-      - name: envoy.filters.http.router
+      - name: router
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
       )EOF";

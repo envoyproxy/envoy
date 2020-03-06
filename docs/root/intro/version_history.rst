@@ -8,6 +8,7 @@ Version history
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
 * aws_request_signing: a few fixes so that it works with S3.
+* admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
@@ -18,10 +19,12 @@ Version history
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher` to false.
 * http: added HTTP/1.1 flood protection. Can be temporarily disabled using the runtime feature `envoy.reloadable_features.http1_flood_protection`
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
+* http: fixed a bug that could send extra METADATA frames and underflow memory when encoding METADATA frames on a connection that was dispatching data.
 * http: connection header sanitizing has been modified to always sanitize if there is no upgrade, including when an h2c upgrade attempt has been removed.
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A
   mapping of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
+* lua: added a parameter to `httpCall` that makes it possible to have the call be asynchronous.
 * mongo: the stat emitted for queries without a max time set in the :ref:`MongoDB filter<config_network_filters_mongo_proxy>` was modified to emit correctly for Mongo v3.2+.
 * network filters: network filter extensions use the "envoy.filters.network" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.

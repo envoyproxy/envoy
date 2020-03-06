@@ -149,7 +149,6 @@ protected:
   std::string getCaFileName() const { return ca_file_path_; };
   void incCounter(const Stats::StatName name, absl::string_view value,
                   const Stats::StatName fallback) const;
-  static std::string generalNameAsString(const GENERAL_NAME* general_name);
 
   Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
