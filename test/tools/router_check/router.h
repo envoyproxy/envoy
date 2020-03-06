@@ -134,17 +134,17 @@ private:
   bool compareRedirectPath(ToolConfig& tool_config,
                            const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   bool compareRequestHeaderFields(ToolConfig& tool_config,
-                                 const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareRequestHeaderField(ToolConfig& tool_config, const std::string& field,
-                                 const std::string& expected, const bool expect_match);
-  bool expectRequestHeaderField(ToolConfig& tool_config, const std::string& field,
-                                  const bool expected_present);
-  bool compareResponseHeaderFields(ToolConfig& tool_config,
                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected);
-  bool compareResponseHeaderField(ToolConfig& tool_config, const std::string& field,
-                                  const std::string& expected, const bool expect_match);
-  bool expectResponseHeaderField(ToolConfig& tool_config, const std::string& field,
-                                  const bool expected_present);
+  bool compareResponseHeaderFields(ToolConfig& tool_config,
+                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected);
+  template <typename HM>
+  bool compareHeaderField(const HM& header_map, const std::string& field,
+                          const std::string& expected, const std::string& test_type,
+                          const bool expect_match);
+  template <typename HM>
+  bool expectHeaderField(const HM& header_map, const std::string& field,
+                         const std::string& test_type, const bool expected_present);
+
   /**
    * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.
