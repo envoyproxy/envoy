@@ -383,23 +383,7 @@ bool RouterCheckTool::compareRequestHeaderFields(
   bool no_failures = true;
   if (expected.request_header_matches().data()) {
     for (const envoy::config::route::v3::HeaderMatcher& header : expected.request_header_matches()) {
-      switch (header.header_match_specifier_case()) {
-        case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
-          if (!compareHeaderField(*tool_config.request_headers_, header.name(), header.exact_match(), "request_header_fields", !header.invert_match())) {
-            no_failures = false;
-          }
-          break;
-        case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
-          if (!expectHeaderField(*tool_config.request_headers_, header.name(), "request_header_fields", !header.invert_match())) {
-            no_failures = false;
-          }
-          break;
-        default:
-          // Not implemented!
-          tests_.back().second.emplace_back("HeaderMatcher option " + ::to_string(header.header_match_specifier_case()) + " not supported.");
-          no_failures = false;
-          break;
-      }
+      no_failures = matchHeaderField(*tool_config.request_headers_, header, "request_header_matches");
     }
   }
   return no_failures;
@@ -410,26 +394,33 @@ bool RouterCheckTool::compareResponseHeaderFields(
   bool no_failures = true;
   if (expected.response_header_matches().data()) {
     for (const envoy::config::route::v3::HeaderMatcher& header : expected.response_header_matches()) {
-      switch (header.header_match_specifier_case()) {
-        case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
-          if (!compareHeaderField(*tool_config.response_headers_, header.name(), header.exact_match(), "response_header_fields", !header.invert_match())) {
-            no_failures = false;
-          }
-          break;
-        case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
-          if (!expectHeaderField(*tool_config.response_headers_, header.name(), "response_header_fields", !header.invert_match())) {
-            no_failures = false;
-          }
-          break;
-        default:
-          // Not implemented!
-          tests_.back().second.emplace_back("HeaderMatcher option " + ::to_string(header.header_match_specifier_case()) + " not supported.");
-          no_failures = false;
-          break;
-      }
+      no_failures = matchHeaderField(*tool_config.response_headers_, header, "response_header_matches");
     }
   }
   return no_failures;
+}
+
+template<typename HM>
+bool RouterCheckTool::matchHeaderField(
+    const HM& header_map, const envoy::config::route::v3::HeaderMatcher& header, const std::string test_type) {
+    switch (header.header_match_specifier_case()) {
+      case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
+        if (compareHeaderField(header_map, header.name(), header.exact_match(), test_type, !header.invert_match())) {
+          return true;
+        }
+        break;
+      case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
+        if (expectHeaderField(header_map, header.name(), test_type, !header.invert_match())) {
+          return true;
+        }
+        break;
+      default:
+        // Not implemented!
+        tests_.back().second.emplace_back("HeaderMatcher option " + ::to_string(header.header_match_specifier_case()) + " not supported.");
+        break;
+    }
+    
+    return false;
 }
 
 template<typename HM>
