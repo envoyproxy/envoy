@@ -44,7 +44,7 @@ public:
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
@@ -68,7 +68,7 @@ public:
     healthy_threshold: 1
     always_log_health_check_failures: true
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
@@ -91,7 +91,7 @@ public:
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
         key: foo
@@ -139,7 +139,7 @@ public:
     healthy_threshold: 1
     reuse_connection: false
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";

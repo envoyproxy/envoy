@@ -156,6 +156,8 @@ private:
    * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
    * @param 3 (string): Body. Can be nil.
    * @param 4 (int): Timeout in milliseconds for the call.
+   * @param 5 (bool): Optional flag. If true, filter continues without waiting for HTTP response
+   * from upstream service. False/synchronous by default.
    * @return headers (table), body (string/nil)
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCall);
@@ -247,7 +249,8 @@ private:
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
-  static void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index);
+  int luaHttpCallSynchronous(lua_State* state);
+  int luaHttpCallAsynchronous(lua_State* state);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
@@ -285,6 +288,16 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+};
+
+/**
+ * An empty Callbacks client. It will ignore everything, including successes and failures.
+ */
+class NoopCallbacks : public Http::AsyncClient::Callbacks {
+public:
+  // Http::AsyncClient::Callbacks
+  void onSuccess(Http::ResponseMessagePtr&&) override {}
+  void onFailure(Http::AsyncClient::FailureReason) override {}
 };
 
 /**
