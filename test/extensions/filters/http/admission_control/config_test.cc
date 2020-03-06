@@ -33,7 +33,7 @@ public:
   AdmissionControlConfigTest() {}
 
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
-    AdmissionControlFilterConfig::AdmissionControlProto proto;
+    AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
     tls->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -61,6 +61,9 @@ sampling_window: 1337s
 aggression_coefficient:
   default_value: 4.2
   runtime_key: "foo.aggression"
+default_success_criteria:
+  http_status:
+  grpc_status:
 )EOF";
 
   auto config = makeConfig(yaml);
@@ -72,10 +75,12 @@ aggression_coefficient:
 // Verify the config defaults when not specified.
 TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
   // Empty config. No fields are required.
-  AdmissionControlFilterConfig::AdmissionControlProto proto;
+  AdmissionControlProto proto;
 
   const std::string yaml = R"EOF(
-enabled:
+default_success_criteria:
+  http_status:
+  grpc_status:
 )EOF";
   auto config = makeConfig(yaml);
 
@@ -93,6 +98,9 @@ sampling_window: 1337s
 aggression_coefficient:
   default_value: 4.2
   runtime_key: "foo.aggression"
+default_success_criteria:
+  http_status:
+  grpc_status:
 )EOF";
 
   auto config = makeConfig(yaml);

@@ -54,7 +54,7 @@ public:
   AdmissionControlTest() {}
 
   std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
-    AdmissionControlFilterConfig::AdmissionControlProto proto;
+    AdmissionControlProto proto;
     TestUtility::loadFromYamlAndValidate(yaml, proto);
     auto tls = context_.threadLocal().allocateSlot();
     return std::make_shared<TestConfig>(proto, runtime_, time_system_, random_, scope_,
@@ -89,6 +89,9 @@ sampling_window: 10s
 aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
+default_success_criteria:
+  http_status:
+  grpc_status:
 )EOF"};
 };
 
@@ -101,6 +104,9 @@ sampling_window: 10s
 aggression_coefficient:
   default_value: 1.0
   runtime_key: "foo.aggression"
+default_success_criteria:
+  http_status:
+  grpc_status:
 )EOF";
 
   auto config = makeConfig(yaml);
@@ -188,7 +194,7 @@ TEST_F(AdmissionControlTest, ErrorCodes) {
 
   setupFilter(config);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordSuccess());
+  EXPECT_CALL(controller_, recordFailure());
   sampleCustomRequest("400");
 
   setupFilter(config);
