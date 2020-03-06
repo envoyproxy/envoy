@@ -17,11 +17,26 @@ FaultAbortConfig:: FaultAbortConfig(
   switch (abort_config.error_type_case()) {
     case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
       provider_ = std::make_unique<FixedAbortProvider>(abort_config.http_status());
+    case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
+      provider_ = std::make_unique<HeaderAbortProvider>();
     case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
       NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
+absl::optional<uint64_t>
+FaultAbortConfig::HeaderAbortProvider::statusCode(const Http::HeaderEntry* header) const {
+  if (header == nullptr) {
+    return absl::nullopt;
+  }
+
+  uint64_t value;
+  if (!absl::SimpleAtoi(header->value().getStringView(), &value)) {
+    return absl::nullopt;
+  }
+
+  return value;
+}
 
 FaultDelayConfig::FaultDelayConfig(
     const envoy::extensions::filters::common::fault::v3::FaultDelay& delay_config)
