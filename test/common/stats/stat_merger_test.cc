@@ -5,6 +5,7 @@
 #include "common/stats/symbol_table_creator.h"
 #include "common/stats/thread_local_store.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -57,7 +58,7 @@ public:
     EXPECT_EQ(stat_name, decoded) << name;
   }
 
-  IsolatedStoreImpl store_;
+  TestUtil::TestStore store_;
   StatMerger stat_merger_;
   Gauge& whywassixafraidofseven_;
   Protobuf::Map<std::string, uint64_t> empty_counter_deltas_;
@@ -330,8 +331,8 @@ protected:
 };
 
 TEST_F(StatMergerThreadLocalTest, FilterOutUninitializedGauges) {
-  Gauge& g1 = store_.gauge("newgauge1", Gauge::ImportMode::Uninitialized);
-  Gauge& g2 = store_.gauge("newgauge2", Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_.gaugeFromString("newgauge1", Gauge::ImportMode::Uninitialized);
+  Gauge& g2 = store_.gaugeFromString("newgauge2", Gauge::ImportMode::Accumulate);
   std::vector<GaugeSharedPtr> gauges = store_.gauges();
   ASSERT_EQ(1, gauges.size());
   EXPECT_EQ(&g2, gauges[0].get());
@@ -357,11 +358,11 @@ TEST_F(StatMergerThreadLocalTest, NewStatFromParent) {
     gauges["newgauge1"] = 1;
     gauges["newgauge2"] = 2;
     stat_merger.mergeStats(counter_deltas, gauges);
-    EXPECT_EQ(0, store_.counter("newcounter0").value());
-    EXPECT_EQ(0, store_.counter("newcounter0").latch());
-    EXPECT_EQ(1, store_.counter("newcounter1").value());
-    EXPECT_EQ(1, store_.counter("newcounter1").latch());
-    EXPECT_EQ(1, store_.gauge("newgauge1", Gauge::ImportMode::Accumulate).value());
+    EXPECT_EQ(0, store_.counterFromString("newcounter0").value());
+    EXPECT_EQ(0, store_.counterFromString("newcounter0").latch());
+    EXPECT_EQ(1, store_.counterFromString("newcounter1").value());
+    EXPECT_EQ(1, store_.counterFromString("newcounter1").latch());
+    EXPECT_EQ(1, store_.gaugeFromString("newgauge1", Gauge::ImportMode::Accumulate).value());
   }
   // We accessed 0 and 1 above, but not 2. Now that StatMerger has been destroyed,
   // 2 should be gone.
@@ -376,7 +377,7 @@ TEST_F(StatMergerThreadLocalTest, NewStatFromParent) {
 // from the parent, that we retain the import-mode, accumulating the updated
 // value. https://github.com/envoyproxy/envoy/issues/7227
 TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
-  Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::Accumulate);
+  Gauge& gauge = store_.gaugeFromString("mygauge", Gauge::ImportMode::Accumulate);
   gauge.set(42);
   EXPECT_EQ(Gauge::ImportMode::Accumulate, gauge.importMode());
   EXPECT_EQ(42, gauge.value());
@@ -395,7 +396,7 @@ TEST_F(StatMergerThreadLocalTest, RetainImportModeAfterMerge) {
 // from the parent, that we retain the import-mode, and don't accumulate the updated
 // value. https://github.com/envoyproxy/envoy/issues/7227
 TEST_F(StatMergerThreadLocalTest, RetainNeverImportModeAfterMerge) {
-  Gauge& gauge = store_.gauge("mygauge", Gauge::ImportMode::NeverImport);
+  Gauge& gauge = store_.gaugeFromString("mygauge", Gauge::ImportMode::NeverImport);
   gauge.set(42);
   EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge.importMode());
   EXPECT_EQ(42, gauge.value());
