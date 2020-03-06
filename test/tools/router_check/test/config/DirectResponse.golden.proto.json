@@ -14,14 +14,14 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "response_header_fields": [
+        "response_header_matches": [
           {
-            "key": "content-type",
-            "value": "text/plain"
+            "name": "content-type",
+            "exact_match": "text/plain"
           },
           {
-            "key": "content-length",
-            "value": "8"
+            "name": "content-length",
+            "exact_match": "8"
           }
         ]
       }
@@ -40,14 +40,14 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "response_header_fields": [
+        "response_header_matches": [
           {
-            "key": "content-type",
-            "value": "application/json"
+            "name": "content-type",
+            "exact_match": "application/json"
           },
           {
-            "key": "content-length",
-            "value": "25"
+            "name": "content-length",
+            "exact_match": "25"
           }
         ]
       }
@@ -66,10 +66,10 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "response_header_fields": [
+        "response_header_matches": [
           {
-            "key": "content-type",
-            "value": "text/plain,application/json"
+            "name": "content-type",
+            "exact_match": "text/plain,application/json"
           }
         ]
       }
@@ -88,14 +88,16 @@
         "path_rewrite": "",
         "virtual_cluster_name": "",
         "virtual_host_name": "",
-        "response_header_fields": [
+        "response_header_matches": [
           {
-            "key": "content-type",
-            "value": ""
+            "name": "content-type",
+            "present_match": true,
+            "invert_match": true
           },
           {
-            "key": "content-length",
-            "value": ""
+            "name": "content-length",
+            "present_match": true,
+            "invert_match": true
           }
         ]
       }
