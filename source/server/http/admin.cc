@@ -1345,7 +1345,7 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::Response
 }
 
 Http::Code AdminImpl::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response, AdminStream&) {
+                                        Buffer::Instance& response, AdminStream&) {
   server_.accessLogManager().reopen();
   response.add("OK\n");
   return Http::Code::OK;
@@ -1456,7 +1456,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
-          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false, false},
+          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
+           false},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}

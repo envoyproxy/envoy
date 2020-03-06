@@ -40,7 +40,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "rename",
     srcs = ["rename.cc"],
-    deps = ["@envoy_api//envoy/api/v2/route:pkg_cc_proto"],
 )
 
 envoy_cc_library(
