@@ -97,7 +97,6 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     return Http::FilterHeadersStatus::Continue;
   }
 
-  DefaultResponseEvaluator(AdmissionControlProto::DefaultSuccessCriteria success_criteria);
   if (shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
                                        "denied by admission control");
@@ -115,7 +114,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHe
                                                                 bool end_stream) {
   if (end_stream) {
     const uint64_t http_status_code = Http::Utility::getResponseStatus(headers);
-    if (response_evaluator_->isSuccess(headers)) {
+    if (config_->response_evaluator()->isSuccess(headers)) {
       config_->getController().recordSuccess();
       ASSERT(deferred_record_failure_);
       deferred_record_failure_->cancel();

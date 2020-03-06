@@ -136,6 +136,7 @@ public:
   TimeSource& timeSource() const { return time_source_; }
   Stats::Scope& scope() const { return scope_; }
   double aggression() const;
+  std::unique_ptr<ResponseEvaluator> response_evaluator() const { return response_evaluator_; }
 
 private:
   Runtime::Loader& runtime_;
