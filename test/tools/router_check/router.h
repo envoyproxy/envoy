@@ -138,6 +138,9 @@ private:
   bool compareResponseHeaderFields(ToolConfig& tool_config,
                                    const envoy::RouterCheckToolSchema::ValidationAssert& expected);
   template <typename HM>
+  bool matchHeaderField(const HM& header_map, const envoy::config::route::v3::HeaderMatcher& header,
+                        const std::string test_type);
+  template <typename HM>
   bool compareHeaderField(const HM& header_map, const std::string& field,
                           const std::string& expected, const std::string& test_type,
                           const bool expect_match);
