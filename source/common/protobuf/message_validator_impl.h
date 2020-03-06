@@ -14,6 +14,7 @@ class NullValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view) override {}
+  void onDeprecatedField(absl::string_view) override {}
 };
 
 ValidationVisitor& getNullValidationVisitor();
@@ -21,25 +22,34 @@ ValidationVisitor& getNullValidationVisitor();
 class WarningValidationVisitorImpl : public ValidationVisitor,
                                      public Logger::Loggable<Logger::Id::config> {
 public:
-  void setCounter(Stats::Counter& counter);
+  void setUnknownCounter(Stats::Counter& counter);
+  void setDeprecatedCounter(Stats::Counter& counter);
 
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
+  void onDeprecatedField(absl::string_view description) override;
 
 private:
+  void onUnexpectedField(absl::string_view description, Stats::Counter* counter,
+                         const ValidationType& validation_type);
   // Track hashes of descriptions we've seen, to avoid log spam. A hash is used here to avoid
   // wasting memory with unused strings.
   absl::flat_hash_set<uint64_t> descriptions_;
-  // This can be late initialized via setCounter(), enabling the server bootstrap loading which
-  // occurs prior to the initialization of the stats subsystem.
-  Stats::Counter* counter_{};
-  uint64_t prestats_count_{};
+  // This can be late initialized via setUnknownCounter(), enabling the server bootstrap loading
+  // which occurs prior to the initialization of the stats subsystem.
+  Stats::Counter* unknown_counter_{};
+  // This can be late initialized via setDeprecatedCounter(), enabling the server bootstrap loading
+  // which occurs prior to the initialization of the stats subsystem.
+  Stats::Counter* deprecated_counter_{};
+  uint64_t prestats_unknown_count_{};
+  uint64_t prestats_deprecated_count_{};
 };
 
 class StrictValidationVisitorImpl : public ValidationVisitor {
 public:
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
+  void onDeprecatedField(absl::string_view description) override;
 };
 
 ValidationVisitor& getStrictValidationVisitor();

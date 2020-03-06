@@ -11,31 +11,59 @@
 namespace Envoy {
 namespace ProtobufMessage {
 
-void WarningValidationVisitorImpl::setCounter(Stats::Counter& counter) {
-  ASSERT(counter_ == nullptr);
-  counter_ = &counter;
-  counter.add(prestats_count_);
+void WarningValidationVisitorImpl::setUnknownCounter(Stats::Counter& counter) {
+  ASSERT(unknown_counter_ == nullptr);
+  unknown_counter_ = &counter;
+  counter.add(prestats_unknown_count_);
+}
+
+void WarningValidationVisitorImpl::setDeprecatedCounter(Stats::Counter& counter) {
+  ASSERT(deprecated_counter_ == nullptr);
+  deprecated_counter_ = &counter;
+  counter.add(prestats_deprecated_count_);
 }
 
 void WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
+  onUnexpectedField(description, unknown_counter_, ValidationType::UnknownFields);
+}
+
+void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description) {
+  onUnexpectedField(description, deprecated_counter_, ValidationType::DeprecatedFields);
+}
+
+void WarningValidationVisitorImpl::onUnexpectedField(absl::string_view description,
+                                                     Stats::Counter* counter,
+                                                     const ValidationType& validation_type) {
   const uint64_t hash = HashUtil::xxHash64(description);
   auto it = descriptions_.insert(hash);
   // If we've seen this before, skip.
   if (!it.second) {
     return;
   }
-  // It's a new field, log and bump stat.
-  ENVOY_LOG(warn, "Unknown field: {}", description);
-  if (counter_ == nullptr) {
-    ++prestats_count_;
+  // It's a new/deprecated field, log and bump stat.
+  ENVOY_LOG(warn, "Unexpected field: {}", description);
+  if (counter != nullptr) {
+    counter->inc();
   } else {
-    counter_->inc();
+    switch (validation_type) {
+    case UnknownFields:
+      ++prestats_unknown_count_;
+      break;
+    case DeprecatedFields:
+      ++prestats_deprecated_count_;
+      break;
+    }
   }
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
   throw UnknownProtoFieldException(
       absl::StrCat("Protobuf message (", description, ") has unknown fields"));
+}
+
+void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description) {
+  throw DeprecatedProtoFieldException(
+      absl::StrCat("Protobuf message (", description, ") has deprecated fields"));
 }
 
 ValidationVisitor& getNullValidationVisitor() {

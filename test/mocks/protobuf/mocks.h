@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/stats/stats.h"
 
 #include "gmock/gmock.h"
 
@@ -13,6 +14,8 @@ public:
   ~MockValidationVisitor() override;
 
   MOCK_METHOD(void, onUnknownField, (absl::string_view));
+  MOCK_METHOD(void, onDeprecatedField, (absl::string_view));
+  MOCK_METHOD(void, onUnexpectedField, (absl::string_view, Stats::Counter*, const ValidationType&));
 };
 
 class MockValidationContext : public ValidationContext {

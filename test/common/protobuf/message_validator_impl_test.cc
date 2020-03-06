@@ -21,25 +21,25 @@ TEST(NullValidationVisitorImpl, UnknownField) {
 // The warning validation visitor logs and bumps stats on unknown fields
 TEST(WarningValidationVisitorImpl, UnknownField) {
   Stats::IsolatedStoreImpl stats;
-  Stats::Counter& counter = stats.counter("counter");
+  Stats::Counter& unknown_counter = stats.counter("counter");
   WarningValidationVisitorImpl warning_validation_visitor;
   // First time around we should log.
-  EXPECT_LOG_CONTAINS("warn", "Unknown field: foo",
+  EXPECT_LOG_CONTAINS("warn", "Unexpected field: foo",
                       warning_validation_visitor.onUnknownField("foo"));
   // Duplicate descriptions don't generate a log the second time around.
-  EXPECT_LOG_NOT_CONTAINS("warn", "Unknown field: foo",
+  EXPECT_LOG_NOT_CONTAINS("warn", "Unexpected field: foo",
                           warning_validation_visitor.onUnknownField("foo"));
   // Unrelated variable increments.
-  EXPECT_LOG_CONTAINS("warn", "Unknown field: bar",
+  EXPECT_LOG_CONTAINS("warn", "Unexpected field: bar",
                       warning_validation_visitor.onUnknownField("bar"));
   // When we set the stats counter, the above increments are transferred.
-  EXPECT_EQ(0, counter.value());
-  warning_validation_visitor.setCounter(counter);
-  EXPECT_EQ(2, counter.value());
+  EXPECT_EQ(0, unknown_counter.value());
+  warning_validation_visitor.setUnknownCounter(unknown_counter);
+  EXPECT_EQ(2, unknown_counter.value());
   // A third unknown field is tracked in stats post-initialization.
-  EXPECT_LOG_CONTAINS("warn", "Unknown field: baz",
+  EXPECT_LOG_CONTAINS("warn", "Unexpected field: baz",
                       warning_validation_visitor.onUnknownField("baz"));
-  EXPECT_EQ(3, counter.value());
+  EXPECT_EQ(3, unknown_counter.value());
 }
 
 // The strict validation visitor throws on unknown fields.

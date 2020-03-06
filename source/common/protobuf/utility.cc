@@ -372,6 +372,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 
 namespace {
 
+// TODO(nezdolik) move this to validation visitor
 void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
                                             absl::string_view filename,
                                             const Protobuf::FieldDescriptor* field,
@@ -433,7 +434,9 @@ void checkForUnexpectedFields(const Protobuf::Message& message,
 
     // Before we check to see if the field is in use, see if there's a
     // deprecated default enum value.
+    // TODO(nezdolik) replace this part with visitor START
     checkForDeprecatedNonRepeatedEnumValue(message, filename, field, reflection, runtime);
+    // TODO(nezdolik) replace this part with visitor END
 
     // If this field is not in use, continue.
     if ((field->is_repeated() && reflection->FieldSize(message, field) == 0) ||
@@ -441,6 +444,7 @@ void checkForUnexpectedFields(const Protobuf::Message& message,
       continue;
     }
 
+    // TODO(nezdolik) replace this part with visitor START
     // If this field is deprecated, warn or throw an error.
     if (field->options().deprecated()) {
       const std::string warning = absl::StrCat(
@@ -454,6 +458,7 @@ void checkForUnexpectedFields(const Protobuf::Message& message,
           field->options().GetExtension(envoy::annotations::disallowed_by_default),
           absl::StrCat("envoy.deprecated_features:", field->full_name()), warning, message);
     }
+    // TODO(nezdolik) replace this part with visitor END
 
     // If this is a message, recurse to check for deprecated fields in the sub-message.
     if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
