@@ -39,7 +39,7 @@ TEST(GrpcContextTest, ChargeStats) {
   EXPECT_EQ(3U, cluster.stats_store_.counter("grpc.service.method.request_message_count").value());
   EXPECT_EQ(4U, cluster.stats_store_.counter("grpc.service.method.response_message_count").value());
 
-  Http::TestHeaderMapImpl trailers;
+  Http::TestResponseTrailerMapImpl trailers;
   trailers.setGrpcStatus("0");
   const Http::HeaderEntry* status = trailers.GrpcStatus();
   context.chargeStat(cluster, Context::Protocol::Grpc, request_names, status);
@@ -60,7 +60,7 @@ TEST(GrpcContextTest, ChargeStats) {
 TEST(GrpcContextTest, ResolveServiceAndMethod) {
   std::string service;
   std::string method;
-  Http::HeaderMapImpl headers;
+  Http::RequestHeaderMapImpl headers;
   headers.setPath("/service_name/method_name?a=b");
   const Http::HeaderEntry* path = headers.Path();
   Stats::TestSymbolTable symbol_table;

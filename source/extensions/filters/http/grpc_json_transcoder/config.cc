@@ -27,7 +27,7 @@ Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromPro
  * Static registration for the grpc transcoding filter. @see RegisterNamedHttpFilterConfigFactory.
  */
 REGISTER_FACTORY(GrpcJsonTranscoderFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.grpc_json_transcoder"};
 
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters

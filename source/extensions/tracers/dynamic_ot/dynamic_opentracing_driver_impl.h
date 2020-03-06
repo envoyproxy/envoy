@@ -21,7 +21,7 @@ namespace DynamicOt {
  */
 class DynamicOpenTracingDriver : public Common::Ot::OpenTracingDriver {
 public:
-  DynamicOpenTracingDriver(Stats::Store& stats, const std::string& library,
+  DynamicOpenTracingDriver(Stats::Scope& scope, const std::string& library,
                            const std::string& tracer_config);
 
   static std::string formatErrorMessage(std::error_code error_code,

@@ -19,7 +19,7 @@ option java_multiple_files = true;
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -72,4 +72,9 @@ message DnsCacheConfig {
   //   it is possible for the maximum hosts in the cache to go slightly above the configured
   //   value depending on timing. This is similar to how other circuit breakers work.
   google.protobuf.UInt32Value max_hosts = 5 [(validate.rules).uint32 = {gt: 0}];
+
+  // If the DNS failure refresh rate is specified,
+  // this is used as the cache's DNS refresh rate when DNS requests are failing. If this setting is
+  // not specified, the failure refresh rate defaults to the dns_refresh_rate.
+  config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
 }

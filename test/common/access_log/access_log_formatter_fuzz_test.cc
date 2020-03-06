@@ -1,6 +1,6 @@
 #include "common/access_log/access_log_formatter.h"
 
-#include "test/common/access_log/access_log_formatter_fuzz.pb.h"
+#include "test/common/access_log/access_log_formatter_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 
@@ -10,6 +10,7 @@ namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::access_log::TestCase& input) {
   try {
+    TestUtility::validate(input);
     std::vector<AccessLog::FormatterProviderPtr> formatters =
         AccessLog::AccessLogFormatParser::parse(input.format());
     const auto& request_headers =

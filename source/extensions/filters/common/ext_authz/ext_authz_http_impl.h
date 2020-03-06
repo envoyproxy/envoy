@@ -9,6 +9,7 @@
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -38,17 +39,17 @@ public:
 
 class HeaderKeyMatcher : public Matcher {
 public:
-  HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcherPtr>&& list);
+  HeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list);
 
   bool matches(absl::string_view key) const override;
 
 private:
-  const std::vector<Matchers::LowerCaseStringMatcherPtr> matchers_;
+  const std::vector<Matchers::StringMatcherPtr> matchers_;
 };
 
 class NotHeaderKeyMatcher : public Matcher {
 public:
-  NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcherPtr>&& list);
+  NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list);
 
   bool matches(absl::string_view key) const override;
 
@@ -109,14 +110,18 @@ public:
 
 private:
   static MatcherSharedPtr
-  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
+  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                    bool enable_case_sensitive_string_matcher);
   static MatcherSharedPtr
-  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
+  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                   bool enable_case_sensitive_string_matcher);
   static MatcherSharedPtr
-  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher);
+  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                     bool enable_case_sensitive_string_matcher);
   static Http::LowerCaseStrPairVector
   toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>&);
 
+  const bool enable_case_sensitive_string_matcher_;
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;

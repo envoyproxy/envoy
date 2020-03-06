@@ -62,7 +62,7 @@ public:
   void expectResponseHeaders(MockAsyncClientStreamCallbacks& callbacks, uint64_t code,
                              bool end_stream) {
     EXPECT_CALL(callbacks, onHeaders_(_, end_stream))
-        .WillOnce(Invoke([code](HeaderMap& headers, bool) -> void {
+        .WillOnce(Invoke([code](ResponseHeaderMap& headers, bool) -> void {
           EXPECT_EQ(std::to_string(code), headers.Status()->value().getStringView());
         }));
   }
