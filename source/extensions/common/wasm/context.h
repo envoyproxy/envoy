@@ -85,21 +85,26 @@ public:
 
   Wasm* wasm() const;
 
+  // proxy_wasm::ContextBase
   void error(absl::string_view message) override;
 
   /**
    * General Callbacks.
    */
+  // proxy_wasm::ContextBase
   WasmResult log(uint64_t level, absl::string_view message) override;
   uint64_t getCurrentTimeNanoseconds() override;
 
   // Buffer
+  // proxy_wasm::ContextBase
   const BufferInterface* getBuffer(WasmBufferType type) override;
 
   // Properties
+  // proxy_wasm::ContextBase
   WasmResult getProperty(absl::string_view path, std::string* result) override;
 
   // Metrics
+  // proxy_wasm::ContextBase
   WasmResult defineMetric(MetricType type, absl::string_view name,
                           uint32_t* metric_id_ptr) override;
   WasmResult incrementMetric(uint32_t metric_id, int64_t offset) override;
