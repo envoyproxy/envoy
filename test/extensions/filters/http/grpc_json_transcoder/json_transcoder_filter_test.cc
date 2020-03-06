@@ -49,6 +49,8 @@ protected:
 
 class GrpcJsonTranscoderConfigTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
 protected:
+  ~GrpcJsonTranscoderConfigTest() { TestEnvironment::removePath("envoy_test/proto.descriptor"); }
+
   const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
                  bool match_incoming_request_route = false,
