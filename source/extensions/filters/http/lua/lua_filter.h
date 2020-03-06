@@ -15,40 +15,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-namespace {
-const std::string DEPRECATED_LUA_NAME = "envoy.lua";
-
-const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
-    return ProtobufWkt::Struct::default_instance();
-  }
-  const auto& metadata = callbacks->route()->routeEntry()->metadata();
-
-  {
-    const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
-    if (filter_it != metadata.filter_metadata().end()) {
-      return filter_it->second;
-    }
-  }
-
-  // TODO(zuercher): Remove this block when deprecated filter names are removed.
-  {
-    const auto& filter_it = metadata.filter_metadata().find(DEPRECATED_LUA_NAME);
-    if (filter_it != metadata.filter_metadata().end()) {
-      // Use the non-throwing check here because this happens at request time.
-      if (Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
-              "http filter", DEPRECATED_LUA_NAME,
-              Extensions::HttpFilters::HttpFilterNames::get().Lua)) {
-        return filter_it->second;
-      }
-    }
-  }
-
-  return ProtobufWkt::Struct::default_instance();
-}
-
-} // namespace
-
 /**
  * Callbacks used by a stream handler to access the filter.
  */
@@ -412,7 +378,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
@@ -433,7 +399,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 

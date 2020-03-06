@@ -20,13 +20,14 @@ public:
   enum class Status { Warn, Block };
 
   /**
-   * Returns the status of deprecated extension names.
+   * Checks the status of deprecated extension names and increments the deprecated feature stats
+   * counter if deprecated names are allowed.
    *
-   * @return Status indicating whether deprecated names trigger warnings or are blocked.
+   * @param runtime Runtime::Loader used to determine if deprecated extension names are allowed.
+   * @return Status::Warn (allowed, warn) or Status::Block (disallowed, error)
    */
   static Status deprecatedExtensionNameStatus(
       Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting()) {
-
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
     UNREFERENCED_PARAMETER(runtime);
     return Status::Block;
@@ -43,7 +44,10 @@ public:
   }
 
   /**
-   * Checks the status of deprecated extension names and generates a log message.
+   * Checks the status of deprecated extension names. If deprecated extension names are allowed,
+   * it increments the deprecated feature stats counter. Generates a warning or error log message
+   * based on whether the name is allowed (warning) or not (error). The string parameters are used
+   * only to generate the log message.
    *
    * @param extension_type absl::string_view that contains the extension type, for logging
    * @param deprecated_name absl::string_view that contains the deprecated name, for logging
@@ -62,13 +66,15 @@ public:
       return true;
     }
 
-    ENVOY_LOG_MISC(warn, "{}", fatalMessage(extension_type, deprecated_name, canonical_name));
+    ENVOY_LOG_MISC(error, "{}", fatalMessage(extension_type, deprecated_name, canonical_name));
     return false;
   }
 
   /**
-   * Checks the status of deprecated extension names and either generates a log message or throws.
-   * The passed strings are used only to generate the log or exception message.
+   * Checks the status of deprecated extension names. If deprecated extension names are allowed,
+   * it increments the deprecated feature stats counter and generates a log message. If not allowed,
+   * an exception is thrown. The passed strings are used only to generate the log or exception
+   * message.
    *
    * @param extension_type absl::string_view that contains the extension type, for logging
    * @param deprecated_name absl::string_view that contains the deprecated name, for logging
@@ -93,11 +99,13 @@ public:
 private:
   static std::string message(absl::string_view extension_type, absl::string_view deprecated_name,
                              absl::string_view canonical_name) {
+    absl::string_view spacing = extension_type.empty() ? "" : " ";
+
     return fmt::format(
-        "Using deprecated {} extension name '{}' for '{}'. This name will be removed from Envoy "
+        "Using deprecated {}{}extension name '{}' for '{}'. This name will be removed from Envoy "
         "soon. Please see "
         "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details.",
-        extension_type, deprecated_name, canonical_name);
+        extension_type, spacing, deprecated_name, canonical_name);
   }
 
   static std::string fatalMessage(absl::string_view extension_type,

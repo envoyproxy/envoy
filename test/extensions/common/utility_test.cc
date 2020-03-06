@@ -147,7 +147,7 @@ TEST(ExtensionNameUtilTest, DEPRECATED_FEATURE_TEST(TestAllowDeprecatedExtension
     };
     EXPECT_FALSE(test());
 
-    EXPECT_LOG_CONTAINS("warn", "#using-runtime-overrides-for-deprecated-features", test());
+    EXPECT_LOG_CONTAINS("error", "#using-runtime-overrides-for-deprecated-features", test());
   }
 }
 

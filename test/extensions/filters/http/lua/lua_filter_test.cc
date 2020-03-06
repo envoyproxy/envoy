@@ -13,6 +13,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -1625,8 +1626,6 @@ TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDepr
     function envoy_on_request(request_handle)
       request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
       request_handle:logTrace(request_handle:metadata():get("foo.bar")["prop"])
-      request_handle:logTrace(request_handle:metadata():get("baz.bat")["name"])
-      request_handle:logTrace(request_handle:metadata():get("baz.bat")["prop"])
     end
   )EOF"};
 
@@ -1636,21 +1635,29 @@ TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDepr
         foo.bar:
           name: foo
           prop: bar
-        baz.bat:
-          name: baz
-          prop: bat
   )EOF"};
 
   InSequence s;
   setup(SCRIPT);
   setupMetadata(METADATA);
 
+  // Logs deprecation warning the first time.
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("baz")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bat")));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_LOG_CONTAINS(
+      "warn",
+      "Using deprecated http filter extension name 'envoy.lua' for 'envoy.filters.http.lua'",
+      filter_->decodeHeaders(request_headers, true));
+
+  // Doesn't log deprecation warning the second time.
+  setupMetadata(METADATA);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn",
+      "Using deprecated http filter extension name 'envoy.lua' for 'envoy.filters.http.lua'",
+      filter_->decodeHeaders(request_headers, true));
 }
 
 // No available metadata on route.
