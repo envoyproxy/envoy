@@ -52,7 +52,7 @@ void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& conten
   const auto short_date = short_date_formatter_.now(time_source_);
   headers.addCopy(SignatureHeaders::get().Date, long_date);
   // Phase 1: Create a canonical request
-  const auto canonical_headers = Utility::canonicalizeHeaders(headers, service_name_);
+  const auto canonical_headers = Utility::canonicalizeHeaders(headers);
   const auto canonical_request = Utility::createCanonicalRequest(
       method_header->value().getStringView(), path_header->value().getStringView(),
       canonical_headers, content_hash);

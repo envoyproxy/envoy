@@ -12,15 +12,11 @@ public:
   /**
    * Creates a canonicalized header map used in creating a AWS Signature V4 canonical request.
    * See https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-   * See
-   * https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html#example-signature-calculations
-   * for special considerations when using S3.
    * @param headers a header map to canonicalize.
-   * @param service_name the service name.
    * @return a std::map of canonicalized headers to be used in building a canonical request.
    */
   static std::map<std::string, std::string>
-  canonicalizeHeaders(const Http::RequestHeaderMap& headers, const std::string& service_name);
+  canonicalizeHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * Creates an AWS Signature V4 canonical request string.
