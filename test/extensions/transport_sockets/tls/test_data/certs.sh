@@ -77,6 +77,7 @@ generate_selfsigned_x509_cert() {
 
 # Generate ca_cert.pem.
 generate_ca ca
+generate_x509_cert ca ca
 
 # Generate intermediate_ca_cert.pem.
 generate_ca intermediate_ca ca
