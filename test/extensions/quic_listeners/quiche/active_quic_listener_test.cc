@@ -8,6 +8,9 @@
 
 #include <memory>
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/base.pb.validate.h"
+
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
@@ -241,10 +244,10 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
       .WillOnce(Return(false));
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
-  EXPECT_THROW_WITH_REGEX(std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
-                                                               listen_socket_, listener_config_,
-                                                               quic_config_, options, enabled_flag()),
-                          EnvoyException, "Failed to apply socket options.");
+  EXPECT_THROW_WITH_REGEX(
+      std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_, listen_socket_,
+                                           listener_config_, quic_config_, options, enabled_flag()),
+      EnvoyException, "Failed to apply socket options.");
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
