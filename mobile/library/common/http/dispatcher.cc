@@ -319,9 +319,9 @@ envoy_status_t Dispatcher::sendHeaders(envoy_stream_t stream, envoy_headers head
     // https://github.com/lyft/envoy-mobile/issues/301
     if (direct_stream) {
       RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
+      setDestinationCluster(*internal_headers);
       ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
                 *internal_headers);
-      setDestinationCluster(*internal_headers);
       direct_stream->request_decoder_->decodeHeaders(std::move(internal_headers), end_stream);
       direct_stream->closeLocal(end_stream);
     }
