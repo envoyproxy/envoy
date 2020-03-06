@@ -24,7 +24,6 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Config {
-namespace {
 
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
@@ -119,6 +118,5 @@ public:
   bool file_at_start_{false};
 };
 
-} // namespace
 } // namespace Config
 } // namespace Envoy

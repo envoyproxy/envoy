@@ -10,7 +10,6 @@
 
 namespace Envoy {
 namespace Config {
-namespace {
 
 const uint64_t TEST_TIME_MILLIS = 42000;
 
@@ -116,6 +115,5 @@ ACTION_P(ThrowOnRejectedConfig, accept) {
   }
 }
 
-} // namespace
 } // namespace Config
 } // namespace Envoy
