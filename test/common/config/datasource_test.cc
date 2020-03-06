@@ -75,7 +75,7 @@ TEST_F(AsyncDataSourceTest, LoadLocalDataSource) {
       inline_string:
         xxxxxx
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_local());
 
   std::string async_data;
@@ -106,10 +106,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         xxxxxx
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
@@ -145,10 +146,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         xxxxxx
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
@@ -185,10 +187,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         xxxxxx
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
@@ -225,10 +228,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         xxxxxx
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
   const std::string body = "hello world";
@@ -270,10 +274,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
   const std::string body = "hello world";
@@ -311,10 +316,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         xxxxxx
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
@@ -350,10 +356,11 @@ TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
   )EOF";
-    TestUtility::loadFromYaml(yaml, config);
+    TestUtility::loadFromYamlAndValidate(yaml, config);
     EXPECT_TRUE(config.has_remote());
 
     initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
@@ -389,6 +396,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
       retry_policy:
@@ -396,7 +404,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
           base_interval: 1s
         num_retries: 3
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
   const std::string body = "hello world";
@@ -454,6 +462,7 @@ TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
       http_uri:
         uri: https://example.com/data
         cluster: cluster_1
+        timeout: 1s
       sha256:
         b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
       retry_policy:
@@ -462,7 +471,7 @@ TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
           max_interval: 1s
         num_retries: 3
   )EOF";
-  TestUtility::loadFromYaml(yaml, config);
+  TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
   EXPECT_THROW_WITH_MESSAGE(std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
