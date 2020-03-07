@@ -115,16 +115,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
+  UNREFERENCED_PARAMETER(data);
   if (skip_) {
     return Http::FilterDataStatus::Continue;
   }
 
   if (end_stream) {
     setHeaders(*headers_, arn_->functionName());
-    decoder_callbacks_->addDecodedData(data, true /*streaming_filter*/);
     auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
-    const auto hash =
-        Hex::encode(hashing_util.getSha256Digest(*decoder_callbacks_->decodingBuffer()));
+    const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
+    const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
     if (headers_->ForwardedProto()) {
       headers_->remove(Http::Headers::get().ForwardedProto); // We must NOT sign this header.
     }
