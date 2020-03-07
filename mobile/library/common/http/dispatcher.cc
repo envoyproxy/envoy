@@ -294,8 +294,12 @@ envoy_status_t Dispatcher::startStream(envoy_stream_t new_stream_handle,
         std::make_unique<DirectStreamCallbacks>(*direct_stream, bridge_callbacks, *this);
 
     // Only the initial setting of the api_listener_ is guarded.
+    //
+    // Note: streams created by Envoy Mobile are tagged as is_internally_created. This means that
+    // the Http::ConnectionManager _will not_ sanitize headers when creating a stream.
     direct_stream->request_decoder_ =
-        &TS_UNCHECKED_READ(api_listener_)->newStream(*direct_stream->callbacks_);
+        &TS_UNCHECKED_READ(api_listener_)
+             ->newStream(*direct_stream->callbacks_, true /* is_internally_created */);
 
     Thread::ReleasableLockGuard lock(streams_lock_);
     streams_.emplace(new_stream_handle, std::move(direct_stream));
@@ -320,6 +324,20 @@ envoy_status_t Dispatcher::sendHeaders(envoy_stream_t stream, envoy_headers head
     if (direct_stream) {
       RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
       setDestinationCluster(*internal_headers);
+      // Set the x-forwarded-proto header to https because Envoy Mobile only has clusters with TLS
+      // enabled. This is done here because the ApiListener's synthetic connection would make the
+      // Http::ConnectionManager set the scheme to http otherwise. In the future we might want to
+      // configure the connection instead of setting the header here.
+      // https://github.com/envoyproxy/envoy/issues/10291
+      //
+      // Setting this header is also currently important because Envoy Mobile starts stream with the
+      // ApiListener setting the is_internally_created bool to true. This means the
+      // Http::ConnectionManager *will not* mutate Envoy Mobile's request headers. One of the
+      // mutations done is adding the x-forwarded-proto header if not present. Unfortunately, the
+      // router relies on the present of this header to determine if it should provided a route for
+      // a request here:
+      // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
+      internal_headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
       ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
                 *internal_headers);
       direct_stream->request_decoder_->decodeHeaders(std::move(internal_headers), end_stream);
