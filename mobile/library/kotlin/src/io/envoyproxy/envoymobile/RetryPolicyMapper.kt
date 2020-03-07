@@ -29,7 +29,10 @@ private fun RetryRule.stringValue(): String {
     RetryRule.STATUS_5XX -> "5xx"
     RetryRule.GATEWAY_ERROR -> "gateway-error"
     RetryRule.CONNECT_FAILURE -> "connect-failure"
+    RetryRule.REFUSED_STREAM -> "refused-stream"
     RetryRule.RETRIABLE_4XX -> "retriable-4xx"
-    RetryRule.REFUSED_UPSTREAM -> "refused-upstream"
+    RetryRule.RETRIABLE_STATUS_CODES -> "retriable-status-codes"
+    RetryRule.RETRIABLE_HEADERS -> "retriable-headers"
+    RetryRule.RESET -> "reset"
   }
 }

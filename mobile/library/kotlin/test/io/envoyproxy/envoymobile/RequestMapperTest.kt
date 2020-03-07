@@ -118,12 +118,7 @@ class RequestMapperTest {
   fun `retry policy is added to outbound request headers`() {
     val retryPolicy = RetryPolicy(
         maxRetryCount = 123,
-        retryOn = listOf(
-            RetryRule.STATUS_5XX,
-            RetryRule.GATEWAY_ERROR,
-            RetryRule.CONNECT_FAILURE,
-            RetryRule.RETRIABLE_4XX,
-            RetryRule.REFUSED_UPSTREAM),
+        retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.GATEWAY_ERROR),
         perRetryTimeoutMS = 9001)
     val retryPolicyHeaders = retryPolicy.outboundHeaders()
 
@@ -139,12 +134,7 @@ class RequestMapperTest {
   fun `retry policy headers are not overwritten in outbound request headers`() {
     val retryPolicy = RetryPolicy(
         maxRetryCount = 123,
-        retryOn = listOf(
-            RetryRule.STATUS_5XX,
-            RetryRule.GATEWAY_ERROR,
-            RetryRule.CONNECT_FAILURE,
-            RetryRule.RETRIABLE_4XX,
-            RetryRule.REFUSED_UPSTREAM),
+        retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.GATEWAY_ERROR),
         perRetryTimeoutMS = 9001)
     val retryPolicyHeaders = retryPolicy.outboundHeaders()
 

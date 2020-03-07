@@ -4,7 +4,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
 class RetryPolicyMapperTest {
-
   @Test
   fun `all retry policy properties should all be encoded`() {
     val retryPolicy = RetryPolicy(
@@ -13,14 +12,20 @@ class RetryPolicyMapperTest {
             RetryRule.STATUS_5XX,
             RetryRule.GATEWAY_ERROR,
             RetryRule.CONNECT_FAILURE,
+            RetryRule.REFUSED_STREAM,
             RetryRule.RETRIABLE_4XX,
-            RetryRule.REFUSED_UPSTREAM),
+            RetryRule.RETRIABLE_STATUS_CODES,
+            RetryRule.RETRIABLE_HEADERS,
+            RetryRule.RESET),
         perRetryTimeoutMS = 15000,
         totalUpstreamTimeoutMS = 60000)
 
     assertThat(retryPolicy.outboundHeaders()).isEqualTo(mapOf(
         "x-envoy-max-retries" to listOf("3"),
-        "x-envoy-retry-on" to listOf("5xx", "gateway-error", "connect-failure", "retriable-4xx", "refused-upstream"),
+        "x-envoy-retry-on" to listOf(
+          "5xx", "gateway-error", "connect-failure", "refused-stream", "retriable-4xx",
+          "retriable-status-codes", "retriable-headers", "reset"
+        ),
         "x-envoy-upstream-rq-per-try-timeout-ms" to listOf("15000"),
         "x-envoy-upstream-rq-timeout-ms" to listOf("60000")
     ))
@@ -30,12 +35,7 @@ class RetryPolicyMapperTest {
   fun `retry policy without perRetryTimeoutMS should exclude per try time ms header key`() {
     val retryPolicy = RetryPolicy(
         maxRetryCount = 123,
-        retryOn = listOf(
-            RetryRule.STATUS_5XX,
-            RetryRule.GATEWAY_ERROR,
-            RetryRule.CONNECT_FAILURE,
-            RetryRule.RETRIABLE_4XX,
-            RetryRule.REFUSED_UPSTREAM))
+        retryOn = listOf(RetryRule.STATUS_5XX, RetryRule.GATEWAY_ERROR))
 
     assertThat(retryPolicy.outboundHeaders()).doesNotContainKey("x-envoy-upstream-rq-per-try-timeout-ms")
   }

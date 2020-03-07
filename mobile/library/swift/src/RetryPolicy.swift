@@ -7,8 +7,11 @@ public enum RetryRule: Int, CaseIterable {
   case status5xx
   case gatewayError
   case connectFailure
+  case refusedStream
   case retriable4xx
-  case refusedUpstream
+  case retriableStatusCodes
+  case retriableHeaders
+  case reset
 
   /// String representation of this rule.
   var stringValue: String {
@@ -19,10 +22,16 @@ public enum RetryRule: Int, CaseIterable {
       return "gateway-error"
     case .connectFailure:
       return "connect-failure"
+    case .refusedStream:
+      return "refused-stream"
     case .retriable4xx:
       return "retriable-4xx"
-    case .refusedUpstream:
-      return "refused-upstream"
+    case .retriableStatusCodes:
+      return "retriable-status-codes"
+    case .retriableHeaders:
+      return "retriable-headers"
+    case .reset:
+      return "reset"
     }
   }
 }
