@@ -160,6 +160,9 @@ public:
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return server_.messageValidationContext();
+  }
   Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
@@ -168,6 +171,7 @@ public:
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
+  Grpc::Context& grpcContext() override { return server_.grpcContext(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }

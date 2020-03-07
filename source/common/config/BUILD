@@ -36,7 +36,9 @@ envoy_cc_library(
         "//include/envoy/server:config_tracker_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
+        "//source/common/init:watcher_lib",
         "//source/common/protobuf",
     ],
 )
@@ -50,6 +52,7 @@ envoy_cc_library(
         "//include/envoy/api:api_interface",
         "//include/envoy/init:manager_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:backoff_lib",
         "//source/common/common:empty_string",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",

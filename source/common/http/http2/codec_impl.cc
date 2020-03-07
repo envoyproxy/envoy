@@ -163,20 +163,14 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
   ASSERT(parent_.allow_metadata_);
-
-  getMetadataEncoder().createPayload(metadata_map_vector);
-
-  // Estimates the number of frames to generate, and breaks the while loop when the size is reached
-  // in case submitting succeeds and packing fails, and we don't get error from packing.
-  const size_t frame_count = metadata_encoder_->frameCountUpperBound();
-  size_t count = 0;
-  // Keep submitting extension frames if there is payload left in the encoder.
-  while (metadata_encoder_->hasNextFrame() && count++ <= frame_count) {
-    submitMetadata();
-    parent_.sendPendingFrames();
+  MetadataEncoder& metadata_encoder = getMetadataEncoder();
+  if (!metadata_encoder.createPayload(metadata_map_vector)) {
+    return;
   }
-
-  ASSERT(!metadata_encoder_->hasNextFrame());
+  for (uint8_t flags : metadata_encoder.payloadFrameFlagBytes()) {
+    submitMetadata(flags);
+  }
+  parent_.sendPendingFrames();
 }
 
 void ConnectionImpl::StreamImpl::readDisable(bool disable) {
@@ -270,11 +264,10 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   ASSERT(rc == 0);
 }
 
-void ConnectionImpl::StreamImpl::submitMetadata() {
+void ConnectionImpl::StreamImpl::submitMetadata(uint8_t flags) {
   ASSERT(stream_id_ > 0);
   const int result =
-      nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE,
-                               metadata_encoder_->nextEndMetadata(), stream_id_, nullptr);
+      nghttp2_submit_extension(parent_.session_, METADATA_FRAME_TYPE, flags, stream_id_, nullptr);
   ASSERT(result == 0);
 }
 
@@ -812,8 +805,7 @@ ssize_t ConnectionImpl::packMetadata(int32_t stream_id, uint8_t* buf, size_t len
   ASSERT(stream != nullptr);
 
   MetadataEncoder& encoder = stream->getMetadataEncoder();
-  const uint64_t payload_size = encoder.packNextFramePayload(buf, len);
-  return static_cast<ssize_t>(payload_size);
+  return encoder.packNextFramePayload(buf, len);
 }
 
 int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,

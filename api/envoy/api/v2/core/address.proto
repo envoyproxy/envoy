@@ -82,7 +82,7 @@ message TcpKeepalive {
 
   // The number of seconds a connection needs to be idle before keep-alive probes
   // start being sent. Default is to use the OS level configuration (unless
-  // overridden, Linux defaults to 7200s (ie 2 hours.)
+  // overridden, Linux defaults to 7200s (i.e., 2 hours.)
   google.protobuf.UInt32Value keepalive_time = 2;
 
   // The number of seconds between keep-alive probes. Default is to use the OS

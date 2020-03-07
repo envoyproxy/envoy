@@ -1,7 +1,7 @@
 # Word list for check_spelling_pedantic.py -- any entry in ALLCAPS will also be accepted in
 # lower case and title case (e.g. HTTP will accept http and Http). Entries in all lower case
-# will accept title case (e.g. lyft matches Lyft).
-AAAA
+# will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
+# are allowed for any otherwise correctly spelled word.
 ABI
 ACK
 AES
@@ -91,7 +91,6 @@ EVAL
 EVLOOP
 EVP
 EWOULDBLOCK
-EXPECTing
 EXPECTs
 EXPR
 FAQ
@@ -337,8 +336,6 @@ XNOR
 XSS
 YAML
 ZXID
-aaa
-abc
 absl
 accesslog
 accessor
@@ -371,7 +368,6 @@ atoi
 atomicity
 atomics
 atoull
-aud
 auth
 authenticator
 authenticators
@@ -391,10 +387,8 @@ balancers
 barbaz
 baz
 bazel
-bbb
 behaviour
 benchmarked
-benchmarking
 bidi
 bitfield
 bitset
@@ -491,14 +485,11 @@ deallocation
 dec
 dechunk
 dechunked
-dechunking
 decl
 decls
 decompressor
 decrement
-decrementing
 decrypt
-decrypting
 dedup
 dedupe
 deduplicate
@@ -530,14 +521,12 @@ dir
 dirname
 djb
 downcasted
-downcasting
 downstreams
 dtor
 dubbo
 dup
 durations
 dynamodb
-eg
 emplace
 emplaced
 emscripten
@@ -581,7 +570,6 @@ filesystem
 firefox
 fixdate
 fixup
-fld
 fmt
 fmtlib
 fn
@@ -624,7 +612,6 @@ hdr
 healthcheck
 healthchecker
 healthcheckers
-healthchecking
 healthchecks
 healths
 healthz
@@ -636,20 +623,17 @@ hostset
 hrefs
 huffman
 hystrix
-iap
 idempotency
 idx
-ie
 ifdef
 iff
 ified
 impl
 implementors
 impls
-incrementing
 inflater
 inflight
-ing
+-ing
 init
 initializer
 inlined
@@ -667,17 +651,13 @@ iovecs
 ips
 iptables
 ish
-iss
 istio
 istream
 istringstream
 iteratively
-ja
 javascript
 jitter
 jittered
-jlt
-jne
 kafka
 keepalive
 keepalives
@@ -689,8 +669,6 @@ kv
 kvs
 lala
 latencies
-ld
-ldb
 len
 lenenc
 lexically
@@ -699,7 +677,6 @@ libevent
 libprotobuf
 libtool
 libstdc
-libtooling
 lifecycle
 lightstep
 linearization
@@ -748,8 +725,6 @@ misconfigured
 mixin
 mkdir
 mmap
-mmaping
-mod
 mongo
 moveable
 msec
@@ -765,14 +740,12 @@ mutex
 mutexes
 mux
 muxed
-muxing
 mysql
 namespace
 namespaces
 namespacing
 nan
 natively
-nd
 netblock
 netblocks
 netfilter
@@ -856,7 +829,6 @@ preflight
 preorder
 prepend
 prepended
-prepending
 prev
 proc
 profiler
@@ -870,13 +842,11 @@ protodoc
 protos
 protoxform
 proxied
-proxying
 pseudocode
 pthread
 pton
 ptr
 ptrs
-pts
 pubkey
 pwd
 py
@@ -884,7 +854,6 @@ qdtext
 qps
 quantile
 quantiles
-queueing
 quiesce
 quitquitquit
 qvalue
@@ -913,7 +882,6 @@ redistributions
 reentrant
 refactor
 refactored
-refactoring
 refcount
 referencee
 referer
@@ -944,7 +912,6 @@ resolvers
 responder
 restarter
 resync
-ret
 retriable
 retriggers
 rmdir
@@ -975,7 +942,6 @@ serializer
 serv
 setenv
 setsockopt
-sharding
 sig
 sigaction
 sigactions
@@ -1053,7 +1019,6 @@ syscall
 syscalls
 sysctl
 sz
-tbl
 tchar
 tchars
 tcmalloc
@@ -1070,14 +1035,12 @@ testcase
 testcases
 testdata
 testee
-th
 threadsafe
 thru
 timespan
 timestamp
 timestamps
 timeval
-tm
 tmp
 tmpfile
 tokenize
@@ -1100,28 +1063,13 @@ typeid
 typesafe
 ucontext
 uint
-un
+un-
 unacked
 unary
-uncomment
-uncommented
 unconfigurable
-unconfigured
-uncontended
 undef
-undefing
-undegraded
 underflowing
-undrained
-uneject
-unejected
-unejecting
-unejection
-unescape
-unescaped
-unescaping
 unfreed
-unhandled
 unicast
 unicode
 unindexed
@@ -1129,33 +1077,8 @@ uninstantiated
 uniq
 unittest
 unix
-unlink
-unlinked
-unmap
-unmapped
-unoptimized
-unordered
-unowned
-unparented
-unpause
-unpaused
-unpopulated
-unprotect
 unref
 unreferenced
-unregister
-unregisters
-unresolvable
-unsatisfiable
-unserializable
-unsetenv
-unsubscription
-unterminated
-untruncated
-untrusted
-untyped
-unwatched
-unweighted
 unzigzag
 upcasts
 upstreams
@@ -1181,7 +1104,6 @@ verifier
 verifiers
 versa
 versioned
-versioning
 vhost
 viewable
 vip
@@ -1209,8 +1131,6 @@ xid
 xmodem
 xxhash
 xxs
-xyz
-yyy
 zag
 zig
 zipkin
@@ -1218,4 +1138,3 @@ zlib
 OBQ
 SemVer
 SCM
-zzz

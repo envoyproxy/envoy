@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/server/instance.h"
+#include "envoy/server/tracer_config.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -16,7 +16,8 @@ namespace XRay {
 
 class Driver : public Tracing::Driver, public Logger::Loggable<Logger::Id::tracing> {
 public:
-  Driver(const XRay::XRayConfiguration& config, Server::Instance& server);
+  Driver(const XRay::XRayConfiguration& config,
+         Server::Configuration::TracerFactoryContext& context);
 
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Http::RequestHeaderMap& request_headers,
                              const std::string& operation_name, Envoy::SystemTime start_time,

@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
+import "envoy/api/v2/core/backoff.proto";
 import "envoy/api/v2/core/http_uri.proto";
 import "envoy/type/percent.proto";
 import "envoy/type/semantic_version.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -277,6 +279,18 @@ message DataSource {
   }
 }
 
+// The message specifies the retry policy of remote data source when fetching fails.
+message RetryPolicy {
+  // Specifies parameters that control :ref:`retry backoff strategy <envoy_api_msg_core.BackoffStrategy>`.
+  // This parameter is optional, in which case the default base interval is 1000 milliseconds. The
+  // default maximum interval is 10 times the base interval.
+  BackoffStrategy retry_back_off = 1;
+
+  // Specifies the allowed number of retries. This parameter is optional and
+  // defaults to 1.
+  google.protobuf.UInt32Value num_retries = 2;
+}
+
 // The message specifies how to fetch data from remote and how to verify it.
 message RemoteDataSource {
   // The HTTP URI to fetch the remote data.
@@ -284,6 +298,9 @@ message RemoteDataSource {
 
   // SHA256 string for verifying data.
   string sha256 = 2 [(validate.rules).string = {min_bytes: 1}];
+
+  // Retry policy for fetching remote data.
+  RetryPolicy retry_policy = 3;
 }
 
 // Async data source which support async data fetch.
