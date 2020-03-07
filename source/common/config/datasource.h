@@ -5,6 +5,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/backoff_strategy.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/config/remote_data_fetcher.h"
@@ -61,16 +62,16 @@ class RemoteAsyncDataProvider : public Config::DataFetcher::RemoteDataFetcherCal
                                 public Logger::Loggable<Logger::Id::config> {
 public:
   RemoteAsyncDataProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
-                          const envoy::config::core::v3::RemoteDataSource& source, bool allow_empty,
-                          AsyncDataSourceCb&& callback)
-      : allow_empty_(allow_empty), callback_(std::move(callback)),
-        fetcher_(std::make_unique<Config::DataFetcher::RemoteDataFetcher>(cm, source.http_uri(),
-                                                                          source.sha256(), *this)),
-        init_target_("RemoteAsyncDataProvider", [this]() { start(); }) {
-    manager.add(init_target_);
-  }
+                          const envoy::config::core::v3::RemoteDataSource& source,
+                          Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                          bool allow_empty, AsyncDataSourceCb&& callback);
 
-  ~RemoteAsyncDataProvider() override { init_target_.ready(); }
+  ~RemoteAsyncDataProvider() override {
+    init_target_.ready();
+    if (retry_timer_) {
+      retry_timer_->disableTimer();
+    }
+  }
 
   // Config::DataFetcher::RemoteDataFetcherCallback
   void onSuccess(const std::string& data) override {
@@ -80,12 +81,20 @@ public:
 
   // Config::DataFetcher::RemoteDataFetcherCallback
   void onFailure(Config::DataFetcher::FailureReason failure) override {
-    ENVOY_LOG(debug, "Failed to fetch remote data. Failure reason: {}", enumToInt(failure));
-    if (allow_empty_) {
-      callback_(EMPTY_STRING);
+    ENVOY_LOG(debug, "Failed to fetch remote data, failure reason: {}", enumToInt(failure));
+    if (retries_remaining_-- == 0) {
+      ENVOY_LOG(warn, "Retry limit exceeded for fetching data from remote data source.");
+      if (allow_empty_) {
+        callback_(EMPTY_STRING);
+      }
+      // We need to allow server startup to continue.
+      init_target_.ready();
+      return;
     }
-    // We need to allow server startup to continue.
-    init_target_.ready();
+
+    const auto retry_ms = std::chrono::milliseconds(backoff_strategy_->nextBackOffMs());
+    ENVOY_LOG(debug, "Remote data provider will retry in {} ms.", retry_ms.count());
+    retry_timer_->enableTimer(retry_ms);
   }
 
 private:
@@ -95,6 +104,10 @@ private:
   AsyncDataSourceCb callback_;
   const Config::DataFetcher::RemoteDataFetcherPtr fetcher_;
   Init::TargetImpl init_target_;
+
+  Event::TimerPtr retry_timer_;
+  BackOffStrategyPtr backoff_strategy_;
+  uint32_t retries_remaining_;
 };
 
 using RemoteAsyncDataProviderPtr = std::unique_ptr<RemoteAsyncDataProvider>;
