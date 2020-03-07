@@ -287,7 +287,7 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
     return ret;
   }
 
-  auto config_abort_code = fault_settings_->requestAbort()->statusCode(
+  auto config_abort_code = fault_settings_->requestAbort()->status_code(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortCodeRequest));
   if (!config_abort_code.has_value()) {
     return ret;

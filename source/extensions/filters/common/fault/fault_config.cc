@@ -27,7 +27,7 @@ FaultAbortConfig::FaultAbortConfig(
 }
 
 absl::optional<uint64_t>
-FaultAbortConfig::HeaderAbortProvider::statusCode(const Http::HeaderEntry* header) const {
+FaultAbortConfig::HeaderAbortProvider::status_code(const Http::HeaderEntry* header) const {
   if (header == nullptr) {
     return absl::nullopt;
   }

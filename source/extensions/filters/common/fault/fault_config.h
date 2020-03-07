@@ -31,8 +31,8 @@ public:
   FaultAbortConfig(const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config);
 
   const envoy::type::v3::FractionalPercent& percentage() const { return percentage_; }
-  absl::optional<uint64_t> statusCode(const Http::HeaderEntry* header) const {
-    return provider_->statusCode(header);
+  absl::optional<uint64_t> status_code(const Http::HeaderEntry* header) const {
+    return provider_->status_code(header);
   }
 
 private:
@@ -43,28 +43,28 @@ private:
 
     // Return the HTTP status code to use. Optionally passed an HTTP header that may contain the
     // HTTP status code depending on the provider implementation.
-    virtual absl::optional<uint64_t> statusCode(const Http::HeaderEntry* header) const PURE;
+    virtual absl::optional<uint64_t> status_code(const Http::HeaderEntry* header) const PURE;
   };
 
   // Delay provider that uses a fixed delay.
   class FixedAbortProvider : public AbortProvider {
   public:
-    FixedAbortProvider(uint64_t statusCode) : statusCode_(statusCode) {}
+    FixedAbortProvider(uint64_t status_code) : status_code_(status_code) {}
 
     // DelayProvider
-    absl::optional<uint64_t> statusCode(const Http::HeaderEntry*) const override {
-      return statusCode_;
+    absl::optional<uint64_t> status_code(const Http::HeaderEntry*) const override {
+      return status_code_;
     }
 
   private:
-    const uint64_t statusCode_;
+    const uint64_t status_code_;
   };
 
   // Abort provider the reads a delay from an HTTP header.
   class HeaderAbortProvider : public AbortProvider {
   public:
     // AbortProvider
-    absl::optional<uint64_t> statusCode(const Http::HeaderEntry* header) const override;
+    absl::optional<uint64_t> status_code(const Http::HeaderEntry* header) const override;
   };
 
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;
