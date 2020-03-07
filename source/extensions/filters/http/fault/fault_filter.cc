@@ -287,15 +287,15 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
     return ret;
   }
 
-  auto config_abort_code = fault_settings_->requestAbort()->status_code(
+  auto config_abort = fault_settings_->requestAbort()->status_code(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortCodeRequest));
-  if (!config_abort_code.has_value()) {
+  if (!config_abort.has_value()) {
     return ret;
   }
 
   // TODO(mattklein123): check http status codes obtained from runtime.
   uint64_t http_status = config_->runtime().snapshot().getInteger(
-      fault_settings_->abortHttpStatusRuntime(), config_abort_code.value());
+      fault_settings_->abortHttpStatusRuntime(), config_abort.value());
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
     http_status = config_->runtime().snapshot().getInteger(
