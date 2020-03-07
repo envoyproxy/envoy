@@ -85,7 +85,7 @@ TEST_P(WasmCommonTest, Logging) {
   wasm_weak.lock()->configure(root_context, plugin);
   wasm_handler.reset();
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-  // This will SEGV on nullptr if wasm has been deleted.
+  // This will fault on nullptr if wasm has been deleted.
   plugin->plugin_configuration_ = "done";
   wasm_weak.lock()->configure(root_context, plugin);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
