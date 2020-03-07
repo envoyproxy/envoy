@@ -10,7 +10,8 @@ final class RetryPolicyMapperTests: XCTestCase {
     let expectedHeaders = [
       "x-envoy-max-retries": ["3"],
       "x-envoy-retry-on": [
-        "5xx", "gateway-error", "connect-failure", "retriable-4xx", "refused-upstream",
+        "5xx", "gateway-error", "connect-failure", "refused-stream", "retriable-4xx",
+        "retriable-status-codes", "retriable-headers", "reset",
       ],
       "x-envoy-upstream-rq-per-try-timeout-ms": ["15000"],
       "x-envoy-upstream-rq-timeout-ms": ["60000"],
