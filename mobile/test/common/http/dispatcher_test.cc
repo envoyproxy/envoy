@@ -114,6 +114,7 @@ TEST_F(DispatcherTest, SetDestinationCluster) {
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base"},
+      {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   send_headers_post_cb();
@@ -133,6 +134,7 @@ TEST_F(DispatcherTest, SetDestinationCluster) {
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base_wlan"},
+      {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers2), false));
   send_headers_post_cb2();
@@ -152,6 +154,7 @@ TEST_F(DispatcherTest, SetDestinationCluster) {
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base_wwan"},
+      {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers3), true));
   send_headers_post_cb3();
@@ -222,6 +225,7 @@ TEST_F(DispatcherTest, SetDestinationClusterUpstreamProtocol) {
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base_h2"},
+      {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   send_headers_post_cb();
@@ -241,6 +245,7 @@ TEST_F(DispatcherTest, SetDestinationClusterUpstreamProtocol) {
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base_wlan_h2"},
+      {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers2), false));
   send_headers_post_cb2();
@@ -260,6 +265,7 @@ TEST_F(DispatcherTest, SetDestinationClusterUpstreamProtocol) {
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base_wwan_h2"},
+      {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers3), true));
   send_headers_post_cb3();
@@ -280,6 +286,7 @@ TEST_F(DispatcherTest, SetDestinationClusterUpstreamProtocol) {
       {":authority", "host"},
       {":path", "/"},
       {"x-envoy-mobile-cluster", "base_wwan"},
+      {"x-forwarded-proto", "https"},
   };
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers4), true));
   send_headers_post_cb4();
