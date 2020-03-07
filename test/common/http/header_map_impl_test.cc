@@ -456,6 +456,10 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ(nullptr, headers.ContentLength());
   EXPECT_EQ(0UL, headers.size());
   EXPECT_TRUE(headers.empty());
+
+  // Try to remove nonexistent headers.
+  EXPECT_EQ(0UL, headers.remove(static_key));
+  EXPECT_EQ(0UL, headers.remove(Headers::get().ContentLength));
 }
 
 TEST(HeaderMapImplTest, RemoveRegex) {
@@ -481,6 +485,9 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ(nullptr, headers.get(key3));
   EXPECT_NE(nullptr, headers.get(key4));
   EXPECT_EQ(nullptr, headers.get(key5));
+
+  // Try to remove headers with no prefix match.
+  EXPECT_EQ(0UL, headers.removePrefix(LowerCaseString("foo")));
 
   // Remove all headers.
   EXPECT_EQ(2UL, headers.removePrefix(LowerCaseString("")));
