@@ -4,6 +4,8 @@
 
 #include "envoy/grpc/status.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -26,6 +28,12 @@ public:
    * @return uint64_t the canonical HTTP status code corresponding to a gRPC status code.
    */
   static uint64_t grpcToHttpStatus(Status::GrpcStatus grpc_status);
+
+  /**
+   * @param grpc_status gRPC status from grpc-status header.
+   * @return gRPC status string converted from grpc-status.
+   */
+  static std::string grpcStatusToString(Status::GrpcStatus grpc_status);
 };
 
 } // namespace Grpc

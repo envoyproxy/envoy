@@ -70,6 +70,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/grpc:status",
+        "//source/common/common:empty_string",
     ],
 )
 

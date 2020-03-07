@@ -1126,6 +1126,38 @@ TEST(AccessLogFormatterTest, StartTimeFormatter) {
   }
 }
 
+TEST(AccessLogFormatterTest, GrpcStatusFormatterTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>());
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestHeaderMapImpl request_header;
+  Http::TestHeaderMapImpl response_header;
+  Http::TestHeaderMapImpl response_trailer;
+
+  std::array<std::string, 18> grpc_statuses{
+      "OK",       "Canceled",       "Unknown",          "InvalidArgument",   "DeadlineExceeded",
+      "NotFound", "AlreadyExists",  "PermissionDenied", "ResourceExhausted", "FailedPrecondition",
+      "Aborted",  "OutOfRange",     "Unimplemented",    "Internal",          "Unavailable",
+      "DataLoss", "Unauthenticated"};
+  for (size_t i = 0; i < grpc_statuses.size(); ++i) {
+    response_trailer = Http::TestHeaderMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(grpc_statuses[i],
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+  }
+
+  response_trailer = Http::TestHeaderMapImpl{{"grpc-status", "-1"}};
+  EXPECT_EQ("InvalidCode",
+            formatter.format(request_header, response_header, response_trailer, stream_info));
+  EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+              ProtoEq(ValueUtil::stringValue("InvalidCode")));
+  response_trailer = Http::TestHeaderMapImpl{{"grpc-status", "42738"}};
+  EXPECT_EQ("", formatter.format(request_header, response_header, response_trailer, stream_info));
+  EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+              ProtoEq(ValueUtil::stringValue("")));
+}
+
 void verifyJsonOutput(std::string json_string,
                       std::unordered_map<std::string, std::string> expected_map) {
   const auto parsed = Json::Factory::loadFromString(json_string);
