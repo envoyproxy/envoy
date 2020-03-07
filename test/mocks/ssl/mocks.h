@@ -39,6 +39,7 @@ public:
   ~MockConnectionInfo() override;
 
   MOCK_METHOD(bool, peerCertificatePresented, (), (const));
+  MOCK_METHOD(bool, peerCertificateValidated, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, sha256PeerCertificateDigest, (), (const));
   MOCK_METHOD(const std::string&, serialNumberPeerCertificate, (), (const));
@@ -56,6 +57,7 @@ public:
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
   MOCK_METHOD(std::string, ciphersuiteString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
+  MOCK_METHOD(absl::optional<std::string>, x509Extension, (absl::string_view), (const));
 };
 
 class MockClientContext : public ClientContext {

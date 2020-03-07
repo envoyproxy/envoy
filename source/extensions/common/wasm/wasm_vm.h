@@ -236,6 +236,12 @@ public:
   virtual absl::string_view getCustomSection(absl::string_view name) PURE;
 
   /**
+   * Get the name of the custom section that contains precompiled module.
+   * @return the name of the custom section that contains precompiled module.
+   */
+  virtual absl::string_view getPrecompiledSectionName() PURE;
+
+  /**
    * Get typed function exported by the WASM module.
    */
 #define _GET_FUNCTION(_T) virtual void getFunction(absl::string_view function_name, _T* f) PURE;

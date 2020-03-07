@@ -216,10 +216,30 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%REQUEST_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the start time to the last byte of
+    the request received from the downstream.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %RESPONSE_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the first byte read from the
     upstream host.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
+%RESPONSE_TX_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the first byte read from the upstream host to the last
+    byte sent downstream.
 
   TCP
     Not implemented ("-").
@@ -254,16 +274,6 @@ The following command operators are supported:
       :ref:`strictly-checked header <envoy_api_field_config.filter.http.router.v2.Router.strict_check_headers>` in addition to 400 response code.
     * **SI**: Stream idle timeout in addition to 408 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
-
-%RESPONSE_TX_DURATION%
-  HTTP
-    Total duration in milliseconds of the request from the first byte read from the upstream host to the last
-    byte sent downstream.
-
-  TCP
-    Not implemented ("-").
-
-  Renders a numeric value in typed JSON logs.
 
 %ROUTE_NAME%
   Name of the route.

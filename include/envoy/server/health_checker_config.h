@@ -56,7 +56,7 @@ public:
  * Implemented by each custom health checker and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class CustomHealthCheckerFactory : public Config::UntypedFactory {
+class CustomHealthCheckerFactory : public Config::TypedFactory {
 public:
   virtual ~CustomHealthCheckerFactory() = default;
 

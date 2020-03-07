@@ -6,8 +6,10 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
+#include "common/common/macros.h"
 #include "common/common/regex.h"
 #include "common/config/metadata.h"
+#include "common/http/path_utility.h"
 
 #include "absl/strings/match.h"
 
@@ -65,10 +67,16 @@ StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3::StringMatch
     : matcher_(matcher) {
   if (matcher.match_pattern_case() ==
       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
+    if (matcher.ignore_case()) {
+      throw EnvoyException("ignore_case has no effect for regex.");
+    }
     regex_ =
         Regex::Utility::parseStdRegexAsCompiledMatcher(matcher_.hidden_envoy_deprecated_regex());
   } else if (matcher.match_pattern_case() ==
              envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
+    if (matcher.ignore_case()) {
+      throw EnvoyException("ignore_case has no effect for safe_regex.");
+    }
     regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
   }
 }
@@ -84,48 +92,21 @@ bool StringMatcherImpl::match(const ProtobufWkt::Value& value) const {
 bool StringMatcherImpl::match(const absl::string_view value) const {
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
-    return matcher_.exact() == value;
+    return matcher_.ignore_case() ? absl::EqualsIgnoreCase(value, matcher_.exact())
+                                  : value == matcher_.exact();
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
-    return absl::StartsWith(value, matcher_.prefix());
+    return matcher_.ignore_case() ? absl::StartsWithIgnoreCase(value, matcher_.prefix())
+                                  : absl::StartsWith(value, matcher_.prefix());
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
-    return absl::EndsWith(value, matcher_.suffix());
+    return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
+                                  : absl::EndsWith(value, matcher_.suffix());
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
+    FALLTHRU;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return regex_->match(value);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-}
-
-bool LowerCaseStringMatcher::match(const absl::string_view value) const {
-  return matcher_.match(value);
-}
-
-bool LowerCaseStringMatcher::match(const ProtobufWkt::Value& value) const {
-  return matcher_.match(value);
-}
-
-envoy::type::matcher::v3::StringMatcher
-LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::v3::StringMatcher& matcher) {
-  envoy::type::matcher::v3::StringMatcher lowercase;
-  switch (matcher.match_pattern_case()) {
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    lowercase.set_hidden_envoy_deprecated_regex(
-        StringUtil::toLower(matcher.hidden_envoy_deprecated_regex()));
-    break;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
-    lowercase.set_exact(StringUtil::toLower(matcher.exact()));
-    break;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
-    lowercase.set_prefix(StringUtil::toLower(matcher.prefix()));
-    break;
-  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
-    lowercase.set_suffix(StringUtil::toLower(matcher.suffix()));
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  return lowercase;
 }
 
 ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher) : matcher_(matcher) {
@@ -159,9 +140,27 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher
   value_matcher_ = ValueMatcher::create(v);
 }
 
+PathMatcherConstSharedPtr PathMatcher::createExact(const std::string& exact, bool ignore_case) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact(exact);
+  matcher.set_ignore_case(ignore_case);
+  return std::make_shared<const PathMatcher>(matcher);
+}
+
+PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, bool ignore_case) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix(prefix);
+  matcher.set_ignore_case(ignore_case);
+  return std::make_shared<const PathMatcher>(matcher);
+}
+
 bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) const {
-  const auto& value = Envoy::Config::Metadata::metadataValue(metadata, matcher_.filter(), path_);
+  const auto& value = Envoy::Config::Metadata::metadataValue(&metadata, matcher_.filter(), path_);
   return value_matcher_ && value_matcher_->match(value);
+}
+
+bool PathMatcher::match(const absl::string_view path) const {
+  return matcher_.match(Http::PathUtil::removeQueryAndFragment(path));
 }
 
 } // namespace Matchers

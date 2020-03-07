@@ -86,6 +86,7 @@ envoy_cc_library(
     hdrs = ["matcher.h"],
     deps = [
         ":verifier_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/router:config_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -107,6 +108,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "filter_config_interface",
+    srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
         ":jwks_cache_lib",

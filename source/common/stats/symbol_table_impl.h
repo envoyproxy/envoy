@@ -16,11 +16,11 @@
 #include "common/common/lock_guard.h"
 #include "common/common/mem_block_builder.h"
 #include "common/common/non_copyable.h"
-#include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/stats/recent_lookups.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -158,6 +158,15 @@ public:
     static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
 
     /**
+     * Appends stat_name's bytes into mem_block, which must have been allocated to
+     * allow for stat_name.size() bytes.
+     *
+     * @param stat_name the stat_name to append.
+     * @param mem_block the block of memory to append to.
+     */
+    static void appendToMemBlock(StatName stat_name, MemBlockBuilder<uint8_t>& mem_block);
+
+    /**
      * Decodes a byte-array containing a variable-length number.
      *
      * @param The encoded byte array, written previously by appendEncoding.
@@ -182,8 +191,7 @@ public:
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   StoragePtr join(const StatNameVec& stat_names) const override;
-  void populateList(const absl::string_view* names, uint32_t num_names,
-                    StatNameList& list) override;
+  void populateList(const StatName* names, uint32_t num_names, StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
   StoragePtr makeDynamicStorage(absl::string_view name) override;
   void callWithStringView(StatName stat_name,
@@ -287,7 +295,7 @@ private:
 };
 
 // Base class for holding the backing-storing for a StatName. The two derived
-// classes, StatNameStorage and StatNameDynamicStore, share a need to hold an
+// classes, StatNameStorage and StatNameDynamicStorage, share a need to hold an
 // array of bytes, but use different representations.
 class StatNameStorageBase {
 public:
@@ -453,6 +461,13 @@ public:
     return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
   }
 
+  const uint8_t* dataIncludingSize() const { return size_and_data_; }
+
+  /**
+   * @return A pointer to the buffer, including the size bytes.
+   */
+  const uint8_t* sizeAndData() const { return size_and_data_; }
+
   /**
    * @return whether this is empty.
    */
@@ -579,6 +594,11 @@ private:
  *   StatNameDynamicPool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
+ *
+ * Note; StatNameDynamicPool::add("foo") != StatNamePool::add("foo"), even
+ * though their string representations are identical. They also will not match
+ * in map lookups. Tests for StatName with dynamic components must therefore
+ * be looked up by string, via Stats::TestUtil::TestStore.
  */
 class StatNameDynamicPool {
 public:

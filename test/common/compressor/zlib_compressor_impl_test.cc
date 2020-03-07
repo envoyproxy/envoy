@@ -1,10 +1,10 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
-#include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
 
 #include "test/test_common/utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -15,7 +15,7 @@ class ZlibCompressorImplTest : public testing::Test {
 protected:
   void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
-    STACK_ARRAY(compressed_slices, Buffer::RawSlice, num_comp_slices);
+    absl::FixedArray<Buffer::RawSlice> compressed_slices(num_comp_slices);
     output_buffer.getRawSlices(compressed_slices.begin(), num_comp_slices);
 
     const std::string header_hex_str = Hex::encode(
@@ -36,7 +36,7 @@ protected:
   void expectValidFinishedBuffer(const Buffer::OwnedImpl& output_buffer,
                                  const uint32_t input_size) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
-    STACK_ARRAY(compressed_slices, Buffer::RawSlice, num_comp_slices);
+    absl::FixedArray<Buffer::RawSlice> compressed_slices(num_comp_slices);
     output_buffer.getRawSlices(compressed_slices.begin(), num_comp_slices);
 
     const std::string header_hex_str = Hex::encode(

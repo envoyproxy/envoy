@@ -1,8 +1,8 @@
 #include "common/stats/symbol_table_impl.h"
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 #include "common/common/assert.h"
@@ -40,20 +40,23 @@ uint64_t StatName::dataSize() const {
 
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
+  // TODO(jmarantz): capture this functionality (always prints regardless of
+  // loglevel) in an ENVOY_LOG macro variant or similar, perhaps
+  // ENVOY_LOG_MISC(stderr, ...);
   if (size_and_data_ == nullptr) {
-    ENVOY_LOG_MISC(info, "Null StatName");
+    std::cerr << "Null StatName" << std::endl;
   } else {
     const uint64_t nbytes = dataSize();
-    std::string msg = absl::StrCat("dataSize=", nbytes, ":");
+    std::cerr << "dataSize=" << nbytes << ":";
     for (uint64_t i = 0; i < nbytes; ++i) {
-      absl::StrAppend(&msg, " ", static_cast<uint64_t>(data()[i]));
+      std::cerr << " " << static_cast<uint64_t>(data()[i]);
     }
     const SymbolVec encoding = SymbolTableImpl::Encoding::decodeSymbols(data(), dataSize());
-    absl::StrAppend(&msg, ", numSymbols=", encoding.size(), ":");
+    std::cerr << ", numSymbols=" << encoding.size() << ":";
     for (Symbol symbol : encoding) {
-      absl::StrAppend(&msg, " ", symbol);
+      std::cerr << " " << symbol;
     }
-    ENVOY_LOG_MISC(info, "{}", msg);
+    std::cerr << std::endl;
   }
 }
 #endif
@@ -168,6 +171,16 @@ void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_blo
   appendEncoding(data_bytes_required_, mem_block);
   mem_block.appendBlock(mem_block_);
   mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
+}
+
+void SymbolTableImpl::Encoding::appendToMemBlock(StatName stat_name,
+                                                 MemBlockBuilder<uint8_t>& mem_block) {
+  const uint8_t* data = stat_name.dataIncludingSize();
+  if (data == nullptr) {
+    mem_block.appendOne(0);
+  } else {
+    mem_block.appendData(absl::MakeSpan(data, stat_name.size()));
+  }
 }
 
 SymbolTableImpl::SymbolTableImpl()
@@ -513,7 +526,9 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
 SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
-    num_bytes += stat_name.dataSize();
+    if (!stat_name.empty()) {
+      num_bytes += stat_name.dataSize();
+    }
   }
   MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
   Encoding::appendEncoding(num_bytes, mem_block);
@@ -524,26 +539,24 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   return mem_block.release();
 }
 
-void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_names,
-                                   StatNameList& list) {
+void SymbolTableImpl::populateList(const StatName* names, uint32_t num_names, StatNameList& list) {
   RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
   // First encode all the names.
   size_t total_size_bytes = 1; /* one byte for holding the number of names */
 
-  STACK_ARRAY(encodings, Encoding, num_names);
   for (uint32_t i = 0; i < num_names; ++i) {
-    Encoding& encoding = encodings[i];
-    addTokensToEncoding(names[i], encoding);
-    total_size_bytes += encoding.bytesRequired();
+    total_size_bytes += names[i].size();
   }
 
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
   MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
   mem_block.appendOne(num_names);
-  for (auto& encoding : encodings) {
-    encoding.moveToMemBlock(mem_block);
+  for (uint32_t i = 0; i < num_names; ++i) {
+    const StatName stat_name = names[i];
+    Encoding::appendToMemBlock(stat_name, mem_block);
+    incRefCount(stat_name);
   }
 
   // This assertion double-checks the arithmetic where we computed

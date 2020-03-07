@@ -75,8 +75,7 @@ public:
     // better for configuration tests.
     ScopedRuntimeInjector scoped_runtime(server_.runtime());
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
-        .WillByDefault(
-            Invoke([](const std::string&, bool default_value) { return default_value; }));
+        .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
@@ -121,6 +120,7 @@ public:
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
                   filters, context);
             }));
+    ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
 
     try {
       main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
@@ -135,6 +135,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
+  Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;

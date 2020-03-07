@@ -18,7 +18,7 @@ public:
     headers_.setPath(path_value);
     return *headers_.Path();
   }
-  HeaderMapImpl headers_;
+  RequestHeaderMapImpl headers_;
 };
 
 // Already normalized path don't change.
@@ -105,6 +105,26 @@ TEST_F(PathUtilityTest, MergeSlashes) {
   EXPECT_EQ("/a/b/c", mergeSlashes("/a////b/c"));         // quadruple / in the middle
   EXPECT_EQ("/a/b?a=///c", mergeSlashes("/a//b?a=///c")); // slashes in the query are ignored
   EXPECT_EQ("/a/b?", mergeSlashes("/a//b?"));             // empty query
+}
+
+TEST_F(PathUtilityTest, RemoveQueryAndFragment) {
+  EXPECT_EQ("", PathUtil::removeQueryAndFragment(""));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value1&param=value2"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc??"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc??param=value"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#fragment"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#fragment?param=value"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc##"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#?"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc#?param=value"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?#"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?#fragment"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value#"));
+  EXPECT_EQ("/abc", PathUtil::removeQueryAndFragment("/abc?param=value#fragment"));
 }
 
 } // namespace Http

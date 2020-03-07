@@ -12,6 +12,7 @@
 
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
+#include "common/init/target_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
 
@@ -42,7 +43,7 @@ public:
   /**
    * @return the socket shared by worker threads; otherwise return null.
    */
-  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+  Network::SocketOptRef sharedSocket() const override {
     if (!reuse_port_) {
       ASSERT(socket_ != nullptr);
       return *socket_;
@@ -95,8 +96,7 @@ public:
    */
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash,
-               ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
+               bool workers_started, uint64_t hash, uint32_t concurrency);
   ~ListenerImpl() override;
 
   /**
@@ -146,7 +146,7 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
@@ -173,10 +173,11 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   const Network::ListenerConfig& listenerConfig() const override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
+  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
 
@@ -225,13 +226,15 @@ private:
   const uint64_t hash_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 
+  // This init watcher, if workers_started_ is false, notifies the "parent" listener manager when
+  // listener initialization is complete.
+  Init::WatcherImpl local_init_watcher_;
+  // A target is added to Server's InitManager if workers_started_ is false.
+  Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   Init::ManagerImpl dynamic_init_manager_;
 
-  // This init watcher, if available, notifies the "parent" listener manager when listener
-  // initialization is complete. It may be reset to cancel interest.
-  std::unique_ptr<Init::WatcherImpl> init_watcher_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;

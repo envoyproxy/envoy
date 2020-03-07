@@ -24,10 +24,17 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
-#include "udpa/type/v1/typed_struct.pb.h"
-
 namespace Envoy {
 namespace Config {
+
+std::string Utility::truncateGrpcStatusMessage(absl::string_view error_message) {
+  // GRPC sends error message via trailers, which by default has a 8KB size limit(see
+  // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests). Truncates the
+  // error message if it's too long.
+  constexpr uint32_t kProtobufErrMsgLen = 4096;
+  return fmt::format("{}{}", error_message.substr(0, kProtobufErrMsgLen),
+                     error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
+}
 
 void Utility::translateApiConfigSource(
     const std::string& cluster, uint32_t refresh_delay_ms, const std::string& api_type,
@@ -287,24 +294,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   if (!config.fields().empty()) {
     MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
-}
-
-BackOffStrategyPtr
-Utility::prepareDnsRefreshStrategy(const envoy::config::cluster::v3::Cluster& cluster,
-                                   const uint64_t dns_refresh_rate_ms,
-                                   Runtime::RandomGenerator& random) {
-  if (cluster.has_dns_failure_refresh_rate()) {
-    uint64_t base_interval_ms =
-        PROTOBUF_GET_MS_REQUIRED(cluster.dns_failure_refresh_rate(), base_interval);
-    uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(cluster.dns_failure_refresh_rate(),
-                                                          max_interval, base_interval_ms * 10);
-    if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("cluster.dns_failure_refresh_rate must have max_interval greater than "
-                           "or equal to the base_interval");
-    }
-    return std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
-  }
-  return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
 }
 
 } // namespace Config

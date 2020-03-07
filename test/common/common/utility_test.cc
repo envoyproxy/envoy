@@ -199,13 +199,6 @@ TEST(StringUtil, toUpper) {
   EXPECT_EQ(StringUtil::toUpper("X asdf aAf"), "X ASDF AAF");
 }
 
-TEST(StringUtil, toLower) {
-  EXPECT_EQ(StringUtil::toLower(""), "");
-  EXPECT_EQ(StringUtil::toLower("a"), "a");
-  EXPECT_EQ(StringUtil::toLower("Ba"), "ba");
-  EXPECT_EQ(StringUtil::toLower("X asdf aAf"), "x asdf aaf");
-}
-
 TEST(StringUtil, StringViewLtrim) {
   EXPECT_EQ("", StringUtil::ltrim("     "));
   EXPECT_EQ("hello \t\f\v\n\r", StringUtil::ltrim("   hello \t\f\v\n\r"));
@@ -247,13 +240,6 @@ TEST(StringUtil, StringViewCaseFindToken) {
   EXPECT_TRUE(StringUtil::caseFindToken(" ", " ", "", true));
   EXPECT_FALSE(StringUtil::caseFindToken(" ", " ", "", false));
   EXPECT_TRUE(StringUtil::caseFindToken("A=5", ".", "A=5"));
-}
-
-TEST(StringUtil, StringViewCaseCompare) {
-  EXPECT_TRUE(StringUtil::caseCompare("HELLO world", "hello world"));
-  EXPECT_TRUE(StringUtil::caseCompare("hello world", "HELLO world"));
-  EXPECT_FALSE(StringUtil::caseCompare("hello world", "hello"));
-  EXPECT_FALSE(StringUtil::caseCompare("hello", "hello world"));
 }
 
 TEST(StringUtil, StringViewCropRight) {

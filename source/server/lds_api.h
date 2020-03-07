@@ -21,7 +21,9 @@ namespace Server {
 /**
  * LDS API implementation that fetches via Subscription.
  */
-class LdsApiImpl : public LdsApi, Config::LdsApiBase, Logger::Loggable<Logger::Id::upstream> {
+class LdsApiImpl : public LdsApi,
+                   Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>,
+                   Logger::Loggable<Logger::Id::upstream> {
 public:
   LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config, Upstream::ClusterManager& cm,
              Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,

@@ -173,6 +173,7 @@ public:
 
 using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
+using SocketOptRef = absl::optional<std::reference_wrapper<Socket>>;
 
 /**
  * A socket passed to a connection. For server connections this represents the accepted socket, and

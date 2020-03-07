@@ -31,6 +31,8 @@ envoy_cc_library(
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
     external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
         "abseil_optional",
         "abseil_synchronization",
         "ssl",
@@ -41,6 +43,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/ssl:ssl_socket_extended_info_interface",
         "//include/envoy/ssl/private_key:private_key_callbacks_interface",
         "//include/envoy/ssl/private_key:private_key_interface",
         "//include/envoy/stats:stats_macros",
@@ -96,6 +99,7 @@ envoy_cc_library(
         "//include/envoy/ssl:context_config_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/ssl:ssl_socket_extended_info_interface",
         "//include/envoy/ssl/private_key:private_key_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
@@ -122,5 +126,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
     ],
 )

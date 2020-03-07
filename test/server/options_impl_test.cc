@@ -8,11 +8,17 @@
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/utility.h"
 
 #include "server/options_impl.h"
+
+#include "extensions/filters/http/buffer/buffer_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #if defined(__linux__)
 #include <sched.h>
@@ -57,7 +63,7 @@ TEST_F(OptionsImplTest, InvalidCommandLine) {
                           "Couldn't find match for argument");
 }
 
-TEST_F(OptionsImplTest, v1Disallowed) {
+TEST_F(OptionsImplTest, V1Disallowed) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
@@ -95,7 +101,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_TRUE(options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
-  EXPECT_TRUE(options->fakeSymbolTableEnabled());
+  EXPECT_FALSE(options->fakeSymbolTableEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -217,6 +223,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
+  EXPECT_EQ(spdlog::level::warn, options->logLevel());
   EXPECT_FALSE(options->hotRestartDisabled());
   EXPECT_FALSE(options->cpusetThreadsEnabled());
 
@@ -299,10 +306,16 @@ TEST_F(OptionsImplTest, InvalidComponent) {
                           "error: invalid component specified 'blah'");
 }
 
-TEST_F(OptionsImplTest, InvalidLogLevel) {
+TEST_F(OptionsImplTest, InvalidComponentLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:blah,connection:trace"),
                           MalformedArgvException, "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, ComponentLogLevelContainsBlank) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:,connection:trace"),
+                          MalformedArgvException, "error: invalid log level specified ''");
 }
 
 TEST_F(OptionsImplTest, InvalidComponentLogLevelStructure) {
@@ -316,6 +329,26 @@ TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream"), MalformedArgvException,
                           "component log level not correctly specified 'upstream'");
+}
+
+TEST_F(OptionsImplTest, InvalidLogLevel) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -l blah"), MalformedArgvException,
+                          "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, ValidLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -l critical");
+  EXPECT_EQ(spdlog::level::level_enum::critical, options->logLevel());
+}
+
+TEST_F(OptionsImplTest, WarnIsValidLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -l warn");
+  EXPECT_EQ(spdlog::level::level_enum::warn, options->logLevel());
+}
+
+TEST_F(OptionsImplTest, AllowedLogLevels) {
+  EXPECT_EQ("[trace][debug][info][warning|warn][error][critical][off]",
+            OptionsImpl::allowedLogLevels());
 }
 
 // Test that the test constructor comes up with the same default values as the main constructor.
@@ -451,10 +484,14 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 
 #endif
 
-class TestFactory : public Config::UntypedFactory {
+class TestFactory : public Config::TypedFactory {
 public:
   virtual ~TestFactory() = default;
   std::string category() const override { return "test"; }
+  std::string configType() override { return "google.protobuf.StringValue"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
 };
 
 class TestTestFactory : public TestFactory {
@@ -462,10 +499,14 @@ public:
   std::string name() const override { return "test"; }
 };
 
-class TestingFactory : public Config::UntypedFactory {
+class TestingFactory : public Config::TypedFactory {
 public:
   virtual ~TestingFactory() = default;
   std::string category() const override { return "testing"; }
+  std::string configType() override { return "google.protobuf.StringValue"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
 };
 
 class TestTestingFactory : public TestingFactory {
@@ -476,7 +517,7 @@ public:
 REGISTER_FACTORY(TestTestFactory, TestFactory){"test-1", "test-2"};
 REGISTER_FACTORY(TestTestingFactory, TestingFactory){"test-1", "test-2"};
 
-TEST(DisableExtensions, IsDisabled) {
+TEST(DisableExtensions, DEPRECATED_FEATURE_TEST(IsDisabled)) {
   EXPECT_LOG_CONTAINS("warning", "failed to disable invalid extension name 'not.a.factory'",
                       OptionsImpl::disableExtensions({"not.a.factory"}));
 
@@ -486,6 +527,8 @@ TEST(DisableExtensions, IsDisabled) {
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactoryByType("google.protobuf.StringValue"),
+            nullptr);
 
   EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
   EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
@@ -502,6 +545,30 @@ TEST(DisableExtensions, IsDisabled) {
   EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
   EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
   EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
+
+  // Typing map for TestingFactory should be constructed here after disabling
+  EXPECT_EQ(
+      Registry::FactoryRegistry<TestingFactory>::getFactoryByType("google.protobuf.StringValue"),
+      nullptr);
+}
+
+TEST(FactoryByTypeTest, EarlierVersionConfigType) {
+  envoy::config::filter::http::buffer::v2::Buffer v2_config;
+  auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
+      getFactoryByType(v2_config.GetDescriptor()->full_name());
+  EXPECT_NE(factory, nullptr);
+  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
+
+  envoy::extensions::filters::http::buffer::v3::Buffer v3_config;
+  factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
+      getFactoryByType(v3_config.GetDescriptor()->full_name());
+  EXPECT_NE(factory, nullptr);
+  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
+
+  ProtobufWkt::Any non_api_type;
+  factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
+      getFactoryByType(non_api_type.GetDescriptor()->full_name());
+  EXPECT_EQ(factory, nullptr);
 }
 
 } // namespace

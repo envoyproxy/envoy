@@ -22,7 +22,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/init/target_impl.h"
@@ -82,24 +81,23 @@ public:
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
-  bool deprecatedFeatureEnabled(const std::string& key, bool default_value) const override;
+  bool deprecatedFeatureEnabled(absl::string_view key, bool default_value) const override;
   bool runtimeFeatureEnabled(absl::string_view key) const override;
-  bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
+  bool featureEnabled(absl::string_view key, uint64_t default_value, uint64_t random_value,
                       uint64_t num_buckets) const override;
-  bool featureEnabled(const std::string& key, uint64_t default_value) const override;
-  bool featureEnabled(const std::string& key, uint64_t default_value,
+  bool featureEnabled(absl::string_view key, uint64_t default_value) const override;
+  bool featureEnabled(absl::string_view key, uint64_t default_value,
                       uint64_t random_value) const override;
-  bool featureEnabled(const std::string& key,
+  bool featureEnabled(absl::string_view key,
                       const envoy::type::v3::FractionalPercent& default_value) const override;
-  bool featureEnabled(const std::string& key,
+  bool featureEnabled(absl::string_view key,
                       const envoy::type::v3::FractionalPercent& default_value,
                       uint64_t random_value) const override;
-  const std::string& get(const std::string& key) const override;
-  uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
-  double getDouble(const std::string& key, double default_value) const override;
+  ConstStringOptRef get(absl::string_view key) const override;
+  uint64_t getInteger(absl::string_view key, uint64_t default_value) const override;
+  double getDouble(absl::string_view key, double default_value) const override;
   bool getBoolean(absl::string_view key, bool value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
-  bool exists(const std::string& key) const override { return values_.contains(key); }
 
   static Entry createEntry(const std::string& value);
   static Entry createEntry(const ProtobufWkt::Value& value);
@@ -202,7 +200,8 @@ private:
 
 class LoaderImpl;
 
-struct RtdsSubscription : Config::RtdsSubscriptionBase, Logger::Loggable<Logger::Id::runtime> {
+struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>,
+                          Logger::Loggable<Logger::Id::runtime> {
   RtdsSubscription(LoaderImpl& parent,
                    const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);

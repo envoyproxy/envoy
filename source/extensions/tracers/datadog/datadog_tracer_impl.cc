@@ -22,11 +22,11 @@ Driver::TlsTracer::TlsTracer(const std::shared_ptr<opentracing::Tracer>& tracer,
     : tracer_(tracer), reporter_(std::move(reporter)), driver_(driver) {}
 
 Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
-               Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+               Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime)
-    : OpenTracingDriver{stats},
+    : OpenTracingDriver{scope},
       cm_(cluster_manager), tracer_stats_{DATADOG_TRACER_STATS(
-                                POOL_COUNTER_PREFIX(stats, "tracing.datadog."))},
+                                POOL_COUNTER_PREFIX(scope, "tracing.datadog."))},
       tls_(tls.allocateSlot()), runtime_(runtime) {
 
   Config::Utility::checkCluster(TracerNames::get().Datadog, datadog_config.collector_cluster(),
@@ -86,7 +86,7 @@ void TraceReporter::flushTraces() {
     ENVOY_LOG(debug, "flushing traces: {} traces", pendingTraces);
     driver_.tracerStats().traces_sent_.add(pendingTraces);
 
-    Http::MessagePtr message(new Http::RequestMessageImpl());
+    Http::RequestMessagePtr message(new Http::RequestMessageImpl());
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setReferencePath(encoder_->path());
     message->headers().setReferenceHost(driver_.cluster()->name());
@@ -114,7 +114,7 @@ void TraceReporter::onFailure(Http::AsyncClient::FailureReason) {
   driver_.tracerStats().reports_failed_.inc();
 }
 
-void TraceReporter::onSuccess(Http::MessagePtr&& http_response) {
+void TraceReporter::onSuccess(Http::ResponseMessagePtr&& http_response) {
   uint64_t responseStatus = Http::Utility::getResponseStatus(http_response->headers());
   if (responseStatus != enumToInt(Http::Code::OK)) {
     // TODO: Consider adding retries for failed submissions.

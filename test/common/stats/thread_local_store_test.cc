@@ -4,11 +4,13 @@
 #include <unordered_map>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/stats/histogram.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -326,6 +328,36 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   ASSERT_TRUE(found_histogram2.has_value());
   EXPECT_EQ(&h2, &found_histogram2->get());
 
+  StatNameManagedStorage tag_key("a", *symbol_table_);
+  StatNameManagedStorage tag_value("b", *symbol_table_);
+  StatNameTagVector tags{{StatName(tag_key.statName()), StatName(tag_value.statName())}};
+
+  const TagVector expectedTags = {Tag{"a", "b"}};
+
+  {
+    StatNameManagedStorage storage("c3", *symbol_table_);
+    Counter& counter = scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags);
+    EXPECT_EQ(expectedTags, counter.tags());
+    EXPECT_EQ(&counter, &scope1->counterFromStatNameWithTags(StatName(storage.statName()), tags));
+  }
+  {
+    StatNameManagedStorage storage("g3", *symbol_table_);
+    Gauge& gauge = scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                     Gauge::ImportMode::Accumulate);
+    EXPECT_EQ(expectedTags, gauge.tags());
+    EXPECT_EQ(&gauge, &scope1->gaugeFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                         Gauge::ImportMode::Accumulate));
+  }
+  {
+    StatNameManagedStorage storage("h3", *symbol_table_);
+    Histogram& histogram = scope1->histogramFromStatNameWithTags(
+        StatName(storage.statName()), tags, Stats::Histogram::Unit::Unspecified);
+    EXPECT_EQ(expectedTags, histogram.tags());
+    EXPECT_EQ(&histogram,
+              &scope1->histogramFromStatNameWithTags(StatName(storage.statName()), tags,
+                                                     Stats::Histogram::Unit::Unspecified));
+  }
+
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);
   scope1->deliverHistogramToSinks(h2, 200);
@@ -362,7 +394,6 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(1UL, store_->counters().size());
   CounterSharedPtr c1 = TestUtility::findCounter(*store_, "scope1.c1");
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(TestUtility::findByName(store_->counters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_, _));
@@ -479,7 +510,7 @@ class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase {};
 
 TEST_F(LookupWithStatNameTest, All) {
   ScopePtr scope1 = store_->createScope("scope1.");
-  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
+  Counter& c1 = store_->Store::counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -488,7 +519,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_->Store::gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -498,7 +529,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
 
   Histogram& h1 =
-      store_->histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+      store_->Store::histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
   Histogram& h2 =
       scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
@@ -877,10 +908,7 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 
 class StatsThreadLocalStoreTestNoFixture : public testing::Test {
 protected:
-  StatsThreadLocalStoreTestNoFixture()
-      : save_use_fakes_(SymbolTableCreator::useFakeSymbolTables()) {}
   ~StatsThreadLocalStoreTestNoFixture() override {
-    TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
     if (threading_enabled_) {
       store_->shutdownThreading();
       tls_.shutdownThread();
@@ -888,7 +916,7 @@ protected:
   }
 
   void init(bool use_fakes) {
-    TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(use_fakes);
+    symbol_table_creator_test_peer_.setUseFakeSymbolTables(use_fakes);
     symbol_table_ = SymbolTableCreator::makeSymbolTable();
     alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_);
     store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);
@@ -912,7 +940,7 @@ protected:
   std::unique_ptr<ThreadLocalStoreImpl> store_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  const bool save_use_fakes_;
+  TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
   bool threading_enabled_{false};
 };
 
@@ -921,9 +949,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
   init(true);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 14892880); // Oct 28, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 15 * million_);
+      100, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 1358576); // Jan 23, 2020
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.4 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
@@ -931,9 +959,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17121392); // Oct 28, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million_);
+      100, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 1498128); // Jan 23, 2020
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.6 * million_);
 }
 
 // Tests how much memory is consumed allocating 100k stats.
@@ -941,9 +969,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   init(false);
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 8017968); // Oct 28, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 9 * million_);
+      100, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 689648); // Jan 23, 2020
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.75 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
@@ -951,9 +979,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 10246480); // Oct 28, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 11 * million_);
+      100, [this](absl::string_view name) { store_->counter(std::string(name)); });
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 829200); // Jan 23, 2020
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.9 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -1369,7 +1397,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
     main_dispatch_block();
 
     // Here we show that the counter cleanups have finished, because the use-count is 1.
-    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
+    CounterSharedPtr counter =
+        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
     EXPECT_EQ(1, counter->use_count()) << "index=" << i;
   }
 }
@@ -1393,7 +1422,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
     // running the test: NumScopes*NumThreads*NumIters == 70000, We use a timer
     // so we don't time out on asan/tsan tests, In opt builds this test takes
     // less than a second, and in fastbuild it takes less than 5.
-    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
+    CounterSharedPtr counter =
+        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
     uint32_t use_count = counter->use_count() - 1; // Subtract off this instance.
     EXPECT_EQ((i + 1) * NumScopes * NumThreads, use_count);
   }

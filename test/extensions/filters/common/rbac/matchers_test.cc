@@ -28,7 +28,7 @@ namespace {
 void checkMatcher(
     const RBAC::Matcher& matcher, bool expected,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
-    const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
+    const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::RequestHeaderMapImpl(),
     const envoy::config::core::v3::Metadata& metadata = envoy::config::core::v3::Metadata()) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
@@ -142,7 +142,7 @@ TEST(HeaderMatcher, HeaderMatcher) {
   config.set_name("foo");
   config.set_exact_match("bar");
 
-  Envoy::Http::HeaderMapImpl headers;
+  Envoy::Http::RequestHeaderMapImpl headers;
   Envoy::Http::LowerCaseString key("foo");
   std::string value = "bar";
   headers.setReference(key, value);
@@ -287,7 +287,7 @@ TEST(AuthenticatedMatcher, NoSSL) {
 
 TEST(MetadataMatcher, MetadataMatcher) {
   Envoy::Network::MockConnection conn;
-  Envoy::Http::HeaderMapImpl header;
+  Envoy::Http::RequestHeaderMapImpl header;
 
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::config::core::v3::Metadata metadata;
@@ -373,6 +373,33 @@ TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
   checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("")), true, conn);
   checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com")), false,
                conn);
+}
+
+TEST(PathMatcher, NoPathInHeader) {
+  Envoy::Http::RequestHeaderMapImpl headers;
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_path()->mutable_safe_regex()->set_regex(".*");
+
+  headers.setPath("/path");
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.removePath();
+  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(PathMatcher, ValidPathInHeader) {
+  Envoy::Http::RequestHeaderMapImpl headers;
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->set_exact("/exact");
+
+  headers.setPath("/exact");
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/exact?param=val");
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/exact#fragment");
+  checkMatcher(PathMatcher(matcher), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/exacz");
+  checkMatcher(PathMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
 }
 
 } // namespace

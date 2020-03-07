@@ -70,11 +70,6 @@ public:
   ~MockGrpcMux() override;
 
   MOCK_METHOD(void, start, ());
-  MOCK_METHOD(GrpcMuxWatch*, subscribe_,
-              (const std::string& type_url, const std::set<std::string>& resources,
-               SubscriptionCallbacks& callbacks));
-  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            SubscriptionCallbacks& callbacks) override;
   MOCK_METHOD(void, pause, (const std::string& type_url));
   MOCK_METHOD(void, resume, (const std::string& type_url));
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
@@ -86,10 +81,9 @@ public:
   MOCK_METHOD(void, updateResourceInterest,
               (const std::set<std::string>& resources, const std::string& type_url));
 
-  MOCK_METHOD(Watch*, addOrUpdateWatch,
-              (const std::string& type_url, Watch* watch, const std::set<std::string>& resources,
-               SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout));
-  MOCK_METHOD(void, removeWatch, (const std::string& type_url, Watch* watch));
+  MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
+              (const std::string& type_url, const std::set<std::string>& resources,
+               SubscriptionCallbacks& callbacks));
 };
 
 class MockGrpcStreamCallbacks
@@ -112,16 +106,16 @@ public:
 
   MOCK_METHOD(ConfigProviderPtr, createXdsConfigProvider,
               (const Protobuf::Message& config_source_proto,
-               Server::Configuration::FactoryContext& factory_context,
-               const std::string& stat_prefix,
+               Server::Configuration::ServerFactoryContext& factory_context,
+               Init::Manager& init_manager, const std::string& stat_prefix,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (const Protobuf::Message& config_proto,
-               Server::Configuration::FactoryContext& factory_context,
+               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,
-               Server::Configuration::FactoryContext& factory_context,
+               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
 };
 

@@ -102,7 +102,7 @@ FaultFilter::~FaultFilter() {
 // followed by an abort or inject just a delay or abort. In this callback,
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
-Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Route-level configuration overrides filter-level configuration
   // NOTE: We should not use runtime when reading from route-level
   // faults. In other words, runtime is supported only when faults are
@@ -173,7 +173,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   return Http::FilterHeadersStatus::Continue;
 }
 
-void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_headers) {
+void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers) {
   if (fault_settings_->responseRateLimit() == nullptr) {
     return;
   }
@@ -244,7 +244,7 @@ bool FaultFilter::isAbortEnabled() {
 }
 
 absl::optional<std::chrono::milliseconds>
-FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
+FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   absl::optional<std::chrono::milliseconds> ret;
 
   if (!isDelayEnabled()) {
@@ -318,7 +318,7 @@ Http::FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
-Http::FilterTrailersStatus FaultFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus FaultFilter::decodeTrailers(Http::RequestTrailerMap&) {
   return delay_timer_ == nullptr ? Http::FilterTrailersStatus::Continue
                                  : Http::FilterTrailersStatus::StopIteration;
 }
@@ -382,7 +382,7 @@ bool FaultFilter::matchesTargetUpstreamCluster() {
   return matches;
 }
 
-bool FaultFilter::matchesDownstreamNodes(const Http::HeaderMap& headers) {
+bool FaultFilter::matchesDownstreamNodes(const Http::RequestHeaderMap& headers) {
   if (fault_settings_->downstreamNodes().empty()) {
     return true;
   }
@@ -413,7 +413,7 @@ Http::FilterDataStatus FaultFilter::encodeData(Buffer::Instance& data, bool end_
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus FaultFilter::encodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus FaultFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (response_limiter_ != nullptr) {
     return response_limiter_->onTrailers();
   }

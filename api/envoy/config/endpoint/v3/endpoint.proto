@@ -50,7 +50,9 @@ message ClusterLoadAssignment {
       type.v3.FractionalPercent drop_percentage = 2;
     }
 
-    reserved 1;
+    reserved 1, 5;
+
+    reserved "disable_overprovisioning";
 
     // Action to trim the overall incoming traffic to protect the upstream
     // hosts. This action allows protection in case the hosts are unable to
@@ -94,17 +96,6 @@ message ClusterLoadAssignment {
     // are considered stale and should be marked unhealthy.
     // Defaults to 0 which means endpoints never go stale.
     google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration = {gt {}}];
-
-    // The flag to disable overprovisioning. If it is set to true,
-    // :ref:`overprovisioning factor
-    // <arch_overview_load_balancing_overprovisioning_factor>` will be ignored
-    // and Envoy will not perform graceful failover between priority levels or
-    // localities as endpoints become unhealthy. Otherwise Envoy will perform
-    // graceful failover as :ref:`overprovisioning factor
-    // <arch_overview_load_balancing_overprovisioning_factor>` suggests.
-    // [#next-major-version: Unify with overprovisioning config as a single message.]
-    // [#not-implemented-hide:]
-    bool disable_overprovisioning = 5;
   }
 
   // Name of the cluster. This will be the :ref:`service_name

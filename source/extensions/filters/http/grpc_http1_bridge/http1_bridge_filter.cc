@@ -18,12 +18,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
+void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
   context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
                       headers.GrpcStatus());
 }
 
-Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const bool grpc_request = Grpc::Common::hasGrpcContentType(headers);
   if (grpc_request) {
     setupStatTracking(headers);
@@ -38,7 +38,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& head
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::HeaderMap& headers,
+Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                            bool end_stream) {
   if (doStatTracking()) {
     chargeStat(headers);
@@ -61,7 +61,7 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end
   }
 }
 
-Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   if (doStatTracking()) {
     chargeStat(trailers);
   }
@@ -96,7 +96,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
+void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
   cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;

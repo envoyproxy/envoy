@@ -21,7 +21,9 @@ namespace Upstream {
 /**
  * CDS API implementation that fetches via Subscription.
  */
-class CdsApiImpl : public CdsApi, Config::CdsApiBase, Logger::Loggable<Logger::Id::upstream> {
+class CdsApiImpl : public CdsApi,
+                   Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
+                   Logger::Loggable<Logger::Id::upstream> {
 public:
   static CdsApiPtr create(const envoy::config::core::v3::ConfigSource& cds_config,
                           ClusterManager& cm, Stats::Scope& scope,

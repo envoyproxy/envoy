@@ -16,12 +16,12 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
@@ -339,7 +339,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
+Address::InstanceConstSharedPtr Utility::getOriginalDst(os_fd_t fd) {
 #ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
@@ -424,17 +424,19 @@ bool Utility::portInRangeList(const Address::Instance& address, const std::list<
 }
 
 absl::uint128 Utility::Ip6ntohl(const absl::uint128& address) {
-  // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  static_assert(ABSL_IS_LITTLE_ENDIAN,
-                "Machines using big-endian byte order is not supported for IPv6.");
+#ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
+#else
+  return address;
+#endif
 }
 
 absl::uint128 Utility::Ip6htonl(const absl::uint128& address) {
-  // TODO(ccaraman): Support Ip6ntohl for big-endian.
-  static_assert(ABSL_IS_LITTLE_ENDIAN,
-                "Machines using big-endian byte order is not supported for IPv6.");
+#ifdef ABSL_IS_LITTLE_ENDIAN
   return flipOrder(address);
+#else
+  return address;
+#endif
 }
 
 absl::uint128 Utility::flipOrder(const absl::uint128& input) {
@@ -500,7 +502,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::I
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
   const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   buffer.getRawSlices(slices.begin(), num_slices);
   return writeToSocket(handle, slices.begin(), num_slices, local_ip, peer_address);
 }
