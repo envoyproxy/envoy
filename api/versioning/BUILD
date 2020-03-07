@@ -73,6 +73,7 @@ proto_library(
         "//envoy/config/filter/network/local_rate_limit/v2alpha:pkg",
         "//envoy/config/filter/network/mongo_proxy/v2:pkg",
         "//envoy/config/filter/network/mysql_proxy/v1alpha1:pkg",
+        "//envoy/config/filter/network/postgresql_proxy/v2alpha:pkg",
         "//envoy/config/filter/network/rate_limit/v2:pkg",
         "//envoy/config/filter/network/rbac/v2:pkg",
         "//envoy/config/filter/network/redis_proxy/v2:pkg",
