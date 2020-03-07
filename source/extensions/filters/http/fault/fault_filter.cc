@@ -49,9 +49,8 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
           PROTOBUF_GET_STRING_OR_DEFAULT(fault, response_rate_limit_percent_runtime,
                                          RuntimeKeys::get().ResponseRateLimitPercentKey)) {
   if (fault.has_abort()) {
-    const auto& abort = fault.abort();
-    abort_percentage_ = abort.percentage();
-    http_status_ = abort.http_status();
+    request_abort_config_ =
+        std::make_unique<Filters::Common::Fault::FaultAbortConfig>(fault.abort());
   }
 
   if (fault.has_delay()) {
@@ -157,7 +156,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   absl::optional<std::chrono::milliseconds> duration = delayDuration(headers);
   if (duration.has_value()) {
     delay_timer_ =
-        decoder_callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
+        decoder_callbacks_->dispatcher().createTimer([this, &headers]() -> void { postDelayInjection(headers); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
     delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
@@ -165,8 +164,9 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  if (isAbortEnabled()) {
-    abortWithHTTPStatus();
+  auto abort_code = abortHttpStatus(headers);
+  if (abort_code.has_value()) {
+    abortWithHTTPStatus(abort_code.value());
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -235,12 +235,16 @@ bool FaultFilter::isDelayEnabled() {
 }
 
 bool FaultFilter::isAbortEnabled() {
+  if (fault_settings_->requestAbort() == nullptr) {
+    return false;
+  }
+
   if (!downstream_cluster_abort_percent_key_.empty()) {
     return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                        fault_settings_->abortPercentage());
+                                                        fault_settings_->requestAbort()->percentage());
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
-                                                      fault_settings_->abortPercentage());
+                                                      fault_settings_->requestAbort()->percentage());
 }
 
 absl::optional<std::chrono::milliseconds>
@@ -275,10 +279,23 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   return ret;
 }
 
-uint64_t FaultFilter::abortHttpStatus() {
+absl::optional<uint64_t>
+FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
+  absl::optional<uint64_t> ret;
+
+  if (!isAbortEnabled()) {
+    return ret;
+  }
+
+  auto config_abort_code = fault_settings_->requestAbort()->statusCode(
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortCodeRequest));
+  if (!config_abort_code.has_value()) {
+    return ret;
+  }
+
   // TODO(mattklein123): check http status codes obtained from runtime.
   uint64_t http_status = config_->runtime().snapshot().getInteger(
-      fault_settings_->abortHttpStatusRuntime(), fault_settings_->abortCode());
+      fault_settings_->abortHttpStatusRuntime(), config_abort_code.value());
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
     http_status = config_->runtime().snapshot().getInteger(
@@ -350,21 +367,22 @@ void FaultFilter::onDestroy() {
   }
 }
 
-void FaultFilter::postDelayInjection() {
+void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_headers) {
   resetTimerState();
 
   // Delays can be followed by aborts
-  if (isAbortEnabled()) {
-    abortWithHTTPStatus();
+  auto abort_code = abortHttpStatus(request_headers);
+  if (abort_code.has_value()) {
+    abortWithHTTPStatus(abort_code.value());
   } else {
     // Continue request processing.
     decoder_callbacks_->continueDecoding();
   }
 }
 
-void FaultFilter::abortWithHTTPStatus() {
+void FaultFilter::abortWithHTTPStatus(uint64_t abort_code) {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
-  decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(abortHttpStatus()),
+  decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(abort_code),
                                      "fault filter abort", nullptr, absl::nullopt,
                                      RcDetails::get().FaultAbort);
   recordAbortsInjectedStats();
