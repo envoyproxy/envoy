@@ -5,8 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/server/process_context.h"
 
+#include "common/config/api_version.h"
+#include "common/config/version_converter.h"
 #include "common/http/codec_client.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -29,7 +33,7 @@ namespace Envoy {
 /**
  * Stream decoder wrapper used during integration testing.
  */
-class IntegrationStreamDecoder : public Http::StreamDecoder, public Http::StreamCallbacks {
+class IntegrationStreamDecoder : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   IntegrationStreamDecoder(Event::Dispatcher& dispatcher);
 
@@ -37,9 +41,9 @@ public:
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
   Http::StreamResetReason reset_reason() { return reset_reason_; }
-  const Http::HeaderMap* continue_headers() { return continue_headers_.get(); }
-  const Http::HeaderMap& headers() { return *headers_; }
-  const Http::HeaderMapPtr& trailers() { return trailers_; }
+  const Http::ResponseHeaderMap* continue_headers() { return continue_headers_.get(); }
+  const Http::ResponseHeaderMap& headers() { return *headers_; }
+  const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
@@ -53,11 +57,13 @@ public:
   void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder
-  void decode100ContinueHeaders(Http::HeaderMapPtr&& headers) override;
-  void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance& data, bool end_stream) override;
-  void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
+
+  // Http::ResponseDecoder
+  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -67,9 +73,9 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  Http::HeaderMapPtr continue_headers_;
-  Http::HeaderMapPtr headers_;
-  Http::HeaderMapPtr trailers_;
+  Http::ResponseHeaderMapPtr continue_headers_;
+  Http::ResponseHeaderMapPtr headers_;
+  Http::ResponseTrailerMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
   std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};
@@ -138,7 +144,7 @@ struct ApiFilesystemConfig {
 /**
  * Test fixture for all integration tests.
  */
-class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
+class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
@@ -189,9 +195,9 @@ public:
 
   // Set the endpoint's socket address to point at upstream at given index.
   void setUpstreamAddress(uint32_t upstream_index,
-                          envoy::api::v2::endpoint::LbEndpoint& endpoint) const;
+                          envoy::config::endpoint::v3::LbEndpoint& endpoint) const;
 
-  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
@@ -269,11 +275,11 @@ public:
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                                  const std::string& version) {
-    envoy::api::v2::DiscoveryResponse discovery_response;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(message);
+      discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -287,25 +293,39 @@ public:
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_);
   }
   template <class T>
-  void sendDeltaDiscoveryResponse(const std::string& type_url,
-                                  const std::vector<T>& added_or_updated,
-                                  const std::vector<std::string>& removed,
-                                  const std::string& version, FakeStreamPtr& stream) {
-    envoy::api::v2::DeltaDiscoveryResponse response;
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version,
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
+    auto response =
+        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
+    stream->sendGrpcMessage(response);
+  }
+
+  template <class T>
+  envoy::api::v2::DeltaDiscoveryResponse
+  createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                               const std::vector<std::string>& removed, const std::string& version,
+                               const std::vector<std::string>& aliases) {
+
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
       ProtobufWkt::Any temp_any;
-      temp_any.PackFrom(message);
+      temp_any.PackFrom(API_DOWNGRADE(message));
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(message);
+      resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
+      for (const auto alias : aliases) {
+        resource->add_aliases(alias);
+      }
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
     static int next_nonce_counter = 0;
     response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    stream->sendGrpcMessage(response);
+    return response;
   }
 
 private:
@@ -348,7 +368,7 @@ protected:
   // The config for envoy start-up.
   ConfigHelper config_helper_;
   // The ProcessObject to use when constructing the envoy server.
-  absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
+  ProcessObjectOptRef process_object_{absl::nullopt};
 
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;
@@ -368,6 +388,10 @@ protected:
 
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
+
+  // If true, allow incomplete streams in AutonomousUpstream
+  // This does nothing if autonomous_upstream_ is false
+  bool autonomous_allow_incomplete_streams_{false};
 
   bool enable_half_close_{false};
 

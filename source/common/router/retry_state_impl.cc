@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/route/v3/route_components.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
@@ -30,7 +32,7 @@ const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
-                                     Http::HeaderMap& request_headers,
+                                     Http::RequestHeaderMap& request_headers,
                                      const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                      Runtime::RandomGenerator& random,
                                      Event::Dispatcher& dispatcher,
@@ -50,19 +52,17 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   return ret;
 }
 
-RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
+RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
+                               Http::RequestHeaderMap& request_headers,
                                const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
-      retriable_headers_(route_policy.retriableHeaders()),
-      retriable_request_headers_(route_policy.retriableRequestHeaders()) {
-
-  retry_on_ = route_policy.retryOn();
-  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
+      retriable_headers_(route_policy.retriableHeaders()) {
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
@@ -90,16 +90,20 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
         parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
   }
 
-  if (!retriable_request_headers_.empty()) {
+  const auto& retriable_request_headers = route_policy.retriableRequestHeaders();
+  if (!retriable_request_headers.empty()) {
     // If this route limits retries by request headers, make sure there is a match.
-    uint32_t request_header_match = 0;
-    for (const auto& retriable_header : retriable_request_headers_) {
+    bool request_header_match = false;
+    for (const auto& retriable_header : retriable_request_headers) {
       if (retriable_header->matchesHeaders(request_headers)) {
-        request_header_match = 1;
+        request_header_match = true;
         break;
       }
     }
-    retry_on_ &= request_header_match;
+
+    if (!request_header_match) {
+      retry_on_ = 0;
+    }
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     uint64_t temp;
@@ -127,7 +131,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     // header. Anything more sophisticated needs to be provided via config.
     for (const auto header_name : StringUtil::splitToken(
              request_headers.EnvoyRetriableHeaderNames()->value().getStringView(), ",")) {
-      envoy::api::v2::route::HeaderMatcher header_matcher;
+      envoy::config::route::v3::HeaderMatcher header_matcher;
       header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
       retriable_headers_.emplace_back(
           std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher));
@@ -240,7 +244,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
   return RetryStatus::Yes;
 }
 
-RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_headers,
+RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                                DoRetryCallback callback) {
   return shouldRetry(wouldRetryFromHeaders(response_headers), callback);
 }
@@ -261,7 +265,7 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
   return shouldRetry(true, callback);
 }
 
-bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {
+bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) {
   if (response_headers.EnvoyOverloaded() != nullptr) {
     return false;
   }

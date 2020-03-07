@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/resolver.h"
@@ -15,7 +15,8 @@ namespace Address {
  * @param address supplies the address proto to resolve.
  * @return pointer to the Instance.
  */
-Address::InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::Address& address);
+Address::InstanceConstSharedPtr
+resolveProtoAddress(const envoy::config::core::v3::Address& address);
 
 /**
  * Create an Instance from a envoy::api::v2::core::SocketAddress.
@@ -23,7 +24,7 @@ Address::InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::
  * @return pointer to the Instance.
  */
 Address::InstanceConstSharedPtr
-resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& address);
+resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& address);
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

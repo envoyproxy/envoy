@@ -57,5 +57,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/dynamo:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/extensions/filters/http/dynamo/v3:pkg_cc_proto",
     ],
 )

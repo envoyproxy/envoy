@@ -1,4 +1,5 @@
-#include "envoy/config/filter/http/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
 
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
@@ -40,7 +41,7 @@ public:
   }
 
   std::unique_ptr<OriginalSrcFilter> makeMarkingFilter(uint32_t mark) {
-    envoy::config::filter::http::original_src::v2alpha1::OriginalSrc proto_config;
+    envoy::extensions::filters::http::original_src::v3::OriginalSrc proto_config;
     proto_config.set_mark(mark);
 
     const Config config(proto_config);
@@ -57,11 +58,12 @@ protected:
   StrictMock<MockBuffer> buffer_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnectionSocket> socket_;
-  Http::TestHeaderMapImpl headers_;
+  Http::TestRequestHeaderMapImpl headers_;
+  Http::TestRequestTrailerMapImpl trailers_;
 
   absl::optional<Network::Socket::Option::Details>
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
-                    envoy::api::v2::core::SocketOption::SocketState state) {
+                    envoy::config::core::v3::SocketOption::SocketState state) {
     for (const auto& option : options) {
       const auto details = option->getOptionDetails(socket_, state);
       if (details.has_value() && details->name_ == name) {
@@ -93,7 +95,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
   EXPECT_CALL(socket,
               setLocalAddress(PointeesEq(callbacks_.stream_info_.downstream_remote_address_)));
   for (const auto& option : *options) {
-    option->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+    option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
 }
 
@@ -127,7 +129,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
 
   EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
   for (const auto& option : *options) {
-    option->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+    option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
 }
 
@@ -145,7 +147,7 @@ TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
   filter->decodeHeaders(headers_, false);
 
   const auto transparent_option = findOptionDetails(
-      *options, ENVOY_SOCKET_IP_TRANSPARENT, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+      *options, ENVOY_SOCKET_IP_TRANSPARENT, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   EXPECT_TRUE(transparent_option.has_value());
 }
@@ -164,7 +166,7 @@ TEST_F(OriginalSrcHttpTest, FilterAddsMarkOption) {
   filter->decodeHeaders(headers_, false);
 
   const auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+                                             envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   ASSERT_TRUE(mark_option.has_value());
   uint32_t value = 1234;
@@ -186,7 +188,7 @@ TEST_F(OriginalSrcHttpTest, Mark0NotAdded) {
   filter->decodeHeaders(headers_, false);
 
   const auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+                                             envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   ASSERT_FALSE(mark_option.has_value());
 }
@@ -205,7 +207,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataEndStreamDoNothing) {
 
   // No new expectations => no side effects from calling these.
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, true));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(trailers_));
 }
 
 TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
@@ -222,7 +224,7 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
 
   // No new expectations => no side effects from calling these.
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(trailers_));
 }
 } // namespace
 } // namespace OriginalSrc

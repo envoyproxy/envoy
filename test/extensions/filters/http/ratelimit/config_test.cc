@@ -1,4 +1,6 @@
-#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.validate.h"
 
 #include "extensions/filters/http/ratelimit/config.h"
 
@@ -18,7 +20,7 @@ namespace {
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(
-                   envoy::config::filter::http::rate_limit::v2::RateLimit(), "stats", context),
+                   envoy::extensions::filters::http::ratelimit::v3::RateLimit(), "stats", context),
                ProtoValidationException);
 }
 
@@ -32,13 +34,13 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
         cluster_name: ratelimit_cluster
   )EOF";
 
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 
@@ -55,8 +57,8 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
 
   RateLimitFilterConfig factory;
 
-  envoy::config::filter::http::rate_limit::v2::RateLimit empty_proto_config =
-      *dynamic_cast<envoy::config::filter::http::rate_limit::v2::RateLimit*>(
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit empty_proto_config =
+      *dynamic_cast<envoy::extensions::filters::http::ratelimit::v3::RateLimit*>(
           factory.createEmptyConfigProto().get());
 
   EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context),
@@ -69,9 +71,19 @@ TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
   route_key: my_route
   )EOF";
 
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
+  envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException,
                           "route_key: Cannot find field");
+}
+
+// Test that the deprecated extension name still functions.
+TEST(RateLimitFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.rate_limit";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

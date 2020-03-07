@@ -40,13 +40,13 @@ public:
   Stats::IsolatedStoreImpl stats_;
 
   const std::string operation_name_{"test"};
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   SystemTime start_time_;
   NiceMock<Tracing::MockConfig> config_;
 };
 
-TEST_F(DynamicOpenTracingDriverTest, formatErrorMessage) {
+TEST_F(DynamicOpenTracingDriverTest, FormatErrorMessage) {
   const std::error_code error_code = std::make_error_code(std::errc::permission_denied);
   EXPECT_EQ(error_code.message(), DynamicOpenTracingDriver::formatErrorMessage(error_code, ""));
   EXPECT_EQ(error_code.message() + ": abc",

@@ -37,29 +37,30 @@ the only one which needs to be amended is the listener
 
 .. code-block:: yaml
 
-  staticResources:
+  static_resources:
     listeners:
       name: http
       address:
-        socketAddress:
+        socket_address:
           address: '::1'
           portValue: 0
-      filterChains:
+      filter_chains:
         filters:
-          name: envoy.http_connection_manager
-          config:
+          name: envoy.filters.network.http_connection_manager
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             http2_protocol_options:
               initial_stream_window_size: 65535
             route_config: {}
             codec_type: HTTP2
             http_filters: []
             stat_prefix: config_test
-      perConnectionBufferLimitBytes: 1024
+      per_connection_buffer_limit_bytes: 1024
     clusters:
       name: cluster_0
-      connectTimeout: 5s
-      perConnectionBufferLimitBytes: 1024
+      connect_timeout: 5s
+      per_connection_buffer_limit_bytes: 1024
       hosts:
-        socketAddress:
+        socket_address:
           address: '::1'
-          portValue: 46685
+          port_value: 46685

@@ -85,3 +85,20 @@ Example:
 Restarts all failed CircleCI tests, as reported in the commit statuses.
 
 [Demo PR](https://github.com/envoyproxy/envoy/pull/5060#issuecomment-439285928)
+
+### [Granular Ownerscheck](https://github.com/repokitteh/modules/blob/master/ownerscheck.star)
+
+Two types of approvals:
+1. Global approvals, done by approving the PR using Github's review approval feature.
+2. Partial approval, done by commenting "/lgtm [label]" where label is the label
+   associated with the path. This does not affect GitHub's PR approve status, only
+   this module's maintained commit status. This approval is automatically revoked
+   if any further changes are done to the relevant files in this spec.
+
+#### Backport labeling
+
+```
+/backport
+```
+
+will labels the PR commented on with `backport/review`.

@@ -20,8 +20,13 @@ The restarter is invoked like so:
   #!/bin/bash
 
   ulimit -n {{ pillar.get('envoy_max_open_files', '102400') }}
+  sysctl fs.inotify.max_user_watches={{ pillar.get('envoy_max_inotify_watches', '524288') }}
+  
   exec /usr/sbin/envoy -c /etc/envoy/envoy.cfg --restart-epoch $RESTART_EPOCH --service-cluster {{ grains['cluster_name'] }} --service-node {{ grains['service_node'] }} --service-zone {{ grains.get('ec2_availability-zone', 'unknown') }}
 
+Note on `inotify.max_user_watches`: If Envoy is being configured to watch many files for configuration in a directory
+on a Linux machine, increase this value as Linux enforces limits on the maximum number of files that can be watched.
+  
 The *RESTART_EPOCH* environment variable is set by the restarter on each restart and can be passed
 to the :option:`--restart-epoch` option.
 

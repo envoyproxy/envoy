@@ -52,9 +52,10 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
-  FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+  Network::DnsResolverSharedPtr
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                    const bool use_tcp_for_dns_lookups) override;
+  FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,

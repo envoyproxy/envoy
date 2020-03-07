@@ -1,5 +1,8 @@
 #include "extensions/filters/network/rbac/config.h"
 
+#include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -17,7 +20,7 @@ static void validateFail(const std::string& header) {
                                    header));
 }
 
-static void validatePermission(const envoy::config::rbac::v2::Permission& permission) {
+static void validatePermission(const envoy::config::rbac::v3::Permission& permission) {
   if (permission.has_header()) {
     validateFail(permission.header().DebugString());
   }
@@ -36,7 +39,7 @@ static void validatePermission(const envoy::config::rbac::v2::Permission& permis
   }
 }
 
-static void validatePrincipal(const envoy::config::rbac::v2::Principal& principal) {
+static void validatePrincipal(const envoy::config::rbac::v3::Principal& principal) {
   if (principal.has_header()) {
     validateFail(principal.header().DebugString());
   }
@@ -58,7 +61,7 @@ static void validatePrincipal(const envoy::config::rbac::v2::Principal& principa
 /**
  * Validate the RBAC rules doesn't include any header or metadata rule.
  */
-static void validateRbacRules(const envoy::config::rbac::v2::RBAC& rules) {
+static void validateRbacRules(const envoy::config::rbac::v3::RBAC& rules) {
   for (const auto& policy : rules.policies()) {
     for (const auto& permission : policy.second.permissions()) {
       validatePermission(permission);
@@ -71,7 +74,7 @@ static void validateRbacRules(const envoy::config::rbac::v2::RBAC& rules) {
 
 Network::FilterFactoryCb
 RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::rbac::v2::RBAC& proto_config,
+    const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config,
     Server::Configuration::FactoryContext& context) {
   validateRbacRules(proto_config.rules());
   validateRbacRules(proto_config.shadow_rules());

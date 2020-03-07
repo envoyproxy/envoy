@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -96,7 +98,7 @@ void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::stri
 }
 
 void ZooKeeperFilter::clearDynamicMetadata() {
-  envoy::api::v2::core::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   auto& metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy];
@@ -105,7 +107,7 @@ void ZooKeeperFilter::clearDynamicMetadata() {
 
 void ZooKeeperFilter::setDynamicMetadata(
     const std::vector<std::pair<const std::string, const std::string>>& data) {
-  envoy::api::v2::core::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   ProtobufWkt::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy]);

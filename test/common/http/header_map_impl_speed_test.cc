@@ -72,9 +72,9 @@ BENCHMARK(HeaderMapImplGet)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
  */
 static void HeaderMapImplGetInline(benchmark::State& state) {
   const std::string value("01234567890123456789");
-  HeaderMapImpl headers;
+  RequestHeaderMapImpl headers;
   addDummyHeaders(headers, state.range(0));
-  headers.insertConnection().value().setReference(value);
+  headers.setReferenceConnection(value);
   size_t size = 0;
   for (auto _ : state) {
     size += headers.Connection()->value().size();
@@ -87,24 +87,9 @@ BENCHMARK(HeaderMapImplGetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
  * Measure the speed of writing to a header for which HeaderMapImpl is expected to
  * provide special optimizations.
  */
-static void HeaderMapImplSetInline(benchmark::State& state) {
-  const std::string value("01234567890123456789");
-  HeaderMapImpl headers;
-  addDummyHeaders(headers, state.range(0));
-  for (auto _ : state) {
-    headers.insertConnection().value().setReference(value);
-  }
-  benchmark::DoNotOptimize(headers.size());
-}
-BENCHMARK(HeaderMapImplSetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
-
-/**
- * Measure the speed of writing to a header for which HeaderMapImpl is expected to
- * provide special optimizations.
- */
 static void HeaderMapImplSetInlineMacro(benchmark::State& state) {
   const std::string value("01234567890123456789");
-  HeaderMapImpl headers;
+  RequestHeaderMapImpl headers;
   addDummyHeaders(headers, state.range(0));
   for (auto _ : state) {
     headers.setReferenceConnection(value);
@@ -119,7 +104,7 @@ BENCHMARK(HeaderMapImplSetInlineMacro)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
  */
 static void HeaderMapImplSetInlineInteger(benchmark::State& state) {
   uint64_t value = 12345;
-  HeaderMapImpl headers;
+  RequestHeaderMapImpl headers;
   addDummyHeaders(headers, state.range(0));
   for (auto _ : state) {
     headers.setConnection(value);
@@ -134,7 +119,7 @@ static void HeaderMapImplGetByteSize(benchmark::State& state) {
   addDummyHeaders(headers, state.range(0));
   uint64_t size = 0;
   for (auto _ : state) {
-    size += headers.byteSize().value();
+    size += headers.byteSize();
   }
   benchmark::DoNotOptimize(size);
 }

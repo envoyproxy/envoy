@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/hash_policy.h"
 
 namespace Envoy {
@@ -13,18 +13,18 @@ namespace Http {
 class HashPolicyImpl : public HashPolicy {
 public:
   explicit HashPolicyImpl(
-      absl::Span<const envoy::api::v2::route::RouteAction::HashPolicy* const> hash_policy);
+      absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policy);
 
   // Http::HashPolicy
   absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
-                                        const HeaderMap& headers,
+                                        const RequestHeaderMap& headers,
                                         const AddCookieCallback add_cookie) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() = default;
     virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
-                                              const HeaderMap& headers,
+                                              const RequestHeaderMap& headers,
                                               const AddCookieCallback add_cookie) const PURE;
 
     // If the method is a terminal method, ignore rest of the hash policy chain.

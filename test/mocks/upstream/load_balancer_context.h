@@ -10,16 +10,17 @@ public:
   MockLoadBalancerContext();
   ~MockLoadBalancerContext() override;
 
-  MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
-  MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
-  MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
-  MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
-  MOCK_METHOD2(determinePriorityLoad,
-               const HealthyAndDegradedLoad&(const PrioritySet&, const HealthyAndDegradedLoad&));
-  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
-  MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
-  MOCK_CONST_METHOD0(upstreamSocketOptions, Network::Socket::OptionsSharedPtr());
-  MOCK_CONST_METHOD0(upstreamTransportSocketOptions, Network::TransportSocketOptionsSharedPtr());
+  MOCK_METHOD(absl::optional<uint64_t>, computeHashKey, ());
+  MOCK_METHOD(Router::MetadataMatchCriteria*, metadataMatchCriteria, ());
+  MOCK_METHOD(const Network::Connection*, downstreamConnection, (), (const));
+  MOCK_METHOD(const Http::RequestHeaderMap*, downstreamHeaders, (), (const));
+  MOCK_METHOD(const HealthyAndDegradedLoad&, determinePriorityLoad,
+              (const PrioritySet&, const HealthyAndDegradedLoad&));
+  MOCK_METHOD(bool, shouldSelectAnotherHost, (const Host&));
+  MOCK_METHOD(uint32_t, hostSelectionRetryCount, (), (const));
+  MOCK_METHOD(Network::Socket::OptionsSharedPtr, upstreamSocketOptions, (), (const));
+  MOCK_METHOD(Network::TransportSocketOptionsSharedPtr, upstreamTransportSocketOptions, (),
+              (const));
 
 private:
   HealthyAndDegradedLoad priority_load_;

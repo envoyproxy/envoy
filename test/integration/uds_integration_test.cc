@@ -1,5 +1,7 @@
 #include "uds_integration_test.h"
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
 
@@ -54,7 +56,7 @@ INSTANTIATE_TEST_SUITE_P(
 #endif
 
 void UdsListenerIntegrationTest::initialize() {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* admin_addr = bootstrap.mutable_admin()->mutable_address();
     admin_addr->clear_socket_address();
     admin_addr->mutable_pipe()->set_path(getAdminSocketName());
@@ -87,7 +89,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
   initialize();
   auto client_connection = createConnectionFn()();
   codec_client_ = makeHttpConnection(std::move(client_connection));
-  Http::TestHeaderMapImpl request_headers{
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -102,7 +104,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
   EXPECT_EQ(credentials->gid, getgid());
 #endif
 
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
 }

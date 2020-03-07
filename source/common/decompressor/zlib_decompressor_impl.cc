@@ -5,7 +5,8 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/stack_array.h"
+
+#include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace Decompressor {
@@ -37,7 +38,7 @@ uint64_t ZlibDecompressorImpl::checksum() { return zstream_ptr_->adler; }
 void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
   const uint64_t num_slices = input_buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
   input_buffer.getRawSlices(slices.begin(), num_slices);
 
   for (const Buffer::RawSlice& input_slice : slices) {
@@ -68,7 +69,15 @@ bool ZlibDecompressorImpl::inflateNext() {
     return false; // This means that zlib needs more input, so stop here.
   }
 
-  RELEASE_ASSERT(result == Z_OK, "");
+  if (result < 0) {
+    decompression_error_ = result;
+    ENVOY_LOG(
+        trace,
+        "zlib decompression error: {}. Error codes are defined in https://www.zlib.net/manual.html",
+        result);
+    return false;
+  }
+
   return true;
 }
 

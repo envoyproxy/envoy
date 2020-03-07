@@ -1,5 +1,7 @@
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
+#include "envoy/config/core/v3/http_uri.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -28,7 +30,7 @@ public:
     reset();
   }
 
-  void fetch(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span,
+  void fetch(const envoy::config::core::v3::HttpUri& uri, Tracing::Span& parent_span,
              JwksFetcher::JwksReceiver& receiver) override {
     ENVOY_LOG(trace, "{}", __func__);
     ASSERT(!receiver_);
@@ -48,7 +50,7 @@ public:
       return;
     }
 
-    Http::MessagePtr message = Http::Utility::prepareHeaders(uri);
+    Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri);
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_->uri());
     auto options = Http::AsyncClient::RequestOptions()
@@ -61,7 +63,7 @@ public:
   }
 
   // HTTP async receive methods
-  void onSuccess(Http::MessagePtr&& response) override {
+  void onSuccess(Http::ResponseMessagePtr&& response) override {
     ENVOY_LOG(trace, "{}", __func__);
     complete_ = true;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
@@ -103,7 +105,7 @@ private:
   Upstream::ClusterManager& cm_;
   bool complete_{};
   JwksFetcher::JwksReceiver* receiver_{};
-  const envoy::api::v2::core::HttpUri* uri_{};
+  const envoy::config::core::v3::HttpUri* uri_{};
   Http::AsyncClient::Request* request_{};
 
   void reset() {

@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/http/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 
@@ -246,13 +248,13 @@ protected:
     wrapper.reset();
   }
 
-  envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
-    envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
+    envoy::config::core::v3::Metadata metadata;
     TestUtility::loadFromYaml(yaml_string, metadata);
     return metadata;
   }
 
-  DangerousDeprecatedTestTime test_time_;
+  Event::SimulatedTimeSystem test_time_;
 };
 
 // Return the current request protocol.

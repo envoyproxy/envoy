@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/backoff_strategy.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -37,8 +39,8 @@ struct DnsCacheStats {
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
-               Stats::Scope& root_scope,
-               const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config);
+               Runtime::RandomGenerator& random, Stats::Scope& root_scope,
+               const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
 
   // DnsCache
@@ -79,8 +81,8 @@ private:
 
     // DnsHostInfo
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
-    const std::string& resolvedHost() override { return resolved_host_; }
-    bool isIpAddress() override { return is_ip_address_; }
+    const std::string& resolvedHost() const override { return resolved_host_; }
+    bool isIpAddress() const override { return is_ip_address_; }
     void touch() override { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
 
     TimeSource& time_source_;
@@ -121,7 +123,8 @@ private:
 
   void startCacheLoad(const std::string& host, uint16_t default_port);
   void startResolve(const std::string& host, PrimaryHostInfo& host_info);
-  void finishResolve(const std::string& host, std::list<Network::DnsResponse>&& response);
+  void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
+                     std::list<Network::DnsResponse>&& response);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runRemoveCallbacks(const std::string& host);
   void updateTlsHostsMap();
@@ -136,6 +139,7 @@ private:
   std::list<AddUpdateCallbacksHandleImpl*> update_callbacks_;
   absl::flat_hash_map<std::string, PrimaryHostInfoPtr> primary_hosts_;
   const std::chrono::milliseconds refresh_interval_;
+  const BackOffStrategyPtr failure_backoff_strategy_;
   const std::chrono::milliseconds host_ttl_;
   const uint32_t max_hosts_;
 };

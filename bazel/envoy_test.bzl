@@ -2,6 +2,7 @@
 # Envoy test targets. This includes both test library and test binary targets.
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load(":envoy_binary.bzl", "envoy_cc_binary")
+load(":envoy_library.bzl", "tcmalloc_external_deps")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -26,6 +27,9 @@ def _envoy_cc_test_infrastructure_library(
         include_prefix = None,
         copts = [],
         **kargs):
+    # Add implicit tcmalloc external dependency(if available) in order to enable CPU and heap profiling in tests.
+    deps += tcmalloc_external_deps(repository)
+
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -66,6 +70,7 @@ def _envoy_test_linkopts():
 def envoy_cc_fuzz_test(
         name,
         corpus,
+        dictionaries = [],
         repository = "",
         size = "medium",
         deps = [],
@@ -80,9 +85,12 @@ def envoy_cc_fuzz_test(
         )
     else:
         corpus_name = corpus
+    tar_src = [corpus_name]
+    if dictionaries:
+        tar_src += dictionaries
     pkg_tar(
         name = name + "_corpus_tar",
-        srcs = [corpus_name],
+        srcs = tar_src,
         testonly = 1,
     )
     test_lib_name = name + "_lib"
@@ -102,9 +110,10 @@ def envoy_cc_fuzz_test(
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
         data = [corpus_name],
-        # No fuzzing on macOS.
+        # No fuzzing on macOS or Windows
         deps = select({
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],
+            "@envoy//bazel:windows_x86_64": [repository + "//test:dummy_main"],
             "//conditions:default": [
                 ":" + test_lib_name,
                 repository + "//test/fuzz:main",
@@ -154,7 +163,8 @@ def envoy_cc_test(
         shard_count = None,
         coverage = True,
         local = False,
-        size = "medium"):
+        size = "medium",
+        flaky = False):
     if coverage:
         coverage_tags = tags + ["coverage_test_lib"]
     else:
@@ -190,6 +200,7 @@ def envoy_cc_test(
         local = local,
         shard_count = shard_count,
         size = size,
+        flaky = flaky,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -227,11 +238,13 @@ def envoy_cc_test_library(
 # Envoy test binaries should be specified with this function.
 def envoy_cc_test_binary(
         name,
+        tags = [],
         **kargs):
     envoy_cc_binary(
         name,
         testonly = 1,
         linkopts = _envoy_test_linkopts(),
+        tags = tags + ["compilation_db_dep"],
         **kargs
     )
 

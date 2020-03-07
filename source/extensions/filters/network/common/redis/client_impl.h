@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -38,7 +38,8 @@ using RedirectionResponse = ConstSingleton<RedirectionValues>;
 class ConfigImpl : public Config {
 public:
   ConfigImpl(
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
+          config);
 
   bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
@@ -83,7 +84,7 @@ public:
     connection_->addConnectionCallbacks(callbacks);
   }
   void close() override;
-  PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) override;
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_password) override;
@@ -104,14 +105,14 @@ private:
   };
 
   struct PendingRequest : public PoolRequest {
-    PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks, Stats::StatName stat_name);
+    PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks, Stats::StatName stat_name);
     ~PendingRequest() override;
 
     // PoolRequest
     void cancel() override;
 
     ClientImpl& parent_;
-    PoolCallbacks& callbacks_;
+    ClientCallbacks& callbacks_;
     Stats::StatName command_;
     bool canceled_{};
     Stats::TimespanPtr aggregate_request_timer_;

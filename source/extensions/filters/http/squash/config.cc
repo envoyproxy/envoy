@@ -1,6 +1,7 @@
 #include "extensions/filters/http/squash/config.h"
 
-#include "envoy/config/filter/http/squash/v2/squash.pb.validate.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/protobuf.h"
@@ -14,7 +15,7 @@ namespace HttpFilters {
 namespace Squash {
 
 Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::squash::v2::Squash& proto_config, const std::string&,
+    const envoy::extensions::filters::http::squash::v3::Squash& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
 
   SquashFilterConfigSharedPtr config = std::make_shared<SquashFilterConfig>(
@@ -29,7 +30,8 @@ Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyp
 /**
  * Static registration for the squash filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(SquashFilterConfigFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(SquashFilterConfigFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.squash"};
 
 } // namespace Squash
 } // namespace HttpFilters

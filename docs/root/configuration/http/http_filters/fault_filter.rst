@@ -25,7 +25,7 @@ Configuration
   including the router filter.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>`
-* This filter should be configured with the name *envoy.fault*.
+* This filter should be configured with the name *envoy.filters.http.fault*.
 
 .. _config_http_filters_fault_injection_http_header:
 
@@ -53,8 +53,9 @@ options:
 
 .. code-block:: yaml
 
-  name: envoy.fault
-  config:
+  name: envoy.filters.http.fault
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
     max_active_faults: 100
     delay:
       header_delay: {}

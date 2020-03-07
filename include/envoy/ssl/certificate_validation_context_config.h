@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -36,9 +38,15 @@ public:
   virtual const std::string& certificateRevocationListPath() const PURE;
 
   /**
-   * @return The subject alt names to be verified, if enabled. Otherwise, ""
+   * @return The subject alt names to be verified, if enabled.
    */
   virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
+
+  /**
+   * @return The subject alt name matchers to be verified, if enabled.
+   */
+  virtual const std::vector<envoy::type::matcher::v3::StringMatcher>&
+  subjectAltNameMatchers() const PURE;
 
   /**
    * @return A list of a hex-encoded SHA-256 certificate hashes to be verified.
@@ -54,6 +62,13 @@ public:
    * @return whether to ignore expired certificates (both too new and too old).
    */
   virtual bool allowExpiredCertificate() const PURE;
+
+  /**
+   * @return client certificate validation configuration.
+   */
+  virtual envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+      TrustChainVerification
+      trustChainVerification() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

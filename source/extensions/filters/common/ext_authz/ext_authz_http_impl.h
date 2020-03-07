@@ -1,11 +1,15 @@
 #pragma once
 
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -35,17 +39,17 @@ public:
 
 class HeaderKeyMatcher : public Matcher {
 public:
-  HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcherPtr>&& list);
+  HeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list);
 
   bool matches(absl::string_view key) const override;
 
 private:
-  const std::vector<Matchers::LowerCaseStringMatcherPtr> matchers_;
+  const std::vector<Matchers::StringMatcherPtr> matchers_;
 };
 
 class NotHeaderKeyMatcher : public Matcher {
 public:
-  NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcherPtr>&& list);
+  NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list);
 
   bool matches(absl::string_view key) const override;
 
@@ -58,8 +62,8 @@ private:
  */
 class ClientConfig {
 public:
-  ClientConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config, uint32_t timeout,
-               absl::string_view path_prefix);
+  ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
+               uint32_t timeout, absl::string_view path_prefix);
 
   /**
    * Returns the name of the authorization cluster.
@@ -105,13 +109,19 @@ public:
   const std::string& tracingName() { return tracing_name_; }
 
 private:
-  static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
-  static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
   static MatcherSharedPtr
-  toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
+  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                    bool enable_case_sensitive_string_matcher);
+  static MatcherSharedPtr
+  toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                   bool enable_case_sensitive_string_matcher);
+  static MatcherSharedPtr
+  toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
+                     bool enable_case_sensitive_string_matcher);
   static Http::LowerCaseStrPairVector
-  toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>&);
+  toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>&);
 
+  const bool enable_case_sensitive_string_matcher_;
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
@@ -141,15 +151,15 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
              Tracing::Span&) override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& message) override;
+  void onSuccess(Http::ResponseMessagePtr&& message) override;
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
 private:
-  ResponsePtr toResponse(Http::MessagePtr message);
+  ResponsePtr toResponse(Http::ResponseMessagePtr message);
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};

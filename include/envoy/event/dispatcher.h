@@ -28,11 +28,9 @@ namespace Event {
 /**
  * All dispatcher stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_DISPATCHER_STATS(HISTOGRAM)                                                            \
   HISTOGRAM(loop_duration_us, Microseconds)                                                        \
   HISTOGRAM(poll_delay_us, Microseconds)
-// clang-format on
 
 /**
  * Struct definition for all dispatcher stats. @see stats_macros.h
@@ -104,10 +102,13 @@ public:
    * dispatcher.
    * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
    * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
+   * @param use_tcp_for_dns_lookups if set to true, tcp will be used to perform dns lookups.
+   * Otherwise, udp is used.
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) PURE;
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                    bool use_tcp_for_dns_lookups) PURE;
 
   /**
    * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
@@ -118,7 +119,7 @@ public:
    * @param events supplies a logical OR of FileReadyType events that the file event should
    *               initially listen on.
    */
-  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+  virtual FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                        uint32_t events) PURE;
 
   /**
@@ -185,8 +186,8 @@ public:
    *              run() will return.
    */
   enum class RunType {
-    Block,       // Executes any events that have been activated, then exit.
-    NonBlock,    // Waits for any pending events to activate, executes them,
+    Block,       // Runs the event-loop until there are no pending events.
+    NonBlock,    // Checks for any pending events to activate, executes them,
                  // then exits. Exits immediately if there are no pending or
                  // active events.
     RunUntilExit // Runs the event-loop until loopExit() is called, blocking

@@ -1,9 +1,11 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/http/rest_api_fetcher.h"
 
 namespace Envoy {
@@ -24,7 +26,8 @@ public:
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
                        std::chrono::milliseconds request_timeout,
-                       const Protobuf::MethodDescriptor& service_method,
+                       const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
+                       envoy::config::core::v3::ApiVersion transport_api_version,
                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                        std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -34,8 +37,8 @@ public:
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
   // Http::RestApiFetcher
-  void createRequest(Http::Message& request) override;
-  void parseResponse(const Http::Message& response) override;
+  void createRequest(Http::RequestMessage& request) override;
+  void parseResponse(const Http::ResponseMessage& response) override;
   void onFetchComplete() override;
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
@@ -45,13 +48,14 @@ private:
 
   std::string path_;
   Protobuf::RepeatedPtrField<std::string> resources_;
-  envoy::api::v2::DiscoveryRequest request_;
+  envoy::service::discovery::v3::DiscoveryRequest request_;
   Config::SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 } // namespace Config

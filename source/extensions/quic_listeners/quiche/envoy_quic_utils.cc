@@ -1,5 +1,10 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
+
+#include "common/network/socket_option_factory.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -38,26 +43,6 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
         envoy_address->ip()->ipv6()->address();
   }
   return quic::QuicSocketAddress(ss);
-}
-
-Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
-  Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  for (const auto& entry : header_list) {
-    // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
-    headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
-  }
-  return headers;
-}
-
-Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
-  Http::HeaderMapImplPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  for (auto entry : header_block) {
-    // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
-    std::string key(entry.first);
-    std::string value(entry.second);
-    headers->addCopy(Http::LowerCaseString(key), value);
-  }
-  return headers;
 }
 
 spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {
@@ -103,6 +88,38 @@ Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode erro
   } else {
     return Http::StreamResetReason::ConnectionFailure;
   }
+}
+
+Network::ConnectionSocketPtr
+createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
+                       Network::Address::InstanceConstSharedPtr& local_addr,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  Network::IoHandlePtr io_handle = peer_addr->socket(Network::Address::SocketType::Datagram);
+  auto connection_socket =
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle), local_addr, peer_addr);
+  connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
+  connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+  if (options != nullptr) {
+    connection_socket->addOptions(options);
+  }
+  if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
+                                     envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
+    connection_socket->close();
+    ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
+    return connection_socket;
+  }
+  local_addr->bind(connection_socket->ioHandle().fd());
+  ASSERT(local_addr->ip());
+  if (local_addr->ip()->port() == 0) {
+    // Get ephemeral port number.
+    local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
+  }
+  if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
+                                     envoy::config::core::v3::SocketOption::STATE_BOUND)) {
+    ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
+    connection_socket->close();
+  }
+  return connection_socket;
 }
 
 } // namespace Quic

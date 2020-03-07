@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
@@ -27,14 +26,10 @@ public:
 
   /**
    * Log a completed request if the underlying AccessLog `filter_` allows it.
-   *
-   * Prior to logging, call refreshByteSize() on HeaderMaps to ensure that an accurate byte size
-   * count is logged.
-   * TODO(asraa): Remove refreshByteSize() requirement when entries in HeaderMap can no longer be
-   * modified by reference and HeaderMap holds an accurate internal byte size count.
    */
-  void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-           const Http::HeaderMap* response_trailers,
+  void log(const Http::RequestHeaderMap* request_headers,
+           const Http::ResponseHeaderMap* response_headers,
+           const Http::ResponseTrailerMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info) override;
 
 private:
@@ -46,9 +41,9 @@ private:
    * @param stream_info supplies additional information about the request not
    * contained in the request headers.
    */
-  virtual void emitLog(const Http::HeaderMap& request_headers,
-                       const Http::HeaderMap& response_headers,
-                       const Http::HeaderMap& response_trailers,
+  virtual void emitLog(const Http::RequestHeaderMap& request_headers,
+                       const Http::ResponseHeaderMap& response_headers,
+                       const Http::ResponseTrailerMap& response_trailers,
                        const StreamInfo::StreamInfo& stream_info) PURE;
 
   AccessLog::FilterPtr filter_;

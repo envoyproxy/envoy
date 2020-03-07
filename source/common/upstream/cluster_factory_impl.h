@@ -11,8 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
@@ -118,7 +117,7 @@ public:
    * Static method to get the registered cluster factory and create an instance of cluster.
    */
   static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(const envoy::api::v2::Cluster& cluster, ClusterManager& cluster_manager,
+  create(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
          Stats::Store& stats, ThreadLocal::Instance& tls,
          Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
          Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
@@ -130,13 +129,15 @@ public:
   /**
    * Create a dns resolver to be used by the cluster.
    */
-  Network::DnsResolverSharedPtr selectDnsResolver(const envoy::api::v2::Cluster& cluster,
-                                                  ClusterFactoryContext& context);
+  Network::DnsResolverSharedPtr
+  selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
+                    ClusterFactoryContext& context);
 
   // Upstream::ClusterFactory
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context) override;
-  std::string name() override { return name_; }
+  create(const envoy::config::cluster::v3::Cluster& cluster,
+         ClusterFactoryContext& context) override;
+  std::string name() const override { return name_; }
 
 protected:
   ClusterFactoryImplBase(const std::string& name) : name_(name) {}
@@ -145,10 +146,10 @@ private:
   /**
    * Create an instance of ClusterImplBase.
    */
-  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) PURE;
+  virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) PURE;
   const std::string name_;
 };
 
@@ -169,10 +170,10 @@ protected:
   ConfigurableClusterFactoryBase(const std::string& name) : ClusterFactoryImplBase(name) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override {
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     Config::Utility::translateOpaqueConfig(
         cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(),
@@ -184,9 +185,9 @@ private:
   }
 
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterWithConfig(
-      const envoy::api::v2::Cluster& cluster, const ConfigProto& proto_config,
+      const envoy::config::cluster::v3::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) PURE;
 };
 

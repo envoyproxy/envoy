@@ -1,4 +1,5 @@
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -10,7 +11,7 @@ namespace Envoy {
 namespace {
 
 const std::string RBAC_CONFIG = R"EOF(
-name: envoy.filters.http.rbac
+name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
   rules:
@@ -23,7 +24,7 @@ typed_config:
 )EOF";
 
 const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
-name: envoy.filters.http.rbac
+name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
   rules:
@@ -31,6 +32,34 @@ typed_config:
       foo:
         permissions:
           - header: { name: ":path", prefix_match: "/foo" }
+        principals:
+          - any: true
+)EOF";
+
+const std::string RBAC_CONFIG_WITH_PATH_EXACT_MATCH = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  rules:
+    policies:
+      foo:
+        permissions:
+          - url_path:
+              path: { exact: "/allow" }
+        principals:
+          - any: true
+)EOF";
+
+const std::string RBAC_CONFIG_WITH_PATH_IGNORE_CASE_MATCH = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.rbac.v2.RBAC
+  rules:
+    policies:
+      foo:
+        permissions:
+          - url_path:
+              path: { exact: "/ignore_case", ignore_case: true }
         principals:
           - any: true
 )EOF";
@@ -48,7 +77,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
           {":path", "/"},
           {":scheme", "http"},
@@ -57,7 +86,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
       },
       1024);
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -71,7 +100,7 @@ TEST_P(RBACIntegrationTest, Denied) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
@@ -86,16 +115,15 @@ TEST_P(RBACIntegrationTest, Denied) {
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
   config_helper_.addConfigModifier(
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
-        cfg.mutable_normalize_path()->set_value(false);
-      });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) { cfg.mutable_normalize_path()->set_value(false); });
   config_helper_.addFilter(RBAC_CONFIG_WITH_PREFIX_MATCH);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
@@ -104,7 +132,7 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
       },
       1024);
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
@@ -113,16 +141,15 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
 
 TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
   config_helper_.addConfigModifier(
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
-        cfg.mutable_normalize_path()->set_value(true);
-      });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) { cfg.mutable_normalize_path()->set_value(true); });
   config_helper_.addFilter(RBAC_CONFIG_WITH_PREFIX_MATCH);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
           {":path", "/foo/../bar"},
           {":scheme", "http"},
@@ -143,7 +170,7 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "HEAD"},
           {":path", "/"},
           {":scheme", "http"},
@@ -161,8 +188,9 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
 
 TEST_P(RBACIntegrationTest, RouteOverride) {
   config_helper_.addConfigModifier(
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
-        envoy::config::filter::http::rbac::v2::RBACPerRoute per_route_config;
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) {
+        envoy::extensions::filters::http::rbac::v3::RBACPerRoute per_route_config;
         TestUtility::loadFromJson("{}", per_route_config);
 
         auto* config = cfg.mutable_route_config()
@@ -178,7 +206,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
-      Http::TestHeaderMapImpl{
+      Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
           {":path", "/"},
           {":scheme", "http"},
@@ -188,11 +216,65 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
       1024);
 
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(RBACIntegrationTest, PathWithQueryAndFragment) {
+  config_helper_.addFilter(RBAC_CONFIG_WITH_PATH_EXACT_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::vector<std::string> paths{"/allow", "/allow?p1=v1&p2=v2", "/allow?p1=v1#seg"};
+
+  for (const auto& path : paths) {
+    auto response = codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{
+            {":method", "POST"},
+            {":path", path},
+            {":scheme", "http"},
+            {":authority", "host"},
+            {"x-forwarded-for", "10.0.0.1"},
+        },
+        1024);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  }
+}
+
+TEST_P(RBACIntegrationTest, PathIgnoreCase) {
+  config_helper_.addFilter(RBAC_CONFIG_WITH_PATH_IGNORE_CASE_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::vector<std::string> paths{"/ignore_case", "/IGNORE_CASE", "/ignore_CASE"};
+
+  for (const auto& path : paths) {
+    auto response = codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{
+            {":method", "POST"},
+            {":path", path},
+            {":scheme", "http"},
+            {":authority", "host"},
+            {"x-forwarded-for", "10.0.0.1"},
+        },
+        1024);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  }
 }
 
 } // namespace

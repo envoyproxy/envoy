@@ -1,9 +1,12 @@
+#pragma once
+
 #include "envoy/common/platform.h"
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/listen_socket_impl.h"
 
 #pragma GCC diagnostic push
 
@@ -33,9 +36,27 @@ quic::QuicSocketAddress envoyAddressInstanceToQuicSocketAddress(
     const Network::Address::InstanceConstSharedPtr& envoy_address);
 
 // The returned header map has all keys in lower case.
-Http::HeaderMapImplPtr quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list);
+template <class T>
+std::unique_ptr<T> quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list) {
+  auto headers = std::make_unique<T>();
+  for (const auto& entry : header_list) {
+    // TODO(danzh): Avoid copy by referencing entry as header_list is already validated by QUIC.
+    headers->addCopy(Http::LowerCaseString(entry.first), entry.second);
+  }
+  return headers;
+}
 
-Http::HeaderMapImplPtr spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block);
+template <class T>
+std::unique_ptr<T> spdyHeaderBlockToEnvoyHeaders(const spdy::SpdyHeaderBlock& header_block) {
+  auto headers = std::make_unique<T>();
+  for (auto entry : header_block) {
+    // TODO(danzh): Avoid temporary strings and addCopy() with std::string_view.
+    std::string key(entry.first);
+    std::string value(entry.second);
+    headers->addCopy(Http::LowerCaseString(key), value);
+  }
+  return headers;
+}
 
 spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers);
 
@@ -47,6 +68,13 @@ Http::StreamResetReason quicRstErrorToEnvoyResetReason(quic::QuicRstStreamErrorC
 
 // Called when underlying QUIC connection is closed either locally or by peer.
 Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error);
+
+// Create a connection socket instance and apply given socket options to the
+// socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
+Network::ConnectionSocketPtr
+createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
+                       Network::Address::InstanceConstSharedPtr& local_addr,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
 } // namespace Quic
 } // namespace Envoy

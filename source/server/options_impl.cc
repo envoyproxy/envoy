@@ -5,6 +5,8 @@
 #include <iostream>
 #include <string>
 
+#include "envoy/admin/v3/server_info.pb.h"
+
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
@@ -14,18 +16,31 @@
 #include "server/options_impl_platform.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
 namespace Envoy {
+namespace {
+std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
+  std::vector<std::string> args;
+  for (int i = 0; i < argc; ++i) {
+    args.emplace_back(argv[i]);
+  }
+  return args;
+}
+} // namespace
+
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level)
+    : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level) {}
+
+OptionsImpl::OptionsImpl(std::vector<std::string> args,
+                         const HotRestartVersionCb& hot_restart_version_cb,
+                         spdlog::level::level_enum default_log_level)
     : signal_handling_enabled_(true) {
-  std::string log_levels_string = "Log levels: ";
-  for (auto level_string_view : spdlog::level::level_string_views) {
-    log_levels_string += fmt::format("[{}]", level_string_view);
-  }
+  std::string log_levels_string = fmt::format("Log levels: {}", allowedLogLevels());
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
 
@@ -116,12 +131,18 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
                                               "Use fake symbol table implementation", false, true,
                                               "bool", cmd);
+
   TCLAP::ValueArg<bool> use_legacy_http_parser("", "use-legacy-http-parser",
                                                "Use the legacy Node HTTP parser implementation",
                                                false, true, "bool", cmd);
+
+  TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
+                                                  "Comma-separated list of extensions to disable",
+                                                  false, "", "string", cmd);
+
   cmd.setExceptionHandling(false);
   try {
-    cmd.parse(argc, argv);
+    cmd.parse(args);
     count_ = cmd.getArgList().size();
   } catch (TCLAP::ArgException& e) {
     try {
@@ -138,18 +159,15 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   }
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
-
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
-
   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
   legacy_http_parser_enabled_ = use_legacy_http_parser.getValue();
   cpuset_threads_ = cpuset_threads.getValue();
 
-  log_level_ = default_log_level;
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-    if (log_level.getValue() == spdlog::level::level_string_views[i]) {
-      log_level_ = static_cast<spdlog::level::level_enum>(i);
-    }
+  if (log_level.isSet()) {
+    log_level_ = parseAndValidateLogLevel(log_level.getValue());
+  } else {
+    log_level_ = default_log_level;
   }
 
   log_format_ = log_format.getValue();
@@ -217,6 +235,42 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     std::cerr << hot_restart_version_cb(!hot_restart_disabled_);
     throw NoServingException();
   }
+
+  if (!disable_extensions.getValue().empty()) {
+    disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ",");
+  }
+}
+
+spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(absl::string_view log_level) {
+  if (log_level == "warn") {
+    return spdlog::level::level_enum::warn;
+  }
+
+  size_t level_to_use = std::numeric_limits<size_t>::max();
+  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
+    spdlog::string_view_t spd_log_level = spdlog::level::level_string_views[i];
+    if (log_level == absl::string_view(spd_log_level.data(), spd_log_level.size())) {
+      level_to_use = i;
+      break;
+    }
+  }
+
+  if (level_to_use == std::numeric_limits<size_t>::max()) {
+    logError(fmt::format("error: invalid log level specified '{}'", log_level));
+  }
+  return static_cast<spdlog::level::level_enum>(level_to_use);
+}
+
+std::string OptionsImpl::allowedLogLevels() {
+  std::string allowed_log_levels;
+  for (auto level_string_view : spdlog::level::level_string_views) {
+    if (level_string_view == spdlog::level::to_string_view(spdlog::level::warn)) {
+      allowed_log_levels += fmt::format("[{}|warn]", level_string_view);
+    } else {
+      allowed_log_levels += fmt::format("[{}]", level_string_view);
+    }
+  }
+  return allowed_log_levels;
 }
 
 void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
@@ -231,23 +285,12 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
       logError(fmt::format("error: component log level not correctly specified '{}'", level));
     }
     std::string log_name = log_name_level[0];
-    std::string log_level = log_name_level[1];
-    size_t level_to_use = std::numeric_limits<size_t>::max();
-    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
-      if (log_level == spdlog::level::level_string_views[i]) {
-        level_to_use = i;
-        break;
-      }
-    }
-    if (level_to_use == std::numeric_limits<size_t>::max()) {
-      logError(fmt::format("error: invalid log level specified '{}'", log_level));
-    }
+    spdlog::level::level_enum log_level = parseAndValidateLogLevel(log_name_level[1]);
     Logger::Logger* logger_to_change = Logger::Registry::logger(log_name);
     if (!logger_to_change) {
       logError(fmt::format("error: invalid component specified '{}'", log_name));
     }
-    component_log_levels_.push_back(
-        std::make_pair(log_name, static_cast<spdlog::level::level_enum>(level_to_use)));
+    component_log_levels_.push_back(std::make_pair(log_name, log_level));
   }
 }
 
@@ -257,7 +300,7 @@ void OptionsImpl::logError(const std::string& error) const { throw MalformedArgv
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   Server::CommandLineOptionsPtr command_line_options =
-      std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+      std::make_unique<envoy::admin::v3::CommandLineOptions>();
   command_line_options->set_base_id(baseId());
   command_line_options->set_concurrency(concurrency());
   command_line_options->set_config_path(configPath());
@@ -275,18 +318,16 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_service_node(serviceNodeName());
   command_line_options->set_service_zone(serviceZone());
   if (mode() == Server::Mode::Serve) {
-    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::Serve);
+    command_line_options->set_mode(envoy::admin::v3::CommandLineOptions::Serve);
   } else if (mode() == Server::Mode::Validate) {
-    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::Validate);
+    command_line_options->set_mode(envoy::admin::v3::CommandLineOptions::Validate);
   } else {
-    command_line_options->set_mode(envoy::admin::v2alpha::CommandLineOptions::InitOnly);
+    command_line_options->set_mode(envoy::admin::v3::CommandLineOptions::InitOnly);
   }
   if (localAddressIpVersion() == Network::Address::IpVersion::v4) {
-    command_line_options->set_local_address_ip_version(
-        envoy::admin::v2alpha::CommandLineOptions::v4);
+    command_line_options->set_local_address_ip_version(envoy::admin::v3::CommandLineOptions::v4);
   } else {
-    command_line_options->set_local_address_ip_version(
-        envoy::admin::v2alpha::CommandLineOptions::v6);
+    command_line_options->set_local_address_ip_version(envoy::admin::v3::CommandLineOptions::v6);
   }
   command_line_options->mutable_file_flush_interval()->MergeFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(fileFlushIntervalMsec().count()));
@@ -298,6 +339,9 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
   command_line_options->set_cpuset_threads(cpusetThreadsEnabled());
   command_line_options->set_restart_epoch(restartEpoch());
+  for (const auto& e : disabledExtensions()) {
+    command_line_options->add_disabled_extensions(e);
+  }
   return command_line_options;
 }
 
@@ -311,5 +355,22 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       parent_shutdown_time_(900), mode_(Server::Mode::Serve), hot_restart_disabled_(false),
       signal_handling_enabled_(true), mutex_tracing_enabled_(false), cpuset_threads_(false),
       fake_symbol_table_enabled_(false), legacy_http_parser_enabled_(false) {}
+
+void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
+  for (const auto& name : names) {
+    const std::vector<absl::string_view> parts = absl::StrSplit(name, absl::MaxSplits("/", 1));
+
+    if (parts.size() != 2) {
+      ENVOY_LOG_MISC(warn, "failed to disable invalid extension name '{}'", name);
+      continue;
+    }
+
+    if (Registry::FactoryCategoryRegistry::disableFactory(parts[0], parts[1])) {
+      ENVOY_LOG_MISC(info, "disabled extension '{}'", name);
+    } else {
+      ENVOY_LOG_MISC(warn, "failed to disable unknown extension '{}'", name);
+    }
+  }
+}
 
 } // namespace Envoy

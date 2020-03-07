@@ -1,4 +1,5 @@
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
@@ -14,37 +15,37 @@ namespace Config {
 namespace {
 
 TEST(MetadataTest, MetadataValue) {
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   Metadata::mutableMetadataValue(metadata, MetadataFilters::get().ENVOY_LB,
                                  MetadataEnvoyLbKeys::get().CANARY)
       .set_bool_value(true);
-  EXPECT_TRUE(Metadata::metadataValue(metadata, MetadataFilters::get().ENVOY_LB,
+  EXPECT_TRUE(Metadata::metadataValue(&metadata, MetadataFilters::get().ENVOY_LB,
                                       MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value());
-  EXPECT_FALSE(Metadata::metadataValue(metadata, "foo", "bar").bool_value());
+  EXPECT_FALSE(Metadata::metadataValue(&metadata, "foo", "bar").bool_value());
   EXPECT_FALSE(
-      Metadata::metadataValue(metadata, MetadataFilters::get().ENVOY_LB, "bar").bool_value());
+      Metadata::metadataValue(&metadata, MetadataFilters::get().ENVOY_LB, "bar").bool_value());
 }
 
 TEST(MetadataTest, MetadataValuePath) {
   const std::string filter = "com.test";
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   std::vector<std::string> path{"test_obj", "inner_key"};
   // not found case
-  EXPECT_EQ(Metadata::metadataValue(metadata, filter, path).kind_case(),
+  EXPECT_EQ(Metadata::metadataValue(&metadata, filter, path).kind_case(),
             ProtobufWkt::Value::KindCase::KIND_NOT_SET);
   ProtobufWkt::Struct& filter_struct = (*metadata.mutable_filter_metadata())[filter];
   auto obj = MessageUtil::keyValueStruct("inner_key", "inner_value");
   ProtobufWkt::Value val;
   *val.mutable_struct_value() = obj;
   (*filter_struct.mutable_fields())["test_obj"] = val;
-  EXPECT_EQ(Metadata::metadataValue(metadata, filter, path).string_value(), "inner_value");
+  EXPECT_EQ(Metadata::metadataValue(&metadata, filter, path).string_value(), "inner_value");
   // not found with longer path
   path.push_back("bad_key");
-  EXPECT_EQ(Metadata::metadataValue(metadata, filter, path).kind_case(),
+  EXPECT_EQ(Metadata::metadataValue(&metadata, filter, path).kind_case(),
             ProtobufWkt::Value::KindCase::KIND_NOT_SET);
   // empty path returns not found
-  EXPECT_EQ(Metadata::metadataValue(metadata, filter, std::vector<std::string>{}).kind_case(),
+  EXPECT_EQ(Metadata::metadataValue(&metadata, filter, std::vector<std::string>{}).kind_case(),
             ProtobufWkt::Value::KindCase::KIND_NOT_SET);
 }
 
@@ -59,9 +60,9 @@ public:
 
   struct Bar : public TypedMetadata::Object {};
 
-  class FooFactory : public TypedMetadataFactory::TypedMetadataFactory {
+  class FooFactory : public TypedMetadataFactory {
   public:
-    const std::string name() const override { return "foo"; }
+    std::string name() const override { return "foo"; }
     // Throws EnvoyException (conversion failure) if d is empty.
     std::unique_ptr<const TypedMetadata::Object>
     parse(const ProtobufWkt::Struct& d) const override {
@@ -78,7 +79,7 @@ protected:
 };
 
 TEST_F(TypedMetadataTest, OkTest) {
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
       MessageUtil::keyValueStruct("name", "foo");
   TypedMetadataImpl<TypedMetadataFactory> typed(metadata);
@@ -89,13 +90,13 @@ TEST_F(TypedMetadataTest, OkTest) {
 }
 
 TEST_F(TypedMetadataTest, NoMetadataTest) {
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   TypedMetadataImpl<TypedMetadataFactory> typed(metadata);
   EXPECT_EQ(nullptr, typed.get<Foo>(foo_factory_.name()));
 }
 
 TEST_F(TypedMetadataTest, MetadataRefreshTest) {
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] =
       MessageUtil::keyValueStruct("name", "foo");
   TypedMetadataImpl<TypedMetadataFactory> typed(metadata);
@@ -116,7 +117,7 @@ TEST_F(TypedMetadataTest, MetadataRefreshTest) {
 }
 
 TEST_F(TypedMetadataTest, InvalidMetadataTest) {
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   (*metadata.mutable_filter_metadata())[foo_factory_.name()] = ProtobufWkt::Struct();
   EXPECT_THROW_WITH_MESSAGE(TypedMetadataImpl<TypedMetadataFactory> typed(metadata),
                             Envoy::EnvoyException, "Cannot create a Foo when metadata is empty.");

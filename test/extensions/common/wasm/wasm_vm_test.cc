@@ -1,5 +1,7 @@
 #include "envoy/registry/registry.h"
 
+#include "common/stats/isolated_store_impl.h"
+
 #include "extensions/common/wasm/null/null_vm_plugin.h"
 #include "extensions/common/wasm/wasm_vm.h"
 
@@ -23,19 +25,19 @@ public:
   TestNullVmPlugin() = default;
   ~TestNullVmPlugin() override = default;
 
-  MOCK_METHOD0(start, void());
+  MOCK_METHOD(void, start, ());
 };
 
 class PluginFactory : public Null::NullVmPluginFactory {
 public:
   PluginFactory() = default;
 
-  const std::string name() const override { return "test_null_vm_plugin"; }
+  std::string name() const override { return "test_null_vm_plugin"; }
   std::unique_ptr<Null::NullVmPlugin> create() const override;
 };
 
 TestNullVmPlugin* test_null_vm_plugin_ = nullptr;
-REGISTER_FACTORY(PluginFactory, Null::NullVmPluginFactory);
+Envoy::Registry::RegisterFactory<PluginFactory, Null::NullVmPluginFactory> register_;
 
 std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   auto result = std::make_unique<TestNullVmPlugin>();
@@ -43,29 +45,38 @@ std::unique_ptr<Null::NullVmPlugin> PluginFactory::create() const {
   return result;
 }
 
-TEST(BadVmTest, NoRuntime) {
-  EXPECT_THROW_WITH_MESSAGE(createWasmVm(""), WasmVmException,
+class BaseVmTest : public testing::Test {
+public:
+  BaseVmTest() : scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
+
+protected:
+  Stats::IsolatedStoreImpl stats_store;
+  Stats::ScopeSharedPtr scope_;
+};
+
+TEST_F(BaseVmTest, NoRuntime) {
+  EXPECT_THROW_WITH_MESSAGE(createWasmVm("", scope_), WasmVmException,
                             "Failed to create WASM VM with unspecified runtime.");
 }
 
-TEST(BadVmTest, BadRuntime) {
-  EXPECT_THROW_WITH_MESSAGE(createWasmVm("envoy.wasm.runtime.invalid"), WasmVmException,
+TEST_F(BaseVmTest, BadRuntime) {
+  EXPECT_THROW_WITH_MESSAGE(createWasmVm("envoy.wasm.runtime.invalid", scope_), WasmVmException,
                             "Failed to create WASM VM using envoy.wasm.runtime.invalid runtime. "
                             "Envoy was compiled without support for it.");
 }
 
-TEST(NullVmTest, NullVmStartup) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
+TEST_F(BaseVmTest, NullVmStartup) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null", scope_);
   EXPECT_TRUE(wasm_vm != nullptr);
   EXPECT_TRUE(wasm_vm->runtime() == "envoy.wasm.runtime.null");
-  EXPECT_TRUE(wasm_vm->cloneable());
+  EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::InstantiatedModule);
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
   EXPECT_TRUE(wasm_vm->getCustomSection("user").empty());
 }
 
-TEST(NullVmTest, NullVmMemory) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
+TEST_F(BaseVmTest, NullVmMemory) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.null", scope_);
   EXPECT_EQ(wasm_vm->getMemorySize(), std::numeric_limits<uint64_t>::max());
   std::string d = "data";
   auto m = wasm_vm->getMemory(reinterpret_cast<uint64_t>(d.data()), d.size()).value();
@@ -95,8 +106,8 @@ TEST(NullVmTest, NullVmMemory) {
 
 class MockHostFunctions {
 public:
-  MOCK_CONST_METHOD1(pong, void(uint32_t));
-  MOCK_CONST_METHOD0(random, uint32_t());
+  MOCK_METHOD(void, pong, (uint32_t), (const));
+  MOCK_METHOD(uint32_t, random, (), (const));
 };
 
 MockHostFunctions* g_host_functions;
@@ -114,42 +125,54 @@ Word bad_pong2(void*, Word) { return 2; }
 // pong() with wrong argument type.
 double bad_pong3(void*, double) { return 3; }
 
-class WasmVmTest : public testing::Test {
+class WasmVmTest : public testing::TestWithParam<bool> {
 public:
+  WasmVmTest() : scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
+
   void SetUp() override { g_host_functions = new MockHostFunctions(); }
   void TearDown() override { delete g_host_functions; }
+
+protected:
+  Stats::IsolatedStoreImpl stats_store;
+  Stats::ScopeSharedPtr scope_;
 };
 
-TEST_F(WasmVmTest, V8BadCode) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+INSTANTIATE_TEST_SUITE_P(AllowPrecompiled, WasmVmTest, testing::Values(false, true));
+
+TEST_P(WasmVmTest, V8BadCode) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
-  EXPECT_FALSE(wasm_vm->load("bad code", false));
+  EXPECT_FALSE(wasm_vm->load("bad code", GetParam()));
 }
 
-TEST_F(WasmVmTest, V8Code) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+TEST_P(WasmVmTest, V8Code) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
-
   EXPECT_TRUE(wasm_vm->runtime() == "envoy.wasm.runtime.v8");
-  EXPECT_FALSE(wasm_vm->cloneable());
-  EXPECT_TRUE(wasm_vm->clone() == nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
-  EXPECT_TRUE(wasm_vm->load(code, false));
+  EXPECT_TRUE(wasm_vm->load(code, GetParam()));
 
+  // Sanity checks for the expected test file.
+  if (!wasm_vm->getPrecompiledSectionName().empty()) {
+    EXPECT_TRUE(!wasm_vm->getCustomSection(wasm_vm->getPrecompiledSectionName()).empty());
+  }
   EXPECT_THAT(wasm_vm->getCustomSection("producers"), HasSubstr("rustc"));
   EXPECT_TRUE(wasm_vm->getCustomSection("emscripten_metadata").empty());
+
+  EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::CompiledBytecode);
+  EXPECT_TRUE(wasm_vm->clone() != nullptr);
 }
 
-TEST_F(WasmVmTest, V8BadHostFunctions) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+TEST_P(WasmVmTest, V8BadHostFunctions) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
-  EXPECT_TRUE(wasm_vm->load(code, false));
+  EXPECT_TRUE(wasm_vm->load(code, GetParam()));
 
   wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
   EXPECT_THROW_WITH_MESSAGE(wasm_vm->link("test"), WasmVmException,
@@ -171,13 +194,13 @@ TEST_F(WasmVmTest, V8BadHostFunctions) {
                             "want: i32 -> void, but host exports: f64 -> f64");
 }
 
-TEST_F(WasmVmTest, V8BadModuleFunctions) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+TEST_P(WasmVmTest, V8BadModuleFunctions) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
-  EXPECT_TRUE(wasm_vm->load(code, false));
+  EXPECT_TRUE(wasm_vm->load(code, GetParam()));
 
   wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
@@ -199,13 +222,13 @@ TEST_F(WasmVmTest, V8BadModuleFunctions) {
                             "Bad function signature for: sum");
 }
 
-TEST_F(WasmVmTest, V8FunctionCalls) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+TEST_P(WasmVmTest, V8FunctionCalls) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
-  EXPECT_TRUE(wasm_vm->load(code, false));
+  EXPECT_TRUE(wasm_vm->load(code, GetParam()));
 
   wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));
@@ -237,13 +260,13 @@ TEST_F(WasmVmTest, V8FunctionCalls) {
                             "Function: abort failed: Uncaught RuntimeError: unreachable");
 }
 
-TEST_F(WasmVmTest, V8Memory) {
-  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8");
+TEST_P(WasmVmTest, V8Memory) {
+  auto wasm_vm = createWasmVm("envoy.wasm.runtime.v8", scope_);
   ASSERT_TRUE(wasm_vm != nullptr);
 
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
-  EXPECT_TRUE(wasm_vm->load(code, false));
+  EXPECT_TRUE(wasm_vm->load(code, GetParam()));
 
   wasm_vm->registerCallback("env", "pong", &pong, CONVERT_FUNCTION_WORD_TO_UINT32(pong));
   wasm_vm->registerCallback("env", "random", &random, CONVERT_FUNCTION_WORD_TO_UINT32(random));

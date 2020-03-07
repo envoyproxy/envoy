@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -e
+set -eo pipefail
 
 ENVOY_SRCDIR=${ENVOY_SRCDIR:-$(cd $(dirname $0)/.. && pwd)}
 
-LLVM_CONFIG=${LLVM_CONFIG:-llvm-config}
+export LLVM_CONFIG=${LLVM_CONFIG:-llvm-config}
 LLVM_PREFIX=${LLVM_PREFIX:-$(${LLVM_CONFIG} --prefix)}
 CLANG_TIDY=${CLANG_TIDY:-$(${LLVM_CONFIG} --bindir)/clang-tidy}
 CLANG_APPLY_REPLACEMENTS=${CLANG_APPLY_REPLACEMENTS:-$(${LLVM_CONFIG} --bindir)/clang-apply-replacements}
@@ -69,8 +69,7 @@ elif [[ "${BUILD_REASON}" != "PullRequest" ]]; then
       -p 1
 else
   echo "Running clang-tidy-diff against master branch..."
-  git fetch https://github.com/envoyproxy/envoy.git master
-  git diff "${SYSTEM_PULLREQUEST_TARGETBRANCH:-refs/heads/master}..HEAD" | filter_excludes | \
+  git diff "remotes/origin/${SYSTEM_PULLREQUEST_TARGETBRANCH}" | filter_excludes | \
     "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
       -clang-tidy-binary=${CLANG_TIDY} \
       -p 1

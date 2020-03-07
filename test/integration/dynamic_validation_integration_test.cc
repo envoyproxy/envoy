@@ -1,11 +1,13 @@
 #include <fstream>
 
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
@@ -22,28 +24,25 @@ public:
 
 class TestDynamicValidationNetworkFilterConfigFactory
     : public Extensions::NetworkFilters::Common::FactoryBase<
-          envoy::config::filter::network::tcp_proxy::v2::TcpProxy> {
+          envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy> {
 public:
   TestDynamicValidationNetworkFilterConfigFactory()
       : Extensions::NetworkFilters::Common::FactoryBase<
-            envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
+            envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             "envoy.test.dynamic_validation") {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& /*proto_config*/,
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& /*proto_config*/,
       Server::Configuration::FactoryContext& /*context*/) override {
     return Network::FilterFactoryCb();
   }
 
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
-      const envoy::config::filter::network::tcp_proxy::v2::TcpProxy&) override {
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy&) override {
     return nullptr;
   }
 };
-
-REGISTER_FACTORY(TestDynamicValidationNetworkFilterConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 // Pretty-printing of parameterized test names.
 std::string dynamicValidationTestParamsToString(
@@ -75,6 +74,11 @@ public:
   ApiFilesystemConfig api_filesystem_config_;
   const bool reject_unknown_dynamic_fields_;
   bool allow_lds_rejection_{};
+
+private:
+  TestDynamicValidationNetworkFilterConfigFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> register_{
+      factory_};
 };
 
 INSTANTIATE_TEST_SUITE_P(

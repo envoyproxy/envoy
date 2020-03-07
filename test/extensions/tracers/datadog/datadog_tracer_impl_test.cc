@@ -3,6 +3,8 @@
 #include <sstream>
 #include <string>
 
+#include "envoy/config/trace/v3/trace.pb.h"
+
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -41,7 +43,7 @@ namespace {
 
 class DatadogDriverTest : public testing::Test {
 public:
-  void setup(envoy::config::trace::v2::DatadogConfig& datadog_config, bool init_timer) {
+  void setup(envoy::config::trace::v3::DatadogConfig& datadog_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -61,16 +63,16 @@ public:
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v2::DatadogConfig datadog_config;
+    envoy::config::trace::v3::DatadogConfig datadog_config;
     TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     setup(datadog_config, true);
   }
 
   const std::string operation_name_{"test"};
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
+  const Http::TestResponseHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -87,7 +89,7 @@ public:
 
 TEST_F(DatadogDriverTest, InitializeDriver) {
   {
-    envoy::config::trace::v2::DatadogConfig datadog_config;
+    envoy::config::trace::v3::DatadogConfig datadog_config;
 
     EXPECT_THROW(setup(datadog_config, false), EnvoyException);
   }
@@ -99,7 +101,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v2::DatadogConfig datadog_config;
+    envoy::config::trace::v3::DatadogConfig datadog_config;
     TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     EXPECT_THROW(setup(datadog_config, false), EnvoyException);
@@ -113,7 +115,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v2::DatadogConfig datadog_config;
+    envoy::config::trace::v3::DatadogConfig datadog_config;
     TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     setup(datadog_config, true);
@@ -129,7 +131,7 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
   EXPECT_CALL(cm_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
@@ -152,8 +154,8 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.datadog.traces_sent").value());
 
-  Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   msg->body() = std::make_unique<Buffer::OwnedImpl>("");
 
   callback->onSuccess(std::move(msg));

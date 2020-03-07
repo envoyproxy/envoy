@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
         "//source/server:connection_handler_lib",
         "//test/mocks/api:api_mocks",
@@ -33,5 +34,6 @@ envoy_extension_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

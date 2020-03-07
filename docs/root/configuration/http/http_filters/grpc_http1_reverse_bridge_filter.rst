@@ -4,7 +4,7 @@ gRPC HTTP/1.1 reverse bridge
 ============================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
+* :ref:`v2 API reference <envoy_api_msg_config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfig>`
 * This filter should be configured with the name *envoy.filters.http.grpc_http1_reverse_bridge*.
 
 This is a filter that enables converting an incoming gRPC request into a HTTP/1.1 request to allow
@@ -59,11 +59,13 @@ How to disable HTTP/1.1 reverse bridge filter per route
           port_value: 80
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
-          config:
+        - name: envoy.filters.network.http_connection_manager
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             access_log:
-            - name: envoy.file_access_log
-              config:
+            - name: envoy.access_loggers.file
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
                 path: /dev/stdout
             stat_prefix: ingress_http
             route_config:
@@ -90,11 +92,12 @@ How to disable HTTP/1.1 reverse bridge filter per route
                     timeout: 5.00s
             http_filters:
             - name: envoy.filters.http.grpc_http1_reverse_bridge
-              config:
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfig
                 content_type: application/grpc+proto
                 withhold_grpc_frames: true
-            - name: envoy.router
-              config: {}
+            - name: envoy.filters.http.router
+              typed_config: {}
     clusters:
     - name: other
       connect_timeout: 5.00s

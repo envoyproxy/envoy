@@ -58,6 +58,19 @@ std::string Hex::uint64ToHex(uint64_t value) {
   data[1] = (value & 0x00FF000000000000) >> 48;
   data[0] = (value & 0xFF00000000000000) >> 56;
 
-  return encode(&data[0], data.size());
+  return encode(data.data(), data.size());
+}
+
+std::string Hex::uint32ToHex(uint32_t value) {
+  std::array<uint8_t, 4> data;
+
+  // This is explicitly done for performance reasons
+  // using std::stringstream with std::hex is ~3 orders of magnitude slower
+  data[3] = (value & 0x000000FF);
+  data[2] = (value & 0x0000FF00) >> 8;
+  data[1] = (value & 0x00FF0000) >> 16;
+  data[0] = (value & 0xFF000000) >> 24;
+
+  return encode(data.data(), data.size());
 }
 } // namespace Envoy

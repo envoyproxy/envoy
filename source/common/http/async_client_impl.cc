@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -18,12 +20,12 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
-const AsyncStreamImpl::NullShadowPolicy AsyncStreamImpl::RouteEntryImpl::shadow_policy_;
+const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
-const envoy::api::v2::core::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
+const envoy::config::core::v3::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
 const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
     AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
@@ -48,7 +50,8 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
+AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
+                                            AsyncClient::Callbacks& callbacks,
                                             const AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, options);
@@ -88,7 +91,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
-void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
+void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) {
   ENVOY_LOG(debug, "async http request response headers (end_stream={}):\n{}", end_stream,
             *headers);
   ASSERT(!remote_closed_);
@@ -115,7 +118,7 @@ void AsyncStreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   closeLocal(end_stream);
 }
 
-void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
+void AsyncStreamImpl::encodeTrailers(ResponseTrailerMapPtr&& trailers) {
   ENVOY_LOG(debug, "async http request response trailers:\n{}", *trailers);
   ASSERT(!remote_closed_);
   stream_callbacks_.onTrailers(std::move(trailers));
@@ -125,7 +128,7 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
   closeLocal(true);
 }
 
-void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
+void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   if (Http::Headers::get().MethodValues.Head == headers.Method()->value().getStringView()) {
     is_head_request_ = true;
   }
@@ -159,7 +162,7 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
   closeLocal(end_stream);
 }
 
-void AsyncStreamImpl::sendTrailers(HeaderMap& trailers) {
+void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
   // See explanation in sendData.
   if (local_closed_) {
     return;
@@ -230,7 +233,7 @@ void AsyncStreamImpl::resetStream() {
   cleanup();
 }
 
-AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
+AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
                                    const AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
@@ -265,7 +268,7 @@ void AsyncRequestImpl::onComplete() {
   callbacks_.onSuccess(std::move(response_));
 }
 
-void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool) {
+void AsyncRequestImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   streamInfo().response_code_ = response_code;
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
@@ -279,7 +282,7 @@ void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
   response_->body()->move(data);
 }
 
-void AsyncRequestImpl::onTrailers(HeaderMapPtr&& trailers) {
+void AsyncRequestImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
 }
 

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/type/v3/percent.pb.h"
+
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
@@ -55,9 +57,9 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 }
 
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
-    HeaderMap& request_headers, Network::Connection& connection, ConnectionManagerConfig& config,
-    const Router::Config& route_config, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info) {
+    RequestHeaderMap& request_headers, Network::Connection& connection,
+    ConnectionManagerConfig& config, const Router::Config& route_config,
+    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (Utility::isUpgrade(request_headers)) {
@@ -88,8 +90,6 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
-  const bool trusted_forwarded_proto =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.trusted_forwarded_proto");
 
   if (config.useRemoteAddress()) {
     single_xff_address = request_headers.ForwardedFor() == nullptr;
@@ -113,18 +113,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         Utility::appendXff(request_headers, *connection.remoteAddress());
       }
     }
-    if (trusted_forwarded_proto) {
-      // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
-      // untrusted. Alternately if no x-forwarded-proto header exists, add one.
-      if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
-        request_headers.setReferenceForwardedProto(connection.ssl()
-                                                       ? Headers::get().SchemeValues.Https
-                                                       : Headers::get().SchemeValues.Http);
-      }
-    } else {
-      // Previously, before the trusted_forwarded_proto logic, Envoy would always overwrite the
-      // x-forwarded-proto header even if it was set by a trusted proxy. This code path is
-      // deprecated and will be removed.
+    // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
+    // untrusted. Alternately if no x-forwarded-proto header exists, add one.
+    if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
       request_headers.setReferenceForwardedProto(
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
     }
@@ -200,8 +191,8 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
   if (config.userAgent()) {
     request_headers.setEnvoyDownstreamServiceCluster(config.userAgent().value());
-    const HeaderEntry& user_agent_header = request_headers.insertUserAgent();
-    if (user_agent_header.value().empty()) {
+    const HeaderEntry* user_agent_header = request_headers.UserAgent();
+    if (!user_agent_header || user_agent_header->value().empty()) {
       // Following setReference() is safe because user agent is constant for the life of the
       // listener.
       request_headers.setReferenceUserAgent(config.userAgent().value());
@@ -239,7 +230,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   return final_remote_address;
 }
 
-void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_headers,
+void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& request_headers,
                                                           Runtime::Loader& runtime,
                                                           ConnectionManagerConfig& config,
                                                           const Router::Route* route) {
@@ -255,9 +246,11 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     return;
   }
 
-  const envoy::type::FractionalPercent* client_sampling = &config.tracingConfig()->client_sampling_;
-  const envoy::type::FractionalPercent* random_sampling = &config.tracingConfig()->random_sampling_;
-  const envoy::type::FractionalPercent* overall_sampling =
+  const envoy::type::v3::FractionalPercent* client_sampling =
+      &config.tracingConfig()->client_sampling_;
+  const envoy::type::v3::FractionalPercent* random_sampling =
+      &config.tracingConfig()->random_sampling_;
+  const envoy::type::v3::FractionalPercent* overall_sampling =
       &config.tracingConfig()->overall_sampling_;
 
   if (route && route->tracingConfig()) {
@@ -283,10 +276,10 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 
-  request_headers.RequestId()->value(x_request_id);
+  request_headers.setRequestId(x_request_id);
 }
 
-void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_headers,
+void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request_headers,
                                                        Network::Connection& connection,
                                                        ConnectionManagerConfig& config) {
   // When AlwaysForwardOnly is set, always forward the XFCC header without modification.
@@ -364,8 +357,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
-    HeaderMapImpl::appendToHeader(request_headers.insertForwardedClientCert().value(),
-                                  client_cert_details_str);
+    request_headers.appendForwardedClientCert(client_cert_details_str, ",");
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.setForwardedClientCert(client_cert_details_str);
   } else {
@@ -373,8 +365,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers,
-                                                     const HeaderMap* request_headers,
+void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
+                                                     const RequestHeaderMap* request_headers,
                                                      const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
@@ -405,17 +397,16 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
   }
 }
 
-/* static */
-bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
+bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
   ASSERT(request_headers.Path());
   bool is_valid_path = true;
   if (config.shouldNormalizePath()) {
-    is_valid_path = PathUtil::canonicalPath(*request_headers.Path());
+    is_valid_path = PathUtil::canonicalPath(request_headers);
   }
   // Merge slashes after path normalization to catch potential edge cases with percent encoding.
   if (is_valid_path && config.shouldMergeSlashes()) {
-    PathUtil::mergeSlashes(*request_headers.Path());
+    PathUtil::mergeSlashes(request_headers);
   }
   return is_valid_path;
 }

@@ -20,21 +20,11 @@
 namespace Envoy {
 namespace Stats {
 
+const char AllocatorImpl::DecrementToZeroSyncPoint[] = "decrement-zero";
+
 AllocatorImpl::~AllocatorImpl() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
-}
-
-void AllocatorImpl::removeCounterFromSet(Counter* counter) {
-  Thread::LockGuard lock(mutex_);
-  const size_t count = counters_.erase(counter->statName());
-  ASSERT(count == 1);
-}
-
-void AllocatorImpl::removeGaugeFromSet(Gauge* gauge) {
-  Thread::LockGuard lock(mutex_);
-  const size_t count = gauges_.erase(gauge->statName());
-  ASSERT(count == 1);
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -59,9 +49,10 @@ void AllocatorImpl::debugPrint() {
 // wasted in the alignment padding next to flags_.
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
-  StatsSharedImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
-                  const std::vector<Tag>& tags)
-      : MetricImpl<BaseClass>(name, tag_extracted_name, tags, alloc.symbolTable()), alloc_(alloc) {}
+  StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+                  const StatNameTagVector& stat_name_tags)
+      : MetricImpl<BaseClass>(name, tag_extracted_name, stat_name_tags, alloc.symbolTable()),
+        alloc_(alloc) {}
 
   ~StatsSharedImpl() override {
     // MetricImpl must be explicitly cleared() before destruction, otherwise it
@@ -78,10 +69,34 @@ public:
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
   bool decRefCount() override {
+    // We must, unfortunately, hold the allocator's lock when decrementing the
+    // refcount. Otherwise another thread may simultaneously try to allocate the
+    // same name'd stat after we decrement it, and we'll wind up with a
+    // dtor/update race. To avoid this we must hold the lock until the stat is
+    // removed from the map.
+    //
+    // It might be worth thinking about a race-free way to decrement ref-counts
+    // without a lock, for the case where ref_count > 2, and we don't need to
+    // destruct anything. But it seems preferable at to be conservative here,
+    // as stats will only go out of scope when a scope is destructed (during
+    // xDS) or during admin stats operations.
+    Thread::LockGuard lock(alloc_.mutex_);
     ASSERT(ref_count_ >= 1);
-    return --ref_count_ == 0;
+    if (--ref_count_ == 0) {
+      alloc_.sync().syncPoint(AllocatorImpl::DecrementToZeroSyncPoint);
+      removeFromSetLockHeld();
+      return true;
+    }
+    return false;
   }
   uint32_t use_count() const override { return ref_count_; }
+
+  /**
+   * We must atomically remove the counter/gauges from the allocator's sets when
+   * our ref-count decrement hits zero. The counters and gauges are held in
+   * distinct sets so we virtualize this removal helper.
+   */
+  virtual void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) PURE;
 
 protected:
   AllocatorImpl& alloc_;
@@ -89,16 +104,31 @@ protected:
   // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
   // adds another field, pending_increment_, that is not used in Gauge.
   std::atomic<uint64_t> value_{0};
+
+  // ref_count_ can be incremented as an atomic, without taking a new lock, as
+  // the critical 0->1 transition occurs in makeCounter and makeGauge, which
+  // already hold the lock. Increment also occurs when copying shared pointers,
+  // but these are always in transition to ref-count 2 or higher, and thus
+  // cannot race with a decrement to zero.
+  //
+  // However, we must hold alloc_.mutex_ when decrementing ref_count_ so that
+  // when it hits zero we can atomically remove it from alloc_.counters_ or
+  // alloc_.gauges_. We leave it atomic to avoid taking the lock on increment.
+  std::atomic<uint32_t> ref_count_{0};
+
   std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{0};
 };
 
 class CounterImpl : public StatsSharedImpl<Counter> {
 public:
-  CounterImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
-              const std::vector<Tag>& tags)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {}
-  ~CounterImpl() override { alloc_.removeCounterFromSet(this); }
+  CounterImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+              const StatNameTagVector& stat_name_tags)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {}
+
+  void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
+    const size_t count = alloc_.counters_.erase(statName());
+    ASSERT(count == 1);
+  }
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -119,9 +149,9 @@ private:
 
 class GaugeImpl : public StatsSharedImpl<Gauge> {
 public:
-  GaugeImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
-            const std::vector<Tag>& tags, ImportMode import_mode)
-      : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {
+  GaugeImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
+            const StatNameTagVector& stat_name_tags, ImportMode import_mode)
+      : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags) {
     switch (import_mode) {
     case ImportMode::Accumulate:
       flags_ |= Flags::LogicAccumulate;
@@ -137,7 +167,11 @@ public:
       break;
     }
   }
-  ~GaugeImpl() override { alloc_.removeGaugeFromSet(this); }
+
+  void removeFromSetLockHeld() override EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
+    const size_t count = alloc_.gauges_.erase(statName());
+    ASSERT(count == 1);
+  }
 
   // Stats::Gauge
   void add(uint64_t amount) override {
@@ -194,21 +228,21 @@ public:
   }
 };
 
-CounterSharedPtr AllocatorImpl::makeCounter(StatName name, absl::string_view tag_extracted_name,
-                                            const std::vector<Tag>& tags) {
+CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracted_name,
+                                            const StatNameTagVector& stat_name_tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
   }
-  auto counter = CounterSharedPtr(new CounterImpl(name, *this, tag_extracted_name, tags));
+  auto counter = CounterSharedPtr(new CounterImpl(name, *this, tag_extracted_name, stat_name_tags));
   counters_.insert(counter.get());
   return counter;
 }
 
-GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_extracted_name,
-                                        const std::vector<Tag>& tags,
+GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_name,
+                                        const StatNameTagVector& stat_name_tags,
                                         Gauge::ImportMode import_mode) {
   Thread::LockGuard lock(mutex_);
   ASSERT(counters_.find(name) == counters_.end());
@@ -216,9 +250,18 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
   }
-  auto gauge = GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, tags, import_mode));
+  auto gauge =
+      GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode));
   gauges_.insert(gauge.get());
   return gauge;
+}
+
+bool AllocatorImpl::isMutexLockedForTest() {
+  bool locked = mutex_.tryLock();
+  if (locked) {
+    mutex_.unlock();
+  }
+  return !locked;
 }
 
 } // namespace Stats

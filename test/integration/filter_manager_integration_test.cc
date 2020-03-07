@@ -2,6 +2,8 @@
 
 #include <regex>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -40,7 +42,8 @@ const std::regex invalid_param_name_regex() { return std::regex{"[^a-zA-Z0-9_]"}
  * Integration test with one of auxiliary filters (listed above)
  * added to the head of the filter chain.
  *
- * Shared by tests for "envoy.echo", "envoy.tcp_proxy" and "envoy.http_connection_manager".
+ * Shared by tests for "envoy.filters.network.echo", "envoy.filters.network.tcp_proxy" and
+ * "envoy.filters.network.http_connection_manager".
  */
 class TestWithAuxiliaryFilter {
 public:
@@ -53,8 +56,9 @@ protected:
   /**
    * Returns configuration for a given auxiliary filter.
    *
-   * Assuming that representative configurations differ in the context of "envoy.echo",
-   * "envoy.tcp_proxy" and "envoy.http_connection_manager".
+   * Assuming that representative configurations differ in the context of
+   * "envoy.filters.network.echo", "envoy.filters.network.tcp_proxy" and
+   * "envoy.filters.network.http_connection_manager".
    */
   virtual std::string filterConfig(const std::string& auxiliary_filter_name) PURE;
 
@@ -73,7 +77,7 @@ protected:
                                                 auxiliary_filter_name_) +
                                         filterConfig(auxiliary_filter_name_));
     // double-check the filter was actually added
-    config_helper.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       ASSERT_EQ(auxiliary_filter_name_,
                 bootstrap.static_resources().listeners(0).filter_chains(0).filters(0).name());
     });
@@ -86,7 +90,7 @@ protected:
    */
   void addNetworkFilter(ConfigHelper& config_helper, const std::string& filter_yaml) {
     config_helper.addConfigModifier(
-        [filter_yaml](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+        [filter_yaml](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
           auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
           ASSERT_GT(l->filter_chains_size(), 0);
@@ -123,7 +127,7 @@ private:
 };
 
 /**
- * Base class for "envoy.echo" and "envoy.tcp_proxy" tests.
+ * Base class for "envoy.filters.network.echo" and "envoy.filters.network.tcp_proxy" tests.
  *
  * Inherits from BaseIntegrationTest; parameterized with IP version and auxiliary filter.
  */
@@ -168,7 +172,7 @@ protected:
 };
 
 /**
- * Integration test with an auxiliary filter in front of "envoy.echo".
+ * Integration test with an auxiliary filter in front of "envoy.filters.network.echo".
  */
 class InjectDataWithEchoFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
@@ -176,7 +180,7 @@ public:
     return ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-      - name: envoy.echo
+      - name: envoy.filters.network.echo
       )EOF";
   }
 
@@ -201,7 +205,7 @@ TEST_P(InjectDataWithEchoFilterIntegrationTest, UsageOfInjectDataMethodsShouldBe
 }
 
 /**
- * Integration test with an auxiliary filter in front of "envoy.tcp_proxy".
+ * Integration test with an auxiliary filter in front of "envoy.filters.network.tcp_proxy".
  */
 class InjectDataWithTcpProxyFilterIntegrationTest : public InjectDataToFilterChainIntegrationTest {
 public:
@@ -246,7 +250,8 @@ TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShou
 }
 
 /**
- * Integration test with an auxiliary filter in front of "envoy.http_connection_manager".
+ * Integration test with an auxiliary filter in front of
+ * "envoy.filters.network.http_connection_manager".
  *
  * Inherits from HttpIntegrationTest;
  * parameterized with IP version, downstream HTTP version and auxiliary filter.
@@ -307,7 +312,7 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl headers{
+  Http::TestRequestHeaderMapImpl headers{
       {":method", "POST"}, {":path", "/api"}, {":authority", "host"}, {":scheme", "http"}};
   auto response = codec_client_->makeRequestWithBody(headers, "hello!");
 
@@ -315,7 +320,7 @@ TEST_P(InjectDataWithHttpConnectionManagerIntegrationTest,
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("hello!", upstream_request_->body().toString());
 
-  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
   Buffer::OwnedImpl response_data{"greetings"};
   upstream_request_->encodeData(response_data, true);
 

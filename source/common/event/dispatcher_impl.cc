@@ -118,12 +118,14 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
-  return Network::DnsResolverSharedPtr{new Network::DnsResolverImpl(*this, resolvers)};
+  return Network::DnsResolverSharedPtr{
+      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
 }
 
-FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
   return FileEventPtr{new FileEventImpl(*this, fd, cb, trigger, events)};
@@ -131,7 +133,7 @@ FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTrigger
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   ASSERT(isThreadSafe());
-  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this)};
+  return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, api_)};
 }
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,

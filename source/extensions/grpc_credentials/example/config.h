@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
 
 #include "extensions/grpc_credentials/well_known_names.h"
@@ -28,7 +29,7 @@ namespace Example {
 class AccessTokenExampleGrpcCredentialsFactory : public Grpc::GoogleGrpcCredentialsFactory {
 public:
   std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+  getChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
                         Api::Api& api) override;
 
   std::string name() const override { return GrpcCredentialsNames::get().AccessTokenExample; }

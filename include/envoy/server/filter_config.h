@@ -3,7 +3,8 @@
 #include <functional>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -16,6 +17,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/process_context.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -52,6 +54,12 @@ public:
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
    * @return RandomGenerator& the random generator for the server.
@@ -103,6 +111,11 @@ public:
 class ServerFactoryContext : public virtual CommonFactoryContext {
 public:
   ~ServerFactoryContext() override = default;
+
+  /**
+   * @return the server-wide grpc context.
+   */
+  virtual Grpc::Context& grpcContext() PURE;
 };
 
 /**
@@ -120,15 +133,20 @@ public:
   virtual ServerFactoryContext& getServerFactoryContext() const PURE;
 
   /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+
+  /**
    * @return AccessLogManager for use by the entire server.
    */
   virtual AccessLog::AccessLogManager& accessLogManager() PURE;
 
   /**
-   * @return envoy::api::v2::core::TrafficDirection the direction of the traffic relative to the
-   * local proxy.
+   * @return envoy::config::core::v3::TrafficDirection the direction of the traffic relative to
+   * the local proxy.
    */
-  virtual envoy::api::v2::core::TrafficDirection direction() const PURE;
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -167,10 +185,10 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the config metadata associated with this
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
    * listener.
    */
-  virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
+  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.
@@ -188,10 +206,10 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return OptProcessContextRef an optional reference to the
+   * @return ProcessContextOptRef an optional reference to the
    * process context. Will be unset when running in validation mode.
    */
-  virtual OptProcessContextRef processContext() PURE;
+  virtual ProcessContextOptRef processContext() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
@@ -200,6 +218,17 @@ public:
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
+/**
+ * An implementation of FactoryContext. The life time is no shorter than the created filter chains.
+ * The life time is no longer than the owning listener. It should be used to create
+ * NetworkFilterChain.
+ */
+class FilterChainFactoryContext : public virtual FactoryContext {};
+
+/**
+ * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
+ * and connections. It can be used to create ListenerFilterChain.
+ */
 class ListenerFactoryContext : public virtual FactoryContext {
 public:
   /**
@@ -211,21 +240,9 @@ public:
 /**
  * Common interface for listener filters and UDP listener filters
  */
-class ListenerFilterConfigFactoryBase {
+class ListenerFilterConfigFactoryBase : public Config::TypedFactory {
 public:
   virtual ~ListenerFilterConfigFactoryBase() = default;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message. The filter
-   *         config, which arrives in an opaque message, will be parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a listener filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
 };
 
 /**
@@ -249,12 +266,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.listener"; }
+  std::string category() const override { return "envoy.filters.listener"; }
 };
 
 /**
@@ -277,19 +289,14 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.udp_listener"; }
+  std::string category() const override { return "envoy.filters.udp_listener"; }
 };
 
 /**
  * Implemented by filter factories that require more options to process the protocol used by the
  * upstream cluster.
  */
-class ProtocolOptionsFactory {
+class ProtocolOptionsFactory : public Config::TypedFactory {
 public:
   virtual ~ProtocolOptionsFactory() = default;
 
@@ -329,31 +336,14 @@ public:
    * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
-   * @param context supplies the filter's context.
+   * @param filter_chain_factory_context supplies the filter's context.
    * @return Network::FilterFactoryCb the factory creation function.
    */
-  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                FactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               FactoryContext& filter_chain_factory_context) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a network filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.network"; }
+  std::string category() const override { return "envoy.filters.network"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -377,23 +367,7 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 CommonFactoryContext& context) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a network filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.upstream_network"; }
+  std::string category() const override { return "envoy.filters.upstream_network"; }
 };
 
 /**
@@ -419,13 +393,6 @@ public:
                                                              FactoryContext& context) PURE;
 
   /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
    *         cluster-local config proto message for v2. The filter config, which arrives in an
    *         opaque message, will be parsed into this empty proto. By default, this method
@@ -446,18 +413,7 @@ public:
     return nullptr;
   }
 
-  /**
-   * @return std::string the identifying name for a particular implementation of an http filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.http"; }
+  std::string category() const override { return "envoy.filters.http"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

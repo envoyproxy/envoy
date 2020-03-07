@@ -1,3 +1,5 @@
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+
 #include "test/common/config/filesystem_subscription_test_harness.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
@@ -45,7 +47,7 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks;
   EXPECT_THROW_WITH_MESSAGE(FilesystemSubscriptionImpl(dispatcher, "##!@/dev/null", callbacks,
                                                        stats, validation_visitor, *api),
                             EnvoyException, "bad path");

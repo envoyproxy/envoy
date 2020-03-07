@@ -1,7 +1,7 @@
 #include "extensions/access_loggers/grpc/http_config.h"
 
-#include "envoy/config/accesslog/v2/als.pb.validate.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -27,7 +27,7 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
-      const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(
+      const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
   return std::make_shared<HttpGrpcAccessLog>(
@@ -36,7 +36,7 @@ HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& confi
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::accesslog::v2::HttpGrpcAccessLogConfig>();
+  return std::make_unique<envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig>();
 }
 
 std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get().HttpGrpc; }
@@ -44,7 +44,8 @@ std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get(
 /**
  * Static registration for the HTTP gRPC access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(HttpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory);
+REGISTER_FACTORY(HttpGrpcAccessLogFactory,
+                 Server::Configuration::AccessLogInstanceFactory){"envoy.http_grpc_access_log"};
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers

@@ -2,9 +2,9 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_package",
 )
 
@@ -66,6 +66,12 @@ envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
     deps = ["//source/common/common:cleanup_lib"],
+)
+
+envoy_cc_test(
+    name = "mem_block_builder_test",
+    srcs = ["mem_block_builder_test.cc"],
+    deps = ["//source/common/common:mem_block_builder_lib"],
 )
 
 envoy_cc_test(
@@ -131,8 +137,9 @@ envoy_cc_test(
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -165,6 +172,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:regex_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -185,20 +193,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "stack_array_test",
-    srcs = ["stack_array_test.cc"],
-    deps = [
-        "//source/common/common:stack_array",
-    ],
-)
-
-envoy_cc_test(
-    name = "to_lower_table_test",
-    srcs = ["to_lower_table_test.cc"],
-    deps = ["//source/common/common:to_lower_table_lib"],
-)
-
-envoy_cc_test(
     name = "token_bucket_impl_test",
     srcs = ["token_bucket_impl_test.cc"],
     deps = [
@@ -214,7 +208,7 @@ envoy_cc_test(
     deps = ["//source/common/common:callback_impl_lib"],
 )
 
-envoy_cc_binary(
+envoy_cc_test_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
     external_deps = [
@@ -251,5 +245,16 @@ envoy_cc_test(
     srcs = ["stl_helpers_test.cc"],
     deps = [
         "//source/common/common:stl_helpers",
+    ],
+)
+
+envoy_cc_test(
+    name = "version_test",
+    srcs = ["version_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//source/common/common:version_lib",
     ],
 )

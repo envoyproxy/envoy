@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 
@@ -25,6 +27,7 @@ using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -54,12 +57,12 @@ public:
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
           connection_balancer_(std::make_unique<Network::NopConnectionBalancerImpl>()) {
-      envoy::api::v2::listener::UdpListenerConfig dummy;
+      envoy::config::listener::v3::UdpListenerConfig dummy;
       std::string listener_name("raw_udp_listener");
       dummy.set_udp_listener_name(listener_name);
       udp_listener_factory_ =
-          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
-              .createActiveUdpListenerFactory(dummy);
+          Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(listener_name)
+              .createActiveUdpListenerFactory(dummy, /*concurrency=*/1);
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
 
@@ -81,11 +84,11 @@ public:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
-    const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+    Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
-    envoy::api::v2::core::TrafficDirection direction() const override {
-      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    envoy::config::core::v3::TrafficDirection direction() const override {
+      return envoy::config::core::v3::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 

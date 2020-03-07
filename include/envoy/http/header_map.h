@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/common/macros.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -61,7 +62,9 @@ public:
   bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
 
 private:
-  void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
+  void lower() {
+    std::transform(string_.begin(), string_.end(), string_.begin(), absl::ascii_tolower);
+  }
   bool valid() const { return validHeaderString(string_); }
 
   std::string string_;
@@ -86,16 +89,25 @@ using LowerCaseStrPairVector =
     std::vector<std::pair<const Http::LowerCaseString, const std::string>>;
 
 /**
+ * Convenient type for an inline vector that will be used by HeaderString.
+ */
+using InlineHeaderVector = absl::InlinedVector<char, 128>;
+
+/**
+ * Convenient type for the underlying type of HeaderString that allows a variant
+ * between string_view and the InlinedVector.
+ */
+using VariantHeader = absl::variant<absl::string_view, InlineHeaderVector>;
+
+/**
  * This is a string implementation for use in header processing. It is heavily optimized for
- * performance. It supports 3 different types of storage and can switch between them:
+ * performance. It supports 2 different types of storage and can switch between them:
  * 1) A reference.
- * 2) Interned string.
- * 3) Heap allocated storage.
+ * 2) An InlinedVector (an optimized interned string for small strings, but allows heap
+ * allocation if needed).
  */
 class HeaderString {
 public:
-  enum class Type { Inline, Reference, Dynamic };
-
   /**
    * Default constructor. Sets up for inline storage.
    */
@@ -113,10 +125,10 @@ public:
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  explicit HeaderString(const std::string& ref_value);
+  explicit HeaderString(absl::string_view ref_value);
 
   HeaderString(HeaderString&& move_value) noexcept;
-  ~HeaderString();
+  ~HeaderString() = default;
 
   /**
    * Append data to an existing string. If the string is a reference string the reference data is
@@ -125,16 +137,23 @@ public:
   void append(const char* data, uint32_t size);
 
   /**
-   * @return the modifiable backing buffer (either inline or heap allocated).
+   * Transforms the inlined vector data using the given UnaryOperation (conforms
+   * to std::transform).
+   * @param unary_op the operations to be performed on each of the elements.
    */
-  char* buffer() { return buffer_.dynamic_; }
+  template <typename UnaryOperation> void inlineTransform(UnaryOperation&& unary_op) {
+    ASSERT(type() == Type::Inline);
+    std::transform(absl::get<InlineHeaderVector>(buffer_).begin(),
+                   absl::get<InlineHeaderVector>(buffer_).end(),
+                   absl::get<InlineHeaderVector>(buffer_).begin(), unary_op);
+  }
 
   /**
    * Get an absl::string_view. It will NOT be NUL terminated!
    *
    * @return an absl::string_view.
    */
-  absl::string_view getStringView() const { return {buffer_.ref_, string_length_}; }
+  absl::string_view getStringView() const;
 
   /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
@@ -145,7 +164,7 @@ public:
   /**
    * @return whether the string is empty or not.
    */
-  bool empty() const { return string_length_ == 0; }
+  bool empty() const { return size() == 0; }
 
   // Looking for find? Use getStringView().find()
 
@@ -172,14 +191,14 @@ public:
   void setReference(absl::string_view ref_value);
 
   /**
-   * @return the size of the string, not including the null terminator.
+   * @return whether the string is a reference or an InlinedVector.
    */
-  uint32_t size() const { return string_length_; }
+  bool isReference() const { return type() == Type::Reference; }
 
   /**
-   * @return the type of backing storage for the string.
+   * @return the size of the string, not including the null terminator.
    */
-  Type type() const { return type_; }
+  uint32_t size() const;
 
   bool operator==(const char* rhs) const {
     return getStringView() == absl::NullSafeStringView(rhs);
@@ -191,25 +210,16 @@ public:
   bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
 private:
-  union Buffer {
-    // This should reference inline_buffer_ for Type::Inline.
-    char* dynamic_;
-    const char* ref_;
-  } buffer_;
+  enum class Type { Reference, Inline };
 
-  // Capacity in both Type::Inline and Type::Dynamic cases must be at least MinDynamicCapacity in
-  // header_map_impl.cc.
-  union {
-    char inline_buffer_[128];
-    // Since this is a union, this is only valid for type_ == Type::Dynamic.
-    uint32_t dynamic_capacity_;
-  };
+  VariantHeader buffer_;
 
-  void freeDynamic();
   bool valid() const;
 
-  uint32_t string_length_;
-  Type type_;
+  /**
+   * @return the type of backing storage for the string.
+   */
+  Type type() const;
 };
 
 /**
@@ -223,13 +233,6 @@ public:
    * @return the header key.
    */
   virtual const HeaderString& key() const PURE;
-
-  /**
-   * Set the header value by copying data into it (deprecated, use absl::string_view variant
-   * instead).
-   * TODO(htuch): Cleanup deprecated call sites.
-   */
-  virtual void value(const char* value, uint32_t size) PURE;
 
   /**
    * Set the header value by copying data into it.
@@ -345,19 +348,23 @@ private:
   HEADER_FUNC(Via)
 
 /**
- * The following functions are defined for each inline header above. E.g., for ContentLength we
- * have:
+ * The following functions are defined for each inline header above.
+
+ * E.g., for path we have:
+ * Path() -> returns the header entry if it exists or nullptr.
+ * appendPath(path, "/") -> appends the string path with delimiter "/" to the header value.
+ * setReferencePath(PATH) -> sets header value to reference string PATH.
+ * setPath(path_string) -> sets the header value to the string path_string by copying the data.
+ * removePath() -> removes the header if it exists.
  *
- * ContentLength() -> returns the header entry if it exists or nullptr.
- * insertContentLength() -> inserts the header if it does not exist, and returns a reference to it.
- * removeContentLength() -> removes the header if it exists.
+ * For inline headers that use integers, we have:
+ * setContentLength(5) -> sets the header value to the integer 5.
  *
- * TODO(asraa): Remove functions with a non-const HeaderEntry return value.
+ * TODO(asraa): Remove the integer set for inline headers that do not take integer values.
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
-  virtual HeaderEntry* name() PURE;                                                                \
-  virtual HeaderEntry& insert##name() PURE;                                                        \
+  virtual void append##name(absl::string_view data, absl::string_view delimiter) PURE;             \
   virtual void setReference##name(absl::string_view value) PURE;                                   \
   virtual void set##name(absl::string_view value) PURE;                                            \
   virtual void set##name(uint64_t value) PURE;                                                     \
@@ -373,6 +380,20 @@ public:
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER)
 
   /**
+   * For testing. This is an exact match comparison (order matters).
+   */
+  virtual bool operator==(const HeaderMap& rhs) const PURE;
+  virtual bool operator!=(const HeaderMap& rhs) const PURE;
+
+  /**
+   * Add a header via full move. This is the expected high performance paths for codecs populating
+   * a map when receiving.
+   * @param key supplies the header key.
+   * @param value supplies the header value.
+   */
+  virtual void addViaMove(HeaderString&& key, HeaderString&& value) PURE;
+
+  /**
    * Add a reference header to the map. Both key and value MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). The key will not be copied and a best effort will be made not to
@@ -381,12 +402,11 @@ public:
    * Calling addReference multiple times for the same header will result in:
    * - Comma concatenation for predefined inline headers.
    * - Multiple headers being present in the HeaderMap for other headers.
-   * TODO(asraa): Replace const std::string& param with an absl::string_view.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL NOT be copied.
    */
-  virtual void addReference(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void addReference(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Add a header with a reference key to the map. The key MUST point to data that will live beyond
@@ -414,7 +434,7 @@ public:
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
    */
-  virtual void addReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void addReferenceKey(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Add a header by copying both the header key and the value.
@@ -438,7 +458,20 @@ public:
    * @param key specifies the name of the header to add; it WILL be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
    */
-  virtual void addCopy(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void addCopy(const LowerCaseString& key, absl::string_view value) PURE;
+
+  /**
+   * Appends data to header. If header already has a value, the string "," is added between the
+   * existing value and data.
+   *
+   * @param key specifies the name of the header to append; it WILL be copied.
+   * @param value specifies the value of the header to add; it WILL be copied.
+   *
+   * Caution: This iterates over the HeaderMap to find the header to append. This will modify only
+   * the first occurrence of the header.
+   * TODO(asraa): Investigate whether necessary to append to all headers with the key.
+   */
+  virtual void appendCopy(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Set a reference header in the map. Both key and value MUST point to data that will live beyond
@@ -447,12 +480,11 @@ public:
    *
    * Calling setReference multiple times for the same header will result in only the last header
    * being present in the HeaderMap.
-   * TODO(asraa): Replace const std::string& param with an absl::string_view.
    *
    * @param key specifies the name of the header to set; it WILL NOT be copied.
    * @param value specifies the value of the header to set; it WILL NOT be copied.
    */
-  virtual void setReference(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void setReference(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Set a header with a reference key in the map. The key MUST point to point to data that will
@@ -465,44 +497,28 @@ public:
    * @param key specifies the name of the header to set; it WILL NOT be copied.
    * @param value specifies the value of the header to set; it WILL be copied.
    */
-  virtual void setReferenceKey(const LowerCaseString& key, const std::string& value) PURE;
+  virtual void setReferenceKey(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
-   * HeaderMap contains an internal byte size count, updated as entries are added, removed, or
-   * modified through the HeaderMap interface. However, HeaderEntries can be accessed and modified
-   * by reference so that the HeaderMap can no longer accurately update the internal byte size
-   * count.
+   * Replaces a header value by copying the value. Copies the key if the key does not exist.
    *
-   * Calling byteSize before a HeaderEntry is accessed will return the internal byte size count. The
-   * value is cleared when a HeaderEntry is accessed, and the value is updated and set again when
-   * refreshByteSize is called.
+   * Calling setCopy multiple times for the same header will result in only the last header
+   * being present in the HeaderMap.
    *
-   * To guarantee an accurate byte size count, call refreshByteSize.
+   * @param key specifies the name of the header to set; it WILL be copied.
+   * @param value specifies the value of the header to set; it WILL be copied.
    *
-   * @return uint64_t the approximate size of the header map in bytes if valid.
+   * Caution: This iterates over the HeaderMap to find the header to set. This will modify only the
+   * first occurrence of the header.
+   * TODO(asraa): Investigate whether necessary to set all headers with the key.
    */
-  virtual absl::optional<uint64_t> byteSize() const PURE;
+  virtual void setCopy(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
-   * This returns the sum of the byte sizes of the keys and values in the HeaderMap. This also
-   * updates and sets the byte size count.
-   *
-   * To guarantee an accurate byte size count, use this. If it is known HeaderEntries have not been
-   * manipulated since a call to refreshByteSize, it is safe to use byteSize.
-   *
-   * @return uint64_t the approximate size of the header map in bytes.
+   * @return uint64_t the size of the header map in bytes. This is the sum of the header keys and
+   * values and does not account for data structure overhead.
    */
-  virtual uint64_t refreshByteSize() PURE;
-
-  /**
-   * This returns the sum of the byte sizes of the keys and values in the HeaderMap.
-   *
-   * This iterates over the HeaderMap to calculate size and should only be called directly when the
-   * user wants an explicit recalculation of the byte size.
-   *
-   * @return uint64_t the approximate size of the header map in bytes.
-   */
-  virtual uint64_t byteSizeInternal() const PURE;
+  virtual uint64_t byteSize() const PURE;
 
   /**
    * Get a header by key.
@@ -510,7 +526,6 @@ public:
    * @return the header entry if it exists otherwise nullptr.
    */
   virtual const HeaderEntry* get(const LowerCaseString& key) const PURE;
-  virtual HeaderEntry* get(const LowerCaseString& key) PURE;
 
   // aliases to make iterate() and iterateReverse() callbacks easier to read
   enum class Iterate { Continue, Break };
@@ -548,6 +563,11 @@ public:
    * exist, or Lookup::NotSupported if key is not one of the predefined inline headers.
    */
   virtual Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const PURE;
+
+  /**
+   * Clears the headers in the map.
+   */
+  virtual void clear() PURE;
 
   /**
    * Remove all instances of a header by key.
@@ -590,9 +610,43 @@ public:
     headers.dumpState(os);
     return os;
   }
+
+protected:
+  // In TestHeaderMapImpl and VerifiedHeaderMapImpl, this method is overridden to perform a
+  // time-consuming manual byte size count on each operation to verify the byte size. For prod
+  // HeaderMaps, this verification is skipped.
+  // TODO(asraa): Move this verification out of prod code and wrap virtual HeaderMap methods
+  // in both VerifiedHeaderMapImpl and TestHeaderMapImpl with the verification.
+  virtual void verifyByteSize() {}
 };
 
 using HeaderMapPtr = std::unique_ptr<HeaderMap>;
+
+/**
+ * Typed derived classes for all header map types.
+ */
+
+// Base class for both request and response headers.
+class RequestOrResponseHeaderMap : public virtual HeaderMap {};
+
+// Request headers.
+class RequestHeaderMap : public RequestOrResponseHeaderMap {};
+using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
+
+// Request trailers.
+class RequestTrailerMap : public virtual HeaderMap {};
+using RequestTrailerMapPtr = std::unique_ptr<RequestTrailerMap>;
+
+// Base class for both response headers and trailers.
+class ResponseHeaderOrTrailerMap : public virtual HeaderMap {};
+
+// Response headers.
+class ResponseHeaderMap : public RequestOrResponseHeaderMap, public ResponseHeaderOrTrailerMap {};
+using ResponseHeaderMapPtr = std::unique_ptr<ResponseHeaderMap>;
+
+// Response trailers.
+class ResponseTrailerMap : public virtual HeaderMap, public ResponseHeaderOrTrailerMap {};
+using ResponseTrailerMapPtr = std::unique_ptr<ResponseTrailerMap>;
 
 /**
  * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
@@ -606,7 +660,7 @@ class HeaderMatcher {
 public:
   virtual ~HeaderMatcher() = default;
 
-  /*
+  /**
    * Check whether header matcher matches any headers in a given HeaderMap.
    */
   virtual bool matchesHeaders(const HeaderMap& headers) const PURE;

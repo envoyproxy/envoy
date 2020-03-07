@@ -23,10 +23,11 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     uint32_t send_buffer_limit)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      QuicFilterManagerConnectionImpl(connection.get(), dispatcher, send_buffer_limit),
+      QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
       quic_connection_(std::move(connection)) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
+  ASSERT(!quic_connection_->connected());
   QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
 }
 
@@ -34,11 +35,12 @@ absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
 }
 
-quic::QuicCryptoServerStreamBase* EnvoyQuicServerSession::CreateQuicCryptoServerStream(
+std::unique_ptr<quic::QuicCryptoServerStreamBase>
+EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
-  return new quic::QuicCryptoServerStream(crypto_config, compressed_certs_cache, this,
-                                          stream_helper());
+  return quic::CreateCryptoServerStream(crypto_config, compressed_certs_cache, this,
+                                        stream_helper());
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {
@@ -69,10 +71,10 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicStream& stream) {
+void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) {
   ASSERT(http_connection_callbacks_ != nullptr);
-  Http::StreamDecoder& decoder = http_connection_callbacks_->newStream(stream);
-  stream.setDecoder(decoder);
+  Http::RequestDecoder& decoder = http_connection_callbacks_->newStream(stream);
+  stream.setRequestDecoder(decoder);
 }
 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
@@ -92,12 +94,22 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
   }
 }
 
-void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
-  quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
-  if (event == HANDSHAKE_CONFIRMED) {
+void EnvoyQuicServerSession::OnCanWrite() {
+  quic::QuicServerSessionBase::OnCanWrite();
+  // Do not update delay close state according to connection level packet egress because that is
+  // equivalent to TCP transport layer egress. But only do so if the session gets chance to write.
+  maybeApplyDelayClosePolicy();
+}
+
+void EnvoyQuicServerSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
+  quic::QuicServerSessionBase::SetDefaultEncryptionLevel(level);
+  if (level == quic::ENCRYPTION_FORWARD_SECURE) {
+    // This is only reached once, when handshake is done.
     raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }
+
+bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 } // namespace Quic
 } // namespace Envoy

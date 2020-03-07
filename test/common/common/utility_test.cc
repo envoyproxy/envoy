@@ -199,13 +199,6 @@ TEST(StringUtil, toUpper) {
   EXPECT_EQ(StringUtil::toUpper("X asdf aAf"), "X ASDF AAF");
 }
 
-TEST(StringUtil, toLower) {
-  EXPECT_EQ(StringUtil::toLower(""), "");
-  EXPECT_EQ(StringUtil::toLower("a"), "a");
-  EXPECT_EQ(StringUtil::toLower("Ba"), "ba");
-  EXPECT_EQ(StringUtil::toLower("X asdf aAf"), "x asdf aaf");
-}
-
 TEST(StringUtil, StringViewLtrim) {
   EXPECT_EQ("", StringUtil::ltrim("     "));
   EXPECT_EQ("hello \t\f\v\n\r", StringUtil::ltrim("   hello \t\f\v\n\r"));
@@ -247,13 +240,6 @@ TEST(StringUtil, StringViewCaseFindToken) {
   EXPECT_TRUE(StringUtil::caseFindToken(" ", " ", "", true));
   EXPECT_FALSE(StringUtil::caseFindToken(" ", " ", "", false));
   EXPECT_TRUE(StringUtil::caseFindToken("A=5", ".", "A=5"));
-}
-
-TEST(StringUtil, StringViewCaseCompare) {
-  EXPECT_TRUE(StringUtil::caseCompare("HELLO world", "hello world"));
-  EXPECT_TRUE(StringUtil::caseCompare("hello world", "HELLO world"));
-  EXPECT_FALSE(StringUtil::caseCompare("hello world", "hello"));
-  EXPECT_FALSE(StringUtil::caseCompare("hello", "hello world"));
 }
 
 TEST(StringUtil, StringViewCropRight) {
@@ -802,34 +788,42 @@ TEST(DateFormatter, FromTimeSameWildcard) {
 
 TEST(TrieLookupTable, AddItems) {
   TrieLookupTable<const char*> trie;
-  EXPECT_TRUE(trie.add("foo", "a"));
-  EXPECT_TRUE(trie.add("bar", "b"));
-  EXPECT_EQ("a", trie.find("foo"));
-  EXPECT_EQ("b", trie.find("bar"));
+  const char* cstr_a = "a";
+  const char* cstr_b = "b";
+  const char* cstr_c = "c";
+
+  EXPECT_TRUE(trie.add("foo", cstr_a));
+  EXPECT_TRUE(trie.add("bar", cstr_b));
+  EXPECT_EQ(cstr_a, trie.find("foo"));
+  EXPECT_EQ(cstr_b, trie.find("bar"));
 
   // overwrite_existing = false
-  EXPECT_FALSE(trie.add("foo", "c", false));
-  EXPECT_EQ("a", trie.find("foo"));
+  EXPECT_FALSE(trie.add("foo", cstr_c, false));
+  EXPECT_EQ(cstr_a, trie.find("foo"));
 
   // overwrite_existing = true
-  EXPECT_TRUE(trie.add("foo", "c"));
-  EXPECT_EQ("c", trie.find("foo"));
+  EXPECT_TRUE(trie.add("foo", cstr_c));
+  EXPECT_EQ(cstr_c, trie.find("foo"));
 }
 
 TEST(TrieLookupTable, LongestPrefix) {
   TrieLookupTable<const char*> trie;
-  EXPECT_TRUE(trie.add("foo", "a"));
-  EXPECT_TRUE(trie.add("bar", "b"));
-  EXPECT_TRUE(trie.add("baro", "c"));
+  const char* cstr_a = "a";
+  const char* cstr_b = "b";
+  const char* cstr_c = "c";
 
-  EXPECT_EQ("a", trie.find("foo"));
-  EXPECT_EQ("a", trie.findLongestPrefix("foo"));
-  EXPECT_EQ("a", trie.findLongestPrefix("foosball"));
+  EXPECT_TRUE(trie.add("foo", cstr_a));
+  EXPECT_TRUE(trie.add("bar", cstr_b));
+  EXPECT_TRUE(trie.add("baro", cstr_c));
 
-  EXPECT_EQ("b", trie.find("bar"));
-  EXPECT_EQ("b", trie.findLongestPrefix("bar"));
-  EXPECT_EQ("b", trie.findLongestPrefix("baritone"));
-  EXPECT_EQ("c", trie.findLongestPrefix("barometer"));
+  EXPECT_EQ(cstr_a, trie.find("foo"));
+  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo"));
+  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foosball"));
+
+  EXPECT_EQ(cstr_b, trie.find("bar"));
+  EXPECT_EQ(cstr_b, trie.findLongestPrefix("bar"));
+  EXPECT_EQ(cstr_b, trie.findLongestPrefix("baritone"));
+  EXPECT_EQ(cstr_c, trie.findLongestPrefix("barometer"));
 
   EXPECT_EQ(nullptr, trie.find("toto"));
   EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));

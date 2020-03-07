@@ -46,8 +46,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
       .Times(0);
   EXPECT_CALL(*timer_, enableTimer(_, _));
   EXPECT_CALL(random_, random());
-  subscription_->grpcMux()->grpcStreamForTest().onRemoteClose(
-      Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+  mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
   verifyControlPlaneStats(0);
 

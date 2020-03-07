@@ -2,6 +2,9 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/base.pb.validate.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
@@ -27,9 +30,9 @@ namespace {
 
 class FakeTransportSocketFactory : public Network::TransportSocketFactory {
 public:
-  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD1(createTransportSocket,
-                     Network::TransportSocketPtr(Network::TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
+              (Network::TransportSocketOptionsSharedPtr), (const));
   FakeTransportSocketFactory(std::string id) : id_(std::move(id)) {}
   std::string id() const { return id_; }
 
@@ -42,14 +45,14 @@ class FooTransportSocketFactory
       public Server::Configuration::UpstreamTransportSocketConfigFactory,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_CONST_METHOD1(createTransportSocket,
-                     Network::TransportSocketPtr(Network::TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
+              (Network::TransportSocketOptionsSharedPtr), (const));
 
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,
                                Server::Configuration::TransportSocketFactoryContext&) override {
-    const auto& node = dynamic_cast<const envoy::api::v2::core::Node&>(proto);
+    const auto& node = dynamic_cast<const envoy::config::core::v3::Node&>(proto);
     std::string id = "default-foo";
     if (!node.id().empty()) {
       id = node.id();
@@ -58,7 +61,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::api::v2::core::Node>();
+    return std::make_unique<envoy::config::core::v3::Node>();
   }
 
   std::string name() const override { return "foo"; }
@@ -71,7 +74,7 @@ public:
         stats_scope_(stats_store_.createScope("transport_socket_match.test")) {}
 
   void init(const std::vector<std::string>& match_yaml) {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch> matches;
+    Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch> matches;
     for (const auto& yaml : match_yaml) {
       auto transport_socket_match = matches.Add();
       TestUtility::loadFromYaml(yaml, *transport_socket_match);
@@ -80,8 +83,8 @@ public:
                                                             mock_default_factory_, *stats_scope_);
   }
 
-  void validate(const envoy::api::v2::core::Metadata& metadata, const std::string& expected) {
-    auto& factory = matcher_->resolve(metadata).factory_;
+  void validate(const envoy::config::core::v3::Metadata& metadata, const std::string& expected) {
+    auto& factory = matcher_->resolve(&metadata).factory_;
     const auto& config_factory = dynamic_cast<const FakeTransportSocketFactory&>(factory);
     EXPECT_EQ(expected, config_factory.id());
   }
@@ -105,7 +108,7 @@ transport_socket:
     id: "abc"
  )EOF"});
 
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   validate(metadata, "default");
 }
 
@@ -128,17 +131,17 @@ transport_socket:
     id: "http"
  )EOF"});
 
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
-  envoy.transport_socket_match: { sidecar: "true" } 
+  envoy.transport_socket_match: { sidecar: "true" }
 )EOF",
                             metadata);
 
   validate(metadata, "sidecar");
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
-  envoy.transport_socket_match: { protocol: "http" } 
+  envoy.transport_socket_match: { protocol: "http" }
 )EOF",
                             metadata);
   validate(metadata, "http");
@@ -164,7 +167,7 @@ transport_socket:
   config:
     id: "sidecar"
  )EOF"});
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
   envoy.transport_socket_match: { sidecar: "true", protocol: "http" }
@@ -182,7 +185,7 @@ transport_socket:
   config:
     id: "match_all"
  )EOF"});
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   validate(metadata, "match_all");
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:

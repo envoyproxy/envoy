@@ -34,7 +34,7 @@ To generate the example configurations run the following from the root of the re
 
   mkdir -p generated/configs
   bazel build //configs:example_configs
-  tar xvf $PWD/bazel-genfiles/configs/example_configs.tar -C generated/configs
+  tar xvf $PWD/bazel-out/k8-fastbuild/bin/configs/example_configs.tar -C generated/configs
 
 The previous command will produce three fully expanded configurations using some variables
 defined inside of `configgen.py`. See the comments inside of `configgen.py` for detailed
@@ -50,7 +50,7 @@ A few notes about the example configurations:
   disable this or enable `Zipkin <https://zipkin.io>`_ or `Datadog <https://datadoghq.com>`_ tracing, delete or
   change the :ref:`tracing configuration <envoy_api_file_envoy/config/trace/v2/trace.proto>` accordingly.
 * The configuration demonstrates the use of a :ref:`global rate limiting service
-  <arch_overview_rate_limit>`. To disable this delete the :ref:`rate limit configuration
+  <arch_overview_global_rate_limit>`. To disable this delete the :ref:`rate limit configuration
   <config_rate_limit_service>`.
 * :ref:`Route discovery service <config_http_conn_man_rds>` is configured for the service to service
   reference configuration and it is assumed to be running at `rds.yourcompany.net`.

@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/secret/secret_provider.h"
 
 namespace Envoy {
@@ -26,7 +27,8 @@ public:
    * @param add a static secret from envoy::api::v2::auth::Secret.
    * @throw an EnvoyException if the secret is invalid or not supported, or there is duplicate.
    */
-  virtual void addStaticSecret(const envoy::api::v2::auth::Secret& secret) PURE;
+  virtual void
+  addStaticSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) PURE;
 
   /**
    * @param name a name of the static TlsCertificateConfigProvider.
@@ -53,11 +55,19 @@ public:
   findStaticTlsSessionTicketKeysContextProvider(const std::string& name) const PURE;
 
   /**
+   * @param name a name of the static GenericSecretConfigProvider.
+   * @return the GenericSecretConfigProviderSharedPtr. Returns nullptr if the static secret is not
+   * found.
+   */
+  virtual GenericSecretConfigProviderSharedPtr
+  findStaticGenericSecretProvider(const std::string& name) const PURE;
+
+  /**
    * @param tls_certificate the protobuf config of the TLS certificate.
    * @return a TlsCertificateConfigProviderSharedPtr created from tls_certificate.
    */
   virtual TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
-      const envoy::api::v2::auth::TlsCertificate& tls_certificate) PURE;
+      const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate) PURE;
 
   /**
    * @param certificate_validation_context the protobuf config of the certificate validation
@@ -67,15 +77,23 @@ public:
    */
   virtual CertificateValidationContextConfigProviderSharedPtr
   createInlineCertificateValidationContextProvider(
-      const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
-      PURE;
+      const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
+          certificate_validation_context) PURE;
 
   /**
    * @param tls_certificate the protobuf config of the TLS session ticket keys.
    * @return a TlsSessionTicketKeysConfigProviderSharedPtr created from session_ticket_keys.
    */
   virtual TlsSessionTicketKeysConfigProviderSharedPtr createInlineTlsSessionTicketKeysProvider(
-      const envoy::api::v2::auth::TlsSessionTicketKeys& tls_certificate) PURE;
+      const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys& tls_certificate)
+      PURE;
+
+  /**
+   * @param generic_secret the protobuf config of the generic secret.
+   * @return a GenericSecretConfigProviderSharedPtr created from tls_certificate.
+   */
+  virtual GenericSecretConfigProviderSharedPtr createInlineGenericSecretProvider(
+      const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create
@@ -88,7 +106,7 @@ public:
    * @return TlsCertificateConfigProviderSharedPtr the dynamic TLS secret provider.
    */
   virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
-      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 
   /**
@@ -104,7 +122,7 @@ public:
    */
   virtual CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
-      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 
   /**
@@ -120,7 +138,21 @@ public:
    */
   virtual TlsSessionTicketKeysConfigProviderSharedPtr
   findOrCreateTlsSessionTicketKeysContextProvider(
-      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
+
+  /**
+   * Finds and returns a dynamic secret provider associated to SDS config. Create a new one if such
+   * provider does not exist.
+   *
+   * @param config_source a protobuf message object containing a SDS config source.
+   * @param config_name a name that uniquely refers to the SDS config source.
+   * @param secret_provider_context context that provides components for creating and initializing
+   * secret provider.
+   * @return GenericSecretConfigProviderSharedPtr the dynamic generic secret provider.
+   */
+  virtual GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
 

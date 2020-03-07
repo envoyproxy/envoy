@@ -16,5 +16,7 @@ envoy_cc_mock(
         "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/upstream:upstream_interface",
         "//test/mocks/upstream:host_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

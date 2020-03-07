@@ -11,6 +11,8 @@ def envoy_copts(repository, test = False):
         "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
+        "-Wformat",
+        "-Wformat-security",
         "-Wvla",
         "-std=c++14",
     ]
@@ -67,6 +69,9 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
            }) + select({
+               repository + "//bazel:disable_known_issue_asserts": ["-DENVOY_DISABLE_KNOWN_ISSUE_ASSERTS"],
+               "//conditions:default": [],
+           }) + select({
                # APPLE_USE_RFC_3542 is needed to support IPV6_PKTINFO in MAC OS.
                repository + "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
                "//conditions:default": [],
@@ -96,6 +101,7 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
 def envoy_stdlib_deps():
     return select({
         "@envoy//bazel:asan_build": ["@envoy//bazel:dynamic_stdlib"],
+        "@envoy//bazel:msan_build": ["@envoy//bazel:dynamic_stdlib"],
         "@envoy//bazel:tsan_build": ["@envoy//bazel:dynamic_stdlib"],
         "//conditions:default": ["@envoy//bazel:static_stdlib"],
     })

@@ -2,6 +2,7 @@
 
 #include <datadog/opentracing.h>
 
+#include "envoy/config/trace/v3/trace.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -41,8 +42,8 @@ public:
   /**
    * Constructor. It adds itself and a newly-created Datadog::Tracer object to a thread-local store.
    */
-  Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
-         Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+  Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
+         Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime);
 
   // Getters to return the DatadogDriver's key members.
@@ -106,7 +107,7 @@ public:
   TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Event::Dispatcher& dispatcher);
 
   // Http::AsyncClient::Callbacks.
-  void onSuccess(Http::MessagePtr&&) override;
+  void onSuccess(Http::ResponseMessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
 private:

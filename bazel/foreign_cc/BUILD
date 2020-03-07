@@ -129,14 +129,22 @@ envoy_cmake_external(
     },
     lib_source = "@com_github_libevent_libevent//:all",
     static_libraries = select({
+        # macOS organization of libevent is different from Windows/Linux.
+        # Including libevent_core is a requirement on those platforms, but
+        # results in duplicate symbols when built on macOS.
+        # See https://github.com/lyft/envoy-mobile/issues/677 for details.
+        "//bazel:apple": [
+            "libevent.a",
+            "libevent_pthreads.a",
+        ],
         "//bazel:windows_x86_64": [
             "event.lib",
             "event_core.lib",
-            "event_extra.lib",
         ],
         "//conditions:default": [
             "libevent.a",
             "libevent_pthreads.a",
+            "libevent_core.a",
         ],
     }),
 )
@@ -155,8 +163,8 @@ envoy_cmake_external(
     defines = ["NGHTTP2_STATICLIB"],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     static_libraries = select({
-        "//bazel:windows_x86_64": ["nghttp2.lib"],
-        "//conditions:default": ["libnghttp2.a"],
+        "//bazel:windows_x86_64": ["nghttp2_static.lib"],
+        "//conditions:default": ["libnghttp2_static.a"],
     }),
 )
 

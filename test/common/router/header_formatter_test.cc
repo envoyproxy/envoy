@@ -1,7 +1,9 @@
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"
@@ -12,10 +14,12 @@
 #include "common/stream_info/filter_state_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -30,8 +34,8 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::route::Route route;
+static envoy::config::route::v3::Route parseRouteFromV2Yaml(const std::string& yaml) {
+  envoy::config::route::v3::Route route;
   TestUtility::loadFromYaml(yaml, route);
   return route;
 }
@@ -80,6 +84,29 @@ TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariabl
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.host_.reset();
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestformatWithHostnameVariable) {
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char*, size_t) -> Api::SysCallIntResult {
+          return {-1, ENAMETOOLONG};
+        }));
+    testFormatting("HOSTNAME", "-");
+  }
+
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+          StringUtil::strlcpy(name, "myhostname", 11);
+          return {0, 0};
+        }));
+    testFormatting("HOSTNAME", "myhostname");
+  }
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
@@ -432,8 +459,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
 
-  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
-      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           namespace:
@@ -453,7 +480,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Prove we're testing the expected types.
   const auto& nested_struct =
-      Envoy::Config::Metadata::metadataValue(*metadata, "namespace", "nested").struct_value();
+      Envoy::Config::Metadata::metadataValue(metadata.get(), "namespace", "nested").struct_value();
   EXPECT_EQ(nested_struct.fields().at("str_key").kind_case(), ProtobufWkt::Value::kStringValue);
   EXPECT_EQ(nested_struct.fields().at("bool_key1").kind_case(), ProtobufWkt::Value::kBoolValue);
   EXPECT_EQ(nested_struct.fields().at("bool_key2").kind_case(), ProtobufWkt::Value::kBoolValue);
@@ -511,8 +538,9 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 // size checks on user defined headers.
 TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
   {
-    envoy::api::v2::RouteConfiguration route;
-    envoy::api::v2::core::HeaderValueOption* header = route.mutable_request_headers_to_add()->Add();
+    envoy::config::route::v3::RouteConfiguration route;
+    envoy::config::core::v3::HeaderValueOption* header =
+        route.mutable_request_headers_to_add()->Add();
     std::string long_string(16385, 'a');
     header->mutable_header()->set_key("header_name");
     header->mutable_header()->set_value(long_string);
@@ -521,9 +549,9 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
                             "Proto constraint validation failed.*");
   }
   {
-    envoy::api::v2::RouteConfiguration route;
+    envoy::config::route::v3::RouteConfiguration route;
     for (int i = 0; i < 1001; ++i) {
-      envoy::api::v2::core::HeaderValueOption* header =
+      envoy::config::core::v3::HeaderValueOption* header =
           route.mutable_request_headers_to_add()->Add();
       header->mutable_header()->set_key("header_name");
       header->mutable_header()->set_value("value");
@@ -542,29 +570,35 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
-  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
-  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(stream_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", filter_state->getDataReadOnly<StringAccessor>("testing").asString());
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
-                       StreamInfo::FilterState::StateType::ReadOnly);
-  EXPECT_EQ(1, filter_state.getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(1, filter_state->getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
-  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   testFormatting(stream_info, "PER_REQUEST_STATE(testing)", "");
 }
@@ -791,13 +825,13 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
 
   // Upstream metadata with percent signs in the key.
-  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
-      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           ns:
@@ -811,15 +845,18 @@ TEST(HeaderParserTest, TestParseInternal) {
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(stream_info, startTime()).WillByDefault(Return(start_time));
 
-  Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
-  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   for (const auto& test_case : test_cases) {
-    Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
-    envoy::api::v2::core::HeaderValueOption* header = to_add.Add();
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> to_add;
+    envoy::config::core::v3::HeaderValueOption* header = to_add.Add();
     header->mutable_header()->set_key("x-header");
     header->mutable_header()->set_value(test_case.input_);
 
@@ -892,7 +929,7 @@ request_headers_to_add:
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>();
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   req_header_parser->evaluateHeaders(header_map, stream_info);
@@ -970,8 +1007,8 @@ request_headers_to_remove: ["x-nope"]
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
   // Metadata with percent signs in the key.
-  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
-      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
+      TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
           R"EOF(
         filter_metadata:
           namespace:
@@ -979,11 +1016,14 @@ request_headers_to_remove: ["x-nope"]
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  Envoy::StreamInfo::FilterStateImpl filter_state;
-  filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
-  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
   req_header_parser->evaluateHeaders(header_map, stream_info);
 
@@ -1048,7 +1088,7 @@ request_headers_to_add:
 )EOF";
 
   // Disable append mode.
-  envoy::api::v2::route::Route route = parseRouteFromV2Yaml(ymal);
+  envoy::config::route::v3::Route route = parseRouteFromV2Yaml(ymal);
   route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
   route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);

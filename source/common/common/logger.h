@@ -7,7 +7,9 @@
 
 #include "envoy/thread/thread.h"
 
+#include "common/common/base_logger.h"
 #include "common/common/fmt.h"
+#include "common/common/logger_impl.h"
 #include "common/common/macros.h"
 #include "common/common/non_copyable.h"
 
@@ -19,96 +21,71 @@
 namespace Envoy {
 namespace Logger {
 
-// clang-format off
 // TODO: find out a way for extensions to register new logger IDs
-#define ALL_LOGGER_IDS(FUNCTION) \
-  FUNCTION(admin)                \
-  FUNCTION(aws)                  \
-  FUNCTION(assert)               \
-  FUNCTION(backtrace)            \
-  FUNCTION(client)               \
-  FUNCTION(config)               \
-  FUNCTION(connection)           \
-  FUNCTION(conn_handler)         \
-  FUNCTION(dubbo)                \
-  FUNCTION(file)                 \
-  FUNCTION(filter)               \
-  FUNCTION(forward_proxy)        \
-  FUNCTION(grpc)                 \
-  FUNCTION(hc)                   \
-  FUNCTION(health_checker)       \
-  FUNCTION(http)                 \
-  FUNCTION(http2)                \
-  FUNCTION(hystrix)              \
-  FUNCTION(init)                 \
-  FUNCTION(io)                   \
-  FUNCTION(jwt)                  \
-  FUNCTION(kafka)                \
-  FUNCTION(lua)                  \
-  FUNCTION(main)                 \
-  FUNCTION(misc)                 \
-  FUNCTION(mongo)                \
-  FUNCTION(quic)                 \
-  FUNCTION(quic_stream)          \
-  FUNCTION(pool)                 \
-  FUNCTION(rbac)                 \
-  FUNCTION(redis)                \
-  FUNCTION(router)               \
-  FUNCTION(runtime)              \
-  FUNCTION(stats)                \
-  FUNCTION(secret)               \
-  FUNCTION(tap)                  \
-  FUNCTION(testing)              \
-  FUNCTION(thrift)               \
-  FUNCTION(tracing)              \
-  FUNCTION(upstream)             \
-  FUNCTION(udp)                  \
+#define ALL_LOGGER_IDS(FUNCTION)                                                                   \
+  FUNCTION(admin)                                                                                  \
+  FUNCTION(aws)                                                                                    \
+  FUNCTION(assert)                                                                                 \
+  FUNCTION(backtrace)                                                                              \
+  FUNCTION(cache_filter)                                                                           \
+  FUNCTION(client)                                                                                 \
+  FUNCTION(config)                                                                                 \
+  FUNCTION(connection)                                                                             \
+  FUNCTION(conn_handler)                                                                           \
+  FUNCTION(decompression)                                                                          \
+  FUNCTION(dubbo)                                                                                  \
+  FUNCTION(file)                                                                                   \
+  FUNCTION(filter)                                                                                 \
+  FUNCTION(forward_proxy)                                                                          \
+  FUNCTION(grpc)                                                                                   \
+  FUNCTION(hc)                                                                                     \
+  FUNCTION(health_checker)                                                                         \
+  FUNCTION(http)                                                                                   \
+  FUNCTION(http2)                                                                                  \
+  FUNCTION(hystrix)                                                                                \
+  FUNCTION(init)                                                                                   \
+  FUNCTION(io)                                                                                     \
+  FUNCTION(jwt)                                                                                    \
+  FUNCTION(kafka)                                                                                  \
+  FUNCTION(lua)                                                                                    \
+  FUNCTION(main)                                                                                   \
+  FUNCTION(misc)                                                                                   \
+  FUNCTION(mongo)                                                                                  \
+  FUNCTION(quic)                                                                                   \
+  FUNCTION(quic_stream)                                                                            \
+  FUNCTION(pool)                                                                                   \
+  FUNCTION(rbac)                                                                                   \
+  FUNCTION(redis)                                                                                  \
+  FUNCTION(router)                                                                                 \
+  FUNCTION(runtime)                                                                                \
+  FUNCTION(stats)                                                                                  \
+  FUNCTION(secret)                                                                                 \
+  FUNCTION(tap)                                                                                    \
+  FUNCTION(testing)                                                                                \
+  FUNCTION(thrift)                                                                                 \
+  FUNCTION(tracing)                                                                                \
+  FUNCTION(upstream)                                                                               \
+  FUNCTION(udp)                                                                                    \
   FUNCTION(wasm)
 
+// clang-format off
 enum class Id {
   ALL_LOGGER_IDS(GENERATE_ENUM)
 };
 // clang-format on
 
 /**
- * Logger wrapper for a spdlog logger.
+ * Logger that uses the DelegatingLogSink.
  */
-class Logger {
-public:
-  /* This is simple mapping between Logger severity levels and spdlog severity levels.
-   * The only reason for this mapping is to go around the fact that spdlog defines level as err
-   * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
-   * fine spdlog::info corresponds to LOGGER.info method.
-   */
-  using Levels = enum {
-    trace = spdlog::level::trace,       // NOLINT(readability-identifier-naming)
-    debug = spdlog::level::debug,       // NOLINT(readability-identifier-naming)
-    info = spdlog::level::info,         // NOLINT(readability-identifier-naming)
-    warn = spdlog::level::warn,         // NOLINT(readability-identifier-naming)
-    error = spdlog::level::err,         // NOLINT(readability-identifier-naming)
-    critical = spdlog::level::critical, // NOLINT(readability-identifier-naming)
-    off = spdlog::level::off            // NOLINT(readability-identifier-naming)
-  };
-
-  spdlog::string_view_t levelString() const {
-    return spdlog::level::level_string_views[logger_->level()];
-  }
-  std::string name() const { return logger_->name(); }
-  void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
-  spdlog::level::level_enum level() const { return logger_->level(); }
-
-  static const char* DEFAULT_LOG_FORMAT;
-
+class StandardLogger : public Logger {
 private:
-  Logger(const std::string& name);
+  StandardLogger(const std::string& name);
 
-  std::shared_ptr<spdlog::logger> logger_; // Use shared_ptr here to allow static construction
-                                           // of constant vector below.
   friend class Registry;
 };
 
 class DelegatingLogSink;
-using DelegatingLogSinkPtr = std::shared_ptr<DelegatingLogSink>;
+using DelegatingLogSinkSharedPtr = std::shared_ptr<DelegatingLogSink>;
 
 /**
  * Captures a logging sink that can be delegated to for a bounded amount of time.
@@ -117,7 +94,7 @@ using DelegatingLogSinkPtr = std::shared_ptr<DelegatingLogSink>;
  */
 class SinkDelegate : NonCopyable {
 public:
-  explicit SinkDelegate(DelegatingLogSinkPtr log_sink);
+  explicit SinkDelegate(DelegatingLogSinkSharedPtr log_sink);
   virtual ~SinkDelegate();
 
   virtual void log(absl::string_view msg) PURE;
@@ -128,7 +105,7 @@ protected:
 
 private:
   SinkDelegate* previous_delegate_;
-  DelegatingLogSinkPtr log_sink_;
+  DelegatingLogSinkSharedPtr log_sink_;
 };
 
 /**
@@ -136,7 +113,7 @@ private:
  */
 class StderrSinkDelegate : public SinkDelegate {
 public:
-  explicit StderrSinkDelegate(DelegatingLogSinkPtr log_sink);
+  explicit StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink);
 
   // SinkDelegate
   void log(absl::string_view msg) override;
@@ -181,10 +158,10 @@ public:
    * A shared_ptr is required for sinks used
    * in spdlog::logger; it would not otherwise be required in Envoy. This method
    * must own the construction process because StderrSinkDelegate needs access to
-   * the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
+   * the DelegatingLogSinkSharedPtr, not just the DelegatingLogSink*, and that is only
    * available after construction.
    */
-  static DelegatingLogSinkPtr init();
+  static DelegatingLogSinkSharedPtr init();
 
   /**
    * Give a log line with trailing whitespace, this will escape all c-style
@@ -253,8 +230,8 @@ public:
   /**
    * @return the singleton sink to use for all loggers.
    */
-  static DelegatingLogSinkPtr getSink() {
-    static DelegatingLogSinkPtr sink = DelegatingLogSink::init();
+  static DelegatingLogSinkSharedPtr getSink() {
+    static DelegatingLogSinkSharedPtr sink = DelegatingLogSink::init();
     return sink;
   }
 

@@ -8,12 +8,14 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
@@ -56,9 +58,11 @@ namespace Server {
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
+  /* hot_restart_generation is an Accumulate gauge; we omit it here for testing dynamics. */       \
   GAUGE(live, NeverImport)                                                                         \
   GAUGE(memory_allocated, Accumulate)                                                              \
   GAUGE(memory_heap_size, Accumulate)                                                              \
+  GAUGE(memory_physical_size, Accumulate)                                                          \
   GAUGE(parent_connections, Accumulate)                                                            \
   GAUGE(state, NeverImport)                                                                        \
   GAUGE(stats_recent_lookups, NeverImport)                                                         \
@@ -120,7 +124,7 @@ public:
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion
-  loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+  loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
@@ -143,14 +147,22 @@ private:
   Event::SignalEventPtr sig_hup_;
 };
 
-class ServerFactoryContextImpl : public Configuration::ServerFactoryContext {
+// ServerFactoryContextImpl implements both ServerFactoryContext and
+// TransportSocketFactoryContext for convenience as these two contexts
+// share common member functions and member variables.
+class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
+                                 public Configuration::TransportSocketFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
       : server_(server), server_scope_(server_.stats().createScope("")) {}
 
+  // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return server_.messageValidationContext();
+  }
   Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
@@ -159,6 +171,23 @@ public:
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
+  Grpc::Context& grpcContext() override { return server_.grpcContext(); }
+
+  // Configuration::TransportSocketFactoryContext
+  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
+  Stats::Store& stats() override { return server_.stats(); }
+  Init::Manager* initManager() override { return &server_.initManager(); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Server has two message validation visitors, one for static and
+    // other for dynamic configuration. Choose the dynamic validation
+    // visitor if server's init manager indicates that the server is
+    // in the Initialized state, as this state is engaged right after
+    // the static configuration (e.g., bootstrap) has been completed.
+    return initManager()->state() == Init::Manager::State::Initialized
+               ? server_.messageValidationContext().dynamicValidationVisitor()
+               : server_.messageValidationContext().staticValidationVisitor();
+  }
 
 private:
   Instance& server_;
@@ -218,12 +247,17 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  OptProcessContextRef processContext() override { return *process_context_; }
+  ProcessContextOptRef processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
+  void flushStats() override;
 
-  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
+
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+    return server_contexts_;
+  }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
@@ -240,7 +274,6 @@ public:
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
-  void flushStats();
   void flushStatsInternal();
   void updateServerStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
@@ -250,6 +283,9 @@ private:
   void terminate();
   void notifyCallbacksForStage(
       Stage stage, Event::PostCb completion_cb = [] {});
+
+  using LifecycleNotifierCallbacks = std::list<StageCallback>;
+  using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
 
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
@@ -285,6 +321,8 @@ private:
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
+  absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
+  absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
   Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
@@ -295,7 +333,7 @@ private:
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
-  envoy::config::bootstrap::v2::Bootstrap bootstrap_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
@@ -312,10 +350,7 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
 
-  ServerFactoryContextImpl server_context_;
-
-  using LifecycleNotifierCallbacks = std::list<StageCallback>;
-  using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
+  ServerFactoryContextImpl server_contexts_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
@@ -323,9 +358,6 @@ private:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
         : RaiiListElement<T>(callbacks, callback) {}
   };
-
-  absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
-  absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

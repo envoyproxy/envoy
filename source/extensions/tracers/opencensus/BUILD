@@ -20,7 +20,7 @@ envoy_cc_extension(
         ":opencensus_tracer_impl",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,7 +42,8 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/config:utility_lib",
+        "//source/common/grpc:google_async_client_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

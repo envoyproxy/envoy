@@ -3,6 +3,8 @@
 #include <sstream>
 #include <string>
 
+#include "envoy/config/trace/v3/trace.pb.h"
+
 #include "common/common/base64.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
@@ -47,7 +49,7 @@ class LightStepDriverTest : public testing::Test {
 public:
   LightStepDriverTest() : grpc_context_(*symbol_table_) {}
 
-  void setup(envoy::config::trace::v2::LightstepConfig& lightstep_config, bool init_timer,
+  void setup(envoy::config::trace::v3::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                  Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
     std::unique_ptr<lightstep::LightStepTracerOptions> opts(
@@ -76,23 +78,23 @@ public:
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v2::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
     TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     setup(lightstep_config, true, propagation_mode);
   }
 
   const std::string operation_name_{"test"};
-  Http::TestHeaderMapImpl request_headers_{
+  Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  const Http::TestHeaderMapImpl response_headers_{{":status", "500"}};
+  const Http::TestResponseHeaderMapImpl response_headers_{{":status", "500"}};
   SystemTime start_time_;
   StreamInfo::MockStreamInfo stream_info_;
 
   Stats::TestSymbolTable symbol_table_;
   Grpc::ContextImpl grpc_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
   std::unique_ptr<LightStepDriver> driver_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -114,7 +116,7 @@ TEST_F(LightStepDriverTest, LightStepLogger) {
 
 TEST_F(LightStepDriverTest, InitializeDriver) {
   {
-    envoy::config::trace::v2::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
   }
@@ -126,7 +128,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v2::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
     TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
@@ -140,7 +142,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v2::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
     TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
@@ -154,7 +156,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v2::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
     TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     setup(lightstep_config, true);
@@ -171,7 +173,7 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   EXPECT_CALL(cm_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
@@ -203,10 +205,11 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
                                                     start_time_, {Tracing::Reason::Sampling, true});
   second_span->finishSpan();
 
-  Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
 
-  msg->trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
+  msg->trailers(
+      Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}}});
   std::unique_ptr<Protobuf::Message> collector_response =
       lightstep::Transporter::MakeCollectorResponse();
   EXPECT_NE(collector_response, nullptr);
@@ -234,7 +237,7 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
   EXPECT_CALL(cm_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
@@ -279,7 +282,7 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
   EXPECT_CALL(cm_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
@@ -303,10 +306,11 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
 
   first_span->finishSpan();
 
-  Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
 
-  msg->trailers(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{"grpc-status", "0"}}});
+  msg->trailers(
+      Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}}});
   msg->body() = std::make_unique<Buffer::OwnedImpl>("invalidresponse");
 
   callback->onSuccess(std::move(msg));
@@ -358,7 +362,7 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
   EXPECT_CALL(cm_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
@@ -380,8 +384,8 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
-  Http::MessagePtr msg(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
 
   // No trailers, gRPC is considered failed.
   callback->onSuccess(std::move(msg));
@@ -405,7 +409,7 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   EXPECT_CALL(cm_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
-          Invoke([&](Http::MessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
@@ -481,8 +485,8 @@ TEST_F(LightStepDriverTest, SpawnChild) {
       config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
   Tracing::SpanPtr childViaSpawn = parent->spawnChild(config_, operation_name_, start_time_);
 
-  Http::TestHeaderMapImpl base1{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  Http::TestHeaderMapImpl base2{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
+  Http::TestRequestHeaderMapImpl base1{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
+  Http::TestRequestHeaderMapImpl base2{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
 
   childViaHeaders->injectContext(base1);
   childViaSpawn->injectContext(base2);

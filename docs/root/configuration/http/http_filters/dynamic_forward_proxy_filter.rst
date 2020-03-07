@@ -51,7 +51,7 @@ host when forwarding. See the example below within the configured routes.
           port_value: 10000
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
@@ -74,11 +74,12 @@ host when forwarding. See the example below within the configured routes.
                     cluster: dynamic_forward_proxy_cluster
             http_filters:
             - name: envoy.filters.http.dynamic_forward_proxy
-              config:
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
                 dns_cache_config:
                   name: dynamic_forward_proxy_cache_config
                   dns_lookup_family: V4_ONLY
-            - name: envoy.router
+            - name: envoy.filters.http.router
     clusters:
     - name: dynamic_forward_proxy_cluster
       connect_timeout: 1s
