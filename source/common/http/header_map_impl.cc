@@ -518,7 +518,7 @@ void HeaderMapImpl::clear() {
   cached_byte_size_ = 0;
 }
 
-int HeaderMapImpl::remove(const LowerCaseString& key) {
+size_t HeaderMapImpl::remove(const LowerCaseString& key) {
   size_t old_size = headers_.size();
   EntryCb cb = staticLookupTable().find(key.get());
   if (cb) {
@@ -539,7 +539,7 @@ int HeaderMapImpl::remove(const LowerCaseString& key) {
   return old_size - new_size;
 }
 
-int HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
+size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
   size_t old_size = headers_.size();
   headers_.remove_if([&prefix, this](const HeaderEntryImpl& entry) {
     bool to_remove = absl::StartsWith(entry.key().getStringView(), prefix.get());

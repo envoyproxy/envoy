@@ -91,8 +91,8 @@ public:
   void iterateReverse(ConstIterateCb cb, void* context) const override;
   Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override;
   void clear() override;
-  int remove(const LowerCaseString& key) override;
-  int removePrefix(const LowerCaseString& key) override;
+  size_t remove(const LowerCaseString& key) override;
+  size_t removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
   bool empty() const override { return headers_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override;
