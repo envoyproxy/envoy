@@ -725,8 +725,8 @@ public:
     return header_map_.lookup(key, entry);
   }
   void clear() override { header_map_.clear(); }
-  void remove(const LowerCaseString& key) override { header_map_.remove(key); }
-  void removePrefix(const LowerCaseString& key) override { header_map_.removePrefix(key); }
+  int remove(const LowerCaseString& key) override { return header_map_.remove(key); }
+  int removePrefix(const LowerCaseString& key) override { return header_map_.removePrefix(key); }
   size_t size() const override { return header_map_.size(); }
   bool empty() const override { return header_map_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override {

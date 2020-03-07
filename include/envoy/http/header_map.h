@@ -572,14 +572,16 @@ public:
   /**
    * Remove all instances of a header by key.
    * @param key supplies the header key to remove.
+   * @return the number of headers removed.
    */
-  virtual void remove(const LowerCaseString& key) PURE;
+  virtual int remove(const LowerCaseString& key) PURE;
 
   /**
    * Remove all instances of headers where the key begins with the supplied prefix.
    * @param prefix supplies the prefix to match header keys against.
+   * @return the number of headers removed.
    */
-  virtual void removePrefix(const LowerCaseString& prefix) PURE;
+  virtual int removePrefix(const LowerCaseString& prefix) PURE;
 
   /**
    * @return the number of headers in the map.

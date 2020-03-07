@@ -518,7 +518,8 @@ void HeaderMapImpl::clear() {
   cached_byte_size_ = 0;
 }
 
-void HeaderMapImpl::remove(const LowerCaseString& key) {
+int HeaderMapImpl::remove(const LowerCaseString& key) {
+  size_t old_size = headers_.size();
   EntryCb cb = staticLookupTable().find(key.get());
   if (cb) {
     StaticLookupResponse ref_lookup_response = cb(*this);
@@ -534,9 +535,12 @@ void HeaderMapImpl::remove(const LowerCaseString& key) {
     }
   }
   verifyByteSize();
+  size_t new_size = headers_.size();
+  return old_size - new_size;
 }
 
-void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
+int HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
+  size_t old_size = headers_.size();
   headers_.remove_if([&prefix, this](const HeaderEntryImpl& entry) {
     bool to_remove = absl::StartsWith(entry.key().getStringView(), prefix.get());
     if (to_remove) {
@@ -558,6 +562,8 @@ void HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
     return to_remove;
   });
   verifyByteSize();
+  size_t new_size = headers_.size();
+  return old_size - new_size;
 }
 
 void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {

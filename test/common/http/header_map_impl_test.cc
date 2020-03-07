@@ -432,7 +432,7 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_TRUE(headers.get(static_key)->value().isReference());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
-  headers.remove(static_key);
+  EXPECT_EQ(1, headers.remove(static_key));
   EXPECT_EQ(nullptr, headers.get(static_key));
   EXPECT_EQ(0UL, headers.size());
   EXPECT_TRUE(headers.empty());
@@ -452,7 +452,7 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
-  headers.remove(Headers::get().ContentLength);
+  EXPECT_EQ(1, headers.remove(Headers::get().ContentLength));
   EXPECT_EQ(nullptr, headers.ContentLength());
   EXPECT_EQ(0UL, headers.size());
   EXPECT_TRUE(headers.empty());
@@ -475,7 +475,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   headers.addReference(key5, "value");
 
   // Test removing the first header, middle headers, and the end header.
-  headers.removePrefix(LowerCaseString("x-prefix-"));
+  EXPECT_EQ(3, headers.removePrefix(LowerCaseString("x-prefix-")));
   EXPECT_EQ(nullptr, headers.get(key1));
   EXPECT_NE(nullptr, headers.get(key2));
   EXPECT_EQ(nullptr, headers.get(key3));
@@ -483,7 +483,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ(nullptr, headers.get(key5));
 
   // Remove all headers.
-  headers.removePrefix(LowerCaseString(""));
+  EXPECT_EQ(2, headers.removePrefix(LowerCaseString("")));
   EXPECT_EQ(nullptr, headers.get(key2));
   EXPECT_EQ(nullptr, headers.get(key4));
 
@@ -492,7 +492,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
-  headers.removePrefix(LowerCaseString("content"));
+  EXPECT_EQ(1, headers.removePrefix(LowerCaseString("content")));
   EXPECT_EQ(nullptr, headers.ContentLength());
 }
 
@@ -664,7 +664,7 @@ TEST(HeaderMapImplTest, SetCopy) {
       &cb);
 
   // Test setting an empty string and then overriding.
-  headers.remove(foo);
+  EXPECT_EQ(2, headers.remove(foo));
   EXPECT_EQ(headers.size(), 0);
   const std::string empty;
   headers.setCopy(foo, empty);
@@ -709,7 +709,7 @@ TEST(HeaderMapImplTest, AddCopy) {
   // addReferenceKey and addCopy can both add multiple instances of a
   // given header, so we need to delete the old "hello" header.
   // Test that removing will return 0 byte size.
-  headers.remove(LowerCaseString("hello"));
+  EXPECT_EQ(1, headers.remove(LowerCaseString("hello")));
   EXPECT_EQ(headers.byteSize(), 0);
 
   // Build "hello" with string concatenation to make it unlikely that the
@@ -975,7 +975,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
         &cb);
 
     // Removal of the header before which pseudo-headers are inserted
-    headers.remove(foo);
+    EXPECT_EQ(1, headers.remove(foo));
     EXPECT_EQ(2UL, headers.size());
     EXPECT_FALSE(headers.empty());
 
@@ -1008,7 +1008,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
         &cb);
 
     // Removing the last normal header
-    headers.remove(Headers::get().ContentType);
+    EXPECT_EQ(1, headers.remove(Headers::get().ContentType));
     EXPECT_EQ(2UL, headers.size());
     EXPECT_FALSE(headers.empty());
 
@@ -1059,9 +1059,9 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
         &cb);
 
     // Removing all pseudo-headers
-    headers.remove(Headers::get().Path);
-    headers.remove(Headers::get().Method);
-    headers.remove(Headers::get().Host);
+    EXPECT_EQ(1, headers.remove(Headers::get().Path));
+    EXPECT_EQ(1, headers.remove(Headers::get().Method));
+    EXPECT_EQ(1, headers.remove(Headers::get().Host));
     EXPECT_EQ(1UL, headers.size());
     EXPECT_FALSE(headers.empty());
 
@@ -1076,7 +1076,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
         &cb);
 
     // Removing all headers
-    headers.remove(Headers::get().ContentType);
+    EXPECT_EQ(1, headers.remove(Headers::get().ContentType));
     EXPECT_EQ(0UL, headers.size());
     EXPECT_TRUE(headers.empty());
 
