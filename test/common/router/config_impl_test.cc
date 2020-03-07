@@ -4857,6 +4857,34 @@ virtual_hosts:
   EXPECT_EQ(opaque_config.find("name2")->second, "value2");
 }
 
+// Test that the deprecated name works for opaque configs.
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestOpaqueConfigUsingDeprecatedName)) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/api"
+    route:
+      cluster: ats
+    metadata:
+      filter_metadata:
+        envoy.router:
+          name1: value1
+          name2: value2
+)EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  const std::multimap<std::string, std::string>& opaque_config =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
+
+  EXPECT_EQ(opaque_config.find("name1")->second, "value1");
+  EXPECT_EQ(opaque_config.find("name2")->second, "value2");
+}
+
 class RoutePropertyTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RoutePropertyTest, ExcludeVHRateLimits) {
