@@ -13,6 +13,23 @@ namespace Common {
 namespace Fault {
 namespace {
 
+TEST(FaultConfigTest, FaultAbortHeaderConfig) {
+  envoy::extensions::filters::http::fault::v3::FaultAbort proto_config;
+  proto_config.mutable_header_abort();
+  FaultAbortConfig config(proto_config);
+
+  // No header.
+  EXPECT_EQ(absl::nullopt, config.status_code(nullptr));
+
+  // Header with bad data.
+  Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-delay-request", "abc"}};
+  EXPECT_EQ(absl::nullopt, config.status_code(bad_headers.get(HeaderNames::get().AbortCodeRequest)));
+
+  // Valid header.
+  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-http-status", "401"}};
+  EXPECT_EQ(401, config.status_code(good_headers.get(HeaderNames::get().AbortCodeRequest)).value());
+}
+
 TEST(FaultConfigTest, FaultDelayHeaderConfig) {
   envoy::extensions::filters::common::fault::v3::FaultDelay proto_config;
   proto_config.mutable_header_delay();
