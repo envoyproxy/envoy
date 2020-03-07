@@ -155,8 +155,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   absl::optional<std::chrono::milliseconds> duration = delayDuration(headers);
   if (duration.has_value()) {
-    delay_timer_ =
-        decoder_callbacks_->dispatcher().createTimer([this, &headers]() -> void { postDelayInjection(headers); });
+    delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
+        [this, &headers]() -> void { postDelayInjection(headers); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
     delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
@@ -240,11 +240,11 @@ bool FaultFilter::isAbortEnabled() {
   }
 
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                        fault_settings_->requestAbort()->percentage());
+    return config_->runtime().snapshot().featureEnabled(
+        downstream_cluster_abort_percent_key_, fault_settings_->requestAbort()->percentage());
   }
-  return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
-                                                      fault_settings_->requestAbort()->percentage());
+  return config_->runtime().snapshot().featureEnabled(
+      fault_settings_->abortPercentRuntime(), fault_settings_->requestAbort()->percentage());
 }
 
 absl::optional<std::chrono::milliseconds>
@@ -382,9 +382,8 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
 
 void FaultFilter::abortWithHTTPStatus(uint64_t abort_code) {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
-  decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(abort_code),
-                                     "fault filter abort", nullptr, absl::nullopt,
-                                     RcDetails::get().FaultAbort);
+  decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(abort_code), "fault filter abort",
+                                     nullptr, absl::nullopt, RcDetails::get().FaultAbort);
   recordAbortsInjectedStats();
 }
 
