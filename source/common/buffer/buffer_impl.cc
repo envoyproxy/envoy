@@ -10,8 +10,15 @@
 
 namespace Envoy {
 namespace Buffer {
+namespace {
+// This size has been determined to be optimal from running the
+// //test/integration:http_benchmark benchmark tests.
+// TODO(yanavlasov): This may not be optimal for all hardware configurations or traffic patterns and
+// may need to be configurable in the future.
+constexpr uint64_t CopyThreshold = 512;
+} // namespace
 
-void OwnedImpl::add(const void* data, uint64_t size) {
+void OwnedImpl::addImpl(const void* data, uint64_t size) {
   const char* src = static_cast<const char*>(data);
   bool new_slice_needed = slices_.empty();
   while (size != 0) {
@@ -25,6 +32,8 @@ void OwnedImpl::add(const void* data, uint64_t size) {
     new_slice_needed = true;
   }
 }
+
+void OwnedImpl::add(const void* data, uint64_t size) { addImpl(data, size); }
 
 void OwnedImpl::addBufferFragment(BufferFragment& fragment) {
   length_ += fragment.size();
@@ -101,6 +110,11 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
     if (slice_index == static_cast<ssize_t>(slices_.size())) {
       break;
     }
+  }
+
+  // In case an extra slice was reserved, remove empty slices from the end of the buffer.
+  while (!slices_.empty() && slices_.back()->dataSize() == 0) {
+    slices_.pop_back();
   }
 
   ASSERT(num_slices_committed > 0);
@@ -223,6 +237,26 @@ void* OwnedImpl::linearize(uint32_t size) {
   return slices_.front()->data();
 }
 
+void OwnedImpl::coalesceOrAddSlice(SlicePtr&& other_slice) {
+  const uint64_t slice_size = other_slice->dataSize();
+  // The `other_slice` content can be coalesced into the existing slice IFF:
+  // 1. The `other_slice` can be coalesced. Objects of type UnownedSlice can not be coalesced. See
+  //    comment in the UnownedSlice class definition;
+  // 2. There are existing slices;
+  // 3. The `other_slice` content length is under the CopyThreshold;
+  // 4. There is enough unused space in the existing slice to accommodate the `other_slice` content.
+  if (other_slice->canCoalesce() && !slices_.empty() && slice_size < CopyThreshold &&
+      slices_.back()->reservableSize() >= slice_size) {
+    // Copy content of the `other_slice`. The `move` methods which call this method effectively
+    // drain the source buffer.
+    addImpl(other_slice->data(), slice_size);
+  } else {
+    // Take ownership of the slice.
+    slices_.emplace_back(std::move(other_slice));
+    length_ += slice_size;
+  }
+}
+
 void OwnedImpl::move(Instance& rhs) {
   ASSERT(&rhs != this);
   // We do the static cast here because in practice we only have one buffer implementation right
@@ -231,10 +265,9 @@ void OwnedImpl::move(Instance& rhs) {
   OwnedImpl& other = static_cast<OwnedImpl&>(rhs);
   while (!other.slices_.empty()) {
     const uint64_t slice_size = other.slices_.front()->dataSize();
-    slices_.emplace_back(std::move(other.slices_.front()));
-    other.slices_.pop_front();
-    length_ += slice_size;
+    coalesceOrAddSlice(std::move(other.slices_.front()));
     other.length_ -= slice_size;
+    other.slices_.pop_front();
   }
   other.postProcess();
 }
@@ -255,9 +288,8 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
       other.slices_.front()->drain(copy_size);
       other.length_ -= copy_size;
     } else {
-      slices_.emplace_back(std::move(other.slices_.front()));
+      coalesceOrAddSlice(std::move(other.slices_.front()));
       other.slices_.pop_front();
-      length_ += slice_size;
       other.length_ -= slice_size;
     }
     length -= copy_size;
@@ -481,6 +513,14 @@ void OwnedImpl::appendSliceForTest(const void* data, uint64_t size) {
 
 void OwnedImpl::appendSliceForTest(absl::string_view data) {
   appendSliceForTest(data.data(), data.size());
+}
+
+std::vector<OwnedSlice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const {
+  std::vector<OwnedSlice::SliceRepresentation> slices;
+  for (const auto& slice : slices_) {
+    slices.push_back(slice->describeSliceForTest());
+  }
+  return slices;
 }
 
 } // namespace Buffer

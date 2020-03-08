@@ -280,23 +280,23 @@ public:
     if (!stat_name_tags) {
       TagVector tags;
       tls.symbolTable().callWithStringView(name, [&tags, &tls, this](absl::string_view name_str) {
-        tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags);
+        tag_extracted_name_ = pool_.add(tls.tagProducer().produceTags(name_str, tags));
       });
       for (const auto& tag : tags) {
         stat_name_tags_.emplace_back(pool_.add(tag.name_), pool_.add(tag.value_));
       }
     } else {
-      tag_extracted_name_ = tls.symbolTable().toString(name);
+      tag_extracted_name_ = name;
     }
   }
 
   const StatNameTagVector& statNameTags() const { return stat_name_tags_; }
-  const std::string& tagExtractedName() { return tag_extracted_name_; }
+  StatName tagExtractedName() const { return tag_extracted_name_; }
 
 private:
   StatNamePool pool_;
   StatNameTagVector stat_name_tags_;
-  std::string tag_extracted_name_;
+  StatName tag_extracted_name_;
 };
 
 bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
@@ -390,7 +390,7 @@ ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptRef stat_name_tags) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags) {
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -420,9 +420,9 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   return safeMakeStat<Counter>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->counters_,
       central_cache_->rejected_stats_,
-      [](Allocator& allocator, StatName name, absl::string_view final_name,
+      [](Allocator& allocator, StatName name, StatName tag_extracted_name,
          const StatNameTagVector& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, final_name, tags);
+        return allocator.makeCounter(name, tag_extracted_name, tags);
       },
       tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
@@ -444,7 +444,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 }
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptRef stat_name_tags, Gauge::ImportMode import_mode) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
+    Gauge::ImportMode import_mode) {
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -471,7 +472,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   Gauge& gauge = safeMakeStat<Gauge>(
       final_stat_name, joiner.tagExtractedName(), stat_name_tags, central_cache_->gauges_,
       central_cache_->rejected_stats_,
-      [import_mode](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
+      [import_mode](Allocator& allocator, StatName name, StatName tag_extracted_name,
                     const StatNameTagVector& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
       },
@@ -481,7 +482,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
-    const StatName& name, StatNameTagVectorOptRef stat_name_tags, Histogram::Unit unit) {
+    const StatName& name, StatNameTagVectorOptConstRef stat_name_tags, Histogram::Unit unit) {
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
@@ -587,7 +588,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
 }
 
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
-                                                   const std::string& tag_extracted_name,
+                                                   StatName tag_extracted_name,
                                                    const StatNameTagVector& stat_name_tags,
                                                    SymbolTable& symbol_table)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
@@ -616,7 +617,7 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 }
 
 ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit, Store& parent,
-                                         TlsScope& tls_scope, absl::string_view tag_extracted_name,
+                                         TlsScope& tls_scope, StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, parent.symbolTable()), unit_(unit),
       parent_(parent), tls_scope_(tls_scope), interval_histogram_(hist_alloc()),

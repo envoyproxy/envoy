@@ -12,7 +12,7 @@ fi
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 # push the envoy image on tags or merge to master
-if [[ "${AZP_BRANCH}" == 'refs/heads/master' ]] || [[ "${AZP_BRACH}" =~ ^refs/heads/release/v.* ]]; then
+if [[ "${AZP_BRANCH}" == 'refs/heads/master' ]] || [[ "${AZP_BRANCH}" =~ ^refs/heads/release/v.* ]]; then
     docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
     for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do

@@ -8,6 +8,7 @@
 using testing::_;
 using testing::Const;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -96,6 +97,13 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, hasResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag flag) {
     return response_flags_ & flag;
   }));
+  ON_CALL(*this, intersectResponseFlags(_)).WillByDefault(Invoke([this](uint64_t response_flags) {
+    return (response_flags_ & response_flags) != 0;
+  }));
+  ON_CALL(*this, hasAnyResponseFlag()).WillByDefault(Invoke([this]() {
+    return response_flags_ != 0;
+  }));
+  ON_CALL(*this, responseFlags()).WillByDefault(Return(response_flags_));
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
 
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));

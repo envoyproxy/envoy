@@ -144,7 +144,7 @@ Counter& TestStore::counter(const std::string& name) {
 }
 
 Counter& TestStore::counterFromStatNameWithTags(const StatName& stat_name,
-                                                StatNameTagVectorOptRef tags) {
+                                                StatNameTagVectorOptConstRef tags) {
   std::string name = symbolTable().toString(stat_name);
   Counter*& counter_ref = counter_map_[name];
   if (counter_ref == nullptr) {
@@ -165,7 +165,8 @@ Gauge& TestStore::gauge(const std::string& name, Gauge::ImportMode mode) {
   return *gauge_ref;
 }
 
-Gauge& TestStore::gaugeFromStatNameWithTags(const StatName& stat_name, StatNameTagVectorOptRef tags,
+Gauge& TestStore::gaugeFromStatNameWithTags(const StatName& stat_name,
+                                            StatNameTagVectorOptConstRef tags,
                                             Gauge::ImportMode mode) {
   std::string name = symbolTable().toString(stat_name);
   Gauge*& gauge_ref = gauge_map_[name];
@@ -186,7 +187,7 @@ Histogram& TestStore::histogram(const std::string& name, Histogram::Unit unit) {
 }
 
 Histogram& TestStore::histogramFromStatNameWithTags(const StatName& stat_name,
-                                                    StatNameTagVectorOptRef tags,
+                                                    StatNameTagVectorOptConstRef tags,
                                                     Histogram::Unit unit) {
   std::string name = symbolTable().toString(stat_name);
   Histogram*& histogram_ref = histogram_map_[name];

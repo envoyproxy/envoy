@@ -2483,6 +2483,52 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   conn_manager_->onData(fake_input, false);
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/10138
+TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
+  InSequence s;
+  setup(false, "");
+
+  RequestDecoder* decoder = nullptr;
+  NiceMock<MockResponseEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(*codec_, shutdownNotice());
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+  expectOnDestroy();
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true);
+
+  // Fake a protocol error that races with the drain timeout. This will cause a local close.
+  // Also fake the local close not closing immediately.
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    throw CodecProtocolException("protocol error");
+  }));
+  EXPECT_CALL(*drain_timer, disableTimer());
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay))
+      .WillOnce(Return());
+  conn_manager_->onData(fake_input, false);
+
+  // Now fire the close event which should have no effect as all close work has already been done.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   setup(true, "");
 

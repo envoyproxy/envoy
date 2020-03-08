@@ -73,7 +73,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
                                              const envoy::config::core::v3::GrpcService& config,
-                                             Api::Api& api, const GoogleGrpcStatNames& stat_names)
+                                             Api::Api& api, const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
