@@ -194,15 +194,15 @@ TEST_F(SignerImplTest, SignHeadersNonS3) {
   headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
   SignerImpl signer("service", "region", CredentialsProviderSharedPtr{credentials_provider},
-    time_system_);
+                    time_system_);
   signer.sign(headers);
 
   EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
-    "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
-    "Signature=d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
-    headers.Authorization()->value().getStringView());
+            "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
+            "Signature=d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
+            headers.Authorization()->value().getStringView());
   EXPECT_EQ(SignatureConstants::get().HashedEmptyString,
-    headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
+            headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
 }
 
 } // namespace
