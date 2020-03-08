@@ -80,8 +80,18 @@ struct ConnectionManagerNamedStats {
 };
 
 struct ConnectionManagerStats {
+  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, const std::string& prefix,
+                         Stats::Scope& scope)
+      : named_(std::move(named_stats)), prefix_(prefix),
+        prefix_stat_name_storage_(
+            std::make_unique<Stats::StatNameManagedStorage>(prefix, scope.symbolTable())),
+        scope_(scope) {}
+
+  Stats::StatName prefixStatName() const { return prefix_stat_name_storage_->statName(); }
+
   ConnectionManagerNamedStats named_;
   std::string prefix_;
+  std::unique_ptr<Stats::StatNameManagedStorage> prefix_stat_name_storage_;
   Stats::Scope& scope_;
 };
 

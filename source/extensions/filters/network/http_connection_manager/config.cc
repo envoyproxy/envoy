@@ -152,9 +152,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager)
-    : context_(context), stat_name_pool_(context_.scope().symbolTable()),
-      stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
-      stats_prefix_stat_name_(pool_.add(stats_prefix_)),
+    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
