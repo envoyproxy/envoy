@@ -935,8 +935,8 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_TRUE(TestUtility::protoEqual(envoy::config::trace::v3::Tracing{},
-                                      server_->httpContext().defaultTracingConfig()));
+  EXPECT_THAT(envoy::config::trace::v3::Tracing{},
+              ProtoEq(server_->httpContext().defaultTracingConfig()));
 }
 
 TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
