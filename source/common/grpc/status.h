@@ -4,8 +4,6 @@
 
 #include "envoy/grpc/status.h"
 
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
 namespace Grpc {
 
