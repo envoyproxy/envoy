@@ -640,7 +640,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
   Counter& lowercase_counter = store_->counterFromString("lowercase_counter");
   EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
-  Gauge& lowercase_gauge = store_->gaugeFromString("lowercase_gauge", Gauge::ImportMode::Accumulate);
+  Gauge& lowercase_gauge =
+      store_->gaugeFromString("lowercase_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(lowercase_gauge.name(), "lowercase_gauge");
   Histogram& lowercase_histogram =
       store_->histogramFromString("lowercase_histogram", Stats::Histogram::Unit::Unspecified);
@@ -654,7 +655,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   uppercase_counter.inc();
   EXPECT_EQ(uppercase_counter.value(), 0);
 
-  Gauge& uppercase_gauge = store_->gaugeFromString("uppercase_GAUGE", Gauge::ImportMode::Accumulate);
+  Gauge& uppercase_gauge =
+      store_->gaugeFromString("uppercase_GAUGE", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(uppercase_gauge.name(), "");
   uppercase_gauge.inc();
   EXPECT_EQ(uppercase_gauge.value(), 0);
@@ -695,7 +697,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   invalid_gauge_1.inc();
   EXPECT_EQ(invalid_gauge_1.value(), 0);
 
-  Gauge& invalid_gauge_2 = store_->gaugeFromString("also_INVALID_gauge", Gauge::ImportMode::Accumulate);
+  Gauge& invalid_gauge_2 =
+      store_->gaugeFromString("also_INVALID_gauge", Gauge::ImportMode::Accumulate);
   invalid_gauge_2.inc();
   EXPECT_EQ(invalid_gauge_2.value(), 0);
 
@@ -1211,7 +1214,8 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
 
 TEST_F(HistogramTest, ParentHistogramBucketSummary) {
   ScopePtr scope1 = store_->createScope("scope1.");
-  Histogram& histogram = store_->histogramFromString("histogram", Stats::Histogram::Unit::Unspecified);
+  Histogram& histogram =
+      store_->histogramFromString("histogram", Stats::Histogram::Unit::Unspecified);
   store_->mergeHistograms([]() -> void {});
   ASSERT_EQ(1, store_->histograms().size());
   ParentHistogramSharedPtr parent_histogram = store_->histograms()[0];

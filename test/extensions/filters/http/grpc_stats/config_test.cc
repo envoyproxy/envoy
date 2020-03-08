@@ -61,11 +61,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.failure")
+                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.failure")
                      .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
@@ -86,11 +86,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
+                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
                      .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
@@ -109,11 +109,11 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
+                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.success")
                      .value());
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
-                     .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
                      .value());
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
@@ -136,13 +136,14 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
 
   EXPECT_EQ(2U, decoder_callbacks_.clusterInfo()
                     ->statsScope()
-                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
+                    .counterFromString(
+                        "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
                     .value());
-  EXPECT_EQ(0U,
-            decoder_callbacks_.clusterInfo()
-                ->statsScope()
-                .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
-                .value());
+  EXPECT_EQ(0U, decoder_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(
+                        "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
+                    .value());
   const auto& data = stream_info_.filterState()->getDataReadOnly<GrpcStatsObject>(
       HttpFilterNames::get().GrpcStats);
   EXPECT_EQ(2U, data.request_message_count);
@@ -158,26 +159,28 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, false));
   EXPECT_EQ(2U, decoder_callbacks_.clusterInfo()
                     ->statsScope()
-                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
+                    .counterFromString(
+                        "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
                     .value());
-  EXPECT_EQ(2U,
-            decoder_callbacks_.clusterInfo()
-                ->statsScope()
-                .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
-                .value());
+  EXPECT_EQ(2U, decoder_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(
+                        "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
+                    .value());
   EXPECT_EQ(2U, data.request_message_count);
   EXPECT_EQ(2U, data.response_message_count);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(*b1, true));
   EXPECT_EQ(2U, decoder_callbacks_.clusterInfo()
                     ->statsScope()
-                    .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
+                    .counterFromString(
+                        "grpc.lyft.users.BadCompanions.GetBadCompanions.request_message_count")
                     .value());
-  EXPECT_EQ(3U,
-            decoder_callbacks_.clusterInfo()
-                ->statsScope()
-                .counter("grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
-                .value());
+  EXPECT_EQ(3U, decoder_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString(
+                        "grpc.lyft.users.BadCompanions.GetBadCompanions.response_message_count")
+                    .value());
   EXPECT_EQ(2U, data.request_message_count);
   EXPECT_EQ(3U, data.response_message_count);
 

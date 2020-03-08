@@ -163,7 +163,9 @@ public:
                                        StatNameTagVectorOptConstRef tags) override {
     return default_scope_->counterFromStatNameWithTags(name, tags);
   }
-  Counter& counterFromString(const std::string& name) override { return default_scope_->counterFromString(name); }
+  Counter& counterFromString(const std::string& name) override {
+    return default_scope_->counterFromString(name);
+  }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
