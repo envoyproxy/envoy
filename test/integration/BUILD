@@ -975,19 +975,29 @@ envoy_cc_test(
     ],
 )
 
+H1_FUZZ_LIB_DEPS = [
+    ":capture_fuzz_proto_cc_proto",
+    ":http_integration_lib",
+    "//source/common/common:assert_lib",
+    "//source/common/common:logger_lib",
+    "//test/fuzz:fuzz_runner_lib",
+    "//test/integration:integration_lib",
+    "//test/test_common:environment_lib",
+]
+
 envoy_cc_test_library(
     name = "h1_fuzz_lib",
     srcs = ["h1_fuzz.cc"],
     hdrs = ["h1_fuzz.h"],
-    deps = [
-        ":capture_fuzz_proto_cc_proto",
-        ":http_integration_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
-        "//test/fuzz:fuzz_runner_lib",
-        "//test/integration:integration_lib",
-        "//test/test_common:environment_lib",
-    ],
+    deps = H1_FUZZ_LIB_DEPS,
+)
+
+envoy_cc_test_library(
+    name = "h1_fuzz_persistent_lib",
+    srcs = ["h1_fuzz.cc"],
+    hdrs = ["h1_fuzz.h"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    deps = H1_FUZZ_LIB_DEPS,
 )
 
 envoy_cc_fuzz_test(
@@ -998,11 +1008,30 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_fuzz_test(
+    name = "h1_capture_persistent_fuzz_test",
+    srcs = ["h1_capture_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h1_corpus",
+    deps = [":h1_fuzz_persistent_lib"],
+)
+
+envoy_cc_fuzz_test(
     name = "h1_capture_direct_response_fuzz_test",
     srcs = ["h1_capture_direct_response_fuzz_test.cc"],
     corpus = "h1_corpus",
     deps = [
         ":h1_fuzz_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "h1_capture_direct_response_persistent_fuzz_test",
+    srcs = ["h1_capture_direct_response_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h1_corpus",
+    deps = [
+        ":h1_fuzz_persistent_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

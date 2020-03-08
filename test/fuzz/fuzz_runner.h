@@ -62,6 +62,12 @@ extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv);
 // See https://llvm.org/docs/LibFuzzer.html#fuzz-target.
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
+#ifdef PERSISTENT_FUZZER
+#define PERSISTENT_FUZZ_VAR static
+#else
+#define PERSISTENT_FUZZ_VAR
+#endif
+
 #define DEFINE_TEST_ONE_INPUT_IMPL                                                                 \
   extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {                        \
     EnvoyTestOneInput(data, size);                                                                 \
