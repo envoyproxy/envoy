@@ -126,7 +126,7 @@ To add an extension config to the API, the steps below should be followed:
    [Buffer filter config](envoy/config/filter/http/buffer/v2/buffer.proto) as an example of `v2`.
 1. Place the v2 extension configuration `.proto` in `api/envoy/config`, e.g.
    `api/envoy/config/filter/http/foobar/v2/foobar.proto` together with an initial BUILD file:
-   ```
+   ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
    licenses(["notice"])  # Apache 2
