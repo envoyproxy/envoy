@@ -433,21 +433,19 @@ message DownstreamTlsContext {
 
     // Config for fetching TLS session ticket keys via SDS API.
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
+
+    // Config to disable TLS session tickets altogether
+    bool disable_session_tickets = 6;
   }
 
   // If specified, session_timeout will change maximum lifetime (in seconds) of TLS session
   // Currently this value is used as a hint to `TLS session ticket lifetime (for TLSv1.2)
   // <https://tools.ietf.org/html/rfc5077#section-5.6>`
   // only seconds could be specified (fractional seconds are going to be ignored).
-  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
+  google.protobuf.Duration session_timeout = 7 [(validate.rules).duration = {
     lt {seconds: 4294967296}
     gte {}
   }];
-
-  // If set to true, TLS session tickets are disabled. Setting this field to true and configuring either one of :ref:`session_ticket_keys
-  // <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys>` or :ref:`session_ticket_keys_sds_secret_config
-  // <envoy_api_field_auth.DownstreamTlsContext.session_ticket_keys_sds_secret_config>` will result in an error.
-  google.protobuf.BoolValue disable_session_tickets = 7;
 }
 
 message GenericSecret {
