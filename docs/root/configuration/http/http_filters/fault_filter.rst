@@ -36,6 +36,9 @@ The fault filter has the capability to allow fault configuration to be specified
 This is useful in certain scenarios in which it is desired to allow the client to specify its own
 fault configuration. The currently supported header controls are:
 
+* Request abort configuration via the *x-envoy-fault-abort-request* header. The header value
+  should be an integer that specifies the HTTP status code to return in response to a request
+  and must be in the range [100, 600).
 * Request delay configuration via the *x-envoy-fault-delay-request* header. The header value
   should be an integer that specifies the number of milliseconds to throttle the latency for.
 * Response rate limit configuration via the *x-envoy-fault-throughput-response* header. The
@@ -57,6 +60,10 @@ options:
   typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
     max_active_faults: 100
+    abort:
+      header_abort: {}
+      percentage:
+        numerator: 100
     delay:
       header_delay: {}
       percentage:
