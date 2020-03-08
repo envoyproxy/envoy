@@ -33,6 +33,10 @@ typed_config:
 name: fault
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+  abort:
+    header_abort: {}
+    percentage:
+      numerator: 100
   delay:
     header_delay: {}
     percentage:
@@ -101,7 +105,8 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
                                                  {":scheme", "http"},
                                                  {":authority", "host"},
                                                  {"x-envoy-fault-delay-request", "200"},
-                                                 {"x-envoy-fault-throughput-response", "1"}};
+                                                 {"x-envoy-fault-throughput-response", "1"},
+                                                 {"x-envoy-fault-abort-http-status", "429"}};
   const auto current_time = simTime().monotonicTime();
   IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
@@ -122,7 +127,11 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
   decoder->waitForBodyData(128);
   decoder->waitForEndStream();
 
+  // Verify abort
+  EXPECT_EQ(429, Http::Utility::getResponseStatus(decoder->headers()));
+
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
 
