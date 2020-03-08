@@ -650,37 +650,60 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
                             "is insecure and not allowed");
 }
 
-TEST_F(SslServerContextImplTicketTest, SessionTicketsDisabledAndKeyIsConfigured) {
-  const std::string yaml = R"EOF(
+TEST_F(SslServerContextImplTicketTest, SessionTicketsEnabledByDefault) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
       certificate_chain:
         filename: "{{ test_tmpdir }}/unittestcert.pem"
       private_key:
         filename: "{{ test_tmpdir }}/unittestkey.pem"
-  disable_session_tickets: true
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableSessionTickets());
+}
+
+TEST_F(SslServerContextImplTicketTest, SessionTicketsExplicitlyEnabled) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  disable_session_tickets: false
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableSessionTickets());
+}
+
+TEST_F(SslServerContextImplTicketTest, SessionTicketsImplicitlyEnabled) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
   session_ticket_keys:
     keys:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_b"
 )EOF";
-  EXPECT_THROW_WITH_MESSAGE(
-      loadConfigYaml(yaml), EnvoyException,
-      "TLS session tickets have been disabled, but either session_ticket_keys or "
-      "session_ticket_keys_sds_secret_config has been set");
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_FALSE(server_context_config.disableSessionTickets());
 }
 
-TEST_F(SslServerContextImplTicketTest, SessionTicketsDisabledAndSdsKeyIsConfigured) {
-  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
-  const std::string secret_yaml = R"EOF(
-  name: "abc.com"
-  session_ticket_keys:
-    keys:
-      - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
-      - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_b"
-  )EOF";
-  TestUtility::loadFromYaml(TestEnvironment::substitute(secret_yaml), secret_config);
-  factory_context_.secretManager().addStaticSecret(secret_config);
-
+TEST_F(SslServerContextImplTicketTest, SessionTicketsDisabled) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
@@ -692,12 +715,9 @@ TEST_F(SslServerContextImplTicketTest, SessionTicketsDisabledAndSdsKeyIsConfigur
   disable_session_tickets: true
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  tls_context.mutable_session_ticket_keys_sds_secret_config()->set_name("abc.com");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
-      "TLS session tickets have been disabled, but either session_ticket_keys or "
-      "session_ticket_keys_sds_secret_config has been set");
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_TRUE(server_context_config.disableSessionTickets());
 }
 
 class ClientContextConfigImplTest : public SslCertsTest {};
