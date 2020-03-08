@@ -287,9 +287,8 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
     return ret;
   }
 
-
-  // See if the configured abort provider has a default status code, if not there is no abort status code (e.g.,
-  // header configuration and no/invalid header).
+  // See if the configured abort provider has a default status code, if not there is no abort status
+  // code (e.g., header configuration and no/invalid header).
   auto config_abort = fault_settings_->requestAbort()->status_code(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequest));
   if (!config_abort.has_value()) {
