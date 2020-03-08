@@ -343,12 +343,6 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(0));
 
-  // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
-      .Times(0);
-
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setResponseFlag(_)).Times(0);
@@ -404,12 +398,6 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
               setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-
-  // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
-      .Times(0);
 
   // Delay only case
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
