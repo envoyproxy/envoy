@@ -1397,7 +1397,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
     main_dispatch_block();
 
     // Here we show that the counter cleanups have finished, because the use-count is 1.
-    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", StatNameTagVector{});
+    CounterSharedPtr counter =
+        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
     EXPECT_EQ(1, counter->use_count()) << "index=" << i;
   }
 }
@@ -1421,7 +1422,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
     // running the test: NumScopes*NumThreads*NumIters == 70000, We use a timer
     // so we don't time out on asan/tsan tests, In opt builds this test takes
     // less than a second, and in fastbuild it takes less than 5.
-    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", StatNameTagVector{});
+    CounterSharedPtr counter =
+        alloc_.makeCounter(my_counter_scoped_name_, StatName(), StatNameTagVector{});
     uint32_t use_count = counter->use_count() - 1; // Subtract off this instance.
     EXPECT_EQ((i + 1) * NumScopes * NumThreads, use_count);
   }

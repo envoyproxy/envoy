@@ -8,6 +8,8 @@
 
 #include "gtest/gtest.h"
 
+using Envoy::Http::HeaderValueOf;
+
 namespace Envoy {
 namespace {
 
@@ -355,6 +357,56 @@ typed_config:
   EXPECT_EQ("nope", response->body());
 }
 
+// Upstream fire and forget asynchronous call.
+TEST_P(LuaIntegrationTest, UpstreamAsyncHttpCall) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.filters.http.lua
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  inline_code: |
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+      "lua_cluster",
+      {
+        [":method"] = "POST",
+        [":path"] = "/",
+        [":authority"] = "lua_cluster"
+      },
+      "hello world",
+      5000,
+      true)
+    end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
+  ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
+  // Sanity checking that we sent the expected data.
+  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Path, "/"));
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+
+  cleanup();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
 // Filter alters headers and changes route.
 TEST_P(LuaIntegrationTest, ChangeRoute) {
   const std::string FILTER_AND_CODE =
@@ -473,7 +525,7 @@ typed_config:
       local sig = request_handle:headers():get("signature")
       local rawsig = sig:fromhex()
       local data = request_handle:headers():get("message")
-      local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data))
 
       if ok then
         request_handle:headers():add("signature_verification", "approved")

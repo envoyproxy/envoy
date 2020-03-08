@@ -402,6 +402,7 @@ envoy_cc_test(
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/common/crypto:utility_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
