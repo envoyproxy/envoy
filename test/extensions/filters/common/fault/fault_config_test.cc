@@ -26,7 +26,7 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
   EXPECT_EQ(absl::nullopt, config.status_code(bad_headers.get(HeaderNames::get().AbortRequest)));
 
   // Valid header.
-  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-http-status", "401"}};
+  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort", "401"}};
   EXPECT_EQ(401, config.status_code(good_headers.get(HeaderNames::get().AbortRequest)).value());
 }
 

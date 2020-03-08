@@ -106,7 +106,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
                                                  {":authority", "host"},
                                                  {"x-envoy-fault-delay-request", "200"},
                                                  {"x-envoy-fault-throughput-response", "1"},
-                                                 {"x-envoy-fault-abort-http-status", "429"}};
+                                                 {"x-envoy-fault-abort-request", "429"}};
   const auto current_time = simTime().monotonicTime();
   IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();

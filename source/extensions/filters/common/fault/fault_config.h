@@ -21,7 +21,7 @@ public:
   const Http::LowerCaseString DelayRequest{absl::StrCat(prefix(), "-fault-delay-request")};
   const Http::LowerCaseString ThroughputResponse{
       absl::StrCat(prefix(), "-fault-throughput-response")};
-  const Http::LowerCaseString AbortRequest{absl::StrCat(prefix(), "-fault-abort-http-status")};
+  const Http::LowerCaseString AbortRequest{absl::StrCat(prefix(), "-fault-abort")};
 };
 
 using HeaderNames = ConstSingleton<HeaderNameValues>;

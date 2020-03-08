@@ -282,7 +282,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   SetUpTest(header_abort_only_yaml);
 
-  request_headers_.addCopy("x-envoy-fault-abort-http-status", "429");
+  request_headers_.addCopy("x-envoy-fault-abort-request", "429");
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
