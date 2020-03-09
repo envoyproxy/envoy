@@ -25,6 +25,13 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers) {
         if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
           return Http::HeaderMap::Iterate::Continue;
         }
+        // Skip headers that are likely to mutate, when crossing proxies
+        const auto key = entry.key().getStringView();
+        if (key == Http::Headers::get().ForwardedFor.get() ||
+            key == Http::Headers::get().ForwardedProto.get()) {
+          return Http::HeaderMap::Iterate::Continue;
+        }
+
         std::string value(entry.value().getStringView());
         // Remove leading, trailing, and deduplicate repeated ascii spaces
         absl::RemoveExtraAsciiWhitespace(&value);

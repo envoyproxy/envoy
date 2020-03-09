@@ -163,6 +163,48 @@ TEST_F(SignerImplTest, SignHostHeader) {
             message_->headers().Authorization()->value().getStringView());
 }
 
+// Verify signing headers for S3
+TEST_F(SignerImplTest, SignHeadersS3) {
+  auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
+  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
+  Http::TestRequestHeaderMapImpl headers{};
+  headers.setMethod("GET");
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+
+  SignerImpl signer("s3", "region", CredentialsProviderSharedPtr{credentials_provider},
+                    time_system_);
+  signer.sign(headers);
+
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/s3/aws4_request, "
+            "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
+            "Signature=d97cae067345792b78d2bad746f25c729b9eb4701127e13a7c80398f8216a167",
+            headers.Authorization()->value().getStringView());
+  EXPECT_EQ(SignatureConstants::get().UnsignedPayload,
+            headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
+}
+
+// Verify signing headers for non S3
+TEST_F(SignerImplTest, SignHeadersNonS3) {
+  auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
+  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
+  Http::TestRequestHeaderMapImpl headers{};
+  headers.setMethod("GET");
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+
+  SignerImpl signer("service", "region", CredentialsProviderSharedPtr{credentials_provider},
+                    time_system_);
+  signer.sign(headers);
+
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region/service/aws4_request, "
+            "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
+            "Signature=d9fd9be575a254c924d843964b063d770181d938ae818f5b603ef0575a5ce2cd",
+            headers.Authorization()->value().getStringView());
+  EXPECT_EQ(SignatureConstants::get().HashedEmptyString,
+            headers.get(SignatureHeaders::get().ContentSha256)->value().getStringView());
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

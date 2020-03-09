@@ -19,10 +19,12 @@ public:
 
   Common::Aws::Signer& signer() override { return *signer_; }
   FilterStats& stats() override { return stats_; }
+  const std::string& hostRewrite() const override { return host_rewrite_; }
 
   std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;
   FilterStats stats_{Filter::generateStats("test", stats_store_)};
+  std::string host_rewrite_;
 };
 
 class AwsRequestSigningFilterTest : public testing::Test {
@@ -43,6 +45,18 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
+}
+
+// Verify filter functionality when a host rewrite happens.
+TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
+  setup();
+  filter_config_->host_rewrite_ = "foo";
+  EXPECT_CALL(*(filter_config_->signer_), sign(_)).Times(1);
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ("foo", headers.Host()->value().getStringView());
   EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
 }
 

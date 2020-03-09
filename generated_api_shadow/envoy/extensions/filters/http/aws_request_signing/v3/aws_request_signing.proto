@@ -31,4 +31,15 @@ message AwsRequestSigning {
   //
   // Example: us-west-2
   string region = 2 [(validate.rules).string = {min_bytes: 1}];
+
+  // Indicates that before signing headers, the host header will be swapped with
+  // this value. If not set or empty, the original host header value
+  // will be used and no rewrite will happen.
+  //
+  // Note: this rewrite affects both signing and host header forwarding. However, this
+  // option shouldn't be used with
+  // :ref:`HCM host rewrite <envoy_api_field_config.route.v3.RouteAction.host_rewrite_literal>` given that the
+  // value set here would be used for signing whereas the value set in the HCM would be used
+  // for host header forwarding which is not the desired outcome.
+  string host_rewrite = 3;
 }

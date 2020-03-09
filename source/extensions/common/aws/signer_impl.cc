@@ -24,7 +24,16 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers) {
-  sign(headers, SignatureConstants::get().HashedEmptyString);
+  // S3 payloads require special treatment.
+  if (service_name_ == "s3") {
+    headers.setReference(SignatureHeaders::get().ContentSha256,
+                         SignatureConstants::get().UnsignedPayload);
+    sign(headers, SignatureConstants::get().UnsignedPayload);
+  } else {
+    headers.setReference(SignatureHeaders::get().ContentSha256,
+                         SignatureConstants::get().HashedEmptyString);
+    sign(headers, SignatureConstants::get().HashedEmptyString);
+  }
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash) {
