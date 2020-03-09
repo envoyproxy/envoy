@@ -195,15 +195,15 @@ http_filters:
 - name: envoy.filters.http.router
   )EOF";
 
-  // when tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
-  // there is no reason to obtain an actual HttpTracer
+  // When tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
+  // there is no reason to obtain an actual HttpTracer.
   EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(_)).Times(0);
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
 
-  // by default, tracer must be a null object (Tracing::HttpNullTracer) rather than nullptr
+  // By default, tracer must be a null object (Tracing::HttpNullTracer) rather than nullptr.
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(config.tracer().get()));
 }
 

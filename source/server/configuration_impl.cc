@@ -102,7 +102,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
                                  Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
-  // default tracing configuration must be set prior to processing of static Listeners begins.
+  // Default tracing configuration must be set prior to processing of static Listeners begins.
   server.setDefaultTracingConfig(configuration);
 
   if (!configuration.has_http()) {
@@ -118,7 +118,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
 
-  // notice that the actual HttpTracer instance will be created on demand
+  // Notice that the actual HttpTracer instance will be created on demand
   // in the context of "envoy.filters.network.http_connection_manager" filter.
   // the side effect of this is that provider-specific configuration
   // is no longer validated in this step.
