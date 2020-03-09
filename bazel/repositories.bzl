@@ -743,10 +743,17 @@ def _com_github_gperftools_gperftools():
         actual = "@envoy//bazel/foreign_cc:gperftools",
     )
 
+#def _proxy_wasm_cpp_sdk():
+#    _repository_impl(
+#        name = "proxy_wasm_cpp_host",
+#    )
+
 def _proxy_wasm_cpp_sdk():
-    _repository_impl(
+    native.local_repository(
         name = "proxy_wasm_cpp_host",
+        path = "/home/jplev_google_com/src/proxy-wasm-cpp-host",
     )
+
 
 def _proxy_wasm_cpp_host():
     _repository_impl(

@@ -13,6 +13,7 @@
 #include "common/common/logger.h"
 
 #include "include/proxy-wasm/context.h"
+#include "include/proxy-wasm/wasm.h"
 
 namespace Envoy {
 namespace Extensions {
