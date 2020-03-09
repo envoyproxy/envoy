@@ -5,7 +5,10 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+
+#include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,16 +18,19 @@ namespace PostgreSQLProxy {
 /**
  * All PostgreSQL proxy stats. @see stats_macros.h
  */
-#define ALL_POSTGRESQL_PROXY_STATS(COUNTER)                                                        \
-  COUNTER(sessions)                                                                                \
-  COUNTER(login_attempts)                                                                          \
-  COUNTER(login_failures)                                                                          \
-  COUNTER(decoder_errors)                                                                          \
-  COUNTER(protocol_errors)                                                                         \
-  COUNTER(upgraded_to_ssl)                                                                         \
-  COUNTER(auth_switch_request)                                                                     \
-  COUNTER(queries_parsed)                                                                          \
-  COUNTER(queries_parse_error)
+#define ALL_POSTGRESQL_PROXY_STATS(COUNTER)   \
+  COUNTER(sessions)                           \
+  COUNTER(errors)                             \
+  COUNTER(statements)                         \
+  COUNTER(statements_insert)                  \
+  COUNTER(statements_delete)                  \
+  COUNTER(statements_update)                  \
+  COUNTER(statements_select)                  \
+  COUNTER(statements_other)                   \
+  COUNTER(transactions)                       \
+  COUNTER(transactions_commit)                \
+  COUNTER(transactions_rollback)              \
+  COUNTER(warnings)
 
 /**
  * Struct definition for all PostgreSQL proxy stats. @see stats_macros.h
@@ -52,7 +58,7 @@ private:
 
 using PostgreSQLFilterConfigSharedPtr = std::shared_ptr<PostgreSQLFilterConfig>;
 
-class PostgreSQLFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
+class PostgreSQLFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
 public:
   PostgreSQLFilter(PostgreSQLFilterConfigSharedPtr config);
   ~PostgreSQLFilter() override = default;
@@ -65,9 +71,28 @@ public:
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
+  // PostgreSQLProxy::DecoderCallback
+  void incErrors() override;
+  void incSessions() override;
+  void incStatements() override;
+  void incStatementsDelete() override;
+  void incStatementsInsert() override;
+  void incStatementsOther() override;
+  void incStatementsSelect() override;
+  void incStatementsUpdate() override;
+  void incTransactions() override;
+  void incTransactionsCommit() override;
+  void incTransactionsRollback() override;
+  void incWarnings() override;
+
+  void doDecode(Buffer::Instance& data);
+  DecoderPtr createDecoder(DecoderCallbacks& callbacks);
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   PostgreSQLFilterConfigSharedPtr config_;
+  Buffer::OwnedImpl frontend_buffer_;
+  Buffer::OwnedImpl backend_buffer_;
+  std::unique_ptr<Decoder> decoder_;
 };
 
 } // namespace PostgreSQLProxy
