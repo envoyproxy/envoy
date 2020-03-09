@@ -99,6 +99,58 @@ TEST(ExtensionNameUtilTest, DEPRECATED_FEATURE_TEST(TestCheckDeprecatedExtension
   }
 }
 
+// Test that deprecated names are reported as allowed or not, with logging.
+TEST(ExtensionNameUtilTest, DEPRECATED_FEATURE_TEST(TestAllowDeprecatedExtensionName)) {
+  // Validate that no runtime available results in warnings and allows deprecated names.
+  {
+    auto test = []() {
+      return ExtensionNameUtil::allowDeprecatedExtensionName("XXX", "deprecated", "canonical",
+                                                             nullptr);
+    };
+    EXPECT_TRUE(test());
+
+    EXPECT_LOG_CONTAINS("warn", "Using deprecated XXX extension name 'deprecated' for 'canonical'.",
+                        test());
+  }
+
+  // If deprecated feature is enabled, log and return true.
+  {
+    NiceMock<Runtime::MockLoader> runtime;
+
+    EXPECT_CALL(
+        runtime.snapshot_,
+        deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_extension_names", _))
+        .WillRepeatedly(Return(true));
+
+    auto test = [&]() {
+      return ExtensionNameUtil::allowDeprecatedExtensionName("XXX", "deprecated", "canonical",
+                                                             &runtime);
+    };
+    EXPECT_TRUE(test());
+
+    EXPECT_LOG_CONTAINS("warn", "Using deprecated XXX extension name 'deprecated' for 'canonical'.",
+                        test());
+  }
+
+  // If deprecated feature is disabled, log and return false.
+  {
+    NiceMock<Runtime::MockLoader> runtime;
+
+    EXPECT_CALL(
+        runtime.snapshot_,
+        deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_extension_names", _))
+        .WillRepeatedly(Return(false));
+
+    auto test = [&]() {
+      return ExtensionNameUtil::allowDeprecatedExtensionName("XXX", "deprecated", "canonical",
+                                                             &runtime);
+    };
+    EXPECT_FALSE(test());
+
+    EXPECT_LOG_CONTAINS("error", "#using-runtime-overrides-for-deprecated-features", test());
+  }
+}
+
 } // namespace
 } // namespace Utility
 } // namespace Common

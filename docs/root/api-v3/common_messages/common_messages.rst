@@ -7,6 +7,7 @@ Common messages
 
   ../config/core/v3/base.proto
   ../config/core/v3/address.proto
+  ../config/core/v3/backoff.proto
   ../config/core/v3/protocol.proto
   ../service/discovery/v3/discovery.proto
   ../config/core/v3/config_source.proto

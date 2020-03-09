@@ -16,6 +16,7 @@
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
 #include "common/grpc/google_grpc_context.h"
+#include "common/grpc/stat_names.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -169,7 +170,8 @@ class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logg
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::config::core::v3::GrpcService& config, Api::Api& api);
+                        const envoy::config::core::v3::GrpcService& config, Api::Api& api,
+                        const StatNames& stat_names);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
