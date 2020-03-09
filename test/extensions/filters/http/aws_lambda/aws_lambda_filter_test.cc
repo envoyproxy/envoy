@@ -52,11 +52,6 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
 TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
   setupFilter({Arn, true /*passthrough*/});
   Http::TestRequestHeaderMapImpl input_headers{{":method", "GET"}, {"x-forwarded-proto", "http"}};
-  EXPECT_CALL(*signer_, sign(_)).WillOnce(Invoke([](Http::RequestHeaderMap& headers) {
-    if (headers.ForwardedProto()) {
-      FAIL() << "X-Forwarded-Proto header should not be signed.";
-    }
-  }));
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 }

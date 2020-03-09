@@ -100,12 +100,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (end_stream) {
     setHeaders(headers, arn_->functionName());
-    // We must NOT sign this header, because it causes signature miscalculation at Lambda's side.
-    // We _could_ remove the header, sign the request, and then tack it back on. But, I don't see
-    // value in that header when targeting AWS Lambda.
-    if (headers.ForwardedProto()) {
-      headers.remove(Http::Headers::get().ForwardedProto);
-    }
     sigv4_signer_->sign(headers);
     return Http::FilterHeadersStatus::Continue;
   }
@@ -125,9 +119,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
     const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
     const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
-    if (headers_->ForwardedProto()) {
-      headers_->removeForwardedProto(); // We must NOT sign this header.
-    }
     sigv4_signer_->sign(*headers_, hash);
     return Http::FilterDataStatus::Continue;
   }
