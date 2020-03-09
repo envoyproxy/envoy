@@ -2970,7 +2970,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector
 
 // Test the tls inspector is not injected twice when the deprecated name is used.
 TEST_F(ListenerManagerImplWithRealFiltersTest,
-       DEPRECATED_FEATURE_TEST(TlsFilterChainWithDecprecatedTlsInspectorName)) {
+       DEPRECATED_FEATURE_TEST(TlsFilterChainWithDeprecatedTlsInspectorName)) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
