@@ -3503,7 +3503,10 @@ envoy_cc_test(
         "quiche/http2/test_tools/http2_random_test.cc",
     ],
     repository = "@envoy",
-    tags = ["nofips", "test_included"],
+    tags = [
+        "nofips",
+        "test_included",
+    ],
     deps = [
         ":http2_platform",
         ":http2_test_tools_random",
@@ -3514,7 +3517,10 @@ envoy_cc_test(
     name = "spdy_platform_api_test",
     srcs = ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
     repository = "@envoy",
-    tags = ["nofips", "test_included"],
+    tags = [
+        "nofips",
+        "test_included",
+    ],
     deps = [
         ":quiche_common_test_tools_test_utils_lib",
         ":spdy_platform",
@@ -3574,7 +3580,10 @@ envoy_cc_test(
     ],
     copts = quiche_copts,
     repository = "@envoy",
-    tags = ["nofips", "test_included"],
+    tags = [
+        "nofips",
+        "test_included",
+    ],
     deps = [
         ":quic_core_buffer_allocator_lib",
         ":quic_platform",
