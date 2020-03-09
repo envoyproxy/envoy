@@ -94,6 +94,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/ext_authz @gsagula @dio
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher
 /*/extensions/filters/network/echo @htuch @alyssawilk
+/*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @snowp
 # support for on-demand VHDS requests

@@ -31,6 +31,8 @@ envoy_cc_library(
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
     external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
         "abseil_optional",
         "abseil_synchronization",
         "ssl",
@@ -124,5 +126,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
     ],
 )
