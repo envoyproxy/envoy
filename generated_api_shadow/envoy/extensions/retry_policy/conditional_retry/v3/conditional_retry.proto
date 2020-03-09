@@ -6,24 +6,71 @@ import "envoy/config/route/v3/route_components.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "validate/validate.proto";
+
 option java_package = "io.envoyproxy.envoy.extensions.retry_policy.conditional_retry.v3";
 option java_outer_classname = "ConditionalRetryProto";
 option java_multiple_files = true;
 
+// [#not-implemented-hide:]
 // [#protodoc-title: Conditional Retry Policy]
 // [#extension: envoy.retry_policy.conditional_retry]
 
+// Retry policy match configuration. This is a recursive structure which allows
+// complex nested match configurations to be built using various logical
+// operators.
+// [#next-free-field: 7]
+message MatchPredicate {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.retry_policy.conditional_retry.v2.MatchPredicate";
+
+  // A set of match configurations used for logical operations.
+  message MatchSet {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.retry_policy.conditional_retry.v2.MatchPredicate.MatchSet";
+
+    // The list of rules that make up the set.
+    repeated MatchPredicate rules = 1 [(validate.rules).repeated = {min_items: 2}];
+  }
+
+  oneof rule {
+    option (validate.required) = true;
+
+    // A set that describes a logical OR. If any member of the set matches,
+    // the match configuration matches.
+    MatchSet or_match = 1;
+
+    // A set that describes a logical AND. If all members of the set match,
+    // the match configuration matches.
+    MatchSet and_match = 2;
+
+    // A negation match. The match configuration will match if the negated
+    // match condition matches.
+    MatchPredicate not_match = 3;
+
+    // The match configuration will always match.
+    bool any_match = 4 [(validate.rules).bool = {const: true}];
+
+    // HTTP request header match configuration.
+    config.route.v3.HeaderMatcher http_request_header_match = 5;
+
+    // HTTP request trailer match configuration.
+    config.route.v3.HeaderMatcher http_request_trailer_match = 6;
+  }
+}
+
+// [#not-implemented-hide:]
 message ConditionalRetry {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.retry_policy.conditional_retry.v2.ConditionalRetry";
 
-  message RetryCondition {
+  message ConditionalRetryPolicy {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.retry_policy.conditional_retry.v2.ConditionalRetry.RetryCondition";
+        "envoy.config.retry_policy.conditional_retry.v2.ConditionalRetry.ConditionalRetryPolicy";
 
-    // HTTP headers which must be present in the request for retries to be
-    // attempted.
-    config.route.v3.HeaderMatcher request_header = 1;
+    // The match configuration. If the configuration matches, the retry policy
+    // will be applied.
+    MatchPredicate match_config = 1;
 
     // Specifies the conditions under which retry takes place. These are the
     // same
@@ -43,17 +90,17 @@ message ConditionalRetry {
   // .. code-block:: yaml
   //
   //   retry_conditions:
-  //   - request_header:
+  //   - http_request_header_match:
   //       name: ":method"
   //       exact_match: "GET"
   //     retry_on: "connect-failure, retriable-status-codes"
   //     retriable_status_codes: [400, 404, 503]
-  //   - request_header:
+  //   - http_request_header_match:
   //       name: ":method"
   //       exact_match: "POST"
   //     retry_on: "connect-failure"
   //
   // The above configuration shows how to configure different retry policies for
   // different HTTP request methods.
-  repeated RetryCondition retry_conditions = 1;
+  repeated ConditionalRetryPolicy retry_policies = 1;
 }
