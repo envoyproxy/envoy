@@ -1,7 +1,7 @@
 #include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
-#include "envoy/extensions/filters/http/grpc_stats/v3alpha/config.pb.h"
-#include "envoy/extensions/filters/http/grpc_stats/v3alpha/config.pb.validate.h"
+#include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/grpc/codec.h"
@@ -22,7 +22,7 @@ public:
   explicit GrpcStatsFilter(Grpc::Context& context, bool emit_filter_state)
       : context_(context), emit_filter_state_(emit_filter_state) {}
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
     if (grpc_request_) {
       cluster_ = decoder_callbacks_->clusterInfo();
@@ -44,7 +44,8 @@ public:
     }
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override {
     grpc_response_ = Grpc::Common::isGrpcResponseHeader(headers, end_stream);
     if (doStatTracking()) {
       context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
@@ -64,7 +65,7 @@ public:
     }
     return Http::FilterDataStatus::Continue;
   }
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
     if (doStatTracking()) {
       context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_names_,
                           trailers.GrpcStatus());
@@ -81,7 +82,7 @@ public:
     if (filter_object_ == nullptr) {
       auto state = std::make_unique<GrpcStatsObject>();
       filter_object_ = state.get();
-      decoder_callbacks_->streamInfo().filterState().setData(
+      decoder_callbacks_->streamInfo().filterState()->setData(
           HttpFilterNames::get().GrpcStats, std::move(state),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -105,7 +106,7 @@ private:
 } // namespace
 
 Http::FilterFactoryCb GrpcStatsFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::grpc_stats::v3alpha::FilterConfig& config,
+    const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& config,
     const std::string&, Server::Configuration::FactoryContext& factory_context) {
   return [&factory_context, emit_filter_state = config.emit_filter_state()](
              Http::FilterChainFactoryCallbacks& callbacks) {

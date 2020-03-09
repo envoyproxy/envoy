@@ -23,7 +23,7 @@ envoy_cc_extension(
         "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/hystrix:hystrix_lib",
         "//source/server:configuration_lib",
-        "@envoy_api//envoy/config/metrics/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 

@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/core/v3alpha/http_uri.pb.h"
-#include "envoy/config/core/v3alpha/protocol.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -66,21 +66,21 @@ private:
  * @param headers supplies the headers to append to.
  * @param remote_address supplies the remote address to append.
  */
-void appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address);
+void appendXff(RequestHeaderMap& headers, const Network::Address::Instance& remote_address);
 
 /**
  * Append to via header.
  * @param headers supplies the headers to append to.
  * @param via supplies the via header to append.
  */
-void appendVia(HeaderMap& headers, const std::string& via);
+void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
 
 /**
  * Creates an SSL (https) redirect path based on the input host and path headers.
  * @param headers supplies the request headers.
  * @return std::string the redirect path.
  */
-std::string createSslRedirectPath(const HeaderMap& headers);
+std::string createSslRedirectPath(const RequestHeaderMap& headers);
 
 /**
  * Parse a URL into query parameters.
@@ -161,19 +161,19 @@ bool isH2UpgradeRequest(const HeaderMap& headers);
  * - Connection: Upgrade
  * - Upgrade: websocket
  */
-bool isWebSocketUpgradeRequest(const HeaderMap& headers);
+bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * @return Http2Settings An Http2Settings populated from the
  * envoy::api::v2::core::Http2ProtocolOptions config.
  */
-Http2Settings parseHttp2Settings(const envoy::config::core::v3alpha::Http2ProtocolOptions& config);
+Http2Settings parseHttp2Settings(const envoy::config::core::v3::Http2ProtocolOptions& config);
 
 /**
  * @return Http1Settings An Http1Settings populated from the
  * envoy::api::v2::core::Http1ProtocolOptions config.
  */
-Http1Settings parseHttp1Settings(const envoy::config::core::v3alpha::Http1ProtocolOptions& config);
+Http1Settings parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config);
 
 /**
  * Create a locally generated response using filter callbacks.
@@ -206,12 +206,12 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
  *                  type.
  * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
  */
-void sendLocalReply(bool is_grpc,
-                    std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
-                    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
-                    const bool& is_reset, Code response_code, absl::string_view body_text,
-                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    bool is_head_request = false);
+void sendLocalReply(
+    bool is_grpc,
+    std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
+    Code response_code, absl::string_view body_text,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request = false);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
@@ -228,7 +228,7 @@ struct GetLastAddressFromXffInfo {
  * @return GetLastAddressFromXffInfo information about the last address in the XFF header.
  *         @see GetLastAddressFromXffInfo for more information.
  */
-GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_headers,
+GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
                                                 uint32_t num_to_skip = 0);
 
 /**
@@ -261,7 +261,7 @@ void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& hos
 /**
  * Prepare headers for a HttpUri.
  */
-MessagePtr prepareHeaders(const envoy::config::core::v3alpha::HttpUri& http_uri);
+RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
 
 /**
  * Serialize query-params into a string.

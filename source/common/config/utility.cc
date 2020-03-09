@@ -2,13 +2,13 @@
 
 #include <unordered_set>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -24,26 +24,33 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
-#include "udpa/type/v1/typed_struct.pb.h"
-
 namespace Envoy {
 namespace Config {
 
+std::string Utility::truncateGrpcStatusMessage(absl::string_view error_message) {
+  // GRPC sends error message via trailers, which by default has a 8KB size limit(see
+  // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests). Truncates the
+  // error message if it's too long.
+  constexpr uint32_t kProtobufErrMsgLen = 4096;
+  return fmt::format("{}{}", error_message.substr(0, kProtobufErrMsgLen),
+                     error_message.length() > kProtobufErrMsgLen ? "...(truncated)" : "");
+}
+
 void Utility::translateApiConfigSource(
     const std::string& cluster, uint32_t refresh_delay_ms, const std::string& api_type,
-    envoy::config::core::v3alpha::ApiConfigSource& api_config_source) {
+    envoy::config::core::v3::ApiConfigSource& api_config_source) {
   // TODO(junr03): document the option to chose an api type once we have created
   // stronger constraints around v2.
   if (api_type == ApiType::get().Grpc) {
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
-    envoy::config::core::v3alpha::GrpcService* grpc_service = api_config_source.add_grpc_services();
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    envoy::config::core::v3::GrpcService* grpc_service = api_config_source.add_grpc_services();
     grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
   } else {
     if (api_type == ApiType::get().UnsupportedRestLegacy) {
-      api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::
+      api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::
                                          hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY);
     } else if (api_type == ApiType::get().Rest) {
-      api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::REST);
+      api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     }
     api_config_source.add_cluster_names(cluster);
   }
@@ -94,10 +101,10 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Ap
 }
 
 void Utility::checkApiConfigSourceNames(
-    const envoy::config::core::v3alpha::ApiConfigSource& api_config_source) {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   const bool is_grpc =
-      (api_config_source.api_type() == envoy::config::core::v3alpha::ApiConfigSource::GRPC ||
-       api_config_source.api_type() == envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC);
+      (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC ||
+       api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
 
   if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
     throw EnvoyException(
@@ -136,7 +143,7 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap
   const auto& it = clusters.find(cluster_name);
 
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
-      it->second.get().info()->type() == envoy::config::cluster::v3alpha::Cluster::EDS) {
+      it->second.get().info()->type() == envoy::config::cluster::v3::Cluster::EDS) {
     throw EnvoyException(fmt::format(
         "envoy::api::v2::core::ConfigSource must have a statically "
         "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
@@ -146,11 +153,11 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap
 
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterInfoMap& clusters,
-    const envoy::config::core::v3alpha::ApiConfigSource& api_config_source) {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   Utility::checkApiConfigSourceNames(api_config_source);
 
   const bool is_grpc =
-      (api_config_source.api_type() == envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+      (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC);
 
   if (!api_config_source.cluster_names().empty()) {
     // All API configs of type REST and UNSUPPORTED_REST_LEGACY should have cluster names.
@@ -170,7 +177,7 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
 }
 
 std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
-    const envoy::config::core::v3alpha::ApiConfigSource& api_config_source) {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   if (!api_config_source.has_refresh_delay()) {
     throw EnvoyException("refresh_delay is required for REST API configuration sources");
   }
@@ -180,19 +187,19 @@ std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
 }
 
 std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
-    const envoy::config::core::v3alpha::ApiConfigSource& api_config_source) {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   return std::chrono::milliseconds(
       PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
 }
 
 std::chrono::milliseconds Utility::configSourceInitialFetchTimeout(
-    const envoy::config::core::v3alpha::ConfigSource& config_source) {
+    const envoy::config::core::v3::ConfigSource& config_source) {
   return std::chrono::milliseconds(
       PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 15000));
 }
 
-RateLimitSettings Utility::parseRateLimitSettings(
-    const envoy::config::core::v3alpha::ApiConfigSource& api_config_source) {
+RateLimitSettings
+Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& api_config_source) {
   RateLimitSettings rate_limit_settings;
   if (api_config_source.has_rate_limit_settings()) {
     rate_limit_settings.enabled_ = true;
@@ -207,41 +214,41 @@ RateLimitSettings Utility::parseRateLimitSettings(
 }
 
 Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 
 Stats::StatsMatcherPtr
-Utility::createStatsMatcher(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
 }
 
 Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
-    const envoy::config::core::v3alpha::ApiConfigSource& api_config_source, Stats::Scope& scope) {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope) {
   Utility::checkApiConfigSourceNames(api_config_source);
 
-  if (api_config_source.api_type() != envoy::config::core::v3alpha::ApiConfigSource::GRPC &&
-      api_config_source.api_type() != envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC) {
+  if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
+      api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
     throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource type must be gRPC: {}",
                                      api_config_source.DebugString()));
   }
 
-  envoy::config::core::v3alpha::GrpcService grpc_service;
+  envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.MergeFrom(api_config_source.grpc_services(0));
 
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
-envoy::config::endpoint::v3alpha::ClusterLoadAssignment Utility::translateClusterHosts(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::Address>& hosts) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment;
-  envoy::config::endpoint::v3alpha::LocalityLbEndpoints* locality_lb_endpoints =
+envoy::config::endpoint::v3::ClusterLoadAssignment Utility::translateClusterHosts(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  envoy::config::endpoint::v3::LocalityLbEndpoints* locality_lb_endpoints =
       load_assignment.add_endpoints();
   // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
   locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
-  for (const envoy::config::core::v3alpha::Address& host : hosts) {
-    envoy::config::endpoint::v3alpha::LbEndpoint* lb_endpoint =
+  for (const envoy::config::core::v3::Address& host : hosts) {
+    envoy::config::endpoint::v3::LbEndpoint* lb_endpoint =
         locality_lb_endpoints->add_lb_endpoints();
     lb_endpoint->mutable_endpoint()->mutable_address()->MergeFrom(host);
     lb_endpoint->mutable_load_balancing_weight()->set_value(1);
@@ -287,24 +294,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   if (!config.fields().empty()) {
     MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
-}
-
-BackOffStrategyPtr
-Utility::prepareDnsRefreshStrategy(const envoy::config::cluster::v3alpha::Cluster& cluster,
-                                   const uint64_t dns_refresh_rate_ms,
-                                   Runtime::RandomGenerator& random) {
-  if (cluster.has_dns_failure_refresh_rate()) {
-    uint64_t base_interval_ms =
-        PROTOBUF_GET_MS_REQUIRED(cluster.dns_failure_refresh_rate(), base_interval);
-    uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(cluster.dns_failure_refresh_rate(),
-                                                          max_interval, base_interval_ms * 10);
-    if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("cluster.dns_failure_refresh_rate must have max_interval greater than "
-                           "or equal to the base_interval");
-    }
-    return std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
-  }
-  return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
 }
 
 } // namespace Config

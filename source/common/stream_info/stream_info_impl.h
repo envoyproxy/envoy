@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "envoy/common/time.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -209,17 +209,22 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  envoy::config::core::v3alpha::Metadata& dynamicMetadata() override { return metadata_; };
-  const envoy::config::core::v3alpha::Metadata& dynamicMetadata() const override {
-    return metadata_;
-  };
+  envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
+  const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  FilterState& filterState() override { return *filter_state_; }
+  const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
+
+  const FilterStateSharedPtr& upstreamFilterState() const override {
+    return upstream_filter_state_;
+  }
+  void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) override {
+    upstream_filter_state_ = filter_state;
+  }
 
   void setRequestedServerName(absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
@@ -235,9 +240,11 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_transport_failure_reason_;
   }
 
-  void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
+  void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
+    request_headers_ = &headers;
+  }
 
-  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
+  const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
@@ -262,8 +269,9 @@ struct StreamInfoImpl : public StreamInfo {
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
-  envoy::config::core::v3alpha::Metadata metadata_{};
-  std::shared_ptr<FilterStateImpl> filter_state_;
+  envoy::config::core::v3::Metadata metadata_{};
+  FilterStateSharedPtr filter_state_;
+  FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
 
 private:
@@ -276,7 +284,7 @@ private:
   Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
-  const Http::HeaderMap* request_headers_{};
+  const Http::RequestHeaderMap* request_headers_{};
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
 };

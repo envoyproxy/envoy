@@ -27,9 +27,9 @@ public:
    * {"vcluster", "bar"}, and return "vhost.vcluster.c1".
    *
    * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
-   * @param tags std::vector a set of Stats::Tag.
+   * @param tags TagVector a set of Stats::Tag.
    */
-  virtual std::string produceTags(absl::string_view metric_name, std::vector<Tag>& tags) const PURE;
+  virtual std::string produceTags(absl::string_view metric_name, TagVector& tags) const PURE;
 };
 
 using TagProducerPtr = std::unique_ptr<const TagProducer>;

@@ -1,7 +1,7 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
-#include "envoy/extensions/filters/network/rbac/v3alpha/rbac.pb.h"
-#include "envoy/extensions/filters/network/rbac/v3alpha/rbac.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
 #include "extensions/filters/network/rbac/config.h"
 
@@ -31,7 +31,7 @@ public:
     rbac_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-       -  name: envoy.filters.network.rbac
+       -  name: rbac
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
             stat_prefix: tcp.
@@ -43,22 +43,20 @@ public:
                   principals:
                     - not_id:
                         any: true
-       -  name: envoy.echo
-          config:
+       -  name: envoy.filters.network.echo
 )EOF";
   }
 
   void initializeFilter(const std::string& config) {
-    config_helper_.addConfigModifier(
-        [config](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-          envoy::config::listener::v3alpha::Filter filter;
-          TestUtility::loadFromYaml(config, filter);
-          ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
-          auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
-          ASSERT_GT(l->filter_chains_size(), 0);
-          ASSERT_GT(l->filter_chains(0).filters_size(), 0);
-          l->mutable_filter_chains(0)->mutable_filters(0)->Swap(&filter);
-        });
+    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      envoy::config::listener::v3::Filter filter;
+      TestUtility::loadFromYaml(config, filter);
+      ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+      auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      ASSERT_GT(l->filter_chains_size(), 0);
+      ASSERT_GT(l->filter_chains(0).filters_size(), 0);
+      l->mutable_filter_chains(0)->mutable_filters(0)->Swap(&filter);
+    });
 
     BaseIntegrationTest::initialize();
   }
@@ -75,7 +73,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrat
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Allowed) {
   initializeFilter(R"EOF(
-name: envoy.filters.network.rbac
+name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
   stat_prefix: tcp.
@@ -108,7 +106,7 @@ typed_config:
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
   initializeFilter(R"EOF(
-name: envoy.filters.network.rbac
+name: rbac
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
   stat_prefix: tcp.

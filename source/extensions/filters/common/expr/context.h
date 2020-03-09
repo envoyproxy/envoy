@@ -1,8 +1,9 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/grpc/status.h"
 #include "common/http/headers.h"
 
 #include "eval/public/cel_value.h"
@@ -38,6 +39,7 @@ constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
+constexpr absl::string_view GrpcStatus = "grpc_status";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
@@ -67,10 +69,18 @@ constexpr absl::string_view Upstream = "upstream";
 
 class RequestWrapper;
 
-class HeadersWrapper : public google::api::expr::runtime::CelMap {
+absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
+
+template <class T> class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
-  HeadersWrapper(const Http::HeaderMap* value) : value_(value) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
+  HeadersWrapper(const T* value) : value_(value) {}
+  absl::optional<CelValue> operator[](CelValue key) const override {
+    if (value_ == nullptr || !key.IsString()) {
+      return {};
+    }
+    auto out = value_->get(Http::LowerCaseString(std::string(key.StringOrDie().value())));
+    return convertHeaderEntry(out);
+  }
   int size() const override { return value_ == nullptr ? 0 : value_->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
   const google::api::expr::runtime::CelList* ListKeys() const override {
@@ -79,7 +89,8 @@ public:
 
 private:
   friend class RequestWrapper;
-  const Http::HeaderMap* value_;
+  friend class ResponseWrapper;
+  const T* value_;
 };
 
 class BaseWrapper : public google::api::expr::runtime::CelMap,
@@ -95,25 +106,25 @@ public:
 
 class RequestWrapper : public BaseWrapper {
 public:
-  RequestWrapper(const Http::HeaderMap* headers, const StreamInfo::StreamInfo& info)
+  RequestWrapper(const Http::RequestHeaderMap* headers, const StreamInfo::StreamInfo& info)
       : headers_(headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const HeadersWrapper headers_;
+  const HeadersWrapper<Http::RequestHeaderMap> headers_;
   const StreamInfo::StreamInfo& info_;
 };
 
 class ResponseWrapper : public BaseWrapper {
 public:
-  ResponseWrapper(const Http::HeaderMap* headers, const Http::HeaderMap* trailers,
+  ResponseWrapper(const Http::ResponseHeaderMap* headers, const Http::ResponseTrailerMap* trailers,
                   const StreamInfo::StreamInfo& info)
       : headers_(headers), trailers_(trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
-  const HeadersWrapper headers_;
-  const HeadersWrapper trailers_;
+  const HeadersWrapper<Http::ResponseHeaderMap> headers_;
+  const HeadersWrapper<Http::ResponseTrailerMap> trailers_;
   const StreamInfo::StreamInfo& info_;
 };
 
@@ -147,13 +158,13 @@ private:
 
 class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
 public:
-  MetadataProducer(const envoy::config::core::v3alpha::Metadata& metadata) : metadata_(metadata) {}
+  MetadataProducer(const envoy::config::core::v3::Metadata& metadata) : metadata_(metadata) {}
   CelValue Produce(ProtobufWkt::Arena* arena) override {
     return CelValue::CreateMessage(&metadata_, arena);
   }
 
 private:
-  const envoy::config::core::v3alpha::Metadata& metadata_;
+  const envoy::config::core::v3::Metadata& metadata_;
 };
 
 } // namespace Expr

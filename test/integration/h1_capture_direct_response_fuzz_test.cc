@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/h1_fuzz.h"
 
@@ -10,8 +10,9 @@ void H1FuzzIntegrationTest::initialize() {
   const std::string prefix("/");
   const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
-      [&file_path, &prefix](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                                HttpConnectionManager& hcm) -> void {
+      [&file_path, &prefix](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
         // adding direct response mode to the default route
         auto* default_route =
@@ -30,8 +31,8 @@ void H1FuzzIntegrationTest::initialize() {
 DEFINE_PROTO_FUZZER(const test::integration::CaptureFuzzTestCase& input) {
   RELEASE_ASSERT(!TestEnvironment::getIpVersionsForTest().empty(), "");
   const auto ip_version = TestEnvironment::getIpVersionsForTest()[0];
-  H1FuzzIntegrationTest h1_fuzz_integration_test(ip_version);
-  h1_fuzz_integration_test.replay(input);
+  PERSISTENT_FUZZ_VAR H1FuzzIntegrationTest h1_fuzz_integration_test(ip_version);
+  h1_fuzz_integration_test.replay(input, true);
 }
 
 } // namespace Envoy

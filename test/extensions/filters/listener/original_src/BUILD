@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.listener.original_src",
     deps = [
         "//source/extensions/filters/listener/original_src:config_lib",
-        "@envoy_api//envoy/extensions/filters/listener/original_src/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/listener/original_src/v3:pkg_cc_proto",
     ],
 )
 
@@ -44,7 +44,7 @@ envoy_extension_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/listener/original_src/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/listener/original_src/v3:pkg_cc_proto",
     ],
 )

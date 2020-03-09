@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/data/accesslog/v3alpha/accesslog.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
@@ -31,23 +31,21 @@ namespace AccessLoggers {
 namespace HttpGrpc {
 namespace {
 
-using envoy::data::accesslog::v3alpha::HTTPAccessLogEntry;
+using envoy::data::accesslog::v3::HTTPAccessLogEntry;
 
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD1(log, void(HTTPAccessLogEntry&& entry));
-  MOCK_METHOD1(log, void(envoy::data::accesslog::v3alpha::TCPAccessLogEntry&& entry));
+  MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry));
+  MOCK_METHOD(void, log, (envoy::data::accesslog::v3::TCPAccessLogEntry && entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD2(
-      getOrCreateLogger,
-      GrpcCommon::GrpcAccessLoggerSharedPtr(
-          const envoy::extensions::access_loggers::grpc::v3alpha::CommonGrpcAccessLogConfig& config,
-          GrpcCommon::GrpcAccessLoggerType logger_type));
+  MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
+              (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+               GrpcCommon::GrpcAccessLoggerType logger_type));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -59,10 +57,9 @@ public:
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
     EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
         .WillOnce(
-            [this](
-                const envoy::extensions::access_loggers::grpc::v3alpha::CommonGrpcAccessLogConfig&
-                    config,
-                GrpcCommon::GrpcAccessLoggerType logger_type) {
+            [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
+                       config,
+                   GrpcCommon::GrpcAccessLoggerType logger_type) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(GrpcCommon::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
@@ -79,8 +76,8 @@ public:
     HTTPAccessLogEntry expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
     EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
-        .WillOnce(Invoke(
-            [expected_log_entry](envoy::data::accesslog::v3alpha::HTTPAccessLogEntry&& entry) {
+        .WillOnce(
+            Invoke([expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
             }));
   }
@@ -88,8 +85,9 @@ public:
   void expectLogRequestMethod(const std::string& request_method) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", request_method},
     };
 
@@ -107,7 +105,8 @@ common_properties:
     socket_address:
       address: "127.0.0.2"
       port_value: 0
-  start_time: {{}}
+  start_time:
+    seconds: 3600
 request:
   request_method: {}
   request_headers_bytes: {}
@@ -119,7 +118,7 @@ response: {{}}
 
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  envoy::extensions::access_loggers::grpc::v3alpha::HttpGrpcAccessLogConfig config_;
+  envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
   std::unique_ptr<HttpGrpcAccessLog> access_log_;
@@ -148,13 +147,13 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
     stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
-    stream_info.filter_state_.setData("string_accessor",
-                                      std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
-    stream_info.filter_state_.setData("serialized", std::make_unique<TestSerializedFilterState>(),
-                                      StreamInfo::FilterState::StateType::ReadOnly,
-                                      StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("string_accessor",
+                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
+    stream_info.filter_state_->setData("serialized", std::make_unique<TestSerializedFilterState>(),
+                                       StreamInfo::FilterState::StateType::ReadOnly,
+                                       StreamInfo::FilterState::LifeSpan::FilterChain);
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:
@@ -242,7 +241,7 @@ response: {}
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":scheme", "scheme_value"},
         {":authority", "authority_value"},
         {":path", "path_value"},
@@ -253,7 +252,7 @@ response: {}
         {"x-request-id", "x-request-id_value"},
         {"x-envoy-original-path", "x-envoy-original-path_value"},
     };
-    Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
     expectLog(R"EOF(
 common_properties:
@@ -326,7 +325,7 @@ response:
     stream_info.start_time_ = SystemTime(1h);
     stream_info.upstream_transport_failure_reason_ = "TLS error";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -378,7 +377,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -438,7 +437,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -488,7 +487,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -538,7 +537,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -588,7 +587,7 @@ response: {}
     stream_info.setDownstreamSslConnection(connection_info);
     stream_info.requested_server_name_ = "sni";
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
     };
 
@@ -647,7 +646,7 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
-    Http::TestHeaderMapImpl request_headers{
+    Http::TestRequestHeaderMapImpl request_headers{
         {":scheme", "scheme_value"},
         {":authority", "authority_value"},
         {":path", "path_value"},
@@ -656,14 +655,14 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
         {"x-custom-request", "custom_value"},
         {"x-custom-empty", ""},
     };
-    Http::TestHeaderMapImpl response_headers{
+    Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
         {"x-custom-response", "custom_value"},
         {"x-custom-empty", ""},
     };
 
-    Http::TestHeaderMapImpl response_trailers{
+    Http::TestResponseTrailerMapImpl response_trailers{
         {"x-logged-trailer", "value"},
         {"x-empty-trailer", ""},
         {"x-unlogged-trailer", "2"},

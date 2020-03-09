@@ -40,7 +40,7 @@ envoy_cc_library(
     deps = [
         ":daemon_cc_proto",
         "//include/envoy/common:time_interface",
-        "//include/envoy/server:instance_interface",
+        "//include/envoy/server:tracer_config_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
@@ -62,7 +62,7 @@ envoy_cc_extension(
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/trace/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

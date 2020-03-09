@@ -3,13 +3,13 @@
 #include <string>
 
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/metadata/v2/metadata.pb.h"
-#include "envoy/type/tracing/v2/custom_tag.pb.h"
+#include "envoy/type/metadata/v3/metadata.pb.h"
+#include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
@@ -46,8 +46,12 @@ public:
   // Non-standard tag names.
   const std::string DownstreamCluster = "downstream_cluster";
   const std::string ErrorReason = "error.reason";
-  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcAuthority = "grpc.authority";
+  const std::string GrpcContentType = "grpc.content_type";
   const std::string GrpcMessage = "grpc.message";
+  const std::string GrpcPath = "grpc.path";
+  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcTimeout = "grpc.timeout";
   const std::string GuidXClientTraceId = "guid:x-client-trace-id";
   const std::string GuidXRequestId = "guid:x-request-id";
   const std::string HttpProtocol = "http.protocol";
@@ -103,15 +107,15 @@ public:
    * @return decision if request is traceable or not and Reason why.
    **/
   static Decision isTracing(const StreamInfo::StreamInfo& stream_info,
-                            const Http::HeaderMap& request_headers);
+                            const Http::RequestHeaderMap& request_headers);
 
   /**
    * Adds information obtained from the downstream request headers as tags to the active span.
    * Then finishes the span.
    */
-  static void finalizeDownstreamSpan(Span& span, const Http::HeaderMap* request_headers,
-                                     const Http::HeaderMap* response_headers,
-                                     const Http::HeaderMap* response_trailers,
+  static void finalizeDownstreamSpan(Span& span, const Http::RequestHeaderMap* request_headers,
+                                     const Http::ResponseHeaderMap* response_headers,
+                                     const Http::ResponseTrailerMap* response_trailers,
                                      const StreamInfo::StreamInfo& stream_info,
                                      const Config& tracing_config);
 
@@ -119,8 +123,8 @@ public:
    * Adds information obtained from the upstream request headers as tags to the active span.
    * Then finishes the span.
    */
-  static void finalizeUpstreamSpan(Span& span, const Http::HeaderMap* response_headers,
-                                   const Http::HeaderMap* response_trailers,
+  static void finalizeUpstreamSpan(Span& span, const Http::ResponseHeaderMap* response_headers,
+                                   const Http::ResponseTrailerMap* response_trailers,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const Config& tracing_config);
 
@@ -128,11 +132,11 @@ public:
    * Create a custom tag according to the configuration.
    * @param tag a tracing custom tag configuration.
    */
-  static CustomTagConstSharedPtr createCustomTag(const envoy::type::tracing::v2::CustomTag& tag);
+  static CustomTagConstSharedPtr createCustomTag(const envoy::type::tracing::v3::CustomTag& tag);
 
 private:
-  static void setCommonTags(Span& span, const Http::HeaderMap* response_headers,
-                            const Http::HeaderMap* response_trailers,
+  static void setCommonTags(Span& span, const Http::ResponseHeaderMap* response_headers,
+                            const Http::ResponseTrailerMap* response_trailers,
                             const StreamInfo::StreamInfo& stream_info,
                             const Config& tracing_config);
 
@@ -163,7 +167,7 @@ public:
   void setTag(absl::string_view, absl::string_view) override {}
   void log(SystemTime, const std::string&) override {}
   void finishSpan() override {}
-  void injectContext(Http::HeaderMap&) override {}
+  void injectContext(Http::RequestHeaderMap&) override {}
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }
@@ -173,7 +177,7 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config&, Http::HeaderMap&, const StreamInfo::StreamInfo&,
+  SpanPtr startSpan(const Config&, Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                     const Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
   }
@@ -184,7 +188,7 @@ public:
   HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& local_info);
 
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
                     const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override;
 
@@ -208,7 +212,7 @@ protected:
 class LiteralCustomTag : public CustomTagBase {
 public:
   LiteralCustomTag(const std::string& tag,
-                   const envoy::type::tracing::v2::CustomTag::Literal& literal)
+                   const envoy::type::tracing::v3::CustomTag::Literal& literal)
       : CustomTagBase(tag), value_(literal.value()) {}
   absl::string_view value(const CustomTagContext&) const override { return value_; }
 
@@ -219,7 +223,7 @@ private:
 class EnvironmentCustomTag : public CustomTagBase {
 public:
   EnvironmentCustomTag(const std::string& tag,
-                       const envoy::type::tracing::v2::CustomTag::Environment& environment);
+                       const envoy::type::tracing::v3::CustomTag::Environment& environment);
   absl::string_view value(const CustomTagContext&) const override { return final_value_; }
 
 private:
@@ -231,7 +235,7 @@ private:
 class RequestHeaderCustomTag : public CustomTagBase {
 public:
   RequestHeaderCustomTag(const std::string& tag,
-                         const envoy::type::tracing::v2::CustomTag::Header& request_header);
+                         const envoy::type::tracing::v3::CustomTag::Header& request_header);
   absl::string_view value(const CustomTagContext& ctx) const override;
 
 private:
@@ -242,13 +246,13 @@ private:
 class MetadataCustomTag : public CustomTagBase {
 public:
   MetadataCustomTag(const std::string& tag,
-                    const envoy::type::tracing::v2::CustomTag::Metadata& metadata);
+                    const envoy::type::tracing::v3::CustomTag::Metadata& metadata);
   void apply(Span& span, const CustomTagContext& ctx) const override;
   absl::string_view value(const CustomTagContext&) const override { return default_value_; }
-  const envoy::config::core::v3alpha::Metadata* metadata(const CustomTagContext& ctx) const;
+  const envoy::config::core::v3::Metadata* metadata(const CustomTagContext& ctx) const;
 
 protected:
-  const envoy::type::metadata::v2::MetadataKind::KindCase kind_;
+  const envoy::type::metadata::v3::MetadataKind::KindCase kind_;
   const Envoy::Config::MetadataKey metadata_key_;
   const std::string default_value_;
 };

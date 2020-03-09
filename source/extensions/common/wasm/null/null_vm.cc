@@ -82,6 +82,11 @@ absl::string_view NullVm::getCustomSection(absl::string_view /* name */) {
   return {};
 }
 
+absl::string_view NullVm::getPrecompiledSectionName() {
+  // Return nothing: there is no WASM file.
+  return {};
+}
+
 } // namespace Null
 } // namespace Wasm
 } // namespace Common

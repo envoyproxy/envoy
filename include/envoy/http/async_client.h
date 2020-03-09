@@ -3,7 +3,7 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
 #include "envoy/tracing/http_tracer.h"
@@ -39,7 +39,7 @@ public:
      * Called when the async HTTP request succeeds.
      * @param response the HTTP response
      */
-    virtual void onSuccess(MessagePtr&& response) PURE;
+    virtual void onSuccess(ResponseMessagePtr&& response) PURE;
 
     /**
      * Called when the async HTTP request fails.
@@ -63,7 +63,7 @@ public:
      * @param headers the headers received
      * @param end_stream whether the response is header only
      */
-    virtual void onHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
+    virtual void onHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
 
     /**
      * Called when a data frame get received on the async HTTP stream.
@@ -77,7 +77,7 @@ public:
      * Called when all trailers get received on the async HTTP stream.
      * @param trailers the trailers received.
      */
-    virtual void onTrailers(HeaderMapPtr&& trailers) PURE;
+    virtual void onTrailers(ResponseTrailerMapPtr&& trailers) PURE;
 
     /**
      * Called when both the local and remote have gracefully closed the stream.
@@ -118,7 +118,7 @@ public:
      * @param headers supplies the headers to send.
      * @param end_stream supplies whether this is a header only request.
      */
-    virtual void sendHeaders(HeaderMap& headers, bool end_stream) PURE;
+    virtual void sendHeaders(RequestHeaderMap& headers, bool end_stream) PURE;
 
     /***
      * Send data to the stream. This method can be invoked multiple times if it get streamed.
@@ -132,7 +132,7 @@ public:
      * Send trailers. This method cannot be invoked more than once, and implicitly ends the stream.
      * @param trailers supplies the trailers to send.
      */
-    virtual void sendTrailers(HeaderMap& trailers) PURE;
+    virtual void sendTrailers(RequestTrailerMap& trailers) PURE;
 
     /***
      * Reset the stream.
@@ -163,8 +163,7 @@ public:
       return *this;
     }
     StreamOptions& setHashPolicy(
-        const Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::RouteAction::HashPolicy>&
-            v) {
+        const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       hash_policy = v;
       return *this;
     }
@@ -189,7 +188,7 @@ public:
     bool send_xff{true};
 
     // Provides the hash policy for hashing load balancing strategies.
-    Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::RouteAction::HashPolicy> hash_policy;
+    Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
   };
 
   /**
@@ -213,8 +212,7 @@ public:
       return *this;
     }
     RequestOptions& setHashPolicy(
-        const Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::RouteAction::HashPolicy>&
-            v) {
+        const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       StreamOptions::setHashPolicy(v);
       return *this;
     }
@@ -252,7 +250,7 @@ public:
    *         handle should just be used to cancel.
    */
 
-  virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
+  virtual Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
                         const RequestOptions& options) PURE;
 
   /**

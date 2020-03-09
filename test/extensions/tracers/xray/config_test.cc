@@ -1,6 +1,6 @@
-#include "envoy/config/trace/v3alpha/trace.pb.h"
-#include "envoy/config/trace/v3alpha/xray.pb.h"
-#include "envoy/config/trace/v3alpha/xray.pb.validate.h"
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/xray.pb.h"
+#include "envoy/config/trace/v3/xray.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/xray/config.h"
@@ -20,11 +20,11 @@ namespace XRay {
 namespace {
 
 TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.xray
+    name: xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
       daemon_endpoint:
@@ -35,18 +35,18 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
       sampling_rule_manifest:
         filename: "rules.json")EOF";
 
-  envoy::config::trace::v3alpha::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   XRayTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 
 TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   NiceMock<Api::MockApi> api;
   NiceMock<Filesystem::MockInstance> file_system;
 
@@ -54,11 +54,11 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
   EXPECT_CALL(file_system, fileReadToEnd("rules.json"))
       .WillRepeatedly(Throw(EnvoyException("failed to open file.")));
   EXPECT_CALL(api, fileSystem()).WillRepeatedly(ReturnRef(file_system));
-  EXPECT_CALL(server, api()).WillRepeatedly(ReturnRef(api));
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(ReturnRef(api));
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.xray
+    name: xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
       daemon_endpoint:
@@ -69,22 +69,22 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
       sampling_rule_manifest:
         filename: "rules.json")EOF";
 
-  envoy::config::trace::v3alpha::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   XRayTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(*message, context);
   ASSERT_NE(nullptr, xray_tracer);
 }
 
 TEST(XRayTracerConfigTest, ProtocolNotUDPThrows) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.xray
+    name: xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
       daemon_endpoint:
@@ -95,21 +95,21 @@ TEST(XRayTracerConfigTest, ProtocolNotUDPThrows) {
       sampling_rule_manifest:
         filename: "rules.json")EOF";
 
-  envoy::config::trace::v3alpha::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   XRayTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  ASSERT_THROW(factory.createHttpTracer(*message, server), EnvoyException);
+  ASSERT_THROW(factory.createHttpTracer(*message, context), EnvoyException);
 }
 
 TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.xray
+    name: xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.XRayConfig
       daemon_endpoint:
@@ -120,14 +120,14 @@ TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
       sampling_rule_manifest:
         filename: "rules.json")EOF";
 
-  envoy::config::trace::v3alpha::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   XRayTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  ASSERT_THROW(factory.createHttpTracer(*message, server), EnvoyException);
+  ASSERT_THROW(factory.createHttpTracer(*message, context), EnvoyException);
 }
 
 } // namespace

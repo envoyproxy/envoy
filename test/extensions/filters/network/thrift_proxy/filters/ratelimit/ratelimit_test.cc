@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/thrift/rate_limit/v3alpha/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -51,7 +51,8 @@ public:
   }
 
   void SetUpTest(const std::string& yaml) {
-    envoy::config::filter::thrift::rate_limit::v3alpha::RateLimit proto_config{};
+    envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit
+        proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 
     config_.reset(new Config(proto_config, local_info_, stats_store_, runtime_, cm_));
@@ -75,14 +76,14 @@ public:
   domain: foo
   )EOF";
 
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ConfigSharedPtr config_;
   Filters::Common::RateLimit::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> filter_callbacks_;
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
   ThriftProxy::MessageMetadataSharedPtr request_metadata_;
-  Http::TestHeaderMapImpl response_headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
   Buffer::OwnedImpl response_data_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -398,7 +399,7 @@ TEST_F(ThriftRateLimitFilterTest, LimitResponseWithHeaders) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
 
-  Http::HeaderMapPtr h{new Http::TestHeaderMapImpl(*rl_headers)};
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl(*rl_headers)};
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, std::move(h),
                                nullptr);
 

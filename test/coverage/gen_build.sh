@@ -59,6 +59,7 @@ envoy_package()
 envoy_cc_test(
     name = "coverage_tests",
     repository = "${REPOSITORY}",
+    flaky = True,
     deps = [
 EOF
   for t in ${TARGETS}

@@ -36,7 +36,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/jwt_authn:extractor_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -49,7 +49,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/jwt_authn:filter_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -63,7 +63,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/jwt_authn:config",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -75,7 +75,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/jwt_authn:config",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -90,7 +90,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -108,8 +108,8 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -119,15 +119,15 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         "//source/common/router:string_accessor_lib",
-        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/jwt_authn:config",
         "//test/config:utility_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/integration:http_protocol_integration_lib",
-        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -140,7 +140,7 @@ envoy_extension_cc_test(
         ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:matchers_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -153,7 +153,7 @@ envoy_extension_cc_test(
         ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:verifier_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -171,6 +171,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/jwt_authn:matchers_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

@@ -6,14 +6,14 @@ import "envoy/type/percent.proto";
 
 import "google/protobuf/duration.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.fault.v2";
 option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.common.fault.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.common.fault.v3";
 
 // [#protodoc-title: Common fault injection types]
 
@@ -35,7 +35,7 @@ message FaultDelay {
   reserved 2;
 
   // Unused and deprecated. Will be removed in the next release.
-  FaultDelayType type = 1 [deprecated = true];
+  FaultDelayType type = 1 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   oneof fault_delay_secifier {
     option (validate.required) = true;

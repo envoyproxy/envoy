@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
@@ -51,10 +51,9 @@ TEST_P(StatsIntegrationTest, WithDefaultConfig) {
 }
 
 TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -62,10 +61,9 @@ TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
 }
 
 TEST_P(StatsIntegrationTest, WithDefaultTagExtractors) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(true);
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(true);
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -81,13 +79,12 @@ TEST_P(StatsIntegrationTest, WithDefaultTagExtractors) {
 // specifier having use defined regex.
 TEST_P(StatsIntegrationTest, WithDefaultTagExtractorNameWithUserDefinedRegex) {
   std::string tag_name = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-        auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-        tag_specifier->set_tag_name(tag_name);
-        tag_specifier->set_regex("((.*))");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+    auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
+    tag_specifier->set_tag_name(tag_name);
+    tag_specifier->set_regex("((.*))");
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -97,12 +94,11 @@ TEST_P(StatsIntegrationTest, WithDefaultTagExtractorNameWithUserDefinedRegex) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierMissingTagValue) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-        auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-        tag_specifier->set_tag_name("envoy.http_conn_manager_prefix");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+    auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
+    tag_specifier->set_tag_name("envoy.http_conn_manager_prefix");
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -112,13 +108,12 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierMissingTagValue) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-        auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-        tag_specifier->set_tag_name("my.http_conn_manager_prefix");
-        tag_specifier->set_regex(R"(^(?:|listener(?=\.).*?\.)http\.((.*?)\.))");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+    auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
+    tag_specifier->set_tag_name("my.http_conn_manager_prefix");
+    tag_specifier->set_regex(R"(^(?:|listener(?=\.).*?\.)http\.((.*?)\.))");
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -128,12 +123,11 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-        tag_specifier->set_tag_name("test.x");
-        tag_specifier->set_fixed_value("xxx");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
+    tag_specifier->set_tag_name("test.x");
+    tag_specifier->set_fixed_value("xxx");
+  });
   initialize();
 
   auto live = test_server_->gauge("server.live");
@@ -181,21 +175,25 @@ private:
    */
   size_t clusterMemoryHelper(int num_clusters, int num_hosts, bool allow_stats) {
     Stats::TestUtil::MemoryTest memory_test;
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!allow_stats) {
         bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
       }
       for (int i = 1; i < num_clusters; ++i) {
         auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-        cluster->set_name(fmt::format("cluster_{}", i));
+        cluster->set_name(absl::StrCat("cluster_", i));
       }
 
       for (int i = 0; i < num_clusters; ++i) {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
         for (int j = 0; j < num_hosts; ++j) {
-          auto* host = cluster->add_hosts();
+          auto* host = cluster->mutable_load_assignment()
+                           ->mutable_endpoints(0)
+                           ->add_lb_endpoints()
+                           ->mutable_endpoint()
+                           ->mutable_address();
           auto* socket_address = host->mutable_socket_address();
-          socket_address->set_protocol(envoy::config::core::v3alpha::SocketAddress::TCP);
+          socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
           socket_address->set_address("0.0.0.0");
           socket_address->set_port_value(80);
         }
@@ -208,13 +206,7 @@ private:
 };
 class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  ClusterMemoryTestRunner() : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
-  ~ClusterMemoryTestRunner() override {
-    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
-  }
-
-private:
-  const bool save_use_fakes_;
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
@@ -222,7 +214,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(true);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(true);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
@@ -265,8 +257,16 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/10/17  8484     43340       44000   stats: add unit support to histogram
   // 2019/11/01  8859     43563       44000   build: switch to libc++ by default
   // 2019/11/15  9040     43371       44000   build: update protobuf to 3.10.1
-  // 2019/11/15  9040     43403       44000   upstream: track whether cluster is local
+  // 2019/11/15  9031     43403       44000   upstream: track whether cluster is local
   // 2019/12/10  8779     42919       43500   use var-length coding for name length
+  // 2020/01/07  9069     43413       44000   upstream: Implement retry concurrency budgets
+  // 2020/01/07  9564     43445       44000   use RefcountPtr for CentralCache.
+  // 2020/01/09  8889     43509       44000   api: add UpstreamHttpProtocolOptions message
+  // 2020/01/09  9227     43637       44000   router: per-cluster histograms w/ timeout budget
+  // 2020/01/12  9633     43797       44104   config: support recovery of original message when
+  //                                          upgrading.
+  // 2020/02/13  10042    43797       44136   Metadata: Metadata are shared across different
+  //                                          clusters and hosts.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -280,12 +280,12 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 42919); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 43500);
+  EXPECT_MEMORY_EQ(m_per_cluster, 43797); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 44136);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
@@ -313,8 +313,14 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/10/17  8484     34998       35000   stats: add unit support to histogram
   // 2019/11/01  8859     35221       36000   build: switch to libc++ by default
   // 2019/11/15  9040     35029       35500   build: update protobuf to 3.10.1
-  // 2019/11/15  9040     35061       35500   upstream: track whether cluster is local
+  // 2019/11/15  9031     35061       35500   upstream: track whether cluster is local
   // 2019/12/10  8779     35053       35000   use var-length coding for name lengths
+  // 2020/01/07  9069     35548       35700   upstream: Implement retry concurrency budgets
+  // 2020/01/07  9564     35580       36000   RefcountPtr for CentralCache.
+  // 2020/01/09  8889     35644       36000   api: add UpstreamHttpProtocolOptions message
+  // 2019/01/09  9227     35772       36500   router: per-cluster histograms w/ timeout budget
+  // 2020/01/12  9633     35932       36500   config: support recovery of original message when
+  //                                          upgrading.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -328,12 +334,12 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 35053); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 35500);
+  EXPECT_MEMORY_EQ(m_per_cluster, 35932); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 36500);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
@@ -357,6 +363,9 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2019/11/01  8859     1299         1315   build: switch to libc++ by default
   // 2019/11/12  8998     1299         1350   test: adjust memory limit for macOS
   // 2019/11/15  9040     1283         1350   build: update protobuf to 3.10.1
+  // 2020/01/13  9663     1619         1655   api: deprecate hosts in Cluster.
+  // 2020/02/13  10042    1363         1655   Metadata object are shared across different clusters
+  //                                          and hosts.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -366,8 +375,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1283);
-  EXPECT_MEMORY_LE(m_per_host, 1350);
+  EXPECT_MEMORY_EQ(m_per_host, 1363);
+  EXPECT_MEMORY_LE(m_per_host, 1655);
 }
 
 } // namespace

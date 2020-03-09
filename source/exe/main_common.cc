@@ -4,7 +4,7 @@
 #include <memory>
 #include <new>
 
-#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
@@ -32,7 +32,7 @@ Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instanc
   // hot restart at the global level. The per-listener drain managers decide whether to
   // to include /healthcheck/fail status.
   return std::make_unique<Server::DrainManagerImpl>(
-      server, envoy::config::listener::v3alpha::Listener::MODIFY_ONLY);
+      server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
 }
 
 Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
@@ -128,7 +128,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
   std::string path_and_query_buf = std::string(path_and_query);
   std::string method_buf = std::string(method);
   server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
-    Http::HeaderMapImpl response_headers;
+    Http::ResponseHeaderMapImpl response_headers;
     std::string body;
     server_->admin().request(path_and_query_buf, method_buf, response_headers, body);
     handler(response_headers, body);

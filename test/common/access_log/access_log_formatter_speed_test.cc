@@ -47,9 +47,9 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
       std::make_unique<Envoy::AccessLog::FormatterImpl>(LogFormat);
 
   size_t output_bytes = 0;
-  Http::TestHeaderMapImpl request_headers;
-  Http::TestHeaderMapImpl response_headers;
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   for (auto _ : state) {
     output_bytes +=
         formatter->format(request_headers, response_headers, response_trailers, *stream_info)
@@ -64,9 +64,9 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   std::unique_ptr<Envoy::AccessLog::JsonFormatterImpl> json_formatter = MakeJsonFormatter(false);
 
   size_t output_bytes = 0;
-  Http::TestHeaderMapImpl request_headers;
-  Http::TestHeaderMapImpl response_headers;
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   for (auto _ : state) {
     output_bytes +=
         json_formatter->format(request_headers, response_headers, response_trailers, *stream_info)
@@ -82,9 +82,9 @@ static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
       MakeJsonFormatter(true);
 
   size_t output_bytes = 0;
-  Http::TestHeaderMapImpl request_headers;
-  Http::TestHeaderMapImpl response_headers;
-  Http::TestHeaderMapImpl response_trailers;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
   for (auto _ : state) {
     output_bytes += typed_json_formatter
                         ->format(request_headers, response_headers, response_trailers, *stream_info)

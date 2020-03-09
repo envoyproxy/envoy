@@ -1,7 +1,7 @@
 #include "extensions/filters/http/gzip/config.h"
 
-#include "envoy/extensions/filters/http/gzip/v3alpha/gzip.pb.h"
-#include "envoy/extensions/filters/http/gzip/v3alpha/gzip.pb.validate.h"
+#include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
+#include "envoy/extensions/filters/http/gzip/v3/gzip.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/gzip/gzip_filter.h"
@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace Gzip {
 
 Http::FilterFactoryCb GzipFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::gzip::v3alpha::Gzip& proto_config,
+    const envoy::extensions::filters::http::gzip::v3::Gzip& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   GzipFilterConfigSharedPtr config = std::make_shared<GzipFilterConfig>(
       proto_config, stats_prefix, context.scope(), context.runtime());
@@ -24,7 +24,8 @@ Http::FilterFactoryCb GzipFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the gzip filter. @see NamedHttpFilterConfigFactory.
  */
-REGISTER_FACTORY(GzipFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(GzipFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.gzip"};
 
 } // namespace Gzip
 } // namespace HttpFilters

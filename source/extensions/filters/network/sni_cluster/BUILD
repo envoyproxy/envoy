@@ -32,5 +32,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/network:well_known_names",
+        "@envoy_api//envoy/extensions/filters/network/sni_cluster/v3:pkg_cc_proto",
     ],
 )

@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
@@ -27,11 +27,10 @@ namespace HttpGrpc {
  */
 class HttpGrpcAccessLog : public Common::ImplBase {
 public:
-  HttpGrpcAccessLog(
-      AccessLog::FilterPtr&& filter,
-      envoy::extensions::access_loggers::grpc::v3alpha::HttpGrpcAccessLogConfig config,
-      ThreadLocal::SlotAllocator& tls,
-      GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
+  HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
+                    envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
+                    ThreadLocal::SlotAllocator& tls,
+                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
 private:
   /**
@@ -44,11 +43,12 @@ private:
   };
 
   // Common::ImplBase
-  void emitLog(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-               const Http::HeaderMap& response_trailers,
+  void emitLog(const Http::RequestHeaderMap& request_headers,
+               const Http::ResponseHeaderMap& response_headers,
+               const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  const envoy::extensions::access_loggers::grpc::v3alpha::HttpGrpcAccessLogConfig config_;
+  const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;

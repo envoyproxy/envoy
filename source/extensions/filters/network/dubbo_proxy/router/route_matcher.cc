@@ -1,7 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -14,11 +14,11 @@ namespace DubboProxy {
 namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
-    const envoy::extensions::filters::network::dubbo_proxy::v3alpha::Route& route)
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())) {
   if (route.route().cluster_specifier_case() ==
-      envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteAction::ClusterSpecifierCase::
+      envoy::extensions::filters::network::dubbo_proxy::v3::RouteAction::ClusterSpecifierCase::
           kWeightedClusters) {
     total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
@@ -55,7 +55,7 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(const RouteEntryI
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {}
 
 ParameterRouteEntryImpl::ParameterRouteEntryImpl(
-    const envoy::extensions::filters::network::dubbo_proxy::v3alpha::Route& route)
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
     : RouteEntryImplBase(route) {
   for (auto& config : route.match().method().params_match()) {
     parameter_data_list_.emplace_back(config.first, config.second);
@@ -129,7 +129,7 @@ ParameterRouteEntryImpl::ParameterData::ParameterData(uint32_t index,
 }
 
 MethodRouteEntryImpl::MethodRouteEntryImpl(
-    const envoy::extensions::filters::network::dubbo_proxy::v3alpha::Route& route)
+    const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route)
     : RouteEntryImplBase(route), method_name_(route.match().method().name()) {
   if (route.match().method().params_match_size() != 0) {
     parameter_route_ = std::make_shared<ParameterRouteEntryImpl>(route);
@@ -171,7 +171,7 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
 SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
                                                Server::Configuration::FactoryContext&)
     : service_name_(config.interface()), group_(config.group()), version_(config.version()) {
-  using envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteMatch;
+  using envoy::extensions::filters::network::dubbo_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
     routes_.emplace_back(std::make_shared<MethodRouteEntryImpl>(route));

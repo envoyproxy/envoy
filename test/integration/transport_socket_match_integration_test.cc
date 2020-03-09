@@ -1,7 +1,7 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
@@ -27,7 +27,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
@@ -38,7 +38,7 @@ name: "tls_socket"
 match:
   mtlsReady: "true"
 transport_socket:
-  name: envoy.transport_sockets.tls
+  name: tls
   typed_config:
     "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
     common_tls_context:
@@ -52,7 +52,7 @@ transport_socket:
         TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
       }
       // Setup the client Envoy TLS config.
-      cluster->clear_hosts();
+      cluster->clear_load_assignment();
       auto* load_assignment = cluster->mutable_load_assignment();
       load_assignment->set_cluster_name(cluster->name());
       auto* endpoints = load_assignment->add_endpoints();
@@ -77,8 +77,8 @@ transport_socket:
       }
     });
     config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                HttpConnectionManager& hcm) {
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
 
           // Report the host's type metadata and remote address on every response.
@@ -101,7 +101,7 @@ transport_socket:
     HttpIntegrationTest::initialize();
   }
 
-  void configureRoute(envoy::config::route::v3alpha::Route* route, const std::string& host_type) {
+  void configureRoute(envoy::config::route::v3::Route* route, const std::string& host_type) {
     auto* match = route->mutable_match();
     match->set_prefix("/");
 
@@ -119,7 +119,7 @@ transport_socket:
   };
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     const std::string yaml = absl::StrFormat(
         R"EOF(
 common_tls_context:
@@ -164,16 +164,16 @@ require_client_certificate: true
   }
 
   const uint32_t num_hosts_;
-  Http::TestHeaderMapImpl type_a_request_headers_{{":method", "GET"},
-                                                  {":path", "/test"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"x-type", "a"}};
-  Http::TestHeaderMapImpl type_b_request_headers_{{":method", "GET"},
-                                                  {":path", "/test"},
-                                                  {":scheme", "http"},
-                                                  {":authority", "host"},
-                                                  {"x-type", "b"}};
+  Http::TestRequestHeaderMapImpl type_a_request_headers_{{":method", "GET"},
+                                                         {":path", "/test"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"x-type", "a"}};
+  Http::TestRequestHeaderMapImpl type_b_request_headers_{{":method", "GET"},
+                                                         {":path", "/test"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"x-type", "b"}};
   const std::string host_type_header_{"x-host-type"};
   const std::string host_header_{"x-host"};
   const std::string type_header_{"x-type"};

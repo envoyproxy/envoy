@@ -1,6 +1,6 @@
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
 #include "common/singleton/manager_impl.h"
 
@@ -74,9 +74,9 @@ public:
   }
 
   void initialize(const std::string& yaml_config) {
-    envoy::config::cluster::v3alpha::Cluster cluster_config =
+    envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV2Yaml(yaml_config);
-    envoy::extensions::clusters::aggregate::v3alpha::ClusterConfig config;
+    envoy::extensions::clusters::aggregate::v3::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
@@ -217,7 +217,18 @@ TEST_F(AggregateClusterTest, AllHostAreUnhealthyTest) {
   EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
   EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
 
-  for (int i = 0; i < 100; ++i) {
+  // Choose the first cluster as the second one is unavailable.
+  for (int i = 0; i < 50; ++i) {
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
+    EXPECT_EQ(host.get(), target.get());
+  }
+
+  EXPECT_CALL(primary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(secondary_load_balancer_, chooseHost(_)).WillRepeatedly(Return(host));
+
+  // Choose the second cluster as the first one is unavailable.
+  for (int i = 50; i < 100; ++i) {
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
     Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr);
     EXPECT_EQ(host.get(), target.get());

@@ -22,11 +22,15 @@ routing PRs, questions, etc. to the right place.
     issues, and CI in general.
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
   * Upstream, host/priority sets, load balancing, and retry plugins.
+* Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
+  * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
 
 # Maintainers
 
 * Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
   * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+  * Data plane, codecs, security, configuration.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
@@ -38,14 +42,14 @@ routing PRs, questions, etc. to the right place.
 
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
-* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+* Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
+* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tallen@lyft.com)
 
 # Emeritus maintainers
 
 * Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
-* Greg Greenway ([ggreenway](https://github.com/ggreenway)) (greg.greenway@gmail.com, formerly ggreenway@apple.com)
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
 
 # Friends of Envoy

@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -53,8 +53,8 @@ public:
  */
 class LightStepDriver : public Common::Ot::OpenTracingDriver {
 public:
-  LightStepDriver(const envoy::config::trace::v3alpha::LightstepConfig& lightstep_config,
-                  Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+  LightStepDriver(const envoy::config::trace::v3::LightstepConfig& lightstep_config,
+                  Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                   ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                   std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
                   PropagationMode propagation_mode, Grpc::Context& grpc_context);
@@ -82,7 +82,7 @@ private:
               lightstep::AsyncTransporter::Callback& callback) override;
 
     // Http::AsyncClient::Callbacks
-    void onSuccess(Http::MessagePtr&& response) override;
+    void onSuccess(Http::ResponseMessagePtr&& response) override;
     void onFailure(Http::AsyncClient::FailureReason) override;
 
   private:

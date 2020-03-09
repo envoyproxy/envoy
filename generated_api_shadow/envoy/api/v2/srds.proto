@@ -6,6 +6,7 @@ import "envoy/api/v2/discovery.proto";
 
 import "google/api/annotations.proto";
 
+import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 
 import public "envoy/api/v2/scoped_route.proto";
@@ -14,7 +15,7 @@ option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "SrdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.service.route.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.service.route.v3";
 
 // [#protodoc-title: SRDS]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -27,6 +28,8 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.service.route.v3
 // :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` message) to each
 // HTTP request.
 service ScopedRoutesDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.api.v2.ScopedRouteConfiguration";
+
   rpc StreamScopedRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 

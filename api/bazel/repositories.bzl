@@ -34,11 +34,6 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
-        name = "kafka_source",
-        locations = REPOSITORY_LOCATIONS,
-        build_file_content = KAFKASOURCE_BUILD_CONTENT,
-    )
-    envoy_http_archive(
         name = "com_github_openzipkin_zipkinapi",
         locations = REPOSITORY_LOCATIONS,
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
@@ -82,26 +77,6 @@ go_proto_library(
     proto = ":trace_model",
     visibility = ["//visibility:public"],
 )
-"""
-
-KAFKASOURCE_BUILD_CONTENT = """
-
-filegroup(
-    name = "request_protocol_files",
-    srcs = glob([
-        "*Request.json",
-    ]),
-    visibility = ["//visibility:public"],
-)
-
-filegroup(
-    name = "response_protocol_files",
-    srcs = glob([
-        "*Response.json",
-    ]),
-    visibility = ["//visibility:public"],
-)
-
 """
 
 ZIPKINAPI_BUILD_CONTENT = """

@@ -283,7 +283,7 @@ HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
 }
 
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
-                                                  Http::HeaderMap& response_headers,
+                                                  Http::ResponseHeaderMap& response_headers,
                                                   Buffer::Instance&,
                                                   Server::AdminStream& admin_stream) {
 
@@ -294,10 +294,16 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.setReferenceAccessControlAllowOrigin(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  response_headers.setNoChunks(0);
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();
+
+  // Disable chunk-encoding in HTTP/1.x.
+  // TODO: This request should be propagated to codecs via API, instead of using a pseudo-header.
+  //       See: https://github.com/envoyproxy/envoy/issues/9749
+  if (stream_decoder_filter_callbacks.streamInfo().protocol() < Http::Protocol::Http2) {
+    response_headers.setNoChunks(0);
+  }
 
   registerConnection(&stream_decoder_filter_callbacks);
 

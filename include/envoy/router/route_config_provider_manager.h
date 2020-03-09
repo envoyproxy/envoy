@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -38,20 +38,21 @@ public:
    * subscription.
    */
   virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
-      const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) PURE;
 
   /**
    * Get a RouteConfigSharedPtr for a statically defined route. Ownership is as described for
    * getRdsRouteConfigProvider above. This method always create a new RouteConfigProvider.
    * @param route_config supplies the RouteConfiguration for this route
-   * @param runtime supplies the runtime loader.
-   * @param cm supplies the ClusterManager.
+   * @param factory_context is the context to use for the route config provider.
+   * @param validator is the message validator for route config.
    */
-  virtual RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const envoy::config::route::v3alpha::RouteConfiguration& route_config,
-      Server::Configuration::FactoryContext& factory_context) PURE;
+  virtual RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
+                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  ProtobufMessage::ValidationVisitor& validator) PURE;
 };
 
 } // namespace Router

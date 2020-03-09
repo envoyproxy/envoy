@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.h"
-#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.validate.h"
+#include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
+#include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -16,13 +16,13 @@ namespace LocalRateLimitFilter {
  */
 class LocalRateLimitConfigFactory
     : public Common::FactoryBase<
-          envoy::config::filter::network::local_rate_limit::v3alpha::LocalRateLimit> {
+          envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit> {
 public:
   LocalRateLimitConfigFactory() : FactoryBase(NetworkFilterNames::get().LocalRateLimit) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::local_rate_limit::v3alpha::LocalRateLimit& proto_config,
+      const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 

@@ -1,7 +1,7 @@
 #include <chrono>
 #include <thread>
 
-#include "envoy/config/core/v3alpha/http_uri.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 
 #include "common/http/message_impl.h"
 #include "common/protobuf/utility.h"
@@ -12,7 +12,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
-using envoy::config::core::v3alpha::HttpUri;
+using envoy::config::core::v3::HttpUri;
 
 namespace Envoy {
 namespace Extensions {
@@ -153,7 +153,7 @@ TEST_F(JwksFetcherTest, TestSpanPassedDown) {
   // Expectations for span
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
-          [this](Http::MessagePtr&, Http::AsyncClient::Callbacks&,
+          [this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
                  const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_TRUE(options.parent_span_ == &this->parent_span_);
             EXPECT_TRUE(options.child_span_name_ == "JWT Remote PubKey Fetch");

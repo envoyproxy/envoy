@@ -2,7 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -39,9 +39,8 @@ absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
   return absl::nullopt;
 }
 
-absl::optional<std::reference_wrapper<SocketOptionImpl>>
-getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
-                   SocketOptionImpl& ipv6_option) {
+SocketOptionImplOptRef getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
+                                          SocketOptionImpl& ipv6_option) {
   auto version = getVersionFromSocket(socket);
   if (!version.has_value()) {
     return absl::nullopt;
@@ -63,12 +62,12 @@ getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
 } // namespace
 
 bool AddrFamilyAwareSocketOptionImpl::setOption(
-    Socket& socket, envoy::config::core::v3alpha::SocketOption::SocketState state) const {
+    Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
   return setIpSocketOption(socket, state, ipv4_option_, ipv6_option_);
 }
 
 absl::optional<Socket::Option::Details> AddrFamilyAwareSocketOptionImpl::getOptionDetails(
-    const Socket& socket, envoy::config::core::v3alpha::SocketOption::SocketState state) const {
+    const Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
   auto option = getOptionForSocket(socket, *ipv4_option_, *ipv6_option_);
 
   if (!option.has_value()) {
@@ -79,7 +78,7 @@ absl::optional<Socket::Option::Details> AddrFamilyAwareSocketOptionImpl::getOpti
 }
 
 bool AddrFamilyAwareSocketOptionImpl::setIpSocketOption(
-    Socket& socket, envoy::config::core::v3alpha::SocketOption::SocketState state,
+    Socket& socket, envoy::config::core::v3::SocketOption::SocketState state,
     const std::unique_ptr<SocketOptionImpl>& ipv4_option,
     const std::unique_ptr<SocketOptionImpl>& ipv6_option) {
   auto option = getOptionForSocket(socket, *ipv4_option, *ipv6_option);

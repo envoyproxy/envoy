@@ -3,8 +3,8 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/extensions/filters/http/ratelimit/v3alpha/rate_limit.pb.h"
-#include "envoy/extensions/filters/http/ratelimit/v3alpha/rate_limit.pb.validate.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -18,7 +18,7 @@ namespace HttpFilters {
 namespace RateLimitFilter {
 
 Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::ratelimit::v3alpha::RateLimit& proto_config,
+    const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.domain().empty());
   FilterConfigSharedPtr filter_config(new FilterConfig(proto_config, context.localInfo(),
@@ -38,7 +38,8 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(RateLimitFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(RateLimitFilterConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.rate_limit"};
 
 } // namespace RateLimitFilter
 } // namespace HttpFilters

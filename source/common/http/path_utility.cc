@@ -6,7 +6,6 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
-#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -29,7 +28,7 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
 } // namespace
 
 /* static */
-bool PathUtil::canonicalPath(HeaderMap& headers) {
+bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
   const auto original_path = headers.Path()->value().getStringView();
   // canonicalPath is supposed to apply on path component in URL instead of :path header
   const auto query_pos = original_path.find('?');
@@ -54,7 +53,7 @@ bool PathUtil::canonicalPath(HeaderMap& headers) {
   return true;
 }
 
-void PathUtil::mergeSlashes(HeaderMap& headers) {
+void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   const auto original_path = headers.Path()->value().getStringView();
   // Only operate on path component in URL.
   const absl::string_view::size_type query_start = original_path.find('?');
@@ -67,6 +66,16 @@ void PathUtil::mergeSlashes(HeaderMap& headers) {
   const absl::string_view suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
   headers.setPath(absl::StrCat(
       prefix, absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"), query, suffix));
+}
+
+absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
+  absl::string_view ret = path;
+  // Trim query parameters and/or fragment if present.
+  size_t offset = ret.find_first_of("?#");
+  if (offset != absl::string_view::npos) {
+    ret.remove_suffix(ret.length() - offset);
+  }
+  return ret;
 }
 
 } // namespace Http
