@@ -438,11 +438,12 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_TRUE(headers.empty());
 
   // Add and remove by inline.
+  EXPECT_EQ(0UL, headers.removeContentLength());
   headers.setContentLength(5);
   EXPECT_EQ("5", headers.ContentLength()->value().getStringView());
   EXPECT_EQ(1UL, headers.size());
   EXPECT_FALSE(headers.empty());
-  headers.removeContentLength();
+  EXPECT_EQ(1UL, headers.removeContentLength());
   EXPECT_EQ(nullptr, headers.ContentLength());
   EXPECT_EQ(0UL, headers.size());
   EXPECT_TRUE(headers.empty());
@@ -1259,10 +1260,11 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
     VerifiedHeaderMapImpl headers;
     std::string foo = "foo";
     headers.setHost(foo);
+    EXPECT_EQ(headers.byteSize(), 13);
     std::string big_foo = "big_foo";
     headers.setReferenceHost(big_foo);
     EXPECT_EQ(headers.byteSize(), 17);
-    headers.removeHost();
+    EXPECT_EQ(1UL, headers.removeHost());
     EXPECT_EQ(headers.byteSize(), 0);
   }
   {
@@ -1274,7 +1276,7 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
     uint64_t newStatus = 500;
     headers.setStatus(newStatus);
     EXPECT_EQ(headers.byteSize(), 10);
-    headers.removeStatus();
+    EXPECT_EQ(1UL, headers.removeStatus());
     EXPECT_EQ(headers.byteSize(), 0);
   }
   {
@@ -1283,7 +1285,7 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
     uint64_t status = 200;
     headers.setStatus(status);
     EXPECT_EQ(headers.byteSize(), 10);
-    headers.removeStatus();
+    EXPECT_EQ(1UL, headers.removeStatus());
     EXPECT_EQ(headers.byteSize(), 0);
     uint64_t newStatus = 500;
     headers.setStatus(newStatus);

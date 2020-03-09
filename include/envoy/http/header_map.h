@@ -368,7 +368,7 @@ private:
   virtual void setReference##name(absl::string_view value) PURE;                                   \
   virtual void set##name(absl::string_view value) PURE;                                            \
   virtual void set##name(uint64_t value) PURE;                                                     \
-  virtual void remove##name() PURE;
+  virtual size_t remove##name() PURE;
 
 /**
  * Wraps a set of HTTP headers.

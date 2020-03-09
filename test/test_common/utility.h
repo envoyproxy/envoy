@@ -634,7 +634,7 @@ public:                                                                         
   }                                                                                                \
   void set##name(absl::string_view value) override { header_map_.set##name(value); }               \
   void set##name(uint64_t value) override { header_map_.set##name(value); }                        \
-  void remove##name() override { header_map_.remove##name(); }
+  size_t remove##name() override { return header_map_.remove##name(); }
 
 /**
  * Base class for all test header map types. This class wraps an underlying real header map

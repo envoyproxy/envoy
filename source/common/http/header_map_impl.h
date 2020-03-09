@@ -46,7 +46,7 @@ public:                                                                         
     addSize(inline_headers_.name##_->value().size());                                              \
     verifyByteSize();                                                                              \
   }                                                                                                \
-  void remove##name() override { removeInline(&inline_headers_.name##_); }
+  size_t remove##name() override { return removeInline(&inline_headers_.name##_); }
 
 #define DEFINE_INLINE_HEADER_STRUCT(name) HeaderEntryImpl* name##_;
 
@@ -212,7 +212,7 @@ protected:
                                      HeaderString&& value);
   HeaderEntry* getExisting(const LowerCaseString& key);
   HeaderEntryImpl* getExistingInline(absl::string_view key);
-  void removeInline(HeaderEntryImpl** entry);
+  size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
   void subtractSize(uint64_t size);
