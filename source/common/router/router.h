@@ -279,7 +279,8 @@ public:
             callbacks_->streamInfo().downstreamRemoteAddress().get(), *downstream_headers_,
             [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, path, max_age);
-            });
+            },
+            callbacks_->streamInfo().filterState());
       }
     }
     return {};
