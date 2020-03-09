@@ -500,6 +500,21 @@ TEST_F(MongoProxyFilterTest, MaxTime) {
   EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
 }
 
+TEST_F(MongoProxyFilterTest, MaxTimeCursor) {
+  initializeFilter();
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create()->addInt32("maxTimeMS", 500));
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
+}
+
 TEST_F(MongoProxyFilterTest, DecodeError) {
   initializeFilter();
 

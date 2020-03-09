@@ -16,18 +16,6 @@ Usage
       and expected route parameter values. Additional parameters such as additional headers are optional.
       
       Schema: All internal schemas in the tool are based on :repo:`proto3 <test/tools/router_check/validation.proto>`.
-      This is enabled by an extra optional parameter ``--useproto``.
-      This parameter will become the default in the future releases and enables more validation features in the tool.
-      Any new feature addition in validations will be added behind this parameter.
-
-      Migration: If you are currently using the tool and plan to migrate to use ``--useproto``,
-      change the yaml/json test's schema based on the :repo:`proto <test/tools/router_check/validation.proto>`.
-      Few known changes necessary are:
-      ``:authority`` input is now ``authority``.
-      ``:path`` input is now ``path``.
-      ``:method`` input is now ``method``. This is a required property.
-      ``additional_headers``, ``header_fields`` and ``custom_header_fields`` contain ``key`` instead of ``field``.
-      ``tests`` is a root level field in the yaml/json.
 
     -c <string>,  --config-path <string>
       Path to a v2 router config file (YAML or JSON). The router config file schema is found in
@@ -39,9 +27,6 @@ Usage
 
     --only-show-failures
       Displays test results for failed tests. Omits test names for passing tests if the details flag is set.
-
-    -p,  --useproto
-      Use Proto test file schema
 
     -f, --fail-under
       Represents a percent value for route test coverage under which the run should fail.
@@ -55,11 +40,6 @@ Usage
 
     -h,  --help
       Displays usage information and exits.
-
-    <unlabelledConfigStrings>  (accepted multiple times)
-      If you haven't migrated to the proto schema, the binary accepts the paths to the 
-      router config file and the tool config JSON file in that particular order.
-      The ``--details`` parameter can be appended at the end to show the detailed test results.
 
 Output
   The program exits with status EXIT_FAILURE if any test case does not match the expected route parameter
@@ -86,13 +66,9 @@ Building
     bazel build //test/tools/router_check:router_check_tool
 
 Running
-  Examples ::
+  Example ::
 
-    bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json
-
-    bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json --details
-
-    bazel-bin/test/tools/router_check/router_check_tool -c router_config.(yaml|json) -t tool_config.json --details --useproto
+    bazel-bin/test/tools/router_check/router_check_tool -c router_config.(yaml|json) -t tool_config.json --details
 
 Testing
   A bash shell script test can be run with bazel. The test compares routes using different router and

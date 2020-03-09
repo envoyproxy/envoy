@@ -52,7 +52,7 @@ TEST(HealthCheckerFactoryTest, CreateRedis) {
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
         key: foo
@@ -100,7 +100,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
@@ -124,7 +124,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithLogHCFailure) {
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     always_log_health_check_failures: true
@@ -149,7 +149,7 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checkers.redis
+      name: redis
       typed_config:
         "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
         key: foo

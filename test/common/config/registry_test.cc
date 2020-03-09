@@ -89,13 +89,13 @@ public:
 REGISTER_FACTORY(TestWithDeprecatedPublishedFactory,
                  PublishedFactory){"testing.published.deprecated_name"};
 
-TEST(RegistryTest, WithDeprecatedFactoryPublished) {
+TEST(RegistryTest, DEPRECATED_FEATURE_TEST(WithDeprecatedFactoryPublished)) {
   EXPECT_EQ("testing.published.instead_name",
             Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
                 "testing.published.deprecated_name")
                 ->name());
   EXPECT_LOG_CONTAINS("warn",
-                      fmt::format("{} is deprecated, use {} instead.",
+                      fmt::format("Using deprecated extension name '{}' for '{}'.",
                                   "testing.published.deprecated_name",
                                   "testing.published.instead_name"),
                       Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
@@ -146,13 +146,13 @@ REGISTER_FACTORY(TestVersionedWithDeprecatedNamesFactory,
                                    {"testing.published.versioned.deprecated_name"}};
 
 // Test registration of versioned factory that also uses deprecated names
-TEST(RegistryTest, VersionedWithDeprecatednamesFactory) {
+TEST(RegistryTest, DEPRECATED_FEATURE_TEST(VersionedWithDeprecatedNamesFactory)) {
   EXPECT_EQ("testing.published.versioned.instead_name",
             Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
                 "testing.published.versioned.deprecated_name")
                 ->name());
   EXPECT_LOG_CONTAINS("warn",
-                      fmt::format("{} is deprecated, use {} instead.",
+                      fmt::format("Using deprecated extension name '{}' for '{}'.",
                                   "testing.published.versioned.deprecated_name",
                                   "testing.published.versioned.instead_name"),
                       Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(

@@ -18,7 +18,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ProxyProtoIntegrationTest, v1RouterRequestAndResponseWithBodyNoBuffer) {
+TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
     Buffer::OwnedImpl buf("PROXY TCP4 1.2.3.4 254.254.254.254 65535 1234\r\n");
@@ -29,7 +29,7 @@ TEST_P(ProxyProtoIntegrationTest, v1RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
-TEST_P(ProxyProtoIntegrationTest, v2RouterRequestAndResponseWithBodyNoBuffer) {
+TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     Network::ClientConnectionPtr conn = makeClientConnection(lookupPort("http"));
     constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -43,7 +43,7 @@ TEST_P(ProxyProtoIntegrationTest, v2RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
-TEST_P(ProxyProtoIntegrationTest, v1RouterRequestAndResponseWithBodyNoBufferV6) {
+TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBufferV6) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     auto conn = makeClientConnection(lookupPort("http"));
     Buffer::OwnedImpl buf("PROXY TCP6 1:2:3::4 FE00:: 65535 1234\r\n");
@@ -54,7 +54,7 @@ TEST_P(ProxyProtoIntegrationTest, v1RouterRequestAndResponseWithBodyNoBufferV6) 
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
-TEST_P(ProxyProtoIntegrationTest, v2RouterRequestAndResponseWithBodyNoBufferV6) {
+TEST_P(ProxyProtoIntegrationTest, V2RouterRequestAndResponseWithBodyNoBufferV6) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
                                   0x0a, 0x21, 0x22, 0x00, 0x24, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,

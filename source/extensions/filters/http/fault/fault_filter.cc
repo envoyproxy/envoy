@@ -173,7 +173,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   return Http::FilterHeadersStatus::Continue;
 }
 
-void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_headers) {
+void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers) {
   if (fault_settings_->responseRateLimit() == nullptr) {
     return;
   }
@@ -244,7 +244,7 @@ bool FaultFilter::isAbortEnabled() {
 }
 
 absl::optional<std::chrono::milliseconds>
-FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
+FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   absl::optional<std::chrono::milliseconds> ret;
 
   if (!isDelayEnabled()) {
@@ -382,7 +382,7 @@ bool FaultFilter::matchesTargetUpstreamCluster() {
   return matches;
 }
 
-bool FaultFilter::matchesDownstreamNodes(const Http::HeaderMap& headers) {
+bool FaultFilter::matchesDownstreamNodes(const Http::RequestHeaderMap& headers) {
   if (fault_settings_->downstreamNodes().empty()) {
     return true;
   }

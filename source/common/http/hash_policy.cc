@@ -24,7 +24,8 @@ public:
   HeaderHashMethod(const std::string& header_name, bool terminal)
       : HashMethodImplBase(terminal), header_name_(header_name) {}
 
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*, const HeaderMap& headers,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const RequestHeaderMap& headers,
                                     const HashPolicy::AddCookieCallback) const override {
     absl::optional<uint64_t> hash;
 
@@ -45,7 +46,8 @@ public:
                    const absl::optional<std::chrono::seconds>& ttl, bool terminal)
       : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl) {}
 
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*, const HeaderMap& headers,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const RequestHeaderMap& headers,
                                     const HashPolicy::AddCookieCallback add_cookie) const override {
     absl::optional<uint64_t> hash;
     std::string value = Utility::parseCookieValue(headers, key_);
@@ -70,7 +72,7 @@ public:
   IpHashMethod(bool terminal) : HashMethodImplBase(terminal) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
-                                    const HeaderMap&,
+                                    const RequestHeaderMap&,
                                     const HashPolicy::AddCookieCallback) const override {
     if (downstream_addr == nullptr) {
       return absl::nullopt;
@@ -92,7 +94,8 @@ public:
   QueryParameterHashMethod(const std::string& parameter_name, bool terminal)
       : HashMethodImplBase(terminal), parameter_name_(parameter_name) {}
 
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*, const HeaderMap& headers,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const RequestHeaderMap& headers,
                                     const HashPolicy::AddCookieCallback) const override {
     absl::optional<uint64_t> hash;
 
@@ -151,7 +154,8 @@ HashPolicyImpl::HashPolicyImpl(
 
 absl::optional<uint64_t>
 HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
-                             const HeaderMap& headers, const AddCookieCallback add_cookie) const {
+                             const RequestHeaderMap& headers,
+                             const AddCookieCallback add_cookie) const {
   absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
     const absl::optional<uint64_t> new_hash =
