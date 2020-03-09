@@ -26,7 +26,7 @@ FaultAbortConfig::FaultAbortConfig(
   }
 }
 
-absl::optional<uint64_t>
+absl::optional<Http::Code>
 FaultAbortConfig::HeaderAbortProvider::status_code(const Http::HeaderEntry* header) const {
   if (header == nullptr) {
     return absl::nullopt;
@@ -37,7 +37,7 @@ FaultAbortConfig::HeaderAbortProvider::status_code(const Http::HeaderEntry* head
     return absl::nullopt;
   }
 
-  return value;
+  return static_cast<Http::Code>(value);
 }
 
 FaultDelayConfig::FaultDelayConfig(

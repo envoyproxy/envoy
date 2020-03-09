@@ -245,14 +245,14 @@ private:
   void recordDelaysInjectedStats();
   void resetTimerState();
   void postDelayInjection(const Http::RequestHeaderMap& request_headers);
-  void abortWithHTTPStatus(uint64_t abort_code);
+  void abortWithHTTPStatus(Http::Code abort_code);
   bool matchesTargetUpstreamCluster();
   bool matchesDownstreamNodes(const Http::RequestHeaderMap& headers);
   bool isAbortEnabled();
   bool isDelayEnabled();
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
-  absl::optional<uint64_t> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
+  absl::optional<Http::Code> abortHttpStatus(const Http::RequestHeaderMap& request_headers);
   void maybeIncActiveFaults();
   void maybeSetupResponseRateLimit(const Http::RequestHeaderMap& request_headers);
 

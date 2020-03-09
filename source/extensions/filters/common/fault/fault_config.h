@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/singleton/const_singleton.h"
 
@@ -31,7 +32,7 @@ public:
   FaultAbortConfig(const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config);
 
   const envoy::type::v3::FractionalPercent& percentage() const { return percentage_; }
-  absl::optional<uint64_t> status_code(const Http::HeaderEntry* header) const {
+  absl::optional<Http::Code> status_code(const Http::HeaderEntry* header) const {
     return provider_->status_code(header);
   }
 
@@ -43,7 +44,7 @@ private:
 
     // Return the HTTP status code to use. Optionally passed an HTTP header that may contain the
     // HTTP status code depending on the provider implementation.
-    virtual absl::optional<uint64_t> status_code(const Http::HeaderEntry* header) const PURE;
+    virtual absl::optional<Http::Code> status_code(const Http::HeaderEntry* header) const PURE;
   };
 
   // Delay provider that uses a fixed delay.
@@ -52,8 +53,8 @@ private:
     FixedAbortProvider(uint64_t status_code) : status_code_(status_code) {}
 
     // DelayProvider
-    absl::optional<uint64_t> status_code(const Http::HeaderEntry*) const override {
-      return status_code_;
+    absl::optional<Http::Code> status_code(const Http::HeaderEntry*) const override {
+      return static_cast<Http::Code>(status_code_);
     }
 
   private:
@@ -64,7 +65,7 @@ private:
   class HeaderAbortProvider : public AbortProvider {
   public:
     // AbortProvider
-    absl::optional<uint64_t> status_code(const Http::HeaderEntry* header) const override;
+    absl::optional<Http::Code> status_code(const Http::HeaderEntry* header) const override;
   };
 
   using AbortProviderPtr = std::unique_ptr<AbortProvider>;

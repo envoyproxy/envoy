@@ -279,12 +279,10 @@ FaultFilter::delayDuration(const Http::RequestHeaderMap& request_headers) {
   return ret;
 }
 
-absl::optional<uint64_t>
+absl::optional<Http::Code>
 FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
-  absl::optional<uint64_t> ret;
-
   if (!isAbortEnabled()) {
-    return ret;
+    return absl::nullopt;
   }
 
   // See if the configured abort provider has a default status code, if not there is no abort status
@@ -292,19 +290,20 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
   auto config_abort = fault_settings_->requestAbort()->status_code(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequest));
   if (!config_abort.has_value()) {
-    return ret;
+    return absl::nullopt;
+    ;
   }
 
-  // TODO(mattklein123): check http status codes obtained from runtime.
-  uint64_t http_status = config_->runtime().snapshot().getInteger(
-      fault_settings_->abortHttpStatusRuntime(), config_abort.value());
+  auto status_code = static_cast<uint64_t>(config_abort.value());
+  auto code = static_cast<Http::Code>(config_->runtime().snapshot().getInteger(
+      fault_settings_->abortHttpStatusRuntime(), status_code));
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
-    http_status = config_->runtime().snapshot().getInteger(
-        downstream_cluster_abort_http_status_key_, http_status);
+    code = static_cast<Http::Code>(config_->runtime().snapshot().getInteger(
+        downstream_cluster_abort_http_status_key_, status_code));
   }
 
-  return http_status;
+  return code;
 }
 
 void FaultFilter::recordDelaysInjectedStats() {
@@ -382,10 +381,10 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   }
 }
 
-void FaultFilter::abortWithHTTPStatus(uint64_t abort_code) {
+void FaultFilter::abortWithHTTPStatus(Http::Code abort_code) {
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::FaultInjected);
-  decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(abort_code), "fault filter abort",
-                                     nullptr, absl::nullopt, RcDetails::get().FaultAbort);
+  decoder_callbacks_->sendLocalReply(abort_code, "fault filter abort", nullptr, absl::nullopt,
+                                     RcDetails::get().FaultAbort);
   recordAbortsInjectedStats();
 }
 
