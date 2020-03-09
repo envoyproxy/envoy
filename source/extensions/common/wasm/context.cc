@@ -18,7 +18,6 @@
 #include "common/common/logger.h"
 
 #include "extensions/common/wasm/wasm.h"
-#include "extensions/common/wasm/wasm_state.h"
 #include "extensions/common/wasm/well_known_names.h"
 
 #include "absl/base/casts.h"

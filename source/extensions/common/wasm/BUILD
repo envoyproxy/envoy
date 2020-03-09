@@ -48,16 +48,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "wasm_interoperation_lib",
-    srcs = ["wasm_state.cc"],
-    hdrs = ["wasm_state.h"],
-    deps = [
-        "//include/envoy/stream_info:filter_state_interface",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "wasm_lib",
     srcs = [
         "context.cc",
@@ -65,7 +55,6 @@ envoy_cc_library(
     ],
     deps = [
         ":wasm_hdr",
-        ":wasm_interoperation_lib",
         ":wasm_vm_lib",
         "//external:abseil_base",
         "//external:abseil_node_hash_map",
