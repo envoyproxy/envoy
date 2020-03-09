@@ -2,9 +2,10 @@
 
 #include <memory>
 
+#include "extensions/common/wasm/well_known_names.h"
+
 #include "include/proxy-wasm/null.h"
 #include "include/proxy-wasm/v8.h"
-#include "extensions/common/wasm/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

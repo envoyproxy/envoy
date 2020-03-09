@@ -2,8 +2,6 @@
 
 #include <memory>
 
-#include "absl/strings/str_cat.h"
-
 #include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -11,6 +9,7 @@
 
 #include "common/common/logger.h"
 
+#include "absl/strings/str_cat.h"
 #include "include/proxy-wasm/wasm_vm.h"
 #include "include/proxy-wasm/word.h"
 

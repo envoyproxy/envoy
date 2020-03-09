@@ -4,8 +4,6 @@
 #include <map>
 #include <memory>
 
-#include "include/proxy-wasm/context.h"
-
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
@@ -13,6 +11,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+
+#include "include/proxy-wasm/context.h"
 
 namespace Envoy {
 namespace Extensions {

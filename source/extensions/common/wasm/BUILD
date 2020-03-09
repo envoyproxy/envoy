@@ -21,10 +21,10 @@ envoy_cc_library(
     srcs = ["wasm_vm.cc"],
     deps = [
         ":wasm_hdr",
-        "@proxy_wasm_cpp_host//:lib",
-        "@proxy_wasm_cpp_sdk//:common_lib",
         "//source/common/common:assert_lib",
         "//source/common/stats:stats_lib",
+        "@proxy_wasm_cpp_host//:lib",
+        "@proxy_wasm_cpp_sdk//:common_lib",
     ],
 )
 
@@ -37,13 +37,13 @@ envoy_cc_library(
         "wasm_vm.h",
     ],
     deps = [
-        "@proxy_wasm_cpp_host//:include",
-        "@proxy_wasm_cpp_sdk//:common_lib",
         ":well_known_names",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/config:datasource_lib",
         "//source/common/stats:stats_lib",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
+        "@proxy_wasm_cpp_host//:include",
+        "@proxy_wasm_cpp_sdk//:common_lib",
     ],
 )
 

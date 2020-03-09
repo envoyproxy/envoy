@@ -2,7 +2,6 @@
 
 #include "common/stats/isolated_store_impl.h"
 
-#include "include/proxy-wasm/null_vm_plugin.h"
 #include "extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
@@ -10,6 +9,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "include/proxy-wasm/null_vm_plugin.h"
 
 using proxy_wasm::WasmCallVoid;
 using proxy_wasm::WasmCallWord;
