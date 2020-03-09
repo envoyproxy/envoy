@@ -25,7 +25,8 @@ using TagVector = std::vector<Tag>;
 
 using StatNameTag = std::pair<StatName, StatName>;
 using StatNameTagVector = std::vector<StatNameTag>;
-using StatNameTagVectorOptRef = absl::optional<std::reference_wrapper<StatNameTagVector>>;
+using StatNameTagVectorOptConstRef =
+    absl::optional<std::reference_wrapper<const StatNameTagVector>>;
 
 } // namespace Stats
 } // namespace Envoy
