@@ -1,4 +1,4 @@
 #!/bin/bash
 
-# Set the benchmark time to a tiny value since we just want to know if the benchmark runs to completion.
-"$@" --benchmark_min_time=0.00001
+# Set the benchmark time to 0 to just verify that the benchmark runs to completion.
+"$@" --benchmark_min_time=0
