@@ -298,7 +298,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           [](const auto& filter) {
             return filter.name() ==
                        Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector ||
-                   filter.name() == "envoy.listeners.tls_inspector";
+                   filter.name() == "envoy.listener.tls_inspector";
           });
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
