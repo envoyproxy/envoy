@@ -13,9 +13,6 @@ option java_outer_classname = "ConditionalRetryProto";
 option java_multiple_files = true;
 
 // [#not-implemented-hide:]
-// [#protodoc-title: Conditional Retry Policy]
-// [#extension: envoy.retry_policy.conditional_retry]
-
 // Retry policy match configuration. This is a recursive structure which allows
 // complex nested match configurations to be built using various logical
 // operators.

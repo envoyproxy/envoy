@@ -4404,7 +4404,7 @@ public:
     }
     throw EnvoyException("Cannot create a Baz when metadata is empty.");
   }
-}; // namespace
+};
 
 TEST_F(RouteMatcherTest, WeightedClusters) {
   const std::string yaml = R"EOF(
