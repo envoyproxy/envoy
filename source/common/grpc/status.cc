@@ -1,5 +1,7 @@
 #include "common/grpc/status.h"
 
+#include "common/common/empty_string.h"
+
 namespace Envoy {
 namespace Grpc {
 
