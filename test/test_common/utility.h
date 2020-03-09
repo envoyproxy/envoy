@@ -678,7 +678,7 @@ public:
   }
   bool has(const std::string& key) const { return get(LowerCaseString(key)) != nullptr; }
   bool has(const LowerCaseString& key) const { return get(key) != nullptr; }
-  void remove(const std::string& key) { remove(LowerCaseString(key)); }
+  size_t remove(const std::string& key) { return remove(LowerCaseString(key)); }
 
   // HeaderMap
   bool operator==(const HeaderMap& rhs) const override { return header_map_.operator==(rhs); }
