@@ -57,8 +57,7 @@ public:
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
-  void onResetStream(Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason);
+  void onResetStream(Http::StreamResetReason reason, absl::string_view transport_failure_reason);
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
