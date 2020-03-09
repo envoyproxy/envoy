@@ -126,22 +126,22 @@ To add an extension config to the API, the steps below should be followed:
    [Buffer filter config](envoy/config/filter/http/buffer/v2/buffer.proto) as an example of `v2`.
 1. Place the v2 extension configuration `.proto` in `api/envoy/config`, e.g.
    `api/envoy/config/filter/http/foobar/v2/foobar.proto` together with an initial BUILD file:
-   ```
+   ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
    licenses(["notice"])  # Apache 2
 
    api_proto_package(
        deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
-       )
+   )
    ```
 1. Add to the v2 extension config proto `import "udpa/annotations/migrate.proto";`
 1. Add to the v2 extension config proto a file level `option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.foobar.v3";`.
-   This places the filter in the correct [v3 package hierarchy](#package-organization). 
+   This places the filter in the correct [v3 package hierarchy](#package-organization).
 1. If this is still WiP and subject to breaking changes, import
    `udpa/annotations/status.proto` and set `option (udpa.annotations.file_status).work_in_progress = true;`.
 1. Add a reference to the v2 extension config in (1) in [api/docs/BUILD](docs/BUILD).
-1. Run `./tools/proto_format fix`. This should regenerate the `BUILD` file,
+1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file,
    reformat `foobar.proto` as needed and also generate the v3 extension config,
    together with shadow API protos.
 1. `git add api/ generated_api_shadow/` to add any new files to your Git index.
