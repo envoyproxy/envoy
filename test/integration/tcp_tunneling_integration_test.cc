@@ -36,7 +36,7 @@ public:
           auto* filter_chain = listener->add_filter_chains();
           auto* filter = filter_chain->add_filters();
           filter->mutable_typed_config()->PackFrom(proxy_config);
-          filter->set_name("envoy.tcp_proxy");
+          filter->set_name("envoy.filters.network.tcp_proxy");
         });
   }
 };
