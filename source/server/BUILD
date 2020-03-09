@@ -295,8 +295,6 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
