@@ -16,8 +16,9 @@ class DynamoStats {
 public:
   DynamoStats(Stats::Scope& scope, const std::string& prefix);
 
-  Stats::Counter& counter(const Stats::StatNameVec& names);
-  Stats::Histogram& histogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit);
+  void incCounter(const Stats::StatNameVec& names);
+  void recordHistogram(const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+                       uint64_t value);
 
   /**
    * Creates the partition id stats string. The stats format is

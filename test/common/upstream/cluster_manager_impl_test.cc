@@ -33,13 +33,14 @@ std::string clustersJson(const std::vector<std::string>& clusters) {
 class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
-      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()) {}
+      : api_(Api::createApiForTest()), http_context_(factory_.stats_.symbolTable()),
+        grpc_context_(factory_.stats_.symbolTable()) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, http_context_);
+        *api_, http_context_, grpc_context_);
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -74,7 +75,7 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *api_, local_cluster_update_, local_hosts_removed_, http_context_);
+        *api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -124,6 +125,7 @@ public:
   MockLocalClusterUpdate local_cluster_update_;
   MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
+  Grpc::ContextImpl grpc_context_;
 };
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {

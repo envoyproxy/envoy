@@ -99,7 +99,7 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      accessLogManager(), singletonManager(), time_system_);
+      grpc_context_, accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   runtime_loader_->initialize(clusterManager());
   http_context_.setTracer(config_.httpTracer());

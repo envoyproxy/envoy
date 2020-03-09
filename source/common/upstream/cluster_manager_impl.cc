@@ -208,7 +208,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-    Http::Context& http_context)
+    Http::Context& http_context, Grpc::Context& grpc_context)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
@@ -219,8 +219,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       http_context_(http_context),
       subscription_factory_(local_info, main_thread_dispatcher, *this, random,
                             validation_context.dynamicValidationVisitor(), api) {
-  async_client_manager_ =
-      std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_, api);
+  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
+      *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -1321,7 +1321,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
       bootstrap, *this, stats_, tls_, runtime_, random_, local_info_, log_manager_,
-      main_thread_dispatcher_, admin_, validation_context_, api_, http_context_)};
+      main_thread_dispatcher_, admin_, validation_context_, api_, http_context_, grpc_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

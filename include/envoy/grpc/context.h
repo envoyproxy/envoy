@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace Grpc {
 
+struct StatNames;
+
 /**
  * Captures grpc-related structures with cardinality of one per server.
  */
@@ -78,6 +80,11 @@ public:
    */
   virtual void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
                                          const RequestNames& request_names, uint64_t amount) PURE;
+
+  /**
+   * @return a struct containing StatNames for gRPC stat tokens.
+   */
+  virtual StatNames& statNames() PURE;
 };
 
 using ContextPtr = std::unique_ptr<Context>;
