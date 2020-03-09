@@ -291,7 +291,6 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequest));
   if (!config_abort.has_value()) {
     return absl::nullopt;
-    ;
   }
 
   auto status_code = static_cast<uint64_t>(config_abort.value());
