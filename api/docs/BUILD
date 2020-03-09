@@ -68,6 +68,7 @@ proto_library(
         "//envoy/config/filter/listener/proxy_protocol/v2:pkg",
         "//envoy/config/filter/listener/tls_inspector/v2:pkg",
         "//envoy/config/filter/network/client_ssl_auth/v2:pkg",
+        "//envoy/config/filter/network/direct_response/v2:pkg",
         "//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg",
         "//envoy/config/filter/network/echo/v2:pkg",
         "//envoy/config/filter/network/ext_authz/v2:pkg",
