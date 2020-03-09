@@ -138,7 +138,7 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const std::vector<nghttp2_nv>
 void ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& headers,
                                                      bool end_stream) {
   // This must exist outside of the scope of isUpgrade as the underlying memory is
-  // needed until submitHeaders has been called.
+  // needed until encodeHeadersBase has been called.
   std::vector<nghttp2_nv> final_headers;
   Http::RequestHeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
@@ -158,7 +158,7 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
   ASSERT(headers.Status() != nullptr);
 
   // This must exist outside of the scope of isUpgrade as the underlying memory is
-  // needed until submitHeaders has been called.
+  // needed until encodeHeadersBase has been called.
   std::vector<nghttp2_nv> final_headers;
   Http::ResponseHeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
@@ -228,9 +228,9 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   readDisable(false);
 }
 
-void ConnectionImpl::ClientStreamImpl::decodeHeaders(nghttp2_headers_category category) {
+void ConnectionImpl::ClientStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
-  if (category == NGHTTP2_HCAT_RESPONSE &&
+  if (allow_waiting_for_informational_headers &&
       CodeUtility::is1xx(Http::Utility::getResponseStatus(*headers))) {
     waiting_for_non_informational_headers_ = true;
   }
@@ -252,7 +252,8 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
       std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
 }
 
-void ConnectionImpl::ServerStreamImpl::decodeHeaders(nghttp2_headers_category) {
+void ConnectionImpl::ServerStreamImpl::decodeHeaders(bool allow_waiting_for_informational_headers) {
+  ASSERT(!allow_waiting_for_informational_headers);
   auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
@@ -564,7 +565,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     switch (frame->headers.cat) {
     case NGHTTP2_HCAT_RESPONSE:
     case NGHTTP2_HCAT_REQUEST: {
-      stream->decodeHeaders(frame->headers.cat);
+      stream->decodeHeaders(frame->headers.cat == NGHTTP2_HCAT_RESPONSE);
       break;
     }
 
@@ -592,7 +593,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           // Even if we have :status 100 in the client case in a response, when
           // we received a 1xx to start out with, nghttp2 message checking
           // guarantees proper flow here.
-          stream->decodeHeaders(frame->headers.cat);
+          stream->decodeHeaders(false);
         }
       }
 
