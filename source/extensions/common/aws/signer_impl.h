@@ -34,6 +34,7 @@ public:
 
   const std::string LongDateFormat{"%Y%m%dT%H%M00Z"};
   const std::string ShortDateFormat{"%Y%m%d"};
+  const std::string UnsignedPayload{"UNSIGNED-PAYLOAD"};
 };
 
 using SignatureConstants = ConstSingleton<SignatureConstantValues>;
