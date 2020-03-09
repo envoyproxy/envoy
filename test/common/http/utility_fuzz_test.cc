@@ -42,9 +42,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
     break;
   }
   case test::common::http::UtilityTestCase::kPercentEncodingString: {
-    auto encoding_string = input.percent_encoding_string();
-    auto encoded_string = Http::Utility::PercentEncoding::encode(encoding_string);
-    FUZZ_ASSERT(Http::Utility::PercentEncoding::decode(encoded_string) == encoding_string);
+    Http::Utility::PercentEncoding::encode(input.percent_encoding_string());
     break;
   }
   case test::common::http::UtilityTestCase::kPercentDecodingString: {
