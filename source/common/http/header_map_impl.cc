@@ -519,7 +519,7 @@ void HeaderMapImpl::clear() {
 }
 
 size_t HeaderMapImpl::remove(const LowerCaseString& key) {
-  size_t old_size = headers_.size();
+  const size_t old_size = headers_.size();
   EntryCb cb = staticLookupTable().find(key.get());
   if (cb) {
     StaticLookupResponse ref_lookup_response = cb(*this);
@@ -535,12 +535,11 @@ size_t HeaderMapImpl::remove(const LowerCaseString& key) {
     }
   }
   verifyByteSize();
-  size_t new_size = headers_.size();
-  return old_size - new_size;
+  return old_size - headers_.size();
 }
 
 size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
-  size_t old_size = headers_.size();
+  const size_t old_size = headers_.size();
   headers_.remove_if([&prefix, this](const HeaderEntryImpl& entry) {
     bool to_remove = absl::StartsWith(entry.key().getStringView(), prefix.get());
     if (to_remove) {
@@ -562,8 +561,7 @@ size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
     return to_remove;
   });
   verifyByteSize();
-  size_t new_size = headers_.size();
-  return old_size - new_size;
+  return old_size - headers_.size();
 }
 
 void HeaderMapImpl::dumpState(std::ostream& os, int indent_level) const {
@@ -622,15 +620,14 @@ size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
     return 0;
   }
 
-  size_t old_size = headers_.size();
+  const size_t old_size = headers_.size();
   HeaderEntryImpl* entry = *ptr_to_entry;
   const uint64_t size_to_subtract = entry->entry_->key().size() + entry->entry_->value().size();
   subtractSize(size_to_subtract);
   *ptr_to_entry = nullptr;
   headers_.erase(entry->entry_);
   verifyByteSize();
-  size_t new_size = headers_.size();
-  return old_size - new_size;
+  return old_size - headers_.size();
 }
 
 } // namespace Http
