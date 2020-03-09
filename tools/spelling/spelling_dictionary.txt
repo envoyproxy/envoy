@@ -541,6 +541,7 @@ eg
 emplace
 emplaced
 emscripten
+emsdk
 enablement
 encodings
 endian

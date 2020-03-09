@@ -65,6 +65,8 @@ struct Plugin : public PluginBase {
       : PluginBase(name, root_id, vm_id, plugin_configuration), direction_(direction),
         local_info_(local_info), listener_metadata_(listener_metadata) {}
 
+  // Information specific to HTTP Filters.
+  // TODO: consider using a varient record or filter-type specific sub-objects via unique_ptr.
   const envoy::config::core::v3::TrafficDirection direction_;
   const LocalInfo::LocalInfo& local_info_;
   const envoy::config::core::v3::Metadata* listener_metadata_;
@@ -117,7 +119,7 @@ protected:
 
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
 
-  // State use for calls into the VM.
+  // Temporary state used for and valid only during calls into the VM.
   Buffer buffer_;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
