@@ -246,22 +246,22 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
 RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                                DoRetryCallback callback) {
-  bool wouldRetry = false;
+  bool would_retry = false;
   if (retry_policy_extension_) {
     retry_policy_extension_->recordResponseHeaders(response_headers);
-    wouldRetry = retry_policy_extension_->shouldRetry();
+    would_retry = retry_policy_extension_->shouldRetry();
   }
-  return shouldRetry(wouldRetry || wouldRetryFromHeaders(response_headers), callback);
+  return shouldRetry(would_retry || wouldRetryFromHeaders(response_headers), callback);
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
                                              DoRetryCallback callback) {
-  bool wouldRetry = false;
+  bool would_retry = false;
   if (retry_policy_extension_) {
     retry_policy_extension_->recordReset(reset_reason);
-    wouldRetry = retry_policy_extension_->shouldRetry();
+    would_retry = retry_policy_extension_->shouldRetry();
   }
-  return shouldRetry(wouldRetry || wouldRetryFromReset(reset_reason), callback);
+  return shouldRetry(would_retry || wouldRetryFromReset(reset_reason), callback);
 }
 
 RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) {
