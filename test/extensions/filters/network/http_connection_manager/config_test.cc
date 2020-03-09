@@ -98,7 +98,7 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.filters.http.router
-- name: envoy.filters.http.health_check
+- name: health_check
   typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
@@ -127,7 +127,7 @@ route_config:
       route:
         cluster: cluster
 http_filters:
-- name: envoy.filters.http.health_check
+- name: health_check
   typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
@@ -138,8 +138,7 @@ http_filters:
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_),
       EnvoyException,
-      "Error: non-terminal filter envoy.filters.http.health_check is the last filter in a http "
-      "filter chain.");
+      "Error: non-terminal filter health_check is the last filter in a http filter chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {

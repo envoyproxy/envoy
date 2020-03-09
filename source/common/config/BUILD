@@ -52,6 +52,7 @@ envoy_cc_library(
         "//include/envoy/api:api_interface",
         "//include/envoy/init:manager_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:backoff_lib",
         "//source/common/common:empty_string",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
