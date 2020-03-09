@@ -26,7 +26,7 @@ public:
   }
 
 private:
-  envoy::config::trace::v3::Tracing default_tracing_config_{};
+  envoy::config::trace::v3::Tracing default_tracing_config_;
   Http::CodeStatsImpl code_stats_;
 };
 
