@@ -33,6 +33,12 @@ void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key) const {
 
 TransportSocketOptionsSharedPtr
 TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& filter_state) {
+  return fromFilterStateWithDownstreamAddrs(filter_state, absl::nullopt);
+}
+
+TransportSocketOptionsSharedPtr TransportSocketOptionsUtility::fromFilterStateWithDownstreamAddrs(
+    const StreamInfo::FilterState& filter_state,
+    absl::optional<Network::TransportSocketOptions::DownstreamAddresses> down_addrs) {
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
@@ -59,9 +65,13 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
     needs_transport_socket_options = true;
   }
 
+  if (down_addrs.has_value()) {
+    needs_transport_socket_options = true;
+  }
+
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
-        server_name, std::move(subject_alt_names), std::move(application_protocols));
+        server_name, std::move(subject_alt_names), std::move(application_protocols), down_addrs);
   } else {
     return nullptr;
   }

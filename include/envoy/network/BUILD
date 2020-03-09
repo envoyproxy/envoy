@@ -96,6 +96,7 @@ envoy_cc_library(
     name = "transport_socket_interface",
     hdrs = ["transport_socket.h"],
     deps = [
+        ":address_interface",
         ":io_handle_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/ssl:connection_interface",

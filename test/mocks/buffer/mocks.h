@@ -118,6 +118,10 @@ MATCHER_P(BufferStringContains, rhs,
   return arg.toString().find(rhs) != std::string::npos;
 }
 
+MATCHER_P(RawSliceVectorEqual, rhs, testing::PrintToString(rhs)) {
+  return TestUtility::rawSlicesEqual(arg, rhs.data(), rhs.size());
+}
+
 ACTION_P(AddBufferToString, target_string) {
   auto bufferToString = [](const Buffer::OwnedImpl& buf) -> std::string { return buf.toString(); };
   target_string->append(bufferToString(arg0));

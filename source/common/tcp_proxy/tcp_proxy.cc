@@ -420,8 +420,21 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   if (downstreamConnection()) {
-    transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstreamConnection()->streamInfo().filterState());
+    if (add_addrs_to_transport_socket_options_) {
+      auto down_addrs = Network::TransportSocketOptions::DownstreamAddresses{
+          .remote_addr_ = read_callbacks_->connection().remoteAddress()->ip()->addressAsString(),
+          .local_addr_ = read_callbacks_->connection().localAddress()->ip()->addressAsString(),
+          .remote_port_ = read_callbacks_->connection().remoteAddress()->ip()->port(),
+          .local_port_ = read_callbacks_->connection().localAddress()->ip()->port(),
+          .version_ = read_callbacks_->connection().remoteAddress()->ip()->version()};
+      transport_socket_options_ =
+          Network::TransportSocketOptionsUtility::fromFilterStateWithDownstreamAddrs(
+              downstreamConnection()->streamInfo().filterState(),
+              absl::optional<Network::TransportSocketOptions::DownstreamAddresses>(down_addrs));
+    } else {
+      transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+          downstreamConnection()->streamInfo().filterState());
+    }
   }
 
   if (!config_->tunnelingConfig()) {

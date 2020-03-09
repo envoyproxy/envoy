@@ -29,6 +29,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
     ],
 )
 

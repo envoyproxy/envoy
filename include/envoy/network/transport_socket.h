@@ -4,6 +4,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/ssl/connection.h"
 
@@ -162,6 +163,14 @@ using TransportSocketPtr = std::unique_ptr<TransportSocket>;
  */
 class TransportSocketOptions {
 public:
+  struct DownstreamAddresses {
+    const std::string remote_addr_;
+    const std::string local_addr_;
+    const uint32_t remote_port_;
+    const uint32_t local_port_;
+    const Address::IpVersion version_;
+  };
+
   virtual ~TransportSocketOptions() = default;
 
   /**
@@ -183,6 +192,12 @@ public:
    * @return the optional overridden application protocols.
    */
   virtual const std::vector<std::string>& applicationProtocolListOverride() const PURE;
+
+  /**
+   * @return the optional downstream address info. Can be used in upstream sockets that
+   *         need awareness of downstream info e.g. proxy_protocol.
+   */
+  virtual const absl::optional<DownstreamAddresses> downstreamAddresses() const PURE;
 
   /**
    * @param vector of bytes to which the option should append hash key data that will be used

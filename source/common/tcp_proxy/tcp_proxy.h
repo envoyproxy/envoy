@@ -376,6 +376,7 @@ protected:
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
+  bool add_addrs_to_transport_socket_options_{true};
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

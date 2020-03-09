@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.config.transport_socket.proxy_protocol.v2;
+
+import "envoy/api/v2/core/base.proto";
+
+import "udpa/annotations/migrate.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.transport_socket.proxy_protocol.v2";
+option java_outer_classname = "ProxyProtocolProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.transport_sockets.proxy_protocol.v3";
+
+// [#protodoc-title: Proxy Protocol]
+// PROXY protocol transport socket.
+// [#extension: envoy.transport_sockets.proxy_protocol]
+
+message ProxyProtocol {
+  enum Version {
+    // PROXY protocol version 1. Human readable format.
+    V1 = 0;
+
+    // PROXY protocol version 2. Binary format.
+    V2 = 1;
+  }
+
+  // The PROXY protocol version to use. See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details
+  Version version = 1;
+
+  // The underlying transport socket being wrapped.
+  api.v2.core.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
+}
