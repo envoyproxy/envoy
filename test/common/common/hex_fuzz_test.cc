@@ -15,8 +15,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   Envoy::Hex::encode(buf, len);
   Envoy::Hex::decode(std::string(reinterpret_cast<const char*>(buf), len));
 
+  FuzzedDataProvider fuzz_codec_data(buf, len);
   auto decoded = Envoy::Hex::decode(Envoy::Hex::encode(buf, len));
-  FUZZ_ASSERT(fuzz_data.ConsumeBytes<uint8_t>(len) == decoded);
+  FUZZ_ASSERT(fuzz_codec_data.ConsumeBytes<uint8_t>(len) == decoded);
 }
 
 } // namespace Fuzz
