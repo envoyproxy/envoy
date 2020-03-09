@@ -162,8 +162,8 @@ private:
                 bool& is_terminal);
 
   /**
-   * Determines what tracing provider to use for a given `envoy.http_connection_manager`
-   * filter instance.
+   * Determines what tracing provider to use for a given
+   * "envoy.filters.network.http_connection_manager" filter instance.
    */
   const envoy::config::trace::v3::Tracing_Http* getPerFilterTracerConfig(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

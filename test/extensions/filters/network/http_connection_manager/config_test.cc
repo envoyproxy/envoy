@@ -195,7 +195,7 @@ http_filters:
 - name: envoy.filters.http.router
   )EOF";
 
-  // when tracing is not enabled on a given `envoy.http_connection_manager` filter,
+  // when tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
   // there is no reason to obtain an actual HttpTracer
   EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(_)).Times(0);
 

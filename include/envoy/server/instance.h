@@ -245,8 +245,8 @@ public:
 
   /**
    * Set the default server-wide tracer provider configuration that will be used as a fallback
-   * if an `envoy.http_connection_manager` filter that has tracing enabled doesn't define
-   * a tracer provider in-place.
+   * if an "envoy.filters.network.http_connection_manager" filter that has tracing enabled doesn't
+   * define a tracer provider in-place.
    *
    * Once deprecation window for the tracer provider configuration in the bootstrap config is over,
    * this method will no longer be necessary.

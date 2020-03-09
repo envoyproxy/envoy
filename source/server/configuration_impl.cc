@@ -58,7 +58,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
   // In order to support dynamic configuration of tracing providers,
   // a former server-wide HttpTracer singleton has been replaced by
-  // an HttpTracer instance per `envoy.http_connection_manager` filter.
+  // an HttpTracer instance per "envoy.filters.network.http_connection_manager" filter.
   // Tracing configuration as part of bootstrap config is still supported,
   // however, it's become mandatory to process it prior to static Listeners.
   // Otherwise, static Listeners will be configured in assumption that
@@ -119,7 +119,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
       configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
 
   // notice that the actual HttpTracer instance will be created on demand
-  // in the context of `envoy.http_connection_manager` filter.
+  // in the context of "envoy.filters.network.http_connection_manager" filter.
   // the side effect of this is that provider-specific configuration
   // is no longer validated in this step.
 }
