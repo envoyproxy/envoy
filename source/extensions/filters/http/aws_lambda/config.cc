@@ -27,9 +27,8 @@ std::string extractRegionFromArn(absl::string_view arn) {
 
 Http::FilterFactoryCb AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext& context) {
 
-  (void)stats_prefix;
   auto credentials_provider =
       std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
           context.api(), Extensions::Common::Aws::Utility::metadataFetcher);

@@ -14,8 +14,8 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.aws_lambda.v3";
 option (udpa.annotations.file_status).work_in_progress = true;
 
-// [#protodoc-title: AwsLambda]
-// AwsLambda :ref:`configuration overview <config_http_filters_aws_lambda>`.
+// [#protodoc-title: AWS Lambda]
+// AWS Lambda :ref:`configuration overview <config_http_filters_aws_lambda>`.
 // [#extension: envoy.filters.http.aws_lambda]
 
 // AWS Lambda filter config

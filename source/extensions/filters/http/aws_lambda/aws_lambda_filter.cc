@@ -126,7 +126,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
     const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
     if (headers_->ForwardedProto()) {
-      headers_->remove(Http::Headers::get().ForwardedProto); // We must NOT sign this header.
+      headers_->removeForwardedProto(); // We must NOT sign this header.
     }
     sigv4_signer_->sign(*headers_, hash);
     return Http::FilterDataStatus::Continue;

@@ -10,7 +10,7 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.http.aws_lambda.v3
 option java_outer_classname = "AwsLambdaProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: AwsLambda]
+// [#protodoc-title: AWS Lambda]
 // AwsLambda :ref:`configuration overview <config_http_filters_aws_lambda>`.
 // [#extension: envoy.filters.http.aws_lambda]
 

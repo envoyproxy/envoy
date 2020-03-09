@@ -15,33 +15,17 @@ The HTTP AWS Lambda filter is used to trigger an AWS Lambda function from a stan
 It supports a few options to control whether to pass through the HTTP request payload as is or to wrap it in a JSON
 schema.
 
-If ``payload_passthrough`` is set to ``true``, then the payload is sent to Lambda without any transformations.
+If :ref:`payload_passthrough <envoy_api_msg_config.filter.http.aws_lambda.v2alpha.config>` is set to
+``true``, then the payload is sent to Lambda without any transformations.
 *Note*: This means you lose access to all the HTTP headers in the Lambda function.
 
-However, if ``payload_passthrough`` is set to ``false``, then the HTTP request is transformed to a JSON payload with the following
-schema:
+However, if :ref:`payload_passthrough <envoy_api_msg_config.filter.http.aws_lambda.v2alpha.config>`
+is set to ``false``, then the HTTP request is transformed to a JSON (the details of the JSON transformation will be
+documented once that feature is implemented).
 
-.. code-block::
-
-    {
-        "path": "/path/to/resource",
-        "httpMethod": "GET|POST|HEAD|...",
-        "headers": {"header-key": "header-value", ... },
-        "queryStringParameters": {"key": "value", ...},
-        "body": "...",
-        "isBase64Encoded": true|false
-    }
-
-If the ``content-type`` of the HTTP request is one of the following:
--  text/*
--  application/json
--  application/xml
--  application/javascript
-
-Then the body is of the HTTP request is added to the JSON ``body`` key as is. Otherwise, it is base64-encoded.
-
-The filter supports per-filter configuration. Below are some examples the show how the filter can be used in different
-deployment scenarios.
+The filter supports :ref:`per-filter configuration
+<envoy_api_msg_config.filter.http.aws_lambda.v2alpha.PerRouteConfig>`.
+Below are some examples the show how the filter can be used in different deployment scenarios.
 
 Example configuration
 ---------------------
