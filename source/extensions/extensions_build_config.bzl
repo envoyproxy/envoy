@@ -163,12 +163,6 @@ EXTENSIONS = {
     "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/previous_priorities:config",
 
     #
-    # Retry policies
-    #
-
-    "envoy.retry_policy.conditional_retry":             "//source/extensions/retry_policy/conditional_retry:config",
-
-    #
     # CacheFilter plugins
     #
 
