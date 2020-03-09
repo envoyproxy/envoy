@@ -139,6 +139,8 @@ public:
    */
   virtual Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                            RecvMsgOutput& output) PURE;
+
+  virtual bool supportMmsg() const PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

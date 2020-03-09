@@ -57,6 +57,8 @@ public:
   virtual SysCallIntResult recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
                                     int flags, struct timespec* timeout) PURE;
 
+  virtual bool supportMmsg() const PURE;
+
   /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.

@@ -33,6 +33,7 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 

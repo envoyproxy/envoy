@@ -553,37 +553,39 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 UdpPacketProcessor& udp_packet_processor,
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped) {
-#if ENVOY_MMSG_MORE
-  const uint32_t num_packets_per_mmsg_call = 16u;
-  const uint32_t num_slices_per_packet = 1u;
-  absl::FixedArray<Buffer::InstancePtr> buffers(num_packets_per_mmsg_call);
-  RawSliceArrays slices(num_packets_per_mmsg_call,
-                        absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
-  for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
-    buffers[i] = std::make_unique<Buffer::OwnedImpl>();
-    const uint64_t num_slices = buffers[i]->reserve(udp_packet_processor.maxPacketSize(),
-                                                    slices[i].data(), num_slices_per_packet);
-    ASSERT(num_slices == num_slices_per_packet);
-  }
+  if (handle.supportMmsg()) {
+    const uint32_t num_packets_per_mmsg_call = 16u;
+    const uint32_t num_slices_per_packet = 1u;
+    absl::FixedArray<Buffer::InstancePtr> buffers(num_packets_per_mmsg_call);
+    RawSliceArrays slices(num_packets_per_mmsg_call,
+                          absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
+    for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
+      buffers[i] = std::make_unique<Buffer::OwnedImpl>();
+      const uint64_t num_slices = buffers[i]->reserve(udp_packet_processor.maxPacketSize(),
+                                                      slices[i].data(), num_slices_per_packet);
+      ASSERT(num_slices == num_slices_per_packet);
+    }
 
-  IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);
-  Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
-  if (!result.ok()) {
+    IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);
+    Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
+    if (!result.ok()) {
+      return result;
+    }
+
+    uint64_t packets_read = result.rc_;
+    ENVOY_LOG_MISC(trace, "recvmmsg read {} packets", packets_read);
+    for (uint64_t i = 0; i < packets_read; ++i) {
+      Buffer::RawSlice* slice = slices[i].data();
+      const uint64_t msg_len = output.msg_[i].msg_len_;
+      ASSERT(msg_len <= slice->len_);
+      ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
+                     output.msg_[i].peer_address_->asString());
+      passPayloadToProcessor(msg_len, *slice, std::move(buffers[i]), output.msg_[i].peer_address_,
+                             output.msg_[i].local_address_, udp_packet_processor, receive_time);
+    }
     return result;
   }
 
-  uint64_t packets_read = result.rc_;
-  ENVOY_LOG_MISC(trace, "recvmmsg read {} packets", packets_read);
-  for (uint64_t i = 0; i < packets_read; ++i) {
-    Buffer::RawSlice* slice = slices[i].data();
-    const uint64_t msg_len = output.msg_[i].msg_len_;
-    ASSERT(msg_len <= slice->len_);
-    ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
-                   output.msg_[i].peer_address_->asString());
-    passPayloadToProcessor(msg_len, *slice, std::move(buffers[i]), output.msg_[i].peer_address_,
-                           output.msg_[i].local_address_, udp_packet_processor, receive_time);
-  }
-#else
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   Buffer::RawSlice slice;
   const uint64_t num_slices = buffer->reserve(udp_packet_processor.maxPacketSize(), &slice, 1);
@@ -602,7 +604,6 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   passPayloadToProcessor(
       result.rc_, slice, std::move(buffer), std::move(output.msg_[0].peer_address_),
       std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
-#endif
   return result;
 }
 

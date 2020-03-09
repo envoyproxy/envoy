@@ -165,6 +165,14 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
+bool OsSysCallsImpl::supportMmsg() const {
+#if ENVOY_MMSG_MORE
+  return true;
+#else
+  return false;
+#endif
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::_chsize_s(fd, length);
   return {rc, rc == 0 ? 0 : errno};

@@ -65,6 +65,14 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
 #endif
 }
 
+bool OsSysCallsImpl::supportMmsg() const {
+#if ENVOY_MMSG_MORE
+  return true;
+#else
+  return false;
+#endif
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, rc != -1 ? 0 : errno};

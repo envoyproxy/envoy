@@ -89,6 +89,9 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
   wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output);
   wrapper_->recvmmsg(slices, /*self_port=*/12345, output2);
+
+  EXPECT_CALL(os_sys_calls_, supportMmsg());
+  wrapper_->supportMmsg();
 }
 
 } // namespace Quic

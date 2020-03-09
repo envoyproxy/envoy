@@ -54,8 +54,6 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -136,6 +134,5 @@ envoy_cc_test_library(
         "//include/envoy/ssl/private_key:private_key_interface",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

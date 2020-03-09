@@ -363,5 +363,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   return sysCallResultToIoCallResult(result);
 }
 
+bool IoSocketHandleImpl::supportMmsg() const {
+  return Api::OsSysCallsSingleton::get().supportMmsg();
+}
+
 } // namespace Network
 } // namespace Envoy

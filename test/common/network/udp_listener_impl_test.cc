@@ -83,11 +83,10 @@ protected:
 
     EXPECT_EQ(*data.addresses_.local_, *send_to_addr_);
 
-#if ENVOY_MMSG_MORE
-    size_t num_packet_per_recv = 16u;
-#else
     size_t num_packet_per_recv = 1u;
-#endif
+    if (Api::OsSysCallsSingleton::get().supportMmsg()) {
+      num_packet_per_recv = 16u;
+    }
     EXPECT_EQ(time_system_.monotonicTime(),
               data.receive_time_ +
                   std::chrono::milliseconds(
@@ -316,12 +315,8 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   // Inject mocked OsSysCalls implementation to mock a read failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-#if ENVOY_MMSG_MORE
-  EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _))
-      .WillOnce(Return(Api::SysCallIntResult{-1, ENOTSUP}));
-#else
+  EXPECT_CALL(os_sys_calls, supportMmsg());
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, ENOTSUP}));
-#endif
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
