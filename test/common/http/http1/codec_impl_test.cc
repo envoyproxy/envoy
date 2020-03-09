@@ -284,10 +284,10 @@ TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
   TestHeaderMapImpl expected_headers{
       {":path", "/"},
       {":method", "GET"},
-      {"transfer-encoding", "identity"},
+      {"transfer-encoding", "identity, chunked"},
   };
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity, chunked\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
 }
@@ -808,7 +808,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
   Buffer::OwnedImpl buffer(
       absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: bar", std::string(1, '\0'), "baz\r\n"));
   EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: header value contains NUL");
+                            "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
 // Mutate an HTTP GET with embedded NULs, this should always be rejected in some
