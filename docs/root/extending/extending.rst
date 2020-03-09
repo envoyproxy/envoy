@@ -16,6 +16,7 @@ types including:
 * :ref:`Health checkers <arch_overview_health_checking>`
 * :ref:`Resource monitors <arch_overview_overload_manager>`
 * :ref:`Retry implementations <arch_overview_http_routing_retry>`
+* :ref:`Retry policies <arch_overview_http_routing_retry_policy>`
 * :ref:`Stat sinks <arch_overview_statistics>`
 * :ref:`Tracers <arch_overview_tracing>`
 * Transport sockets

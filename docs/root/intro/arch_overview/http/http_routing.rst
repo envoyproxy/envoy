@@ -125,6 +125,40 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 Note that retries may be disabled depending on the contents of the :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_consumed>`.
 
+.. _arch_overview_http_routing_retry_policy:
+
+Retry Policy
+------------
+
+Envoy allows :ref:`pluggable retry policy <envoy_api_field_route.RetryPolicy.typed_config>` to be
+configured in the :ref:`route configuration <envoy_api_field_route.RouteAction.retry_policy>`. The
+extenison applies additional logic to the retry decision logic when the downstream Envoy receives
+response/reset from the upstream. The extenison records response/resets during the whole lifecycle
+of the upstream requests.
+
+.. attention::
+
+   If any of :ref:`retry_on<envoy_api_field_route.RetryPolicy.retry_on>`,
+   :ref:`retriable_status_codes <envoy_api_field_route.RetryPolicy.retriable_status_codes>`,
+   :ref:`retriable_headers<envoy_api_field_route.RetryPolicy.retriable_headers>` or
+   :ref:`retriable_request_headers<envoy_api_field_route.RetryPolicy.retriable_request_headers>`
+   is specific in :ref:`retry policy <envoy_api_field_route.RouteAction.retry_policy>`, the retry
+   decision could be overridden by the core retry policy implementation.
+
+The final retry decision is the **OR** value of extension retry policy decision and core retry
+policy decision.
+
+.. attention::
+
+  The retry policy extension can count the retry number inside the extension. There is a global
+  :ref:`configuration<envoy_api_field_route.RetryPolicy.num_retries>` for controlling the retry
+  count. If the retry number inside the extension is greater than the global retry number, the
+  downstream Envoy won't retry after exceeding the gobal retry number.
+
+Retry plugins, e.g. :ref:`retry host predicate <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
+are not usable in the retry policy plugin and they have to be specified in the
+:ref:`core retry policy<envoy_api_field_route.RouteAction.retry_policy>`.
+
 .. _arch_overview_http_routing_hedging:
 
 Request Hedging
