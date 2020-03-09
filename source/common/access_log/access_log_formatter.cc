@@ -862,8 +862,9 @@ GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
-std::string GrpcStatusFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
-                                        const Http::HeaderMap& response_trailers,
+std::string GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
+                                        const Http::ResponseHeaderMap&,
+                                        const Http::ResponseTrailerMap& response_trailers,
                                         const StreamInfo::StreamInfo&) const {
   const auto grpc_status_code_str = HeaderFormatter::format(response_trailers);
   int32_t grpc_status_code;
@@ -875,9 +876,10 @@ std::string GrpcStatusFormatter::format(const Http::HeaderMap&, const Http::Head
   return std::string(Grpc::Utility::grpcStatusToString(grpc_status_code));
 }
 
-ProtobufWkt::Value GrpcStatusFormatter::formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                                    const Http::HeaderMap& response_trailers,
-                                                    const StreamInfo::StreamInfo&) const {
+ProtobufWkt::Value
+GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo&) const {
   const auto grpc_status_code_str = HeaderFormatter::format(response_trailers);
   int32_t grpc_status_code;
 

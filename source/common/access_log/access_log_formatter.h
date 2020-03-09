@@ -217,11 +217,11 @@ public:
                       absl::optional<size_t> max_length);
 
   // FormatterProvider
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
-                     const Http::HeaderMap& response_trailers,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
-                                 const Http::HeaderMap&,
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
                                  const StreamInfo::StreamInfo&) const override;
 };
 
