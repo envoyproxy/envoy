@@ -5,6 +5,7 @@ Version history
 ================
 * access loggers: access logger extensions use the "envoy.access_loggers" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* access loggers: added GRPC_STATUS operator on logging format.
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
 * admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.

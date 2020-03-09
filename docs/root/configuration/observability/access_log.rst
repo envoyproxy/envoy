@@ -351,6 +351,9 @@ The following command operators are supported:
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
     Same as **%DOWNSTREAM_LOCAL_ADDRESS%** excluding port if the address is an IP address.
 
+%GRPC_STATUS%
+  gRPC status code which is easy to interpret with text message corresponding with number.
+
 %REQ(X?Y):Z%
   HTTP
     An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
