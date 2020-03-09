@@ -31,7 +31,6 @@ class GenericUpstream;
 // The base request for Upstream.
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Http::ResponseDecoder,
-                        public Http::StreamCallbacks,
                         public Http::ConnectionPool::Callbacks,
                         public LinkedObject<UpstreamRequest> {
 public:
@@ -58,11 +57,8 @@ public:
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
-  // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason) override;
-  void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
-  void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
+                     absl::string_view transport_failure_reason);
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
@@ -150,7 +146,7 @@ private:
 // A generic API which covers common functionality between HTTP and TCP upstreams.
 class GenericUpstream {
 public:
-  virtual ~GenericUpstream() {}
+  virtual ~GenericUpstream() = default;
   virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
   virtual void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) PURE;
   virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
