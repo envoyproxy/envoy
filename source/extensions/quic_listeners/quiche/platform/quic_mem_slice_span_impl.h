@@ -52,7 +52,7 @@ public:
     if (buffer_ != nullptr) {
       return buffer_->length();
     } else {
-      size_t len = 0;
+      QuicByteCount len = 0;
       for (auto& slice : span_) {
         len += slice.length();
       }
@@ -69,7 +69,7 @@ public:
   bool empty() const { return buffer_ != nullptr ? buffer_->length() == 0 : span_.empty(); }
 
 private:
-  // Either |buffer_| or |span_| is used to point to the mem slices.
+  // Only one of |buffer_| or |span_| is in use. This depends on which contructor is called.
   Envoy::Buffer::Instance* buffer_{nullptr};
   absl::Span<QuicMemSliceImpl> span_;
 };
