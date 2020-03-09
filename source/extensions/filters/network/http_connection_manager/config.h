@@ -162,7 +162,7 @@ private:
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
-  std::string stats_prefix_;
+  const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
