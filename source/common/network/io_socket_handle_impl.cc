@@ -327,7 +327,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     RELEASE_ASSERT(hdr.msg_namelen > 0,
                    fmt::format("Unable to get remote address from recvmmsg() for fd: {}", fd_));
     if ((hdr.msg_flags & MSG_TRUNC) != 0) {
-      ENVOY_LOG_MISC(warn, "Dropping truncated QUIC packet with size: {}.", mmsg_hdr[i].msg_len);
+      ENVOY_LOG_MISC(warn, "Dropping truncated UDP packet with size: {}.", mmsg_hdr[i].msg_len);
       continue;
     }
 
