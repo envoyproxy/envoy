@@ -24,6 +24,7 @@
 #include "envoy/router/scopes.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -262,7 +263,8 @@ public:
   // Http::HashPolicy
   MOCK_METHOD(absl::optional<uint64_t>, generateHash,
               (const Network::Address::Instance* downstream_address,
-               const Http::RequestHeaderMap& headers, const AddCookieCallback add_cookie),
+               const Http::RequestHeaderMap& headers, const AddCookieCallback add_cookie,
+               const StreamInfo::FilterStateSharedPtr filter_state),
               (const));
 };
 

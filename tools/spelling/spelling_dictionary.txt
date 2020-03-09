@@ -119,6 +119,7 @@ GRPC
 GTEST
 GURL
 Grabbit
+Hashable
 HC
 HCM
 HDS
@@ -193,6 +194,7 @@ NOSORT
 NS
 NUL
 Nilsson
+Nonhashable
 OCSP
 OK
 OOM

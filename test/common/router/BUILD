@@ -27,6 +27,7 @@ envoy_cc_test_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:config_lib",
+        "//source/common/stream_info:filter_state_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/server:server_mocks",

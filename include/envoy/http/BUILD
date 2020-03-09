@@ -77,6 +77,7 @@ envoy_cc_library(
         "//include/envoy/grpc:status",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/tracing:http_tracer_interface",
     ],
 )

@@ -2,11 +2,18 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
+
+class Hashable {
+public:
+  virtual absl::optional<uint64_t> hash() const PURE;
+  virtual ~Hashable() {}
+};
 
 /**
  * Request hash policy. I.e., if using a hashing load balancer, how a request should be hashed onto
@@ -37,7 +44,8 @@ public:
    */
   virtual absl::optional<uint64_t>
   generateHash(const Network::Address::Instance* downstream_address,
-               const RequestHeaderMap& headers, AddCookieCallback add_cookie) const PURE;
+               const RequestHeaderMap& headers, AddCookieCallback add_cookie,
+               const StreamInfo::FilterStateSharedPtr filter_state) const PURE;
 };
 
 } // namespace Http

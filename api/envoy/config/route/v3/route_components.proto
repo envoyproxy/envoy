@@ -550,7 +550,7 @@ message RouteAction {
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
   // <arch_overview_load_balancing_types>`.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message HashPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.HashPolicy";
@@ -616,6 +616,16 @@ message RouteAction {
       string name = 1 [(validate.rules).string = {min_bytes: 1}];
     }
 
+    message FilterState {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.route.RouteAction.HashPolicy.FilterState";
+
+      // The name of the Object in the per-request filterState, which is an
+      // Envoy::Http::Hashable object. If there is no data associated with the key,
+      // or the stored object is not Envoy::Http::Hashable, no hash will be produced.
+      string key = 1 [(validate.rules).string = {min_bytes: 1}];
+    }
+
     oneof policy_specifier {
       option (validate.required) = true;
 
@@ -630,6 +640,9 @@ message RouteAction {
 
       // Query parameter hash policy.
       QueryParameter query_parameter = 5;
+
+      // Filter state hash policy.
+      FilterState filter_state = 6;
     }
 
     // The flag that short-circuits the hash computing. This field provides a
