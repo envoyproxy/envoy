@@ -19,7 +19,7 @@ public:
 
   Common::Aws::Signer& signer() override { return *signer_; }
   FilterStats& stats() override { return stats_; }
-  const std::string& hostRewrite() override { return host_rewrite_; }
+  const std::string& hostRewrite() const override { return host_rewrite_; }
 
   std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;

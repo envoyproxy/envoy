@@ -26,12 +26,12 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
 void SignerImpl::sign(Http::RequestHeaderMap& headers) {
   // S3 payloads require special treatment.
   if (service_name_ == "s3") {
-    headers.addCopy(SignatureHeaders::get().ContentSha256,
-                    SignatureConstants::get().UnsignedPayload);
+    headers.setReference(SignatureHeaders::get().ContentSha256,
+                         SignatureConstants::get().UnsignedPayload);
     sign(headers, SignatureConstants::get().UnsignedPayload);
   } else {
-    headers.addCopy(SignatureHeaders::get().ContentSha256,
-                    SignatureConstants::get().HashedEmptyString);
+    headers.setReference(SignatureHeaders::get().ContentSha256,
+                         SignatureConstants::get().HashedEmptyString);
     sign(headers, SignatureConstants::get().HashedEmptyString);
   }
 }

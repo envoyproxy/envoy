@@ -85,7 +85,7 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
 }
 
 // Headers that are likely to mutate are not considered canonical
-TEST(UtilityTest, CanonicalizeHeadersS3) {
+TEST(UtilityTest, CanonicalizeHeadersDropMutatingHeaders) {
   Http::TestRequestHeaderMapImpl headers{
       {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
       {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},

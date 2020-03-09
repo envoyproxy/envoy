@@ -19,7 +19,7 @@ Extensions::Common::Aws::Signer& FilterConfigImpl::signer() { return *signer_; }
 
 FilterStats& FilterConfigImpl::stats() { return stats_; }
 
-const std::string& FilterConfigImpl::hostRewrite() { return host_rewrite_; }
+const std::string& FilterConfigImpl::hostRewrite() const { return host_rewrite_; }
 
 FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = prefix + "aws_request_signing.";

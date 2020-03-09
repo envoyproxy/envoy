@@ -49,7 +49,7 @@ public:
   /**
    * @return the host rewrite value.
    */
-  virtual const std::string& hostRewrite() PURE;
+  virtual const std::string& hostRewrite() const PURE;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -64,7 +64,7 @@ public:
 
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
-  const std::string& hostRewrite() override;
+  const std::string& hostRewrite() const override;
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
