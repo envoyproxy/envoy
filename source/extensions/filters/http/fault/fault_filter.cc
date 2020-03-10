@@ -164,7 +164,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  auto abort_code = abortHttpStatus(headers);
+  const auto abort_code = abortHttpStatus(headers);
   if (abort_code.has_value()) {
     abortWithHTTPStatus(abort_code.value());
     return Http::FilterHeadersStatus::StopIteration;
@@ -222,29 +222,31 @@ bool FaultFilter::faultOverflow() {
 }
 
 bool FaultFilter::isDelayEnabled() {
-  if (fault_settings_->requestDelay() == nullptr) {
+  const auto request_delay = fault_settings_->requestDelay();
+  if (request_delay == nullptr) {
     return false;
   }
 
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    return config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
+    return config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
+                                                        request_delay->percentage());
   }
-  return config_->runtime().snapshot().featureEnabled(
-      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
+  return config_->runtime().snapshot().featureEnabled(fault_settings_->delayPercentRuntime(),
+                                                      request_delay->percentage());
 }
 
 bool FaultFilter::isAbortEnabled() {
-  if (fault_settings_->requestAbort() == nullptr) {
+  const auto request_abort = fault_settings_->requestAbort();
+  if (request_abort == nullptr) {
     return false;
   }
 
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    return config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_abort_percent_key_, fault_settings_->requestAbort()->percentage());
+    return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
+                                                        request_abort->percentage());
   }
-  return config_->runtime().snapshot().featureEnabled(
-      fault_settings_->abortPercentRuntime(), fault_settings_->requestAbort()->percentage());
+  return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
+                                                      request_abort->percentage());
 }
 
 absl::optional<std::chrono::milliseconds>
@@ -287,7 +289,7 @@ FaultFilter::abortHttpStatus(const Http::RequestHeaderMap& request_headers) {
 
   // See if the configured abort provider has a default status code, if not there is no abort status
   // code (e.g., header configuration and no/invalid header).
-  auto config_abort = fault_settings_->requestAbort()->status_code(
+  const auto config_abort = fault_settings_->requestAbort()->statusCode(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().AbortRequest));
   if (!config_abort.has_value()) {
     return absl::nullopt;
