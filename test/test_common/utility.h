@@ -642,11 +642,11 @@ public:                                                                         
     header_map_.set##name(value);                                                                  \
     header_map_.verifyByteSizeInternalForTest();                                                   \
   }                                                                                                \
-  size_t remove##name() override {                                                                   \
-    size_t headers_removed = header_map_.remove##name();                                                                    \
-    header_map_.verifyByteSizeInternalForTest();  
-    return headers_removed                                                 \
-  }
+  size_t remove##name() override {                                                                 \
+    size_t headers_removed = header_map_.remove##name();                                           \
+    header_map_.verifyByteSizeInternalForTest();                                                   \
+    return headers_removed
+} // namespace Http
 
 /**
  * Base class for all test header map types. This class wraps an underlying real header map
@@ -820,7 +820,7 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
       values);
 }
 
-} // namespace Http
+} // namespace Envoy
 
 namespace Api {
 ApiPtr createApiForTest();
