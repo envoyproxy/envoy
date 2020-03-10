@@ -22,6 +22,7 @@ jobs:
         mkdir /c/tmp || true
         cd /
         rm -rf /tmp
+        cmd.exe /c echo "Why doesn't /c flag work?"
         cmd.exe /c mklink /d tmp "C:\\tmp"
       displayName: "Resolve bash /tmp to c:\\tmp"
 
