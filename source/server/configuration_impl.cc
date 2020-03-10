@@ -120,7 +120,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
 
   // Notice that the actual HttpTracer instance will be created on demand
   // in the context of "envoy.filters.network.http_connection_manager" filter.
-  // the side effect of this is that provider-specific configuration
+  // The side effect of this is that provider-specific configuration
   // is no longer validated in this step.
 }
 
