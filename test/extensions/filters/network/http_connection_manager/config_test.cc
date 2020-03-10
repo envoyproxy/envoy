@@ -22,6 +22,7 @@ using testing::_;
 using testing::An;
 using testing::Eq;
 using testing::NotNull;
+using testing::Pointee;
 using testing::Return;
 using testing::ReturnRef;
 using testing::WhenDynamicCastTo;
@@ -279,6 +280,47 @@ http_filters:
       .Times(1)
       .WillOnce(Return(http_tracer_));
   ;
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+
+  // Actual HttpTracer must be obtained from the HttpTracerManager.
+  EXPECT_THAT(config.tracer(), Eq(http_tracer_));
+}
+
+TEST_F(HttpConnectionManagerConfigTest, TracingIsEnabledAndThereIsTracingConfigInBootstrap) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing: {} # notice that tracing is enabled
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+  // Simulate tracer provider configuration in the bootstrap config.
+  envoy::config::trace::v3::Tracing tracing_config;
+  tracing_config.mutable_http()->set_name("zipkin");
+  tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+      envoy::config::trace::v3::ZipkinConfig{});
+  context_.http_context_.setDefaultTracingConfig(tracing_config);
+
+  // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
+  // an actual HttpTracer must be obtained from the HttpTracerManager.
+  EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(Pointee(ProtoEq(tracing_config.http()))))
+      .Times(1)
+      .WillOnce(Return(http_tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
