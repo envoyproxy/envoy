@@ -68,6 +68,17 @@ TEST_F(HttpTracerManagerImplTest, ShouldUseProperTracerFactory) {
   EXPECT_THAT(http_tracer.get(), WhenDynamicCastTo<SampleTracer*>(NotNull()));
 }
 
+TEST_F(HttpTracerManagerImplTest, ShouldCacheAndReuseTracers) {
+  envoy::config::trace::v3::Tracing_Http tracing_config;
+  tracing_config.set_name("envoy.tracers.sample");
+
+  auto http_tracer_one = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config);
+  auto http_tracer_two = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config);
+
+  // Should reuse previously created HttpTracer instance.
+  EXPECT_EQ(http_tracer_two, http_tracer_one);
+}
+
 } // namespace
 } // namespace Tracing
 } // namespace Envoy
