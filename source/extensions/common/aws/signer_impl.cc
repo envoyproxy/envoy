@@ -37,6 +37,7 @@ void SignerImpl::sign(Http::RequestHeaderMap& headers) {
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash) {
+  headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
@@ -85,7 +86,6 @@ std::string SignerImpl::createContentHash(Http::RequestMessage& message, bool si
   const auto content_hash = message.body()
                                 ? Hex::encode(crypto_util.getSha256Digest(*message.body()))
                                 : SignatureConstants::get().HashedEmptyString;
-  message.headers().addCopy(SignatureHeaders::get().ContentSha256, content_hash);
   return content_hash;
 }
 

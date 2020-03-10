@@ -44,7 +44,7 @@ public:
     EXPECT_TRUE(absl::StartsWith(auth_parts[1], "Credential=test_akid/"));
     EXPECT_TRUE(absl::EndsWith(auth_parts[1],
                                fmt::format("{}/{}/aws4_request", region_name_, service_name_)));
-    EXPECT_EQ("SignedHeaders=host;x-amz-date", auth_parts[2]);
+    EXPECT_EQ("SignedHeaders=host;x-amz-content-sha256;x-amz-date", auth_parts[2]);
     // We don't verify correctness off the signature here, as this is part of the signer unit tests.
     EXPECT_TRUE(absl::StartsWith(auth_parts[3], "Signature="));
   }
