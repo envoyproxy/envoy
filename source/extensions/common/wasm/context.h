@@ -66,7 +66,7 @@ struct Plugin : public PluginBase {
         local_info_(local_info), listener_metadata_(listener_metadata) {}
 
   // Information specific to HTTP Filters.
-  // TODO: consider using a varient record or filter-type specific sub-objects via unique_ptr.
+  // TODO: consider using a variant record or filter-type specific sub-objects via unique_ptr.
   const envoy::config::core::v3::TrafficDirection direction_;
   const LocalInfo::LocalInfo& local_info_;
   const envoy::config::core::v3::Metadata* listener_metadata_;
