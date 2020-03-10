@@ -70,7 +70,7 @@ private:
                                         const std::map<std::string, std::string>& canonical_headers,
                                         absl::string_view signature) const;
 
-  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash);
+  void sign(Http::RequestHeaderMap& headers, const std::string& content_hash) override;
 
   const std::string service_name_;
   const std::string region_;
