@@ -328,7 +328,11 @@ std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
   if (keep_empty_string) {
     result = absl::StrSplit(source, absl::ByAnyChar(delimiters));
   } else {
-    result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
+    if (trim_whitespace) {
+      result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipWhitespace());
+    } else {
+      result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
+    }
   }
 
   if (trim_whitespace) {
