@@ -20,8 +20,10 @@
 
 using testing::_;
 using testing::An;
+using testing::NotNull;
 using testing::Return;
 using testing::ReturnRef;
+using testing::WhenDynamicCastTo;
 
 namespace Envoy {
 namespace Extensions {
@@ -176,7 +178,7 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabled) {
+TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledAndNoTracingConfigInBootstrap) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 server_name: foo
@@ -204,7 +206,7 @@ http_filters:
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
 
   // By default, tracer must be a null object (Tracing::HttpNullTracer) rather than nullptr.
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(config.tracer().get()));
+  EXPECT_THAT(config.tracer().get(), WhenDynamicCastTo<Tracing::HttpNullTracer*>(NotNull()));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
