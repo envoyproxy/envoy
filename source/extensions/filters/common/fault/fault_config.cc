@@ -27,17 +27,22 @@ FaultAbortConfig::FaultAbortConfig(
 }
 
 absl::optional<Http::Code>
-FaultAbortConfig::HeaderAbortProvider::status_code(const Http::HeaderEntry* header) const {
+FaultAbortConfig::HeaderAbortProvider::statusCode(const Http::HeaderEntry* header) const {
+  absl::optional<Http::Code> ret;
   if (header == nullptr) {
-    return absl::nullopt;
+    return ret;
   }
 
-  uint64_t value;
-  if (!absl::SimpleAtoi(header->value().getStringView(), &value)) {
-    return absl::nullopt;
+  uint64_t code;
+  if (!absl::SimpleAtoi(header->value().getStringView(), &code)) {
+    return ret;
   }
 
-  return static_cast<Http::Code>(value);
+  if (code >= 200 and code < 600) {
+    ret = static_cast<Http::Code>(code);
+  }
+
+  return ret;
 }
 
 FaultDelayConfig::FaultDelayConfig(

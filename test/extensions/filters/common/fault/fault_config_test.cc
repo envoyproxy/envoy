@@ -19,16 +19,16 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
   FaultAbortConfig config(proto_config);
 
   // No header.
-  EXPECT_EQ(absl::nullopt, config.status_code(nullptr));
+  EXPECT_EQ(absl::nullopt, config.statusCode(nullptr));
 
   // Header with bad data.
   Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request", "abc"}};
-  EXPECT_EQ(absl::nullopt, config.status_code(bad_headers.get(HeaderNames::get().AbortRequest)));
+  EXPECT_EQ(absl::nullopt, config.statusCode(bad_headers.get(HeaderNames::get().AbortRequest)));
 
   // Valid header.
   Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request", "401"}};
   EXPECT_EQ(Http::Code::Unauthorized,
-            config.status_code(good_headers.get(HeaderNames::get().AbortRequest)).value());
+            config.statusCode(good_headers.get(HeaderNames::get().AbortRequest)).value());
 }
 
 TEST(FaultConfigTest, FaultDelayHeaderConfig) {
