@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Config {
 
 ImmutableConfigProviderBase::ImmutableConfigProviderBase(
-    Server::Configuration::FactoryContext& factory_context,
+    Server::Configuration::ServerFactoryContext& factory_context,
     ConfigProviderManagerImplBase& config_provider_manager,
     ConfigProviderInstanceType instance_type, ApiType api_type)
     : last_updated_(factory_context.timeSource().systemTime()),
@@ -20,7 +20,7 @@ ImmutableConfigProviderBase::~ImmutableConfigProviderBase() {
 }
 
 ConfigSubscriptionCommonBase::~ConfigSubscriptionCommonBase() {
-  init_target_.ready();
+  local_init_target_.ready();
   config_provider_manager_.unbindSubscription(manager_identifier_);
 }
 

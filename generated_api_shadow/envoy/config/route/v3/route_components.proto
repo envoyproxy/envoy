@@ -626,7 +626,7 @@ message RouteAction {
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
   // <arch_overview_load_balancing_types>`.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message HashPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.HashPolicy";
@@ -692,6 +692,16 @@ message RouteAction {
       string name = 1 [(validate.rules).string = {min_bytes: 1}];
     }
 
+    message FilterState {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.route.RouteAction.HashPolicy.FilterState";
+
+      // The name of the Object in the per-request filterState, which is an
+      // Envoy::Http::Hashable object. If there is no data associated with the key,
+      // or the stored object is not Envoy::Http::Hashable, no hash will be produced.
+      string key = 1 [(validate.rules).string = {min_bytes: 1}];
+    }
+
     oneof policy_specifier {
       option (validate.required) = true;
 
@@ -706,6 +716,9 @@ message RouteAction {
 
       // Query parameter hash policy.
       QueryParameter query_parameter = 5;
+
+      // Filter state hash policy.
+      FilterState filter_state = 6;
     }
 
     // The flag that short-circuits the hash computing. This field provides a
@@ -964,6 +977,15 @@ message RouteAction {
   // :ref:`timeout <envoy_api_field_config.route.v3.RouteAction.timeout>` or its default.
   // This can be used to prevent unexpected upstream request timeouts due to potentially long
   // time gaps between gRPC request and response in gRPC streaming mode.
+  //
+  // .. note::
+  //
+  //    If a timeout is specified using :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`, it takes
+  //    precedence over `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_, when
+  //    both are present. See also
+  //    :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
+  //    :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
+  //    :ref:`retry overview <arch_overview_http_routing_retry>`.
   google.protobuf.Duration max_grpc_timeout = 23;
 
   // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting

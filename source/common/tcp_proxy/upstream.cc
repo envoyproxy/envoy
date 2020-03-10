@@ -56,7 +56,7 @@ HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
-bool HttpUpstream::isValidBytestreamResponse(const Http::HeaderMap& headers) {
+bool HttpUpstream::isValidBytestreamResponse(const Http::ResponseHeaderMap& headers) {
   if (Http::Utility::getResponseStatus(headers) != 200) {
     return false;
   }

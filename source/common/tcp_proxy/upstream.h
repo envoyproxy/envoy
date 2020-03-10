@@ -77,7 +77,7 @@ public:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
   ~HttpUpstream();
 
-  static bool isValidBytestreamResponse(const Http::HeaderMap& headers);
+  static bool isValidBytestreamResponse(const Http::ResponseHeaderMap& headers);
 
   void doneReading();
   void doneWriting();
