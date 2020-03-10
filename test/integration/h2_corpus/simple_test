@@ -1,0 +1,15 @@
+events {
+  downstream_send_event {
+    frames: EmptySettings
+    frames: EmptySettingsAck
+    frames: Request
+  }
+}
+events {
+  upstream_send_event {
+    frames: EmptySettings
+    frames: EmptySettingsAck
+    frames: EmptyHeaders
+    frames: EmptyData
+  }
+}

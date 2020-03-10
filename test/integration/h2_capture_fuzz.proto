@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package test.integration;
+
+enum H2TestFrame {
+  // These values map to the frame creation methods in:
+  // test/common/http/http2/http2_frame.h
+  PING = 0;
+  EmptySettings = 1;
+  EmptySettingsAck = 2;
+  EmptyHeaders = 3;
+  EmptyHeadersEndStream = 4;
+  EmptyHeadersEndHeaders = 5;
+  EmptyContinuation = 6;
+  EmptyContinuationEndStream = 7;
+  EmptyContinuationEndHeaders = 8;
+  EmptyData = 9;
+  EmptyDataEndStream = 10;
+  Priority = 11;
+  WindowUpdate = 12;
+  MalformedRequest = 13;
+  MalformedRequestWithZerolenHeader = 14;
+  Request = 15;
+  PostRequest = 16;
+}
+
+message DownstreamSendEvent {
+  repeated H2TestFrame frames = 1;
+}
+
+message UpstreamSendEvent {
+  repeated H2TestFrame frames = 1;
+}
+
+message Event {
+  oneof event_selector {
+    // Downstream sent given frames.
+    DownstreamSendEvent downstream_send_event = 1;
+    // Upstream sent given frames.
+    UpstreamSendEvent upstream_send_event = 2;
+    // TODO(adip): Downstream/Upstream receive bytes should be added
+  }
+}
+
+// Test case in corpus for *_h2_capture_fuzz_test.
+message H2CaptureFuzzTestCase {
+  repeated Event events = 1;
+}
