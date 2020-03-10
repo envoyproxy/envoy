@@ -10,16 +10,15 @@ Starting Envoy
 Starting an instance of Envoy Mobile for making requests is done by creating an ``EnvoyClient``,
 which conforms to the ``HTTPClient`` interface.
 
-To do so, create an ``EnvoyClientBuilder`` and call ``build()``.
+To do so, create an ``EnvoyClientBuilder`` and call ``build()`` (see below).
 
-This builder exposes some of Envoy's configuration options programmatically using builder
-functions, some of which are demonstrated below:
+After the client is created, it should be stored and kept in memory in order to be used
+for issuing requests.
 
 **Kotlin example**::
 
-  val envoy = AndroidEnvoyClientBuilder(baseContext)
+  val envoy = AndroidEnvoyClientBuilder(getApplication())
     .addLogLevel(LogLevel.WARN)
-    .addStatsFlushSeconds(60)
     ...
     .build()
 
@@ -27,12 +26,114 @@ functions, some of which are demonstrated below:
 
   let envoy = try EnvoyClientBuilder()
     .addLogLevel(.warn)
-    .addStatsFlushSeconds(60)
     ...
     .build()
 
-After the client is created, it should be stored and kept in memory in order to be used
-for issuing requests.
+----------------------
+``EnvoyClientBuilder``
+----------------------
+
+This type is used to configure an instance of ``EnvoyClient`` before finally
+creating the client using ``.build()``.
+
+Available builders are 1:1 between iOS/Android, and are documented below.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addConnectTimeoutSeconds``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify the timeout for new network connections to hosts in Envoy Mobile clusters.
+
+**Example**::
+
+  // Kotlin
+  builder.addConnectTimeoutSeconds(30L)
+
+  // Swift
+  builder.addConnectTimeoutSeconds(30)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addDNSFailureRefreshSeconds``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify the rate at which Envoy Mobile should refresh DNS in states of failure.
+
+This should typically be a relatively aggressive range compared to the standard-state DNS refresh
+rate, as it is required for Envoy Mobile to recover and continue making requests.
+
+**Example**::
+
+  // Kotlin
+  builder.addDNSFailureRefreshSeconds(2, 5)
+
+  // Swift
+  builder.addDNSFailureRefreshSeconds(base: 2, max: 5)
+
+~~~~~~~~~~~~~~~~~~~~~~~~
+``addDNSRefreshSeconds``
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify the interval at which Envoy should forcefully refresh DNS.
+
+**Example**::
+
+  // Kotlin
+  builder.addDNSRefreshSeconds(60L)
+
+  // Swift
+  builder.addDNSRefreshSeconds(60)
+
+~~~~~~~~~~~~~~~
+``addLogLevel``
+~~~~~~~~~~~~~~~
+
+Specify the log level to be used when running the underlying Envoy engine.
+
+**Example**::
+
+  // Kotlin
+  builder.addLogLevel(LogLevel.WARN)
+
+  // Swift
+  builder.addLogLevel(.warn)
+
+~~~~~~~~~~~~~~~~~~
+``addStatsDomain``
+~~~~~~~~~~~~~~~~~~
+
+Specify a domain which implements the
+:tree:`stats endpoint <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L139-L145>`
+in order to take advantage of the
+`stats emitted by Envoy <https://www.envoyproxy.io/docs/envoy/latest/configuration/upstream/cluster_manager/cluster_stats>`_
+(and subsequently Envoy Mobile).
+
+Note that only stats specified in the configuration's
+:tree:`whitelist <83908423d46a37574e9a35627df1f3dd9634e5ec/library/common/config_template.cc#L146-L167>`
+will be emitted.
+
+**Example**::
+
+  // Kotlin
+  builder.addStatsDomain("envoy-mobile.envoyproxy.io")
+
+  // Swift
+  builder.addStatsDomain("envoy-mobile.envoyproxy.io")
+
+~~~~~~~~~~~~~~~~~~~~~~~~
+``addStatsFlushSeconds``
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify the rate at which Envoy Mobile should flush its queued stats.
+
+Note that the library automatically flushes stats on application backgrounding/termination as well.
+
+**Example**::
+
+  // Kotlin
+  builder.addStatsFlushSeconds(5L)
+
+  // Swift
+  builder.addStatsFlushSeconds(5)
 
 ----------------------
 Advanced configuration
@@ -68,6 +169,7 @@ This may be done by initializing a builder with the contents of the YAML file yo
   configuration string is not evaluated until runtime, and not all of the core Envoy configuration
   options are supported by Envoy Mobile.
 
+---------------
 Making Requests
 ---------------
 
