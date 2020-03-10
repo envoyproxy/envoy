@@ -15,6 +15,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
+    copts = ["-UFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION"],
     deps = [":config_impl_test_lib"],
 )
 
