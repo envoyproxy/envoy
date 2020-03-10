@@ -2692,9 +2692,9 @@ void testSupportForSessionTickets(const std::string& server_ctx_yaml,
         SSL* server_ssl_socket = ssl_socket->rawSslForTest();
         SSL_CTX* server_ssl_context = SSL_get_SSL_CTX(server_ssl_socket);
         if (expect_support) {
-          EXPECT_EQ((SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET), 0);
+          EXPECT_EQ(0, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
         } else {
-          EXPECT_EQ((SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET), SSL_OP_NO_TICKET);
+          EXPECT_EQ(SSL_OP_NO_TICKET, (SSL_CTX_get_options(server_ssl_context) & SSL_OP_NO_TICKET));
         }
       }));
 
