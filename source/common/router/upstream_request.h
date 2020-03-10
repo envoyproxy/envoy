@@ -10,6 +10,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/cleanup.h"
@@ -25,10 +26,11 @@ namespace Envoy {
 namespace Router {
 
 class Filter;
+class GenericUpstream;
 
+// The base request for Upstream.
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public Http::ResponseDecoder,
-                        public Http::StreamCallbacks,
                         public Http::ConnectionPool::Callbacks,
                         public LinkedObject<UpstreamRequest> {
 public:
@@ -55,11 +57,7 @@ public:
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
 
-  // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason,
-                     absl::string_view transport_failure_reason) override;
-  void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
-  void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
+  void onResetStream(Http::StreamResetReason reason, absl::string_view transport_failure_reason);
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
@@ -112,7 +110,7 @@ private:
   bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;
   Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
-  Http::RequestEncoder* request_encoder_{};
+  std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Buffer::WatermarkBufferPtr buffered_request_body_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
@@ -142,6 +140,65 @@ private:
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.
   bool record_timeout_budget_ : 1;
+};
+
+// A generic API which covers common functionality between HTTP and TCP upstreams.
+class GenericUpstream {
+public:
+  virtual ~GenericUpstream() = default;
+  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) PURE;
+  virtual void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) PURE;
+  virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
+  virtual void readDisable(bool disable) PURE;
+  virtual void resetStream() PURE;
+};
+
+class HttpUpstream : public GenericUpstream, public Http::StreamCallbacks {
+public:
+  HttpUpstream(UpstreamRequest& upstream_request, Http::RequestEncoder* encoder)
+      : upstream_request_(upstream_request), request_encoder_(encoder) {
+    request_encoder_->getStream().addCallbacks(*this);
+  }
+
+  // GenericUpstream
+  void encodeData(Buffer::Instance& data, bool end_stream) override {
+    request_encoder_->encodeData(data, end_stream);
+  }
+  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override {
+    request_encoder_->encodeMetadata(metadata_map_vector);
+  }
+  void encodeHeaders(const Http::RequestHeaderMap& headers, bool end_stream) override {
+    request_encoder_->encodeHeaders(headers, end_stream);
+  }
+  void encodeTrailers(const Http::RequestTrailerMap& trailers) override {
+    request_encoder_->encodeTrailers(trailers);
+  }
+
+  void readDisable(bool disable) override { request_encoder_->getStream().readDisable(disable); }
+
+  void resetStream() override {
+    request_encoder_->getStream().removeCallbacks(*this);
+    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+  }
+
+  // Http::StreamCallbacks
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override {
+    upstream_request_.onResetStream(reason, transport_failure_reason);
+  }
+
+  void onAboveWriteBufferHighWatermark() override {
+    upstream_request_.disableDataFromDownstreamForFlowControl();
+  }
+
+  void onBelowWriteBufferLowWatermark() override {
+    upstream_request_.enableDataFromDownstreamForFlowControl();
+  }
+
+private:
+  UpstreamRequest& upstream_request_;
+  Http::RequestEncoder* request_encoder_{};
 };
 
 } // namespace Router
