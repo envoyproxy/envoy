@@ -1244,8 +1244,7 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
                          {Http::LowerCaseString{"bar"}, "foo"},
                          {Http::LowerCaseString{"set-cookie"}, "cookie1=value"},
                          {Http::LowerCaseString{"set-cookie"}, "cookie2=value"},
-                         {Http::LowerCaseString{"accept-encoding"}, "gzip"},
-                         {Http::LowerCaseString{"accept-encoding"}, "deflate"}};
+                         {Http::LowerCaseString{"accept-encoding"}, "gzip,deflate"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1265,8 +1264,7 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
                                                    {"bar", "foo"},
                                                    {"set-cookie", "cookie1=value"},
                                                    {"set-cookie", "cookie2=value"},
-                                                   {"accept-encoding", "gzip"},
-                                                   {"accept-encoding", "deflate"}};
+                                                   {"accept-encoding", "gzip,deflate"}};
   Http::HeaderMap* saved_headers;
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) {

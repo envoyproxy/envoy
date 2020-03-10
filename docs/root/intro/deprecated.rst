@@ -87,7 +87,11 @@ Deprecated items below are listed in chronological order.
 * The `header_fields`, `custom_header_fields`, and `additional_headers` fields for the route checker
   tool have been deprecated in favor of `request_header_fields`, `response_header_fields`,
   `additional_request_headers`, and `additional_response_headers`.
-
+* The `content_length`, `content_type`, `disable_on_etag_header` and `remove_accept_encoding_header`
+  fields in :ref:`HTTP Gzip filter config <envoy_api_msg_config.filter.http.gzip.v2.Gzip>` have
+  been deprecated in favor of `compressor`.
+* The statistics counter `header_gzip` in :ref:`HTTP Gzip filter <config_http_filters_gzip>`
+  has been deprecated in favor of `header_compressor_used`.
 
 1.13.0 (January 20, 2020)
 =========================
