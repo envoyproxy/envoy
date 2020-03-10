@@ -642,9 +642,10 @@ public:                                                                         
     header_map_.set##name(value);                                                                  \
     header_map_.verifyByteSizeInternalForTest();                                                   \
   }                                                                                                \
-  void remove##name() override {                                                                   \
-    header_map_.remove##name();                                                                    \
+  size_t remove##name() override {                                                                 \
+    size_t headers_removed = header_map_.remove##name();                                           \
     header_map_.verifyByteSizeInternalForTest();                                                   \
+    return headers_removed;                                                                        \
   }
 
 /**
@@ -694,7 +695,7 @@ public:
   }
   bool has(const std::string& key) const { return get(LowerCaseString(key)) != nullptr; }
   bool has(const LowerCaseString& key) const { return get(key) != nullptr; }
-  void remove(const std::string& key) { remove(LowerCaseString(key)); }
+  size_t remove(const std::string& key) { return remove(LowerCaseString(key)); }
 
   // HeaderMap
   bool operator==(const HeaderMap& rhs) const override { return header_map_.operator==(rhs); }
@@ -753,13 +754,15 @@ public:
     header_map_.clear();
     header_map_.verifyByteSizeInternalForTest();
   }
-  void remove(const LowerCaseString& key) override {
-    header_map_.remove(key);
+  size_t remove(const LowerCaseString& key) override {
+    size_t headers_removed = header_map_.remove(key);
     header_map_.verifyByteSizeInternalForTest();
+    return headers_removed;
   }
-  void removePrefix(const LowerCaseString& key) override {
-    header_map_.removePrefix(key);
+  size_t removePrefix(const LowerCaseString& key) override {
+    size_t headers_removed = header_map_.removePrefix(key);
     header_map_.verifyByteSizeInternalForTest();
+    return headers_removed;
   }
   size_t size() const override { return header_map_.size(); }
   bool empty() const override { return header_map_.empty(); }
