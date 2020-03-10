@@ -19,10 +19,10 @@ jobs:
 
     - bash: |
         set -ex
-        mkdir /c/tmp > /dev/null || true
+        mkdir /c/tmp || true
         cd /
         rm -rf /tmp
-        cmd.exe /c mklink tmp C:\\tmp
+        cmd.exe /c mklink tmp "C:\\tmp"
       displayName: "Resolve bash /tmp to c:\\tmp"
 
     - bash: ci/windows_ci_steps.sh
