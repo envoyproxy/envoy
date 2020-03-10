@@ -46,7 +46,6 @@ envoy_cc_test(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:http_tracer_manager_lib",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
+        "//test/test_common:registry_lib",
     ],
 )
