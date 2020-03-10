@@ -197,21 +197,9 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
   upstream_request_->encodeData(data, true);
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
-                ->value(),
-            0);
   tcp_client->readDisable(false);
   tcp_client->waitForData(data);
   tcp_client->waitForHalfClose();
-
-  uint32_t upstream_pauses =
-      test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
-          ->value();
-  uint32_t upstream_resumes =
-      test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
-          ->value();
-  EXPECT_GE(upstream_pauses, upstream_resumes);
-  EXPECT_GT(upstream_resumes, 0);
 }
 
 // Test that an upstream flush works correctly (all data is flushed)
