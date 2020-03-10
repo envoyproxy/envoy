@@ -3,6 +3,7 @@
 #include "common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -10,14 +11,18 @@
 namespace Envoy {
 namespace Config {
 
+const uint64_t TEST_TIME_MILLIS = 42000;
+
 /**
  * Interface for different Subscription implementation test harnesses. This has common functionality
  * that we can use to write tests that work across all Subscription types. EDS is used as the API in
  * tests depending on SubscriptionTestHarness, as representative of a subscription API.
  */
-class SubscriptionTestHarness {
+class SubscriptionTestHarness : public Event::TestUsingSimulatedTime {
 public:
-  SubscriptionTestHarness() : stats_(Utility::generateStats(stats_store_)) {}
+  SubscriptionTestHarness() : stats_(Utility::generateStats(stats_store_)) {
+    simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS)));
+  }
   virtual ~SubscriptionTestHarness() = default;
 
   /**
@@ -52,7 +57,7 @@ public:
 
   virtual testing::AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected,
                                             uint32_t failure, uint32_t init_fetch_timeout,
-                                            uint64_t version) {
+                                            uint64_t update_time, uint64_t version) {
     // TODO(fredlas) rework update_success_ to make sense across all xDS carriers. Its value in
     // statsAre() calls in many tests will probably have to be changed.
     UNREFERENCED_PARAMETER(attempt);
@@ -71,6 +76,10 @@ public:
     if (init_fetch_timeout != stats_.init_fetch_timeout_.value()) {
       return testing::AssertionFailure() << "init_fetch_timeout: expected " << init_fetch_timeout
                                          << ", got " << stats_.init_fetch_timeout_.value();
+    }
+    if (update_time != stats_.update_time_.value()) {
+      return testing::AssertionFailure()
+             << "update_time: expected " << update_time << ", got " << stats_.update_time_.value();
     }
     if (version != stats_.version_.value()) {
       return testing::AssertionFailure()

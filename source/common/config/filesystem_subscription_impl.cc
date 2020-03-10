@@ -3,6 +3,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/macros.h"
+#include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -51,6 +52,7 @@ void FilesystemSubscriptionImpl::refresh() {
     MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
     config_update_available = true;
     callbacks_.onConfigUpdate(message.resources(), message.version_info());
+    stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(message.version_info()));
     stats_.update_success_.inc();
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_, message.DebugString());

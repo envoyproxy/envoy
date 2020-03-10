@@ -8,6 +8,7 @@
 
 #include "common/common/utility.h"
 
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -102,6 +103,13 @@ TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;
   EXPECT_TRUE(DateUtil::timePointValid(test_time.timeSystem().systemTime()));
+}
+
+TEST(DateUtil, NowToMilliseconds) {
+  Event::SimulatedTimeSystem test_time;
+  const SystemTime time_with_millis(std::chrono::seconds(12345) + std::chrono::milliseconds(67));
+  test_time.setSystemTime(time_with_millis);
+  EXPECT_EQ(12345067, DateUtil::nowToMilliseconds(test_time));
 }
 
 TEST(InputConstMemoryStream, All) {

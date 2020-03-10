@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -61,6 +62,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   callbacks_.onConfigUpdate(resources, version_info);
   stats_.update_success_.inc();
   stats_.update_attempt_.inc();
+  stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(version_info));
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
@@ -74,6 +76,7 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   stats_.update_attempt_.inc();
   callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   stats_.update_success_.inc();
+  stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
 }
 
