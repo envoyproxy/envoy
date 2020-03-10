@@ -128,11 +128,11 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers(),
           enable_case_sensitive_string_matcher_)),
-      authorization_headers_to_add_(
-          toHeadersAdd(config.http_service().authorization_request().headers_to_add())),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
-      tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())) {}
+      tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
+      request_headers_parser_(Router::HeaderParser::configure(
+          toHeadersAdd(config.http_service().authorization_request().headers_to_add()))) {}
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -190,14 +190,17 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
       createStringMatchers(list, disable_lowercase_string_matcher));
 }
 
-Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
+Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> ClientConfig::toHeadersAdd(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers) {
-  Http::LowerCaseStrPairVector header_vec;
-  header_vec.reserve(headers.size());
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_value_options;
+  headers_value_options.Reserve(headers.size());
   for (const auto& header : headers) {
-    header_vec.emplace_back(Http::LowerCaseString(header.key()), header.value());
+    envoy::config::core::v3::HeaderValueOption option;
+    option.mutable_header()->MergeFrom(header);
+    option.mutable_append()->set_value(false);
+    headers_value_options.Add()->CopyFrom(option);
   }
-  return header_vec;
+  return headers_value_options;
 }
 
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
@@ -222,7 +225,8 @@ void RawHttpClientImpl::cancel() {
 // Client
 void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v3::CheckRequest& request,
-                              Tracing::Span& parent_span) {
+                              Tracing::Span& parent_span,
+                              const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   ASSERT(span_ == nullptr);
   callbacks_ = &callbacks;
@@ -255,9 +259,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     }
   }
 
-  for (const auto& header_to_add : config_->headersToAdd()) {
-    headers->setReference(header_to_add.first, header_to_add.second);
-  }
+  config_->requestHeaderParser().evaluateHeaders(*headers, stream_info);
 
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));

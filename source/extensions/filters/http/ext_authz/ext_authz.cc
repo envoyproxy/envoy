@@ -84,7 +84,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
   initiating_call_ = true;
-  client_->check(*this, check_request_, callbacks_->activeSpan());
+  client_->check(*this, check_request_, callbacks_->activeSpan(), callbacks_->streamInfo());
   initiating_call_ = false;
 }
 
