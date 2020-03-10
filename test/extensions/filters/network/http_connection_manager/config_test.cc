@@ -20,6 +20,7 @@
 
 using testing::_;
 using testing::An;
+using testing::Eq;
 using testing::NotNull;
 using testing::Return;
 using testing::ReturnRef;
@@ -49,6 +50,8 @@ public:
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockHttpTracerManager> http_tracer_manager_;
+  std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> http_tracer_{
+      std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
@@ -248,6 +251,41 @@ http_filters:
 
   // By default, tracer must be a null object (Tracing::HttpNullTracer) rather than nullptr.
   EXPECT_THAT(config.tracer().get(), WhenDynamicCastTo<Tracing::HttpNullTracer*>(NotNull()));
+}
+
+TEST_F(HttpConnectionManagerConfigTest, TracingIsEnabledWhileThereIsNoTracingConfigInBootstrap) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing: {} # notice that tracing is enabled
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+  // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
+  // an actual HttpTracer must be obtained from the HttpTracerManager.
+  EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(nullptr))
+      .Times(1)
+      .WillOnce(Return(http_tracer_));
+  ;
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+
+  // Actual HttpTracer must be obtained from the HttpTracerManager.
+  EXPECT_THAT(config.tracer(), Eq(http_tracer_));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
