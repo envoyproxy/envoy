@@ -708,6 +708,9 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
+  EXPECT_EQ(
+      2,
+      atoi(std::string(response->headers().EnvoyAttemptCount()->value().getStringView()).c_str()));
 }
 
 void HttpIntegrationTest::testGrpcRetry() {

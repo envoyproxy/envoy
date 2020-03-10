@@ -1229,6 +1229,16 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
     headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
   }
 
+  // This header is added without checking for config_.suppress_envoy_headers_ to mirror what is
+  // done for upstream requests. Note: this work is done here instead of in
+  // route_entry_->finalizeResponse headers because the attempt_count_ data pertains to the router.
+  // This could be moved, if desired, by charging callbacks_->streamInfo with the attemp count.
+  // Adding the information to the stream info would also be necessary if we wanted this header to
+  // be added on sendLocalReply.
+  if (include_attempt_count_) {
+    headers->setEnvoyAttemptCount(attempt_count_);
+  }
+
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
   // Router::Filter we'll need to find a better location for this work. One possibility is to
   // provide finalizeResponseHeaders functions on the Router::Config and VirtualHost interfaces.
