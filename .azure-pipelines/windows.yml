@@ -18,11 +18,8 @@ jobs:
         TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
 
     - bash: |
-        set -ex
         mkdir -p /c/tmp
         cd / && cmd.exe "/c rmdir /s /q tmp"
-        ls -lah /c/tmp
-        ls -lah /
         cmd.exe "/c mklink /d tmp C:\\tmp"
       displayName: "Resolve bash /tmp to c:\\tmp"
 
