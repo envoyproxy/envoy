@@ -42,11 +42,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
-  HttpConnectionManagerConfigTest() {
-    ON_CALL(context_, getServerFactoryContext()).WillByDefault(ReturnRef(server_context_));
-  }
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
@@ -1321,6 +1317,42 @@ TEST_F(FilterChainTest, InvalidConfig) {
                                   route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
+}
+
+class UtilityTest : public testing::Test {
+public:
+  UtilityTest() {
+    // Although different Listeners will have separate FactoryContexts,
+    // those contexts must share the same SingletonManager.
+    ON_CALL(context_two_, singletonManager()).WillByDefault([&]() -> Singleton::Manager& {
+      return *context_one_.singleton_manager_;
+    });
+  }
+  NiceMock<Server::Configuration::MockFactoryContext> context_one_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_two_;
+};
+
+TEST_F(UtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
+  // Simulate `HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped()`
+  // call for filter instance "one".
+  auto singletons_one = Utility::createSingletons(context_one_);
+
+  EXPECT_THAT(singletons_one.date_provider_.get(), NotNull());
+  EXPECT_THAT(singletons_one.route_config_provider_manager_.get(), NotNull());
+  EXPECT_THAT(singletons_one.scoped_routes_config_provider_manager_.get(), NotNull());
+  EXPECT_THAT(singletons_one.http_tracer_manager_.get(), NotNull());
+
+  // Simulate `HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped()`
+  // call for filter instance "two".
+  auto singletons_two = Utility::createSingletons(context_two_);
+
+  // Ensure that returned values are still the same, even though the context has changed.
+  EXPECT_EQ(singletons_two.date_provider_, singletons_one.date_provider_);
+  EXPECT_EQ(singletons_two.route_config_provider_manager_,
+            singletons_one.route_config_provider_manager_);
+  EXPECT_EQ(singletons_two.scoped_routes_config_provider_manager_,
+            singletons_one.scoped_routes_config_provider_manager_);
+  EXPECT_EQ(singletons_two.http_tracer_manager_, singletons_one.http_tracer_manager_);
 }
 
 } // namespace HttpConnectionManager
