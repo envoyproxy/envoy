@@ -272,8 +272,7 @@ http_filters:
 
   // When tracing is enabled on a given "envoy.filters.network.http_connection_manager" filter,
   // an actual HttpTracer must be obtained from the HttpTracerManager.
-  EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(nullptr))
-      .WillOnce(Return(http_tracer_));
+  EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(nullptr)).WillOnce(Return(http_tracer_));
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
