@@ -69,7 +69,7 @@ public:
   bool empty() const { return buffer_ != nullptr ? buffer_->length() == 0 : span_.empty(); }
 
 private:
-  // Only one of |buffer_| or |span_| is in use. This depends on which contructor is called.
+  // Only one of |buffer_| or |span_| is in use. This depends on which constructor is called.
   Envoy::Buffer::Instance* buffer_{nullptr};
   absl::Span<QuicMemSliceImpl> span_;
 };
