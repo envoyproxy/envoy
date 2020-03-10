@@ -55,10 +55,10 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 0.25s
-   
-    authorization_request: 
-      allowed_headers: 
-        patterns: 
+
+    authorization_request:
+      allowed_headers:
+        patterns:
         - exact: baz
         - prefix: x-
       headers_to_add:
@@ -66,19 +66,19 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
         value: bar
       - key: bar
         value: foo
-    
-    authorization_response: 
-      allowed_upstream_headers: 
-        patterns: 
+
+    authorization_response:
+      allowed_upstream_headers:
+        patterns:
         - exact: baz
         - prefix: x-success
-      allowed_client_headers: 
-        patterns: 
+      allowed_client_headers:
+        patterns:
         - exact: baz
         - prefix: x-fail
 
     path_prefix: /extauth
-    
+
   failure_mode_allow: true
   with_request_body:
     max_request_bytes: 100
@@ -98,6 +98,16 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.ext_authz";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

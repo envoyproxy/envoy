@@ -1,5 +1,7 @@
 #include <string>
 
+#include "common/api/os_sys_calls_impl.h"
+
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
@@ -34,7 +36,7 @@ TEST_P(NetworkUtilityTest, DISABLED_ValidateBindFreeLoopbackPort) {
   const size_t kLimit = 50;
   for (size_t n = 0; n < kLimit; ++n) {
     auto addr_fd = Network::Test::bindFreeLoopbackPort(version_, Address::SocketType::Stream);
-    close(addr_fd.second);
+    Api::OsSysCallsSingleton::get().close(addr_fd.second);
     auto addr = addr_fd.first->asString();
     auto search = seen.find(addr);
     if (search != seen.end()) {

@@ -485,8 +485,8 @@ TEST_F(LightStepDriverTest, SpawnChild) {
       config_, request_headers_, operation_name_, start_time_, {Tracing::Reason::Sampling, true});
   Tracing::SpanPtr childViaSpawn = parent->spawnChild(config_, operation_name_, start_time_);
 
-  Http::TestHeaderMapImpl base1{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
-  Http::TestHeaderMapImpl base2{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
+  Http::TestRequestHeaderMapImpl base1{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
+  Http::TestRequestHeaderMapImpl base2{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
 
   childViaHeaders->injectContext(base1);
   childViaSpawn->injectContext(base2);

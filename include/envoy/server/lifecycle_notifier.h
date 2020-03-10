@@ -51,7 +51,7 @@ public:
    * Instances of the second type which take an Event::PostCb parameter must post
    * that callback to the main dispatcher when they have finished processing of
    * the new lifecycle state. This is useful when the main dispatcher needs to
-   * wait for registered callbacks to finish their work before continuing, eg.
+   * wait for registered callbacks to finish their work before continuing, e.g.,
    * during server shutdown.
    */
   using StageCallback = std::function<void()>;

@@ -37,7 +37,8 @@ public:
 /**
  * Static registration for the original dst filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(OriginalDstConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory);
+REGISTER_FACTORY(OriginalDstConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory){
+    "envoy.listener.original_dst"};
 
 } // namespace OriginalDst
 } // namespace ListenerFilters

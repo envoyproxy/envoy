@@ -19,8 +19,9 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()) {
-  failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
-      cluster, dns_refresh_rate_ms_.count(), factory_context.random());
+  failure_backoff_strategy_ =
+      Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
+          cluster, dns_refresh_rate_ms_.count(), factory_context.random());
 
   std::list<ResolveTargetPtr> resolve_targets;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment(
@@ -102,69 +103,77 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](std::list<Network::DnsResponse>&& response) -> void {
+      [this](Network::DnsResolver::ResolutionStatus status,
+             std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        parent_.info_->stats().update_success_.inc();
 
-        std::unordered_map<std::string, HostSharedPtr> updated_hosts;
-        HostVector new_hosts;
-        std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
-        for (const auto& resp : response) {
-          // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
-          // make a new address that has port in it. We need to both support IPv6 as well as
-          // potentially move port handling into the DNS interface itself, which would work better
-          // for SRV.
-          ASSERT(resp.address_ != nullptr);
-          new_hosts.emplace_back(new HostImpl(
-              parent_.info_, dns_address_,
-              Network::Utility::getAddressWithPort(*(resp.address_), port_),
-              lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
-              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
-              locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
+        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
-          ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
-        }
+        if (status == Network::DnsResolver::ResolutionStatus::Success) {
+          parent_.info_->stats().update_success_.inc();
 
-        HostVector hosts_added;
-        HostVector hosts_removed;
-        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                          updated_hosts, all_hosts_)) {
-          ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
-          ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
-            return host->priority() == locality_lb_endpoint_.priority();
-          }));
-          parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
+          std::unordered_map<std::string, HostSharedPtr> updated_hosts;
+          HostVector new_hosts;
+          std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
+          for (const auto& resp : response) {
+            // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
+            // make a new address that has port in it. We need to both support IPv6 as well as
+            // potentially move port handling into the DNS interface itself, which would work better
+            // for SRV.
+            ASSERT(resp.address_ != nullptr);
+            new_hosts.emplace_back(new HostImpl(
+                parent_.info_, dns_address_,
+                Network::Utility::getAddressWithPort(*(resp.address_), port_),
+                // TODO(zyfjeff): Created through metadata shared pool
+                std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
+                lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
+                lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
+                lb_endpoint_.health_status()));
+
+            ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
+          }
+
+          HostVector hosts_added;
+          HostVector hosts_removed;
+          if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
+                                            updated_hosts, all_hosts_)) {
+            ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+            ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
+              return host->priority() == locality_lb_endpoint_.priority();
+            }));
+            parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
+          } else {
+            parent_.info_->stats().update_no_rebuild_.inc();
+          }
+
+          all_hosts_ = std::move(updated_hosts);
+
+          // reset failure backoff strategy because there was a success.
+          parent_.failure_backoff_strategy_->reset();
+
+          if (!response.empty() && parent_.respect_dns_ttl_ &&
+              ttl_refresh_rate != std::chrono::seconds(0)) {
+            final_refresh_rate = ttl_refresh_rate;
+            ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
+                   final_refresh_rate.count() > 0);
+          }
+          ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
+                    final_refresh_rate.count());
         } else {
-          parent_.info_->stats().update_no_rebuild_.inc();
-        }
+          parent_.info_->stats().update_failure_.inc();
 
-        all_hosts_ = std::move(updated_hosts);
+          final_refresh_rate =
+              std::chrono::milliseconds(parent_.failure_backoff_strategy_->nextBackOffMs());
+          ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms",
+                    dns_address_, final_refresh_rate.count());
+        }
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
         // multiple DNS names, this will return initialized after a single DNS resolution
         // completes. This is not perfect but is easier to code and unclear if the extra
         // complexity is needed so will start with this.
         parent_.onPreInitComplete();
-
-        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
-
-        if (response.empty()) {
-          final_refresh_rate =
-              std::chrono::milliseconds(parent_.failure_backoff_strategy_->nextBackOffMs());
-          ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms",
-                    dns_address_, final_refresh_rate.count());
-        } else {
-          parent_.failure_backoff_strategy_->reset();
-          if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0)) {
-            final_refresh_rate = ttl_refresh_rate;
-            ASSERT(ttl_refresh_rate != std::chrono::seconds::max() &&
-                   final_refresh_rate.count() > 0);
-            ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
-                      final_refresh_rate.count());
-          }
-        }
-
         resolve_timer_->enableTimer(final_refresh_rate);
       });
 }

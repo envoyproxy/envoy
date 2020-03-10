@@ -9,7 +9,7 @@
 #include "test/test_common/utility.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
-using Envoy::Http::TestHeaderMapImpl;
+using Envoy::Http::TestRequestHeaderMapImpl;
 
 namespace Envoy {
 namespace Extensions {
@@ -27,15 +27,15 @@ TEST_F(MatcherTest, TestMatchPrefix) {
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestHeaderMapImpl{{":path", "/match/this"}};
+  auto headers = TestRequestHeaderMapImpl{{":path", "/match/this"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/MATCH"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/MATCH"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/matching"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/matching"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/matc"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/matc"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/no"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/no"}};
   EXPECT_FALSE(matcher->matches(headers));
 }
 
@@ -45,15 +45,15 @@ TEST_F(MatcherTest, TestMatchRegex) {
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestHeaderMapImpl{{":path", "/but"}};
+  auto headers = TestRequestHeaderMapImpl{{":path", "/but"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/mat?ok=bye"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/mat?ok=bye"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/maut"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/maut"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/cut"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/cut"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/mut/"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/mut/"}};
   EXPECT_FALSE(matcher->matches(headers));
 }
 
@@ -67,15 +67,15 @@ match:
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestHeaderMapImpl{{":path", "/but"}};
+  auto headers = TestRequestHeaderMapImpl{{":path", "/but"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/mat?ok=bye"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/mat?ok=bye"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/maut"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/maut"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/cut"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/cut"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/mut/"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/mut/"}};
   EXPECT_FALSE(matcher->matches(headers));
 }
 
@@ -86,17 +86,17 @@ TEST_F(MatcherTest, TestMatchPath) {
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestHeaderMapImpl{{":path", "/match"}};
+  auto headers = TestRequestHeaderMapImpl{{":path", "/match"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/MATCH"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/MATCH"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/match?ok=bye"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/match?ok=bye"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/matc"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/matc"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/match/"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/match/"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/matching"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/matching"}};
   EXPECT_FALSE(matcher->matches(headers));
 }
 
@@ -109,15 +109,15 @@ TEST_F(MatcherTest, TestMatchQuery) {
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestHeaderMapImpl{{":path", "/boo?foo=bar"}};
+  auto headers = TestRequestHeaderMapImpl{{":path", "/boo?foo=bar"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/boo?ok=bye"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/boo?ok=bye"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/foo?bar=bar"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/foo?bar=bar"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/boo?foo"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/boo?foo"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/boo?bar=foo"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/boo?bar=foo"}};
   EXPECT_FALSE(matcher->matches(headers));
 }
 
@@ -129,15 +129,15 @@ TEST_F(MatcherTest, TestMatchHeader) {
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestHeaderMapImpl{{":path", "/"}, {"a", ""}};
+  auto headers = TestRequestHeaderMapImpl{{":path", "/"}, {"a", ""}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/"}, {"a", "some"}, {"b", ""}};
+  headers = TestRequestHeaderMapImpl{{":path", "/"}, {"a", "some"}, {"b", ""}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/"}, {"aa", ""}};
+  headers = TestRequestHeaderMapImpl{{":path", "/"}, {"aa", ""}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/"}, {"", ""}};
+  headers = TestRequestHeaderMapImpl{{":path", "/"}, {"", ""}};
   EXPECT_FALSE(matcher->matches(headers));
 }
 
@@ -150,15 +150,15 @@ TEST_F(MatcherTest, TestMatchPathAndHeader) {
   RequirementRule rule;
   TestUtility::loadFromYaml(config, rule);
   MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestHeaderMapImpl{{":path", "/boo?foo=bar"}};
+  auto headers = TestRequestHeaderMapImpl{{":path", "/boo?foo=bar"}};
   EXPECT_TRUE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/boo?ok=bye"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/boo?ok=bye"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/foo?bar=bar"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/foo?bar=bar"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/boo?foo"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/boo?foo"}};
   EXPECT_FALSE(matcher->matches(headers));
-  headers = TestHeaderMapImpl{{":path", "/boo?bar=foo"}};
+  headers = TestRequestHeaderMapImpl{{":path", "/boo?bar=foo"}};
   EXPECT_FALSE(matcher->matches(headers));
 }
 

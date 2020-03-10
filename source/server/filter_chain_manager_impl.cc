@@ -53,6 +53,9 @@ envoy::config::core::v3::TrafficDirection FilterChainFactoryContextImpl::directi
   return parent_context_.direction();
 }
 
+ProtobufMessage::ValidationContext& FilterChainFactoryContextImpl::messageValidationContext() {
+  return parent_context_.messageValidationContext();
+}
 ProtobufMessage::ValidationVisitor& FilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
@@ -607,6 +610,9 @@ OverloadManager& FactoryContextImpl::overloadManager() { return server_.overload
 ThreadLocal::SlotAllocator& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
 Admin& FactoryContextImpl::admin() { return server_.admin(); }
 TimeSource& FactoryContextImpl::timeSource() { return server_.timeSource(); }
+ProtobufMessage::ValidationContext& FactoryContextImpl::messageValidationContext() {
+  return server_.messageValidationContext();
+}
 ProtobufMessage::ValidationVisitor& FactoryContextImpl::messageValidationVisitor() {
   return server_.messageValidationContext().staticValidationVisitor();
 }

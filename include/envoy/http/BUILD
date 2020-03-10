@@ -77,6 +77,7 @@ envoy_cc_library(
         "//include/envoy/grpc:status",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/tracing:http_tracer_interface",
     ],
 )
@@ -93,10 +94,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "header_map_interface",
     hdrs = ["header_map.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
-        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
