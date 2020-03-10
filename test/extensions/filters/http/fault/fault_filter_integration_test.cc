@@ -133,6 +133,27 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
 
+// Request abort controlled via header configuration.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
+  initializeFilter(header_fault_config_);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-envoy-fault-abort-request", "429"}});
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("429"));
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+}
+
 // Header configuration with no headers, so no fault injection.
 TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfigNoHeaders) {
   initializeFilter(header_fault_config_);
