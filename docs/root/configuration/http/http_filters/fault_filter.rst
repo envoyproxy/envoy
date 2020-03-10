@@ -38,7 +38,7 @@ fault configuration. The currently supported header controls are:
 
 * Request abort configuration via the *x-envoy-fault-abort-request* header. The header value
   should be an integer that specifies the HTTP status code to return in response to a request
-  and must be in the range [100, 600).
+  and must be in the range [200, 600).
 * Request delay configuration via the *x-envoy-fault-delay-request* header. The header value
   should be an integer that specifies the number of milliseconds to throttle the latency for.
 * Response rate limit configuration via the *x-envoy-fault-throughput-response* header. The
