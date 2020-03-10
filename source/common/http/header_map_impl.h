@@ -42,7 +42,7 @@ public:                                                                         
     entry.value().setInteger(value);                                                               \
     addSize(inline_headers_.name##_->value().size());                                              \
   }                                                                                                \
-  void remove##name() override { removeInline(&inline_headers_.name##_); }
+  size_t remove##name() override { return removeInline(&inline_headers_.name##_); }
 
 #define DEFINE_INLINE_HEADER_STRUCT(name) HeaderEntryImpl* name##_;
 
@@ -86,8 +86,8 @@ public:
   void iterateReverse(ConstIterateCb cb, void* context) const override;
   Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override;
   void clear() override;
-  void remove(const LowerCaseString& key) override;
-  void removePrefix(const LowerCaseString& key) override;
+  size_t remove(const LowerCaseString& key) override;
+  size_t removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
   bool empty() const override { return headers_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override;
@@ -215,7 +215,7 @@ protected:
                                      HeaderString&& value);
   HeaderEntry* getExisting(const LowerCaseString& key);
   HeaderEntryImpl* getExistingInline(absl::string_view key);
-  void removeInline(HeaderEntryImpl** entry);
+  size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
   void subtractSize(uint64_t size);
