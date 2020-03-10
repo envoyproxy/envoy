@@ -140,7 +140,7 @@ message VirtualHost {
   // in the upstream request and the downstream response.
   // Setting this option will cause it to override any existing header
   // value, so in the case of two Envoys on the request path with this option enabled, the upstream
-  // will see the attempt count as perceived by the second Envoy. Similarly if there are two Envoys
+  // will see the attempt count as perceived by the second Envoy. Similarly, if there are two Envoys
   // on the response path with this option enabled, the downstream will see the attempt count
   // as perceived by the second Envoy. This field Defaults to false.
   // This header is unaffected by the
