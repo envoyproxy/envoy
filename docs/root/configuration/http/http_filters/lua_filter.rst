@@ -343,6 +343,15 @@ the length of the signature. *data* is the content which will be hashed. *dataLe
 The function returns a pair. If the first element is *true*, the second element will be empty
 which means signature is verified; otherwise, the second element will store the error message.
 
+timestamp()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  timestamp = timestamp()
+
+High resolution timestamp function. The function returns timestamp in milliseconds since epoch.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API

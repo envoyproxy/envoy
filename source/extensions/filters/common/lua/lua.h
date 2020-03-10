@@ -23,7 +23,7 @@ namespace Lua {
  * Some general notes on everything in this file. Lua/C bindings are functional, but not the most
  * beautiful interfaces. For more general overview information see the following:
  * 1) https://www.lua.org/manual/5.1/manual.html#3
- * 2) https://doc.lagout.org/programmation/Lua/Programming%20in%20Lua%20Second%20Edition.pdf
+ * 2) https://doc.lagout.org/programmation/Lua/Programming%20in%20Lua.pdf
  * 3) http://luajit.org/extensions.html
  *
  * Instead of delving into crazy template metaprogramming in all cases, I've tried to use a mix

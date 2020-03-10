@@ -116,7 +116,8 @@ public:
   };
 
   StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine, Http::HeaderMap& headers,
-                      bool end_stream, Filter& filter, FilterCallbacks& callbacks);
+                      bool end_stream, Filter& filter, FilterCallbacks& callbacks,
+                      TimeSource& time_source);
 
   Http::FilterHeadersStatus start(int function_ref);
   Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
@@ -146,7 +147,8 @@ public:
             {"streamInfo", static_luaStreamInfo},
             {"connection", static_luaConnection},
             {"importPublicKey", static_luaImportPublicKey},
-            {"verifySignature", static_luaVerifySignature}};
+            {"verifySignature", static_luaVerifySignature},
+            {"timestamp", static_luaTimestamp}};
   }
 
 private:
@@ -245,6 +247,12 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaImportPublicKey);
 
   /**
+   * Timestamp.
+   * @return timestamp in millis
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestamp);
+
+  /**
    * This is the closure/iterator returned by luaBodyChunks() above.
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
@@ -288,6 +296,7 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+  TimeSource& time_source_;
 };
 
 /**
@@ -330,7 +339,8 @@ using FilterConfigConstSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::lua> {
 public:
-  Filter(FilterConfigConstSharedPtr config) : config_(config) {}
+  Filter(FilterConfigConstSharedPtr config, TimeSource& time_source)
+      : config_(config), time_source_(time_source) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
   void scriptError(const Filters::Common::Lua::LuaException& e);
@@ -435,6 +445,7 @@ private:
   StreamHandleRef request_stream_wrapper_;
   StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
+  TimeSource& time_source_;
 
   // These coroutines used to be owned by the stream handles. After investigating #3570, it
   // became clear that there is a circular memory reference when a coroutine yields. Basically,

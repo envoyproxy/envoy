@@ -90,13 +90,14 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::HeaderMap& headers, bool end_stream, Filter& filter,
-                                         FilterCallbacks& callbacks)
+                                         FilterCallbacks& callbacks, TimeSource& time_source)
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
       callbacks_(callbacks), yield_callback_([this]() {
         if (state_ == State::Running) {
           throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
         }
-      }) {}
+      }),
+      time_source_(time_source) {}
 
 Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
@@ -499,6 +500,14 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   return 2;
 }
 
+int StreamHandleWrapper::luaTimestamp(lua_State* state) {
+  auto millis_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                time_source_.systemTime().time_since_epoch())
+                                .count();
+  lua_pushnumber(state, millis_since_epoch);
+  return 1;
+}
+
 int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   // Get byte array and the length.
   const char* str = luaL_checkstring(state, 2);
@@ -562,7 +571,7 @@ Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
 
   coroutine = config_->createCoroutine();
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
-                                           *this, callbacks),
+                                           *this, callbacks, time_source_),
                true);
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;

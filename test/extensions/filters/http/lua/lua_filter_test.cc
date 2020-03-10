@@ -75,7 +75,11 @@ public:
   }
 
   void setupFilter() {
-    filter_ = std::make_unique<TestFilter>(config_);
+    Event::SimulatedTimeSystem test_time;
+    test_time.setSystemTime(std::chrono::milliseconds(1583879145572));
+
+    filter_ = std::make_unique<TestFilter>(config_, test_time.timeSystem());
+
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -576,7 +580,8 @@ TEST_F(LuaHttpFilterTest, ThreadEnvironments) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  TestFilter filter2(config_);
+  Event::SimulatedTimeSystem test_time;
+  TestFilter filter2(config_, test_time.timeSystem());
   EXPECT_CALL(filter2, scriptLog(spdlog::level::err,
                                  StrEq("[string \"...\"]:6: object used outside of proper scope")));
   filter2.decodeHeaders(request_headers, true);
@@ -1872,6 +1877,21 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
               scriptLog(spdlog::level::trace, StrEq("Failed to verify digest. Error code: 0")));
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::trace, StrEq("Failed to verify digest. Error code: 0")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, Timestamp) {
+  const std::string SCRIPT{R"EOF(
+      function envoy_on_request(request_handle)
+        request_handle:logTrace(request_handle:timestamp())
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1583879145572")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
