@@ -22,8 +22,8 @@ jobs:
         mkdir /c/tmp || true
         cd /
         rm -rf /tmp
-        cmd.exe /c echo "Why doesn't /c flag work?"
-        cmd.exe /c mklink /d tmp "C:\\tmp"
+        cmd.exe /c echo "Why does not c flag work?"
+        cmd.exe /c mklink /j tmp "C:\\tmp"
       displayName: "Resolve bash /tmp to c:\\tmp"
 
     - bash: ci/windows_ci_steps.sh
