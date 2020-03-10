@@ -1055,7 +1055,8 @@ message RetryPolicy {
   repeated HeaderMatcher retriable_request_headers = 10;
 
   // Implementation specific configuration which depends on the implementation being instantiated.
-  // See the supported retry policy implementations for further documentation.
+  // Documentation for :ref:`retry policy extension <arch_overview_http_routing_retry_policy>`. See
+  // the supported retry policy implementations for further documentation.
   google.protobuf.Any typed_config = 11;
 }
 
