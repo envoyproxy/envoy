@@ -31,6 +31,9 @@ HttpTracerManagerImpl::getOrCreateHttpTracer(const envoy::config::trace::v3::Tra
       *config, factory_context_->messageValidationVisitor(), factory);
 
   HttpTracerSharedPtr http_tracer = factory.createHttpTracer(*message, *factory_context_);
+  // TODO(yskopets): In the initial implementation HttpTracers are never removed from the cache.
+  // Once HttpTracer implementations have been revised to support removal and cleanup,
+  // this cache must be reworked to release HttpTracers as soon as they are no longer in use.
   http_tracers_.emplace(cache_key, http_tracer);
   return http_tracer;
 }
