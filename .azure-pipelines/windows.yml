@@ -20,7 +20,7 @@ jobs:
     - bash: |
         set -ex
         mkdir -p /c/tmp
-        cd / && rm -rf tmp
+        cd / && cmd.exe "/c rmdir /s /q tmp"
         ls -lah /c/tmp
         ls -lah /
         cmd.exe "/c mklink /d tmp C:\\tmp"
