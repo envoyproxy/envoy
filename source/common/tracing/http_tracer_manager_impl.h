@@ -22,7 +22,7 @@ public:
 
 private:
   Server::Configuration::TracerFactoryContextPtr factory_context_;
-  HttpTracerSharedPtr null_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
+  const HttpTracerSharedPtr null_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
 
   // HttpTracers indexed by the hash of their configuration.
   absl::flat_hash_map<std::size_t, HttpTracerSharedPtr> http_tracers_;
