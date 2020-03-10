@@ -18,11 +18,12 @@ jobs:
         TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
 
     - bash: |
-        mkdir -p /c/tmp > /dev/null || true
+        set -ex
+        mkdir /c/tmp > /dev/null || true
         cd /
         rm -rf /tmp
         cmd.exe /c mklink tmp C:\\tmp
-      displayName: "Resolve bash /tmp to c:\tmp"
+      displayName: "Resolve bash /tmp to c:\\tmp"
 
     - bash: ci/windows_ci_steps.sh
       displayName: "Run Windows CI"
