@@ -57,9 +57,11 @@ convertInternalRedirectAction(const envoy::config::route::v3::RouteAction& route
   }
 }
 
+const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
+
 } // namespace
 
-std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
+std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
@@ -422,7 +424,7 @@ bool RouteEntryImplBase::evaluateTlsContextMatch(const StreamInfo::StreamInfo& s
   return matches;
 }
 
-bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
+bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const {
   bool matches = true;
@@ -457,7 +459,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
+void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
@@ -491,7 +493,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 }
 
-void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
+void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
     // Append user-specified request headers from most to least specific: route-level headers,
@@ -528,7 +530,7 @@ RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& 
 // parameters) that should be replaced by the rewrite. A "regex_rewrite"
 // applies to the entire path (excluding query parameters), regardless of what
 // portion was matched.
-void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
+void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
                                             absl::string_view matched_path,
                                             bool insert_envoy_original_path) const {
   const auto& rewrite = getPathRewrite();
@@ -558,7 +560,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   }
 }
 
-absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,
+absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHeaderMap& headers,
                                                          absl::string_view new_scheme,
                                                          absl::string_view new_port) const {
 
@@ -597,7 +599,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& 
   return request_host;
 }
 
-std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
+std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
   absl::string_view final_scheme;
@@ -647,10 +649,18 @@ std::multimap<std::string, std::string>
 RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
-    const auto filter_metadata = route.metadata().filter_metadata().find(
+    auto filter_metadata = route.metadata().filter_metadata().find(
         Extensions::HttpFilters::HttpFilterNames::get().Router);
     if (filter_metadata == route.metadata().filter_metadata().end()) {
-      return ret;
+      // TODO(zuercher): simply return `ret` when deprecated filter names are removed.
+      filter_metadata = route.metadata().filter_metadata().find(DEPRECATED_ROUTER_NAME);
+      if (filter_metadata == route.metadata().filter_metadata().end()) {
+        return ret;
+      }
+
+      Extensions::Common::Utility::ExtensionNameUtil::checkDeprecatedExtensionName(
+          "http filter", DEPRECATED_ROUTER_NAME,
+          Extensions::HttpFilters::HttpFilterNames::get().Router);
     }
     for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
@@ -832,12 +842,12 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     : RouteEntryImplBase(vhost, route, factory_context, validator), prefix_(route.match().prefix()),
       path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
 
-void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
   finalizePathHeader(headers, prefix_, insert_envoy_original_path);
 }
 
-RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
+RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
@@ -854,12 +864,12 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
     : RouteEntryImplBase(vhost, route, factory_context, validator), path_(route.match().path()),
       path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_)) {}
 
-void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
   finalizePathHeader(headers, path_, insert_envoy_original_path);
 }
 
-RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
+RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
@@ -889,7 +899,7 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
   }
 }
 
-void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                             bool insert_envoy_original_path) const {
   const absl::string_view path =
       Http::PathUtil::removeQueryAndFragment(headers.Path()->value().getStringView());
@@ -899,7 +909,7 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
-RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
+RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
@@ -1033,7 +1043,7 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
     const std::string& host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
     RouteMatcher::SubstringFunction substring_function) const {
   // We do a longest wildcard match against the host that's passed in
-  // (e.g. foo-bar.baz.com should match *-bar.baz.com before matching *.baz.com for suffix
+  // (e.g. "foo-bar.baz.com" should match "*-bar.baz.com" before matching "*.baz.com" for suffix
   // wildcards). This is done by scanning the length => wildcards map looking for every wildcard
   // whose size is < length.
   for (const auto& iter : wildcard_virtual_hosts) {
@@ -1085,7 +1095,7 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
   }
 }
 
-RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
+RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::RequestHeaderMap& headers,
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          uint64_t random_value) const {
   // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
@@ -1115,7 +1125,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
   return nullptr;
 }
 
-const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& headers) const {
+const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
   // Fast path the case where we only have a default virtual host.
   if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
       wildcard_virtual_host_prefixes_.empty()) {
@@ -1154,7 +1164,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   return default_virtual_host_.get();
 }
 
-RouteConstSharedPtr RouteMatcher::route(const Http::HeaderMap& headers,
+RouteConstSharedPtr RouteMatcher::route(const Http::RequestHeaderMap& headers,
                                         const StreamInfo::StreamInfo& stream_info,
                                         uint64_t random_value) const {
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);

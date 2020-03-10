@@ -158,6 +158,15 @@ public:
     static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
 
     /**
+     * Appends stat_name's bytes into mem_block, which must have been allocated to
+     * allow for stat_name.size() bytes.
+     *
+     * @param stat_name the stat_name to append.
+     * @param mem_block the block of memory to append to.
+     */
+    static void appendToMemBlock(StatName stat_name, MemBlockBuilder<uint8_t>& mem_block);
+
+    /**
      * Decodes a byte-array containing a variable-length number.
      *
      * @param The encoded byte array, written previously by appendEncoding.
@@ -451,6 +460,8 @@ public:
   const uint8_t* data() const {
     return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
   }
+
+  const uint8_t* dataIncludingSize() const { return size_and_data_; }
 
   /**
    * @return A pointer to the buffer, including the size bytes.

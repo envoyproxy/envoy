@@ -7,6 +7,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/hash.h"
+#include "common/grpc/stat_names.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/types/optional.h"
@@ -49,6 +50,8 @@ public:
     return protocol == Context::Protocol::Grpc ? grpc_ : grpc_web_;
   }
 
+  StatNames& statNames() override { return stat_names_; }
+
 private:
   // Makes a stat name from a string, if we don't already have one for it.
   // This always takes a lock on mutex_, and if we haven't seen the name
@@ -70,6 +73,8 @@ private:
   const Stats::StatName zero_;
   const Stats::StatName request_message_count_;
   const Stats::StatName response_message_count_;
+
+  StatNames stat_names_;
 };
 
 } // namespace Grpc

@@ -63,7 +63,7 @@ TEST_F(OptionsImplTest, InvalidCommandLine) {
                           "Couldn't find match for argument");
 }
 
-TEST_F(OptionsImplTest, v1Disallowed) {
+TEST_F(OptionsImplTest, V1Disallowed) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "

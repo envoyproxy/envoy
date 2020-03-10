@@ -34,7 +34,7 @@ public:
   MOCK_METHOD(void, setTag, (absl::string_view name, absl::string_view value));
   MOCK_METHOD(void, log, (SystemTime timestamp, const std::string& event));
   MOCK_METHOD(void, finishSpan, ());
-  MOCK_METHOD(void, injectContext, (Http::HeaderMap & request_headers));
+  MOCK_METHOD(void, injectContext, (Http::RequestHeaderMap & request_headers));
   MOCK_METHOD(void, setSampled, (const bool sampled));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
@@ -51,7 +51,7 @@ public:
   MockHttpTracer();
   ~MockHttpTracer() override;
 
-  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
                     const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override {
     return SpanPtr{startSpan_(config, request_headers, stream_info, tracing_decision)};
@@ -68,7 +68,7 @@ public:
   MockDriver();
   ~MockDriver() override;
 
-  SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
+  SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
                     const std::string& operation_name, SystemTime start_time,
                     const Tracing::Decision tracing_decision) override {
     return SpanPtr{

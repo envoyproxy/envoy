@@ -49,7 +49,6 @@
 #include "quiche/quic/platform/api/quic_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
-#include "quiche/quic/platform/api/quic_optional.h"
 #include "quiche/quic/platform/api/quic_pcc_sender.h"
 #include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
@@ -714,13 +713,6 @@ TEST_F(QuicPlatformTest, TestQuicMacros) {
   // Just make sure it compiles.
   EXPECT_FALSE(dummyTestFunction());
   int a QUIC_UNUSED;
-}
-
-TEST_F(QuicPlatformTest, TestQuicOptional) {
-  QuicOptional<int32_t> maybe_a;
-  EXPECT_FALSE(maybe_a.has_value());
-  maybe_a = 1;
-  EXPECT_EQ(1, *maybe_a);
 }
 
 TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {

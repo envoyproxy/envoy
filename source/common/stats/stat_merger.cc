@@ -132,6 +132,7 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges,
       }
     }
 
+    // TODO(snowp): Propagate tag values during hot restarts.
     auto& gauge_ref = temp_scope_->gaugeFromStatName(stat_name, import_mode);
     if (gauge_ref.importMode() == Gauge::ImportMode::NeverImport) {
       // On the first iteration through the loop, the gauge will not be loaded into the scope

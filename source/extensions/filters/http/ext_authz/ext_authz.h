@@ -220,7 +220,7 @@ public:
 
 private:
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
-  void initiateCall(const Http::HeaderMap& headers);
+  void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   bool isBufferFull();
 
@@ -238,7 +238,7 @@ private:
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  Http::HeaderMap* request_headers_;
+  Http::RequestHeaderMap* request_headers_;
   State state_{State::NotStarted};
   FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
