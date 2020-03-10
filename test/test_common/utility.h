@@ -750,24 +750,20 @@ public:
   HeaderMap::Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override {
     return header_map_.lookup(key, entry);
   }
-<<<<<<< HEAD
-  void clear() override { header_map_.clear(); }
-  size_t remove(const LowerCaseString& key) override { return header_map_.remove(key); }
-  size_t removePrefix(const LowerCaseString& key) override { return header_map_.removePrefix(key); }
-=======
   void clear() override {
     header_map_.clear();
     header_map_.verifyByteSizeInternalForTest();
   }
-  void remove(const LowerCaseString& key) override {
-    header_map_.remove(key);
+  size_t remove(const LowerCaseString& key) override {
+    size_t headers_removed = header_map_.remove(key);
     header_map_.verifyByteSizeInternalForTest();
+    return headers_removed;
   }
-  void removePrefix(const LowerCaseString& key) override {
-    header_map_.removePrefix(key);
+  size_t removePrefix(const LowerCaseString& key) override {
+    size_t headers_removed = header_map_.removePrefix(key);
     header_map_.verifyByteSizeInternalForTest();
+    return headers_removed;
   }
->>>>>>> master
   size_t size() const override { return header_map_.size(); }
   bool empty() const override { return header_map_.empty(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override {

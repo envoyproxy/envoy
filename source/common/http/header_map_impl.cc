@@ -516,7 +516,6 @@ size_t HeaderMapImpl::remove(const LowerCaseString& key) {
       }
     }
   }
-  verifyByteSize();
   return old_size - headers_.size();
 }
 
@@ -541,7 +540,6 @@ size_t HeaderMapImpl::removePrefix(const LowerCaseString& prefix) {
     }
     return to_remove;
   });
-  verifyByteSize();
   return old_size - headers_.size();
 }
 
@@ -605,7 +603,6 @@ size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   subtractSize(size_to_subtract);
   *ptr_to_entry = nullptr;
   headers_.erase(entry->entry_);
-  verifyByteSize();
   return 1;
 }
 
