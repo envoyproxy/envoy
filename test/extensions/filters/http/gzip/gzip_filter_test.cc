@@ -177,7 +177,7 @@ TEST_F(GzipFilterTest, RuntimeDisabled) {
 }
 )EOF");
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
-  doRequest({{":method", "get"}, {"accept-encoding", "deflate, test"}}, false);
+  doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
