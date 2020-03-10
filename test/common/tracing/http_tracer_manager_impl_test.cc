@@ -97,6 +97,15 @@ TEST_F(HttpTracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
   EXPECT_NE(http_tracer_two, http_tracer_one);
 }
 
+TEST_F(HttpTracerManagerImplTest, ShouldFailIfTracerProviderIsUnknown) {
+  envoy::config::trace::v3::Tracing_Http tracing_config;
+  tracing_config.set_name("invalid");
+
+  EXPECT_THROW_WITH_MESSAGE(http_tracer_manager_.getOrCreateHttpTracer(&tracing_config),
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: 'invalid'");
+}
+
 } // namespace
 } // namespace Tracing
 } // namespace Envoy
