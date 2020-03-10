@@ -142,7 +142,7 @@ message VirtualHost {
   // as perceived by the first Envoy in the path. This field Defaults to false.
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
-  // <envoy_api_field_extensions.filters.http.router.v2.Router.suppress_envoy_headers>` flag.
+  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
   bool include_request_attempt_count = 14;
 
   // Indicates the retry policy for all routes in this virtual host. Note that setting a
