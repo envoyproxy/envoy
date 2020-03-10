@@ -191,7 +191,7 @@ private:
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_unique<Tracing::HttpNullTracer>()};
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
