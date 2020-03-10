@@ -84,6 +84,19 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
                           Pair("leading", "leading value"), Pair("trailing", "trailing value")));
 }
 
+// Headers that are likely to mutate are not considered canonical
+TEST(UtilityTest, CanonicalizeHeadersDropMutatingHeaders) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
+      {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
+      {"x-amz-content-sha256", "e3b0c44..."},
+  };
+  const auto map = Utility::canonicalizeHeaders(headers);
+  EXPECT_THAT(map,
+              ElementsAre(Pair("host", "example.com"), Pair("x-amz-content-sha256", "e3b0c44..."),
+                          Pair("x-amz-date", "20130708T220855Z")));
+}
+
 // Verify the format of a minimalist canonical request
 TEST(UtilityTest, MinimalCanonicalRequest) {
   std::map<std::string, std::string> headers;

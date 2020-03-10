@@ -37,23 +37,28 @@ XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
 }
 } // namespace
 
-Driver::Driver(const XRayConfiguration& config, Server::Instance& server)
-    : xray_config_(config), tls_slot_ptr_(server.threadLocal().allocateSlot()) {
+Driver::Driver(const XRayConfiguration& config,
+               Server::Configuration::TracerFactoryContext& context)
+    : xray_config_(config),
+      tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
 
   const std::string daemon_endpoint =
       config.daemon_endpoint_.empty() ? DefaultDaemonEndpoint : config.daemon_endpoint_;
 
   ENVOY_LOG(debug, "send X-Ray generated segments to daemon address on {}", daemon_endpoint);
   sampling_strategy_ = std::make_unique<XRay::LocalizedSamplingStrategy>(
-      xray_config_.sampling_rules_, server.random(), server.timeSource());
+      xray_config_.sampling_rules_, context.serverFactoryContext().random(),
+      context.serverFactoryContext().timeSource());
 
   tls_slot_ptr_->set([this, daemon_endpoint,
-                      &server](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    std::string span_name = xray_config_.segment_name_.empty() ? server.localInfo().clusterName()
-                                                               : xray_config_.segment_name_;
+                      &context](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    std::string span_name = xray_config_.segment_name_.empty()
+                                ? context.serverFactoryContext().localInfo().clusterName()
+                                : xray_config_.segment_name_;
 
     DaemonBrokerPtr broker = std::make_unique<DaemonBrokerImpl>(daemon_endpoint);
-    TracerPtr tracer = std::make_unique<Tracer>(span_name, std::move(broker), server.timeSource());
+    TracerPtr tracer = std::make_unique<Tracer>(span_name, std::move(broker),
+                                                context.serverFactoryContext().timeSource());
     return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
   });
 }

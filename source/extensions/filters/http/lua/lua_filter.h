@@ -5,6 +5,7 @@
 
 #include "common/crypto/utility.h"
 
+#include "extensions/common/utility.h"
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -13,20 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
-
-namespace {
-const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
-    return ProtobufWkt::Struct::default_instance();
-  }
-  const auto& metadata = callbacks->route()->routeEntry()->metadata();
-  const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
-  if (filter_it == metadata.filter_metadata().end()) {
-    return ProtobufWkt::Struct::default_instance();
-  }
-  return filter_it->second;
-}
-} // namespace
 
 /**
  * Callbacks used by a stream handler to access the filter.
@@ -156,6 +143,8 @@ private:
    * @param 2 (table): A table of HTTP headers. :method, :path, and :authority must be defined.
    * @param 3 (string): Body. Can be nil.
    * @param 4 (int): Timeout in milliseconds for the call.
+   * @param 5 (bool): Optional flag. If true, filter continues without waiting for HTTP response
+   * from upstream service. False/synchronous by default.
    * @return headers (table), body (string/nil)
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHttpCall);
@@ -247,7 +236,8 @@ private:
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
-  static void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table_index);
+  int luaHttpCallSynchronous(lua_State* state);
+  int luaHttpCallAsynchronous(lua_State* state);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
@@ -285,6 +275,16 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+};
+
+/**
+ * An empty Callbacks client. It will ignore everything, including successes and failures.
+ */
+class NoopCallbacks : public Http::AsyncClient::Callbacks {
+public:
+  // Http::AsyncClient::Callbacks
+  void onSuccess(Http::ResponseMessagePtr&&) override {}
+  void onFailure(Http::AsyncClient::FailureReason) override {}
 };
 
 /**
@@ -378,7 +378,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
@@ -399,7 +399,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    const ProtobufWkt::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 

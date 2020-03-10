@@ -213,9 +213,9 @@ message RedisProxy {
   //
   // When using the above routes, the following prefixes would be sent to:
   //
-  // * 'get abc:users' would retrieve the key 'abc:users' from cluster_b.
-  // * 'get ab:users' would retrieve the key 'ab:users' from cluster_a.
-  // * 'get z:users' would return a NoUpstreamHost error. A :ref:`catch-all
+  // * ``get abc:users`` would retrieve the key 'abc:users' from cluster_b.
+  // * ``get ab:users`` would retrieve the key 'ab:users' from cluster_a.
+  // * ``get z:users`` would return a NoUpstreamHost error. A :ref:`catch-all
   //   route<envoy_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`
   //   would have retrieved the key from that cluster instead.
   //

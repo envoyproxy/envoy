@@ -7,6 +7,7 @@ Common messages
 
   ../api/v2/core/base.proto
   ../api/v2/core/address.proto
+  ../api/v2/core/backoff.proto
   ../api/v2/core/protocol.proto
   ../api/v2/discovery.proto
   ../api/v2/core/config_source.proto
