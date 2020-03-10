@@ -296,11 +296,13 @@ public:
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
+  bool sampled() const override { return sampled_; }
 
 private:
   std::string cluster_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
+  bool sampled_;
 };
 
 /**
