@@ -71,12 +71,30 @@ TEST_F(HttpTracerManagerImplTest, ShouldUseProperTracerFactory) {
 TEST_F(HttpTracerManagerImplTest, ShouldCacheAndReuseTracers) {
   envoy::config::trace::v3::Tracing_Http tracing_config;
   tracing_config.set_name("envoy.tracers.sample");
+  tracing_config.mutable_typed_config()->PackFrom(MessageUtil::keyValueStruct("key1", "value1"));
 
   auto http_tracer_one = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config);
   auto http_tracer_two = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config);
 
   // Should reuse previously created HttpTracer instance.
   EXPECT_EQ(http_tracer_two, http_tracer_one);
+}
+
+TEST_F(HttpTracerManagerImplTest, ShouldCacheTracersBasedOnFullConfig) {
+  envoy::config::trace::v3::Tracing_Http tracing_config_one;
+  tracing_config_one.set_name("envoy.tracers.sample");
+  tracing_config_one.mutable_typed_config()->PackFrom(MessageUtil::keyValueStruct("key1", "value1"));
+
+  auto http_tracer_one = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config_one);
+
+  envoy::config::trace::v3::Tracing_Http tracing_config_two;
+  tracing_config_two.set_name("envoy.tracers.sample");
+  tracing_config_two.mutable_typed_config()->PackFrom(MessageUtil::keyValueStruct("key2", "value2"));
+
+  auto http_tracer_two = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config_two);
+
+  // Any changes to config must result in a new HttpTracer instance.
+  EXPECT_NE(http_tracer_two, http_tracer_one);
 }
 
 } // namespace
