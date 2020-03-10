@@ -149,15 +149,38 @@ analysis pipeline described above, and make sure your changes match
 expectations.
 
 Current status
-~~~~~~~~~~~~~~
+--------------
 
-.. TODO: move this section to a 'releases' docs once we cut 0.2
+iOS
+~~~
 
-As of
-https://github.com/lyft/envoy-mobile/tree/f17caebcfce09ec5dcda905dc8418fea4d382da7
-The test_binary_size_size as built by the toolchain against the architecture
-described above compiles to a stripped size of 8.9mb and a compressed size of
-3mb.
+When compiling Envoy Mobile for ``arm64`` only, we found the final size to be
+**approximately 4.6 MB** as of :tree:`v0.2.3.03062020 <v0.2.3.03062020>`.
+
+This analysis was done by:
+
+- Compiling the `analysis variant example app <https://github.com/rebello95/EnvoyMobileAnalysis/tree/v0.2.3.03062020/AnalysisVariant>`_ for release
+- Exporing the app for Ad Hoc distribution using Xcode
+- Enabling app thinning for ``arm64`` only
+- Investigating the ``.ipa`` file and/or ``App Thinning Size Report.txt``
+- Doing the same for the `analysis control example app <https://github.com/rebello95/EnvoyMobileAnalysis/tree/v0.2.3.03062020/AnalysisControl>`_ in that repository, and comparing the size differences
+
+::
+
+  Control:
+  App + On Demand Resources size: 27 KB compressed, 113 KB uncompressed
+  App size: 27 KB compressed, 113 KB uncompressed
+
+  Variant:
+  App + On Demand Resources size: 4.6 MB compressed, 13.8 MB uncompressed
+  App size: 4.6 MB compressed, 13.8 MB uncompressed
+
+  Net: 4.6 MB compressed, 13.8 MB uncompressed
+
+Android
+~~~~~~~
+
+This is being done in :issue:`#742 <742>`.
 
 CI integration
 --------------
