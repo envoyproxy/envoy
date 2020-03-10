@@ -29,6 +29,15 @@ TEST(FaultConfigTest, FaultAbortHeaderConfig) {
   Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request", "401"}};
   EXPECT_EQ(Http::Code::Unauthorized,
             config.statusCode(good_headers.get(HeaderNames::get().AbortRequest)).value());
+
+  // Out of range header.
+  Http::TestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request", "199"}};
+  EXPECT_EQ(absl::nullopt, config.statusCode(too_low_headers.get(HeaderNames::get().AbortRequest)));
+
+  // Out of range header.
+  Http::TestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-request", "600"}};
+  EXPECT_EQ(absl::nullopt,
+            config.statusCode(too_high_headers.get(HeaderNames::get().AbortRequest)));
 }
 
 TEST(FaultConfigTest, FaultDelayHeaderConfig) {

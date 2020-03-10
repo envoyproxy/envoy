@@ -38,7 +38,7 @@ FaultAbortConfig::HeaderAbortProvider::statusCode(const Http::HeaderEntry* heade
     return ret;
   }
 
-  if (code >= 200 and code < 600) {
+  if (code >= 200 && code < 600) {
     ret = static_cast<Http::Code>(code);
   }
 
