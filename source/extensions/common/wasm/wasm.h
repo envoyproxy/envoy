@@ -24,12 +24,6 @@
 #include "include/proxy-wasm/wasm.h"
 
 namespace Envoy {
-
-// TODO: move to source/common/stats/symbol_table_impl.h when upstreaming.
-namespace Stats {
-using StatNameSetSharedPtr = std::shared_ptr<Stats::StatNameSet>;
-} // namespace Stats
-
 namespace Extensions {
 namespace Common {
 namespace Wasm {

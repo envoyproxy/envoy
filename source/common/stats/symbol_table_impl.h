@@ -826,6 +826,7 @@ private:
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
 };
+using StatNameSetSharedPtr = std::shared_ptr<Stats::StatNameSet>;
 
 } // namespace Stats
 } // namespace Envoy
