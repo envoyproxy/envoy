@@ -373,7 +373,7 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   resetTimerState();
 
   // Delays can be followed by aborts
-  auto abort_code = abortHttpStatus(request_headers);
+  const auto abort_code = abortHttpStatus(request_headers);
   if (abort_code.has_value()) {
     abortWithHTTPStatus(abort_code.value());
   } else {
