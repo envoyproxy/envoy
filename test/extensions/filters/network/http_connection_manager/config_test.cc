@@ -209,6 +209,47 @@ http_filters:
   EXPECT_THAT(config.tracer().get(), WhenDynamicCastTo<Tracing::HttpNullTracer*>(NotNull()));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledWhileThereIsTracingConfigInBootstrap) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+  // Simulate tracer provider configuration in the bootstrap config.
+  envoy::config::trace::v3::Tracing tracing_config;
+  tracing_config.mutable_http()->set_name("zipkin");
+  tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
+      envoy::config::trace::v3::ZipkinConfig{});
+  context_.http_context_.setDefaultTracingConfig(tracing_config);
+
+  // When tracing is not enabled on a given "envoy.filters.network.http_connection_manager" filter,
+  // there is no reason to obtain an actual HttpTracer.
+  EXPECT_CALL(http_tracer_manager_, getOrCreateHttpTracer(_)).Times(0);
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+
+  // Even though tracer provider is configured in the bootsrap config, a given filter instance
+  // should not have a tracer associated with it.
+
+  // By default, tracer must be a null object (Tracing::HttpNullTracer) rather than nullptr.
+  EXPECT_THAT(config.tracer().get(), WhenDynamicCastTo<Tracing::HttpNullTracer*>(NotNull()));
+}
+
 TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
   const std::string yaml_string = R"EOF(
 stat_prefix: router
