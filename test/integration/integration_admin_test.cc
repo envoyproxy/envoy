@@ -117,7 +117,8 @@ std::string ContentType(const BufferingStreamDecoderPtr& response) {
 } // namespace
 
 TEST_P(IntegrationAdminTest, Admin) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer;
+  symbol_table_creator_test_peer.setUseFakeSymbolTables(false);
   initialize();
 
   BufferingStreamDecoderPtr response;
