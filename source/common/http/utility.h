@@ -140,7 +140,7 @@ std::string makeSetCookieValue(const std::string& key, const std::string& value,
  * @param headers supplies the headers to get the status from.
  * @return uint64_t the response code or throws an exception if the headers are invalid.
  */
-uint64_t getResponseStatus(const HeaderMap& headers);
+uint64_t getResponseStatus(const ResponseHeaderMap& headers);
 
 /**
  * Determine whether these headers are a valid Upgrade request or response.
@@ -148,12 +148,12 @@ uint64_t getResponseStatus(const HeaderMap& headers);
  * - Connection: Upgrade
  * - Upgrade: [any value]
  */
-bool isUpgrade(const HeaderMap& headers);
+bool isUpgrade(const RequestOrResponseHeaderMap& headers);
 
 /**
  * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
  */
-bool isH2UpgradeRequest(const HeaderMap& headers);
+bool isH2UpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * Determine whether this is a WebSocket Upgrade request.
@@ -238,7 +238,7 @@ GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::RequestHeaderMap& re
  * @param headers the client request headers
  * @return whether the headers were sanitized successfully
  */
-bool sanitizeConnectionHeader(Http::HeaderMap& headers);
+bool sanitizeConnectionHeader(Http::RequestHeaderMap& headers);
 
 /**
  * Get the string for the given http protocol.
@@ -278,28 +278,28 @@ const std::string resetReasonToString(const Http::StreamResetReason reset_reason
  * Changes the method to connection, moves the Upgrade to a :protocol header,
  * @param headers the headers to convert.
  */
-void transformUpgradeRequestFromH1toH2(HeaderMap& headers);
+void transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers);
 
 /**
  * Transforms the supplied headers from an HTTP/1 Upgrade response to an H2 style upgrade response.
  * Changes the 101 upgrade response to a 200 for the CONNECT response.
  * @param headers the headers to convert.
  */
-void transformUpgradeResponseFromH1toH2(HeaderMap& headers);
+void transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers);
 
 /**
  * Transforms the supplied headers from an H2 "CONNECT"-with-:protocol-header to an HTTP/1 style
  * Upgrade response.
  * @param headers the headers to convert.
  */
-void transformUpgradeRequestFromH2toH1(HeaderMap& headers);
+void transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers);
 
 /**
  * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
  * The caller is responsible for ensuring this only happens on upgraded streams.
  * @param headers the headers to convert.
  */
-void transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade);
+void transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
 
 /**
  * The non template implementation of resolveMostSpecificPerFilterConfig. see
