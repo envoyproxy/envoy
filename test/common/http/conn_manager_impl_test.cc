@@ -304,6 +304,9 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return max_stream_duration_timer_;
+  }
   bool use_srds_{};
   Router::RouteConfigProvider* routeConfigProvider() override {
     if (use_srds_) {
@@ -378,6 +381,7 @@ public:
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
+  absl::optional<std::chrono::milliseconds> max_stream_duration_timer_{};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -2396,6 +2400,24 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
   conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, StreamAliveDurationExpired) {
+  max_stream_duration_timer_ = absl::make_optional<std::chrono::milliseconds>(10);
+  setup(false, "");
+  Event::MockTimer* duration_timer = setUpTimer();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_timer_.value(), _)).Times(1);
+    conn_manager_->newStream(response_encoder_);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  EXPECT_CALL(*duration_timer, disableTimer()).Times(1);
+  duration_timer->invokeCallback();
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {

@@ -124,6 +124,9 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return absl::make_optional<std::chrono::milliseconds>({});
+  }
   Router::RouteConfigProvider* routeConfigProvider() override { return &route_config_provider_; }
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;

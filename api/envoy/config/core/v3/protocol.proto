@@ -128,7 +128,7 @@ message Http1ProtocolOptions {
   bool enable_trailers = 5;
 }
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -235,6 +235,9 @@ message Http2ProtocolOptions {
   //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12;
+
+  // Specify duration to keep alive HTTP/2 stream. If not specified, this value is not set.
+  google.protobuf.Duration max_stream_duration = 13;
 }
 
 // [#not-implemented-hide:]

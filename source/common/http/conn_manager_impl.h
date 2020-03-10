@@ -701,6 +701,8 @@ private:
     Event::TimerPtr stream_idle_timer_;
     // Per-stream request timeout.
     Event::TimerPtr request_timer_;
+    // Per-stream alive duration.
+    Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     StreamInfo::StreamInfoImpl stream_info_;
