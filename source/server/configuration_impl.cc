@@ -21,9 +21,6 @@
 #include "common/config/utility.h"
 #include "common/network/socket_option_factory.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_config_impl.h"
-#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -59,6 +56,15 @@ void FilterChainUtility::buildUdpFilterChain(
 void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
+  // In order to support dynamic configuration of tracing providers,
+  // a former server-wide HttpTracer singleton has been replaced by
+  // an HttpTracer instance per "envoy.filters.network.http_connection_manager" filter.
+  // Tracing configuration as part of bootstrap config is still supported,
+  // however, it's become mandatory to process it prior to static Listeners.
+  // Otherwise, static Listeners will be configured in assumption that
+  // tracing configuration is missing from the bootstrap config.
+  initializeTracers(bootstrap.tracing(), server);
+
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
@@ -89,7 +95,6 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   watchdog_multikill_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(watchdog, multikill_timeout, 0));
 
-  initializeTracers(bootstrap.tracing(), server);
   initializeStatsSinks(bootstrap, server);
 }
 
@@ -97,22 +102,26 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
                                  Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
+  // Default tracing configuration must be set prior to processing of static Listeners begins.
+  server.setDefaultTracingConfig(configuration);
+
   if (!configuration.has_http()) {
-    http_tracer_ = std::make_unique<Tracing::HttpNullTracer>();
     return;
   }
 
-  // Initialize tracing driver.
-  ENVOY_LOG(info, "  loading tracing driver: {}", configuration.http().name());
+  // Validating tracing configuration (minimally).
+  ENVOY_LOG(info, "  validating default server-wide tracing driver: {}",
+            configuration.http().name());
 
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(configuration.http());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
 
-  Tracing::TracerFactoryContextImpl factory_context(
-      server.serverFactoryContext(), server.messageValidationContext().staticValidationVisitor());
-  http_tracer_ = factory.createHttpTracer(*message, factory_context);
+  // Notice that the actual HttpTracer instance will be created on demand
+  // in the context of "envoy.filters.network.http_connection_manager" filter.
+  // The side effect of this is that provider-specific configuration
+  // is no longer validated in this step.
 }
 
 void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,

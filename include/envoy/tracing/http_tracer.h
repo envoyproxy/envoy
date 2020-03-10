@@ -190,7 +190,10 @@ public:
                             const Tracing::Decision tracing_decision) PURE;
 };
 
+// HttpTracerPtr is intended for use by Server::Configuration::TracerFactory implementations.
 using HttpTracerPtr = std::unique_ptr<HttpTracer>;
+// HttpTracerSharedPtr should be used wherever an HttpTracer instance is necessary.
+using HttpTracerSharedPtr = std::shared_ptr<HttpTracer>;
 
 } // namespace Tracing
 } // namespace Envoy

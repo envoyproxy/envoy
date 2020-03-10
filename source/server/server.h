@@ -267,6 +267,10 @@ public:
     return validation_context_;
   }
 
+  void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
+    http_context_.setDefaultTracingConfig(tracing_config);
+  }
+
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr

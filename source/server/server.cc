@@ -399,7 +399,6 @@ void InstanceImpl::initialize(const Options& options,
   // is constructed as part of the InstanceImpl and then populated once
   // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
-  http_context_.setTracer(config_.httpTracer());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.

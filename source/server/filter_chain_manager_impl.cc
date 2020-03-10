@@ -80,8 +80,6 @@ bool FilterChainFactoryContextImpl::healthCheckFailed() {
   return parent_context_.healthCheckFailed();
 }
 
-Tracing::HttpTracer& FilterChainFactoryContextImpl::httpTracer() { return httpContext().tracer(); }
-
 Http::Context& FilterChainFactoryContextImpl::httpContext() {
   return parent_context_.httpContext();
 }
@@ -598,7 +596,6 @@ Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.
 Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
 bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
-Tracing::HttpTracer& FactoryContextImpl::httpTracer() { return server_.httpContext().tracer(); }
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
 const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }

@@ -96,8 +96,6 @@ public:
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))} {
 
-    http_context_.setTracer(tracer_);
-
     ON_CALL(route_config_provider_, lastUpdated())
         .WillByDefault(Return(test_time_.timeSystem().systemTime()));
     ON_CALL(scoped_route_config_provider_, lastUpdated())
@@ -337,6 +335,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
+  Tracing::HttpTracerSharedPtr tracer() override { return tracer_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
@@ -348,7 +347,6 @@ public:
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
   std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   NiceMock<Router::MockScopedRouteConfigProvider> scoped_route_config_provider_;
-  NiceMock<Tracing::MockHttpTracer> tracer_;
   Stats::IsolatedStoreImpl fake_stats_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -382,6 +380,8 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_connection_;
+  std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> tracer_{
+      std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
   MockStream stream_;
@@ -812,7 +812,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   setup(false, "");
 
   auto* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
                      const Tracing::Decision) -> Tracing::Span* {
@@ -969,7 +969,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   setup(false, "");
 
   auto* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
                      const Tracing::Decision) -> Tracing::Span* {
@@ -1034,7 +1034,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   setup(false, "");
 
   auto* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
                      const Tracing::Decision) -> Tracing::Span* {
@@ -1100,7 +1100,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   setup(false, "");
 
   auto* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
                      const Tracing::Decision) -> Tracing::Span* {
@@ -1180,7 +1180,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      256});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
                      const Tracing::Decision) -> Tracing::Span* {
@@ -1261,7 +1261,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      256});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
                      const Tracing::Decision) -> Tracing::Span* {
@@ -1342,7 +1342,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      256});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _))
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
       .WillOnce(
           Invoke([&](const Tracing::Config& config, const HeaderMap&, const StreamInfo::StreamInfo&,
                      const Tracing::Decision) -> Tracing::Span* {
@@ -1689,7 +1689,7 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   // Disable tracing.
   tracing_config_.reset();
 
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _)).Times(0);
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).Times(0);
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
                                              An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillByDefault(Return(true));

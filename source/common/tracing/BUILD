@@ -53,3 +53,21 @@ envoy_cc_library(
         "//include/envoy/server:tracer_config_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "http_tracer_manager_lib",
+    srcs = [
+        "http_tracer_manager_impl.cc",
+    ],
+    hdrs = [
+        "http_tracer_manager_impl.h",
+    ],
+    deps = [
+        "//include/envoy/server:tracer_config_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/tracing:http_tracer_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/tracing:http_tracer_lib",
+    ],
+)

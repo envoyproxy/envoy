@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/http_tracer_manager.h"
 
 #include "gmock/gmock.h"
 
@@ -79,6 +80,15 @@ public:
               (const Config& config, Http::HeaderMap& request_headers,
                const std::string& operation_name, SystemTime start_time,
                const Tracing::Decision tracing_decision));
+};
+
+class MockHttpTracerManager : public HttpTracerManager {
+public:
+  MockHttpTracerManager();
+  ~MockHttpTracerManager() override;
+
+  MOCK_METHOD(HttpTracerSharedPtr, getOrCreateHttpTracer,
+              (const envoy::config::trace::v3::Tracing_Http*));
 };
 
 } // namespace Tracing

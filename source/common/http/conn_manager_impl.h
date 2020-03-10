@@ -26,6 +26,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -743,7 +744,7 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
-  Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
+  Tracing::HttpTracer& tracer() { return *config_.tracer(); }
   void handleCodecException(const char* error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::ResponseFlag> response_flag);

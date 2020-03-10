@@ -412,6 +412,10 @@ public:
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
 
+  void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
+    http_context_.setDefaultTracingConfig(tracing_config);
+  }
+
   TimeSource& timeSource() override { return time_system_; }
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -456,7 +460,6 @@ public:
   ~MockMain() override;
 
   MOCK_METHOD(Upstream::ClusterManager*, clusterManager, ());
-  MOCK_METHOD(Tracing::HttpTracer&, httpTracer, ());
   MOCK_METHOD(std::list<Stats::SinkPtr>&, statsSinks, ());
   MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, wdMissTimeout, (), (const));
@@ -520,7 +523,6 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(bool, healthCheckFailed, ());
-  MOCK_METHOD(Tracing::HttpTracer&, httpTracer, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
@@ -543,11 +545,11 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
+  testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
-  testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
