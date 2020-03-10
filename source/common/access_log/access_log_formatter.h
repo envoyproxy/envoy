@@ -217,7 +217,7 @@ public:
                       absl::optional<size_t> max_length);
 
   // FormatterProvider
-  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
                      const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo&) const override;
   ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,

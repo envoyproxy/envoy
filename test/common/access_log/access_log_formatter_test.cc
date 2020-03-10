@@ -1332,16 +1332,34 @@ TEST(AccessLogFormatterTest, GrpcStatusFormatterTest) {
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
         ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
   }
-
-  response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-  EXPECT_EQ("InvalidCode",
-            formatter.format(request_header, response_header, response_trailer, stream_info));
-  EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-              ProtoEq(ValueUtil::stringValue("InvalidCode")));
-  response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-  EXPECT_EQ("", formatter.format(request_header, response_header, response_trailer, stream_info));
-  EXPECT_THAT(formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-              ProtoEq(ValueUtil::stringValue("")));
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("InvalidCode",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue("InvalidCode")));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("", formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue("")));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("InvalidCode",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue("InvalidCode")));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("", formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(ValueUtil::stringValue("")));
+    response_header.clear();
+  }
 }
 
 void verifyJsonOutput(std::string json_string,

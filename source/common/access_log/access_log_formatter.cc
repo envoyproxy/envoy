@@ -863,26 +863,28 @@ GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
-                                        const Http::ResponseHeaderMap&,
+                                        const Http::ResponseHeaderMap& response_headers,
                                         const Http::ResponseTrailerMap& response_trailers,
                                         const StreamInfo::StreamInfo&) const {
-  const auto grpc_status_code_str = HeaderFormatter::format(response_trailers);
+  std::string grpc_status_code_str = HeaderFormatter::format(response_trailers);
+  if (grpc_status_code_str == UnspecifiedValueString) {
+    grpc_status_code_str = HeaderFormatter::format(response_headers);
+  }
   int32_t grpc_status_code;
-
   if (!absl::SimpleAtoi(grpc_status_code_str, &grpc_status_code)) {
     return UnspecifiedValueString;
   }
-
   return std::string(Grpc::Utility::grpcStatusToString(grpc_status_code));
 }
 
-ProtobufWkt::Value
-GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap& response_trailers,
-                                 const StreamInfo::StreamInfo&) const {
-  const auto grpc_status_code_str = HeaderFormatter::format(response_trailers);
+ProtobufWkt::Value GrpcStatusFormatter::formatValue(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo&) const {
+  std::string grpc_status_code_str = HeaderFormatter::format(response_trailers);
+  if (grpc_status_code_str == UnspecifiedValueString) {
+    grpc_status_code_str = HeaderFormatter::format(response_headers);
+  }
   int32_t grpc_status_code;
-
   if (!absl::SimpleAtoi(grpc_status_code_str, &grpc_status_code)) {
     return unspecifiedValue();
   }
