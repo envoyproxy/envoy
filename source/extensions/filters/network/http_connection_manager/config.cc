@@ -539,7 +539,7 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
         HttpConnectionManager&) {
   // At the moment, it is not yet possible to define tracing provider as part of
   // "envoy.filters.network.http_connection_manager" config.
-  // therefore, we always fallback to using the default server-wide tracing provider.
+  // Therefore, we always fallback to using the default server-wide tracing provider.
   if (context_.httpContext().defaultTracingConfig().has_http()) {
     return &context_.httpContext().defaultTracingConfig().http();
   }
