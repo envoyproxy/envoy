@@ -243,7 +243,7 @@ http_filters:
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
 
-  // Even though tracer provider is configured in the bootsrap config, a given filter instance
+  // Even though tracer provider is configured in the bootstrap config, a given filter instance
   // should not have a tracer associated with it.
 
   // By default, tracer must be a null object (Tracing::HttpNullTracer) rather than nullptr.
