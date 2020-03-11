@@ -11,7 +11,7 @@ trap finish EXIT
 echo "disk space at beginning of build:"
 df -h
 
-/c/windows/system32/cmd.exe /c "rmdir /s /q C:\Program Files\Git\tmp && mkdir C:\tmp && mklink /d C:\Program Files\Git\tmp C:\tmp && mklink /d D:\tmp C:\tmp"
+/c/windows/system32/cmd.exe "/c rmdir /s /q C:\Program Files\Git\tmp && mkdir C:\tmp && mklink /d C:\Program Files\Git\tmp C:\tmp && mklink /d D:\tmp C:\tmp"
 
 echo "check on the directory setup"
 ls -lah / && ls -lah /tmp
