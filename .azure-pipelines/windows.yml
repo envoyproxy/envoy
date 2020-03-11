@@ -38,12 +38,13 @@ jobs:
     #   displayName: "Resolve bash /tmp to c:\\tmp"
 
     - script: |
-        cd "C:\Program Files\Git"
         dir /n
         rmdir /s /q "tmp"
-        mkdir "C:\tmp" 2> NUL || true
+        mkdir "C:\tmp" || true
         mklink /d "tmp" "C:\tmp"
         dir /n
+      workingDirectory: "C:\\Program Files\\Git"
+      failOnStderr: false
       displayName: "Resolve bash /tmp to c:\\tmp"
 
     - bash: ci/windows_ci_steps.sh
