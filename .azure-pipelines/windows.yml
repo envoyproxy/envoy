@@ -17,21 +17,33 @@ jobs:
       env:
         TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
 
-    - bash: |
-        set -ex
-        mkdir -p /c/tmp
-        touch /c/tmp/created
-        ls -lah /c && ls -lah /c/tmp
-        # demonstrate rm not working
-        rm -rf /tmp
-        cd / && /c/windows/system32/cmd.exe "/d /c cd && dir"
-        ls -lah / && ls -lah /tmp
-        # demonstrate cmd.exe rmdir not working
-        cd / && /c/windows/system32/cmd.exe "/d /c rmdir /s /q tmp"
-        ls -lah / && ls -lah /tmp
-        # symlink /tmp to /c/tmp
-        /c/windows/system32/cmd.exe "/d /c mklink /d tmp C:\\tmp && cd && dir /n"
-        ls -lah / && ls -lah /tmp && ls -lah /c/tmp
+    # - bash: |
+    #     set -ex
+    #     /c/windows/system32/cmd.exe "/d /c help dir"
+    #     mkdir -p /c/tmp
+    #     touch /c/tmp/created
+    #     ls -lah /c && ls -lah /c/tmp
+    #     # demonstrate rm not working
+    #     rm -rf /tmp
+    #     cd / && /c/windows/system32/cmd.exe "/d /c cd && dir"
+    #     ls -lah / && ls -lah /tmp
+    #     # demonstrate cmd.exe rmdir not working
+    #     cd / && /c/windows/system32/cmd.exe "/d /c rmdir /s /q tmp"
+    #     ls -lah / && ls -lah /tmp
+    #     # symlink /tmp to /c/tmp
+    #     /c/windows/system32/cmd.exe "/d /c mklink /d tmp C:\\tmp && cd && dir"
+    #     ls -lah / && ls -lah /tmp && ls -lah /c/tmp
+    #   env:
+    #     MSYS2_ARG_CONV_EXCL: *
+    #   displayName: "Resolve bash /tmp to c:\\tmp"
+
+    - script: |
+        cd "C:\Program Files\Git"
+        dir /n
+        rmdir /s /q "tmp"
+        mkdir "C:\tmp" 2> NUL || true
+        mklink /d "tmp" "C:\tmp"
+        dir /n
       displayName: "Resolve bash /tmp to c:\\tmp"
 
     - bash: ci/windows_ci_steps.sh
