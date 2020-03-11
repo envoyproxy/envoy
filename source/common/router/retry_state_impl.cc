@@ -18,8 +18,13 @@ RetryStatePtr RetryStateImpl::create(RetryPolicy& route_policy,
                                      Runtime::RandomGenerator& random,
                                      Event::Dispatcher& dispatcher,
                                      Upstream::ResourcePriority priority) {
-  RetryStatePtr ret{new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
-                                       dispatcher, priority)};
+  RetryStatePtr ret;
+  // We short circuit here and do not bother with an allocation if there is no chance we will retry.
+  if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
+      route_policy.enabled()) {
+    ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
+                                 dispatcher, priority));
+  }
 
   request_headers.removeEnvoyRetryOn();
   request_headers.removeEnvoyRetryGrpcOn();
@@ -36,8 +41,10 @@ RetryStateImpl::RetryStateImpl(RetryPolicy& route_policy, Http::RequestHeaderMap
       retry_priority_(route_policy.retryPriority()),
       host_selection_max_attempts_(route_policy.hostSelectionMaxAttempts()),
       retry_policy_(route_policy) {
+  std::cout << "Before:" << retry_policy_.enabled() << std::endl;
   // Inject request headers to retry policy.
   retry_policy_.recordRequestHeader(request_headers);
+  std::cout << "After:" << retry_policy_.enabled() << std::endl;
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));

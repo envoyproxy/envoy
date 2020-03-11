@@ -92,7 +92,6 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
       retriable_request_headers_(
           Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_request_headers())),
       validation_visitor_(&validation_visitor) {
-
   retry_on_ = parseRetryOn(retry_policy.retry_on()).first;
   retry_on_ |= parseRetryGrpcOn(retry_policy.retry_on()).first;
 
@@ -121,9 +120,17 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
   if (retry_policy.has_retry_back_off()) {
     base_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval));
-    max_interval_ = PROTOBUF_GET_OPTIONAL_MS(retry_policy.retry_back_off(), max_interval);
+    if ((*base_interval_).count() < 1) {
+      base_interval_ = std::chrono::milliseconds(1);
+    }
 
+    max_interval_ = PROTOBUF_GET_OPTIONAL_MS(retry_policy.retry_back_off(), max_interval);
     if (max_interval_) {
+      // Apply the same rounding to max interval in case both are set to sub-millisecond values.
+      if ((*max_interval_).count() < 1) {
+        max_interval_ = std::chrono::milliseconds(1);
+      }
+
       if ((*max_interval_).count() < (*base_interval_).count()) {
         throw EnvoyException(
             "retry_policy.max_interval must greater than or equal to the base_interval");
@@ -133,6 +140,7 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
 }
 
 void RetryPolicyImpl::recordRequestHeader(Http::RequestHeaderMap& request_headers) {
+  std::cout << retry_on_ << std::endl;
   // Merge in the headers.
   if (request_headers.EnvoyRetryOn()) {
     retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().getStringView()).first;
@@ -141,6 +149,7 @@ void RetryPolicyImpl::recordRequestHeader(Http::RequestHeaderMap& request_header
     retry_on_ |=
         parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
   }
+  std::cout << retry_on_ << std::endl;
 
   if (!retriable_request_headers_.empty()) {
     // If this route limits retries by request headers, make sure there is a match.

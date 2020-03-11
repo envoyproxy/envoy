@@ -95,18 +95,13 @@ public:
   bool hedge_on_per_try_timeout_{};
 };
 
-class TestRetryPolicy : public RetryPolicy {
+class TestRetryPolicy : public CoreRetryPolicy {
 public:
   TestRetryPolicy();
   ~TestRetryPolicy() override;
 
-  // Router::RetryPolicy
-  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
-  uint32_t numRetries() const override { return num_retries_; }
+  // Router::CoreRetryPolicy
   uint32_t retryOn() const override { return retry_on_; }
-  MOCK_METHOD(std::vector<Upstream::RetryHostPredicateSharedPtr>, retryHostPredicates, (), (const));
-  MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, (), (const));
-  uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
   }
@@ -117,14 +112,26 @@ public:
     return retriable_request_headers_;
   }
 
-  MOCK_METHOD(RetryPolicyExtensionSharedPtr, retryPolicyExtension, (const Http::RequestHeaderMap&),
-              (const));
+  // Router::RetryPolicy
+  bool enabled() const override { return retry_on_ != 0; }
+  MOCK_METHOD(void, recordRequestHeader, (Http::RequestHeaderMap&));
+  MOCK_METHOD(void, recordResponseHeaders, (const Http::ResponseHeaderMap&));
+  MOCK_METHOD(void, recordReset, (Http::StreamResetReason));
+  MOCK_METHOD(bool, wouldRetryFromHeaders, (const Http::ResponseHeaderMap&), (const));
+  MOCK_METHOD(bool, wouldRetryFromReset, (Http::StreamResetReason), (const));
+  MOCK_METHOD(std::vector<Upstream::RetryHostPredicateSharedPtr>, retryHostPredicates, (), (const));
+  MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, (), (const));
 
+  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
+  uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+  uint32_t numRetries() const override { return num_retries_; }
+  uint32_t& remainingRetries() override { return remaining_retries_; }
   absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
   absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
+  uint32_t remaining_retries_{};
   uint32_t retry_on_{};
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
@@ -134,18 +141,10 @@ public:
   absl::optional<std::chrono::milliseconds> max_interval_{};
 };
 
-class MockRetryPolicyExtension : public RetryPolicyExtension {
-public:
-  MOCK_METHOD(void, recordResponseHeaders, (const Http::ResponseHeaderMap&));
-  MOCK_METHOD(void, recordReset, (Http::StreamResetReason));
-  MOCK_METHOD(bool, shouldRetry, (), (const));
-};
-
 class MockRetryPolicyFactory : public RetryPolicyFactory {
 public:
-  MOCK_METHOD(RetryPolicyExtensionSharedPtr, createRetryPolicy,
-              (const Protobuf::Message&, const Http::RequestHeaderMap&,
-               ProtobufMessage::ValidationVisitor&));
+  MOCK_METHOD(RetryPolicySharedPtr, createRetryPolicy,
+              (const Protobuf::Message&, ProtobufMessage::ValidationVisitor&));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
 
   std::string name() const override { return "envoy.test_retry_policy"; }
@@ -346,7 +345,7 @@ public:
   MOCK_METHOD(const Router::TlsContextMatchCriteria*, tlsContextMatchCriteria, (), (const));
   MOCK_METHOD(Upstream::ResourcePriority, priority, (), (const));
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
-  MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
+  MOCK_METHOD(RetryPolicy&, retryPolicy, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
