@@ -189,7 +189,7 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
     runtime_key_ = config.hidden_envoy_deprecated_runtime_key();
     default_value_.set_numerator(0);
   }
-  sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, sampled, true);
+  sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tracing_sampled, true);
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
