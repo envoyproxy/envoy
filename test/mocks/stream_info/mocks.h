@@ -89,6 +89,8 @@ public:
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
   MOCK_METHOD(const Http::RequestHeaderMap*, getRequestHeaders, (), (const));
+  MOCK_METHOD(void, setAttemptCount, (uint32_t));
+  MOCK_METHOD(uint32_t, attemptCount, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -121,6 +123,7 @@ public:
   std::string requested_server_name_;
   std::string route_name_;
   std::string upstream_transport_failure_reason_;
+  uint32_t attempt_count_{1};
 };
 
 } // namespace StreamInfo

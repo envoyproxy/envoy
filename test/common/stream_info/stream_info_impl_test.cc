@@ -175,6 +175,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     absl::string_view sni_name = "stubserver.org";
     stream_info.setRequestedServerName(sni_name);
     EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
+
+    // attempt_count
+    EXPECT_EQ(1, stream_info.attemptCount());
+    stream_info.setAttemptCount(123);
+    EXPECT_EQ(123, stream_info.attemptCount());
   }
 }
 

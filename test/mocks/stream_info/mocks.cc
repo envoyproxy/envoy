@@ -126,6 +126,10 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, upstreamTransportFailureReason())
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
+  ON_CALL(*this, setAttemptCount(_)).WillByDefault(Invoke([this](uint32_t attempt_count) {
+    attempt_count_ = attempt_count;
+  }));
+  ON_CALL(*this, attemptCount()).WillByDefault(Return(attempt_count_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

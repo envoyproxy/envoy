@@ -520,6 +520,16 @@ public:
    * @return request headers.
    */
   virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
+
+  /**
+   * @param attempt_count how many upstream attempts have occurred in a series of retries.
+   */
+  virtual void setAttemptCount(uint32_t attempt_count) PURE;
+
+  /**
+   * @return how many upstream attempts have occurred in a series of retries.
+   */
+  virtual uint32_t attemptCount() const PURE;
 };
 
 } // namespace StreamInfo

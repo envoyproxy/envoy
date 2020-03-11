@@ -1413,6 +1413,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers,
 void Filter::doRetry() {
   is_retry_ = true;
   attempt_count_++;
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
   ASSERT(pending_retries_ > 0);
   pending_retries_--;
   Http::ConnectionPool::Instance* conn_pool = getConnPool();
