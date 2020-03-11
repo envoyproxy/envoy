@@ -66,7 +66,13 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  void sampleCustomRequest(std::string&& http_error_code) {
+  void sampleGrpcRequest(std::string&& grpc_status) {
+    Http::TestResponseHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                            {"grpc-status", grpc_status}};
+    filter_->encodeHeaders(headers, true);
+  }
+
+  void sampleHttpRequest(std::string&& http_error_code) {
     Http::TestResponseHeaderMapImpl headers{{":status", http_error_code}};
     filter_->encodeHeaders(headers, true);
   }
@@ -158,10 +164,11 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
   EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
 
-  // Should continue forwarding since SR has become stale and there's no additional data.
+  // Should continue forwarding since SR has become stale and there's no additional data. This also
+  // verifies that HTTP 200s are default successes.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordSuccess());
-  sampleCustomRequest("200");
+  sampleHttpRequest("200");
 
   // Fail exactly half of the requests so we get a ~50% rejection rate.
   EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(1000));
@@ -172,7 +179,7 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   EXPECT_CALL(random_, random()).WillOnce(Return(5500));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordFailure());
-  sampleCustomRequest("503");
+  sampleHttpRequest("503");
 
   EXPECT_CALL(random_, random()).WillOnce(Return(4500));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -181,11 +188,10 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
 
 // TODO (tonya11en) more tests around logic of specifying error codes. Still WIP.
 
-TEST_F(AdmissionControlTest, ErrorCodes) {
+TEST_F(AdmissionControlTest, HttpErrorCodes) {
   const std::string yaml = R"EOF(
 default_success_criteria:
   http_status:
-    - code: OK
     - code: MovedPermanently
   grpc_status:
 )EOF";
@@ -199,27 +205,76 @@ default_success_criteria:
 
   setupFilter(config);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordSuccess());
-  sampleCustomRequest("200");
+  EXPECT_CALL(controller_, recordFailure());
+  sampleHttpRequest("200");
 
   setupFilter(config);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordSuccess());
-  sampleCustomRequest("301");
+  sampleHttpRequest("301");
 
   setupFilter(config);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordFailure());
-  sampleCustomRequest("400");
+  sampleHttpRequest("400");
 
   setupFilter(config);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(controller_, recordFailure());
-  sampleCustomRequest("500");
+  sampleHttpRequest("500");
 }
 
-// TODO(tonya11en): The intent is to fill this out with more tests after soliciting feedback on the
-// general approach.
+TEST_F(AdmissionControlTest, HttpCodeInfluence) {
+  const std::string yaml = R"EOF(
+default_success_criteria:
+  http_status:
+  grpc_status:
+    - status: PERMISSION_DENIED
+    - status: UNIMPLEMENTED
+)EOF";
+
+  auto config = makeConfig(yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
+
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  // Verify that the HTTP 200 isn't causing this request to pass as a success even though it's an
+  // unsuccessful GRPC request.
+  EXPECT_CALL(controller_, recordFailure());
+  Http::TestResponseHeaderMapImpl headers{
+      {"content-type", "application/grpc"}, {"grpc-status", "0"}, {":status", "200"}};
+  filter_->encodeHeaders(headers, true);
+}
+
+TEST_F(AdmissionControlTest, GrpcErrorCodes) {
+  const std::string yaml = R"EOF(
+default_success_criteria:
+  http_status:
+  grpc_status:
+    - status: PERMISSION_DENIED
+    - status: UNIMPLEMENTED
+)EOF";
+
+  auto config = makeConfig(yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
+
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_CALL(controller_, recordFailure());
+  sampleGrpcRequest("0");
+
+  setupFilter(config);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_CALL(controller_, recordSuccess());
+  sampleGrpcRequest("7");
+}
 
 } // namespace
 } // namespace AdmissionControl
