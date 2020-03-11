@@ -98,8 +98,6 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
-  enum class BootstrapVersion { V2 };
-
   /**
    * Default implementation of runtime loader creation used in the real server and in most
    * integration tests where a mock runtime is not needed.
@@ -115,17 +113,16 @@ public:
   static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
 
   /**
-   * Load a bootstrap config from either v1 or v2 and perform validation.
+   * Load a bootstrap config and perform validation.
    * @param bootstrap supplies the bootstrap to fill.
-   * @param config_path supplies the config path.
-   * @param v2_only supplies whether to attempt v1 fallback.
+   * @param options supplies the server options.
    * @param api reference to the Api object
    * @param validation_visitor message validation visitor instance.
-   * @return BootstrapVersion to indicate which version of the API was parsed.
    */
-  static BootstrapVersion
-  loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
-                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  const Options& options,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api);
 };
 
 /**
