@@ -32,7 +32,7 @@ option java_multiple_files = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -140,12 +140,9 @@ message VirtualHost {
 
   // Decides whether the :ref:`x-envoy-attempt-count
   // <config_http_filters_router_x-envoy-attempt-count>` header should be included
-  // in the upstream request and the downstream response.
-  // Setting this option will cause it to override any existing header
+  // in the upstream request. Setting this option will cause it to override any existing header
   // value, so in the case of two Envoys on the request path with this option enabled, the upstream
-  // will see the attempt count as perceived by the second Envoy. Similarly, if there are multiple Envoys
-  // on the response path with this option enabled, the downstream will see the attempt count
-  // as perceived by the first Envoy in the path. This field Defaults to false.
+  // will see the attempt count as perceived by the second Envoy. Defaults to false.
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
   // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
@@ -165,6 +162,16 @@ message VirtualHost {
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
+
+  // Decides whether the :ref:`x-envoy-attempt-count
+  // <config_http_filters_router_x-envoy-attempt-count>` header should be included
+  // in the downstream response. Setting this option will cause it to override any existing header
+  // value, so in the case of two Envoys on the request path with this option enabled, the downstream
+  // will see the attempt count as perceived by the Envoy directly upstream from it. Defaults to false.
+  // This header is unaffected by the
+  // :ref:`suppress_envoy_headers
+  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  bool include_respsonse_attempt_count = 19;
 }
 
 // A filter-defined action type.
