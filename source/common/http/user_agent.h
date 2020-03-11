@@ -15,6 +15,10 @@
 namespace Envoy {
 namespace Http {
 
+/**
+ * Captures the stat tokens used for recording user-agent stats. These are
+ * independent of scope.
+ */
 struct UserAgentContext {
   UserAgentContext(Stats::SymbolTable& symbol_table);
 
@@ -28,6 +32,12 @@ struct UserAgentContext {
   Stats::StatName downstream_rq_total_;
 };
 
+/**
+ * Captures the stats (counters and histograms) for user-agents. These are
+ * established within a stats scope. You must supply a UserAgentContext so that
+ * none of the symbols have to be looked up in the symbol-table in the
+ * request-path.
+ */
 struct UserAgentStats {
   UserAgentStats(Stats::StatName prefix, Stats::StatName device, Stats::Scope& scope,
                  const UserAgentContext& context);
