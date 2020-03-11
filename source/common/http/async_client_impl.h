@@ -185,6 +185,7 @@ private:
       return nullptr;
     }
     bool includeRequestAttemptCount() const override { return false; }
+    bool includeResponseAttemptCount() const override { return false; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -269,6 +270,7 @@ private:
     }
 
     bool includeRequestAttemptCount() const override { return false; }
+    bool includeResponseAttemptCount() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     Router::InternalRedirectAction internalRedirectAction() const override {
       return Router::InternalRedirectAction::PassThrough;

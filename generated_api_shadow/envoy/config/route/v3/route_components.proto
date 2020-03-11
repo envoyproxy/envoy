@@ -171,7 +171,7 @@ message VirtualHost {
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
   // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
-  bool include_respsonse_attempt_count = 19;
+  bool include_response_attempt_count = 19;
 }
 
 // A filter-defined action type.

@@ -175,6 +175,7 @@ public:
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   bool includeRequestAttemptCount() const override { return include_request_attempt_count_; }
+  bool includeResponseAttemptCount() const override { return include_response_attempt_count_; }
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
     return retry_policy_;
   }
@@ -224,6 +225,7 @@ private:
   PerFilterConfigs per_filter_configs_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const bool include_request_attempt_count_;
+  const bool include_response_attempt_count_;
   absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
   absl::optional<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
@@ -450,6 +452,7 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeRequestAttemptCount() const override { return vhost_.includeRequestAttemptCount(); }
+  bool includeResponseAttemptCount() const override { return vhost_.includeResponseAttemptCount(); }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;
@@ -572,6 +575,9 @@ private:
 
     bool includeRequestAttemptCount() const override {
       return parent_->includeRequestAttemptCount();
+    }
+    bool includeResponseAttemptCount() const override {
+      return parent_->includeResponseAttemptCount();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     InternalRedirectAction internalRedirectAction() const override {

@@ -441,6 +441,11 @@ public:
   virtual bool includeRequestAttemptCount() const PURE;
 
   /**
+   * @return bool whether to include the request count header in the downstream response.
+   */
+  virtual bool includeResponseAttemptCount() const PURE;
+
+  /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.
@@ -774,6 +779,13 @@ public:
    * @return bool whether x-envoy-attempt-count should be included on the upstream request.
    */
   virtual bool includeRequestAttemptCount() const PURE;
+
+  /**
+   * True if the virtual host this RouteEntry belongs to is configured to include the attempt
+   * count header.
+   * @return bool whether x-envoy-attempt-count should be included on the downstream response.
+   */
+  virtual bool includeResponseAttemptCount() const PURE;
 
   using UpgradeMap = std::map<std::string, bool>;
   /**
