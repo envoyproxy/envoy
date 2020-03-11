@@ -25,6 +25,7 @@
 #include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
 #include "common/router/header_formatter.h"
+#include "common/router/retry_policy_impl.h"
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
@@ -178,6 +179,10 @@ public:
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
     return retry_policy_;
   }
+  const absl::optional<envoy::config::route::v3::RetryPolicyExtension>&
+  retryPolicyExtension() const {
+    return retry_policy_extension_;
+  }
   const absl::optional<envoy::config::route::v3::HedgePolicy>& hedgePolicy() const {
     return hedge_policy_;
   }
@@ -225,67 +230,12 @@ private:
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const bool include_attempt_count_;
   absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
+  absl::optional<envoy::config::route::v3::RetryPolicyExtension> retry_policy_extension_;
   absl::optional<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
-
-/**
- * Implementation of RetryPolicy that reads from the proto route or virtual host config.
- */
-class RetryPolicyImpl : public RetryPolicy {
-
-public:
-  RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                  ProtobufMessage::ValidationVisitor& validation_visitor);
-  RetryPolicyImpl() = default;
-
-  // Router::RetryPolicy
-  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
-  uint32_t numRetries() const override { return num_retries_; }
-  uint32_t retryOn() const override { return retry_on_; }
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
-  Upstream::RetryPrioritySharedPtr retryPriority() const override;
-  uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
-  const std::vector<uint32_t>& retriableStatusCodes() const override {
-    return retriable_status_codes_;
-  }
-  const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
-    return retriable_headers_;
-  }
-  const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
-    return retriable_request_headers_;
-  }
-  absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
-  absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
-  RetryPolicyExtensionSharedPtr
-  retryPolicyExtension(const Http::RequestHeaderMap& request_header) const override;
-
-private:
-  std::chrono::milliseconds per_try_timeout_{0};
-  // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
-  // set) so that when retries get enabled through the x-envoy-retry-on header we default to 1
-  // retry.
-  uint32_t num_retries_{1};
-  uint32_t retry_on_{};
-  // Each pair contains the name and config proto to be used to create the RetryHostPredicates
-  // that should be used when with this policy.
-  std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
-      retry_host_predicate_configs_;
-  Upstream::RetryPrioritySharedPtr retry_priority_;
-  // Name and config proto to use to create the RetryPriority to use with this policy. Default
-  // initialized when no RetryPriority should be used.
-  std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
-  std::pair<RetryPolicyFactory*, ProtobufTypes::MessagePtr> retry_policy_config_;
-  uint32_t host_selection_attempts_{1};
-  std::vector<uint32_t> retriable_status_codes_;
-  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
-  std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
-  absl::optional<std::chrono::milliseconds> base_interval_;
-  absl::optional<std::chrono::milliseconds> max_interval_;
-  ProtobufMessage::ValidationVisitor* validation_visitor_{};
-};
 
 /**
  * Implementation of ShadowPolicy that reads from the proto route config.
@@ -429,7 +379,7 @@ public:
   }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-  const RetryPolicy& retryPolicy() const override { return retry_policy_; }
+  RetryPolicy& retryPolicy() const override { return *retry_policy_; }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
@@ -528,7 +478,7 @@ private:
     const HedgePolicy& hedgePolicy() const override { return parent_->hedgePolicy(); }
     Upstream::ResourcePriority priority() const override { return parent_->priority(); }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
-    const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
+    RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
     const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
       return parent_->shadowPolicies();
@@ -662,10 +612,16 @@ private:
   buildHedgePolicy(const absl::optional<envoy::config::route::v3::HedgePolicy>& vhost_hedge_policy,
                    const envoy::config::route::v3::RouteAction& route_config) const;
 
-  RetryPolicyImpl
+  RetryPolicySharedPtr
   buildRetryPolicy(const absl::optional<envoy::config::route::v3::RetryPolicy>& vhost_retry_policy,
+                   const absl::optional<envoy::config::route::v3::RetryPolicyExtension>&
+                       vhost_retry_policy_extension,
                    const envoy::config::route::v3::RouteAction& route_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) const;
+
+  RetryPolicySharedPtr buildRetryPolicyExtension(
+      const envoy::config::route::v3::RetryPolicyExtension& retry_policy_extension,
+      ProtobufMessage::ValidationVisitor& validation_visitor) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
@@ -692,7 +648,7 @@ private:
   const std::string prefix_rewrite_redirect_;
   const bool strip_query_;
   const HedgePolicyImpl hedge_policy_;
-  const RetryPolicyImpl retry_policy_;
+  RetryPolicySharedPtr retry_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   const Upstream::ResourcePriority priority_;

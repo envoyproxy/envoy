@@ -303,10 +303,10 @@ FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
   } else if (target_header == Http::Headers::get().EnvoyMaxRetries) {
     return isInteger(headers.EnvoyMaxRetries());
   } else if (target_header == Http::Headers::get().EnvoyRetryOn) {
-    return hasValidRetryFields(headers.EnvoyRetryOn(), &Router::RetryStateImpl::parseRetryOn);
+    return hasValidRetryFields(headers.EnvoyRetryOn(), &Router::RetryPolicyImpl::parseRetryOn);
   } else if (target_header == Http::Headers::get().EnvoyRetryGrpcOn) {
     return hasValidRetryFields(headers.EnvoyRetryGrpcOn(),
-                               &Router::RetryStateImpl::parseRetryGrpcOn);
+                               &Router::RetryPolicyImpl::parseRetryGrpcOn);
   }
   // Should only validate headers for which we have implemented a validator.
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1443,7 +1443,7 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 }
 
 RetryStatePtr
-ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+ProdFilter::createRetryState(RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                              Upstream::ResourcePriority priority) {

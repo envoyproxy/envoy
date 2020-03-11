@@ -393,7 +393,7 @@ private:
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
-  virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
+  virtual RetryStatePtr createRetryState(RetryPolicy& policy,
                                          Http::RequestHeaderMap& request_headers,
                                          const Upstream::ClusterInfo& cluster,
                                          Runtime::Loader& runtime, Runtime::RandomGenerator& random,
@@ -492,7 +492,7 @@ public:
 
 private:
   // Filter
-  RetryStatePtr createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+  RetryStatePtr createRetryState(RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                                  const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                  Upstream::ResourcePriority priority) override;

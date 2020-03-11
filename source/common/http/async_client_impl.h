@@ -126,18 +126,8 @@ private:
         rate_limit_policy_entry_;
   };
 
-  struct NullRetryPolicy : public Router::RetryPolicy {
-    // Router::RetryPolicy
-    std::chrono::milliseconds perTryTimeout() const override {
-      return std::chrono::milliseconds(0);
-    }
-    std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
-      return {};
-    }
-    Upstream::RetryPrioritySharedPtr retryPriority() const override { return {}; }
-
-    uint32_t hostSelectionMaxAttempts() const override { return 1; }
-    uint32_t numRetries() const override { return 1; }
+  struct NullRetryPolicy : public Router::CoreRetryPolicy {
+    // Router::CoreRetryPolicy
     uint32_t retryOn() const override { return 0; }
     const std::vector<uint32_t>& retriableStatusCodes() const override {
       return retriable_status_codes_;
@@ -148,15 +138,31 @@ private:
     const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
       return retriable_request_headers_;
     }
+
+    // Router::RetryPolicy
+    bool enabled() const override { return true; }
+    void recordRequestHeader(Http::RequestHeaderMap&) override {}
+    void recordResponseHeaders(const Http::ResponseHeaderMap&) override {}
+    void recordReset(Http::StreamResetReason) override {}
+    bool wouldRetryFromHeaders(const Http::ResponseHeaderMap&) const override { return false; }
+    bool wouldRetryFromReset(Http::StreamResetReason) const override { return false; }
+    std::chrono::milliseconds perTryTimeout() const override {
+      return std::chrono::milliseconds(0);
+    }
+    std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
+      return {};
+    }
+    Upstream::RetryPrioritySharedPtr retryPriority() const override { return {}; }
+    uint32_t hostSelectionMaxAttempts() const override { return 1; }
+    uint32_t numRetries() const override { return 1; }
+    uint32_t& remainingRetries() override { return remaining_retries_; }
+
     absl::optional<std::chrono::milliseconds> baseInterval() const override {
       return absl::nullopt;
     }
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
-    Router::RetryPolicyExtensionSharedPtr
-    retryPolicyExtension(const Http::RequestHeaderMap&) const override {
-      return {};
-    }
 
+    uint32_t remaining_retries_{1};
     const std::vector<uint32_t> retriable_status_codes_{};
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_{};
@@ -229,7 +235,7 @@ private:
       return Upstream::ResourcePriority::Default;
     }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-    const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -280,9 +286,9 @@ private:
     uint32_t maxInternalRedirects() const override { return 1; }
     const std::string& routeName() const override { return route_name_; }
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
+    static NullRetryPolicy retry_policy_;
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
-    static const NullRetryPolicy retry_policy_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;

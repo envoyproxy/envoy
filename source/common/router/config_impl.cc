@@ -72,111 +72,6 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& he
 
 HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
 
-RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor)
-    : retriable_headers_(
-          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_headers())),
-      retriable_request_headers_(
-          Http::HeaderUtility::buildHeaderMatcherVector(retry_policy.retriable_request_headers())),
-      validation_visitor_(&validation_visitor) {
-  per_try_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
-  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on()).first;
-  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on()).first;
-
-  for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-        host_predicate);
-    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate,
-                                                                   validation_visitor, factory);
-    retry_host_predicate_configs_.emplace_back(factory, std::move(config));
-  }
-
-  const auto& retry_priority = retry_policy.retry_priority();
-  if (!retry_priority.name().empty()) {
-    auto& factory =
-        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(retry_priority);
-    retry_priority_config_ =
-        std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
-                                     retry_priority, validation_visitor, factory));
-  }
-
-  auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
-  if (host_selection_attempts) {
-    host_selection_attempts_ = host_selection_attempts;
-  }
-
-  for (auto code : retry_policy.retriable_status_codes()) {
-    retriable_status_codes_.emplace_back(code);
-  }
-
-  if (retry_policy.has_retry_back_off()) {
-    base_interval_ = std::chrono::milliseconds(
-        PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval));
-    if ((*base_interval_).count() < 1) {
-      base_interval_ = std::chrono::milliseconds(1);
-    }
-
-    max_interval_ = PROTOBUF_GET_OPTIONAL_MS(retry_policy.retry_back_off(), max_interval);
-    if (max_interval_) {
-      // Apply the same rounding to max interval in case both are set to sub-millisecond values.
-      if ((*max_interval_).count() < 1) {
-        max_interval_ = std::chrono::milliseconds(1);
-      }
-
-      if ((*max_interval_).count() < (*base_interval_).count()) {
-        throw EnvoyException(
-            "retry_policy.max_interval must greater than or equal to the base_interval");
-      }
-    }
-  }
-
-  if (retry_policy.has_typed_config()) {
-    const std::string type{
-        TypeUtil::typeUrlToDescriptorFullName(retry_policy.typed_config().type_url())};
-    RetryPolicyFactory* factory =
-        Registry::FactoryRegistry<RetryPolicyFactory>::getFactoryByType(type);
-
-    if (factory == nullptr) {
-      throw EnvoyException(
-          fmt::format("Didn't find a registered implementation for type: '{}'", type));
-    }
-    retry_policy_config_ =
-        std::make_pair(factory, Envoy::Config::Utility::translateAnyToFactoryConfig(
-                                    retry_policy, validation_visitor, *factory));
-  }
-}
-
-std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
-  std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
-
-  for (const auto& config : retry_host_predicate_configs_) {
-    predicates.emplace_back(config.first.createHostPredicate(*config.second, num_retries_));
-  }
-
-  return predicates;
-}
-
-Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
-  if (retry_priority_config_.first == nullptr) {
-    return nullptr;
-  }
-
-  return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
-                                                           *validation_visitor_, num_retries_);
-}
-
-RetryPolicyExtensionSharedPtr
-RetryPolicyImpl::retryPolicyExtension(const Http::RequestHeaderMap& request_header) const {
-  if (retry_policy_config_.first == nullptr) {
-    return nullptr;
-  }
-
-  return retry_policy_config_.first->createRetryPolicy(*retry_policy_config_.second, request_header,
-                                                       *validation_visitor_);
-}
-
 CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,
                                Runtime::Loader& loader)
     : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
@@ -297,7 +192,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
-      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(), validator)),
+      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), vhost.retryPolicyExtension(),
+                                     route.route(), validator)),
       rate_limit_policy_(route.route().rate_limits()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
@@ -713,22 +609,49 @@ HedgePolicyImpl RouteEntryImplBase::buildHedgePolicy(
   return HedgePolicyImpl();
 }
 
-RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
+RetryPolicySharedPtr RouteEntryImplBase::buildRetryPolicy(
     const absl::optional<envoy::config::route::v3::RetryPolicy>& vhost_retry_policy,
+    const absl::optional<envoy::config::route::v3::RetryPolicyExtension>&
+        vhost_retry_policy_extension,
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor) const {
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
-    return RetryPolicyImpl(route_config.retry_policy(), validation_visitor);
+    return std::make_shared<RetryPolicyImpl>(route_config.retry_policy(), validation_visitor);
+  }
+
+  if (route_config.has_retry_policy_extension()) {
+    return buildRetryPolicyExtension(route_config.retry_policy_extension(), validation_visitor);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
   if (vhost_retry_policy) {
-    return RetryPolicyImpl(vhost_retry_policy.value(), validation_visitor);
+    return std::make_shared<RetryPolicyImpl>(vhost_retry_policy.value(), validation_visitor);
+  }
+
+  if (vhost_retry_policy_extension) {
+    return buildRetryPolicyExtension(vhost_retry_policy_extension.value(), validation_visitor);
   }
 
   // Otherwise, an empty policy will do.
-  return RetryPolicyImpl();
+  return std::make_shared<RetryPolicyImpl>();
+}
+
+RetryPolicySharedPtr RouteEntryImplBase::buildRetryPolicyExtension(
+    const envoy::config::route::v3::RetryPolicyExtension& retry_policy_extension,
+    ProtobufMessage::ValidationVisitor& validation_visitor) const {
+  const std::string type{
+      TypeUtil::typeUrlToDescriptorFullName(retry_policy_extension.typed_config().type_url())};
+  RetryPolicyFactory* factory =
+      Registry::FactoryRegistry<RetryPolicyFactory>::getFactoryByType(type);
+
+  if (factory == nullptr) {
+    throw EnvoyException(
+        fmt::format("Didn't find a registered implementation for type: '{}'", type));
+  }
+  return factory->createRetryPolicy(*Envoy::Config::Utility::translateAnyToFactoryConfig(
+                                        retry_policy_extension, validation_visitor, *factory),
+                                    validation_visitor);
 }
 
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::config::route::v3::Route& route) {
@@ -984,6 +907,9 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
   // Retry and Hedge policies must be set before routes, since they may use them.
   if (virtual_host.has_retry_policy()) {
     retry_policy_ = virtual_host.retry_policy();
+  }
+  if (virtual_host.has_retry_policy_extension()) {
+    retry_policy_extension_ = virtual_host.retry_policy_extension();
   }
   if (virtual_host.has_hedge_policy()) {
     hedge_policy_ = virtual_host.hedge_policy();

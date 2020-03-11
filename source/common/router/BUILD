@@ -38,6 +38,7 @@ envoy_cc_library(
         ":header_parser_lib",
         ":metadatamatchcriteria_lib",
         ":retry_state_lib",
+        ":retry_policy_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
         "//include/envoy/config:typed_metadata_interface",
@@ -225,6 +226,25 @@ envoy_cc_library(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "retry_policy_lib",
+    srcs = ["retry_policy_impl.cc"],
+    hdrs = ["retry_policy_impl.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/router:router_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
