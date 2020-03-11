@@ -93,7 +93,8 @@ static void createWasmInternal(const VmConfig& vm_config, PluginSharedPtr plugin
                                Stats::ScopeSharedPtr scope,
                                Upstream::ClusterManager& cluster_manager,
                                Init::Manager& init_manager, Event::Dispatcher& dispatcher,
-                               Api::Api& api, std::unique_ptr<Context> root_context_for_testing,
+                               Runtime::RandomGenerator& random, Api::Api& api,
+                               std::unique_ptr<Context> root_context_for_testing,
                                Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                                CreateWasmCallback&& cb) {
   std::string source, code;
@@ -130,7 +131,8 @@ static void createWasmInternal(const VmConfig& vm_config, PluginSharedPtr plugin
 
   if (vm_config.code().has_remote()) {
     remote_data_provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
-        cluster_manager, init_manager, vm_config.code().remote(), true, std::move(callback));
+        cluster_manager, init_manager, vm_config.code().remote(), dispatcher, random, true,
+        std::move(callback));
   } else if (vm_config.code().has_local()) {
     callback(code);
   } else {
@@ -140,21 +142,23 @@ static void createWasmInternal(const VmConfig& vm_config, PluginSharedPtr plugin
 
 void createWasm(const VmConfig& vm_config, PluginSharedPtr plugin, Stats::ScopeSharedPtr scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-                Event::Dispatcher& dispatcher, Api::Api& api,
+                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random, Api::Api& api,
                 Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                 CreateWasmCallback&& cb) {
-  createWasmInternal(vm_config, plugin, scope, cluster_manager, init_manager, dispatcher, api,
-                     nullptr /* root_context_for_testing */, remote_data_provider, std::move(cb));
+  createWasmInternal(vm_config, plugin, scope, cluster_manager, init_manager, dispatcher, random,
+                     api, nullptr /* root_context_for_testing */, remote_data_provider,
+                     std::move(cb));
 }
 
 void createWasmForTesting(const VmConfig& vm_config, PluginSharedPtr plugin,
                           Stats::ScopeSharedPtr scope, Upstream::ClusterManager& cluster_manager,
-                          Init::Manager& init_manager, Event::Dispatcher& dispatcher, Api::Api& api,
+                          Init::Manager& init_manager, Event::Dispatcher& dispatcher,
+                          Runtime::RandomGenerator& random, Api::Api& api,
                           std::unique_ptr<Context> root_context_for_testing,
                           Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                           CreateWasmCallback&& cb) {
-  createWasmInternal(vm_config, plugin, scope, cluster_manager, init_manager, dispatcher, api,
-                     std::move(root_context_for_testing), remote_data_provider, std::move(cb));
+  createWasmInternal(vm_config, plugin, scope, cluster_manager, init_manager, dispatcher, random,
+                     api, std::move(root_context_for_testing), remote_data_provider, std::move(cb));
 }
 
 WasmHandleSharedPtr getOrCreateThreadLocalWasm(WasmHandleSharedPtr base_wasm,

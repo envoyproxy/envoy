@@ -80,7 +80,8 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 // be shared by APIs (e.g. HTTP Filter + AccessLog).
 void createWasm(const VmConfig& vm_config, PluginSharedPtr plugin_config,
                 Stats::ScopeSharedPtr scope, Upstream::ClusterManager& cluster_manager,
-                Init::Manager& init_manager, Event::Dispatcher& dispatcher, Api::Api& api,
+                Init::Manager& init_manager, Event::Dispatcher& dispatcher,
+                Runtime::RandomGenerator& random, Api::Api& api,
                 Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                 CreateWasmCallback&& cb);
 
@@ -90,7 +91,8 @@ WasmHandleSharedPtr createThreadLocalWasm(WasmHandle& base_wasm_handle, PluginSh
 
 void createWasmForTesting(const VmConfig& vm_config, PluginSharedPtr plugin,
                           Stats::ScopeSharedPtr scope, Upstream::ClusterManager& cluster_manager,
-                          Init::Manager& init_manager, Event::Dispatcher& dispatcher, Api::Api& api,
+                          Init::Manager& init_manager, Event::Dispatcher& dispatcher,
+                          Runtime::RandomGenerator& random, Api::Api& api,
                           std::unique_ptr<Context> root_context_for_testing,
                           Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                           CreateWasmCallback&& cb);
