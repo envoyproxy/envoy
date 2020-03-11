@@ -175,7 +175,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!encode_complete_);
   encode_complete_ = end_stream;
 
-  if (!request_encoder_) {
+  if (!upstream_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks_, data.length());
     if (!buffered_request_body_) {
       buffered_request_body_ = std::make_unique<Buffer::WatermarkBuffer>(
@@ -190,7 +190,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
 
     ENVOY_STREAM_LOG(trace, "proxying {} bytes", *parent_.callbacks_, data.length());
     stream_info_.addBytesSent(data.length());
-    request_encoder_->encodeData(data, end_stream);
+    upstream_->encodeData(data, end_stream);
     if (end_stream) {
       upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
     }
@@ -202,27 +202,27 @@ void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   encode_complete_ = true;
   encode_trailers_ = true;
 
-  if (!request_encoder_) {
+  if (!upstream_) {
     ENVOY_STREAM_LOG(trace, "buffering trailers", *parent_.callbacks_);
   } else {
     ASSERT(downstream_metadata_map_vector_.empty());
 
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
-    request_encoder_->encodeTrailers(trailers);
+    upstream_->encodeTrailers(trailers);
     upstream_timing_.onLastUpstreamTxByteSent(parent_.callbacks_->dispatcher().timeSource());
   }
 }
 
 void UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
-  if (!request_encoder_) {
-    ENVOY_STREAM_LOG(trace, "request_encoder_ not ready. Store metadata_map to encode later: {}",
+  if (!upstream_) {
+    ENVOY_STREAM_LOG(trace, "upstream_ not ready. Store metadata_map to encode later: {}",
                      *parent_.callbacks_, *metadata_map_ptr);
     downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
   } else {
     ENVOY_STREAM_LOG(trace, "Encode metadata: {}", *parent_.callbacks_, *metadata_map_ptr);
     Http::MetadataMapVector metadata_map_vector;
     metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
-    request_encoder_->encodeMetadata(metadata_map_vector);
+    upstream_->encodeMetadata(metadata_map_vector);
   }
 }
 
@@ -259,15 +259,14 @@ void UpstreamRequest::resetStream() {
 
   if (conn_pool_stream_handle_) {
     ENVOY_STREAM_LOG(debug, "cancelling pool request", *parent_.callbacks_);
-    ASSERT(!request_encoder_);
+    ASSERT(!upstream_);
     conn_pool_stream_handle_->cancel();
     conn_pool_stream_handle_ = nullptr;
   }
 
-  if (request_encoder_) {
+  if (upstream_) {
     ENVOY_STREAM_LOG(debug, "resetting pool request", *parent_.callbacks_);
-    request_encoder_->getStream().removeCallbacks(*this);
-    request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+    upstream_->resetStream();
     clearRequestEncoder();
   }
 }
@@ -324,7 +323,6 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
   onUpstreamHostSelected(host);
-  request_encoder.getStream().addCallbacks(*this);
 
   stream_info_.setUpstreamLocalAddress(request_encoder.getStream().connectionLocalAddress());
   parent_.callbacks_->streamInfo().setUpstreamLocalAddress(
@@ -396,7 +394,7 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
 }
 
 void UpstreamRequest::setRequestEncoder(Http::RequestEncoder& request_encoder) {
-  request_encoder_ = &request_encoder;
+  upstream_.reset(new HttpUpstream(*this, &request_encoder));
   // Now that there is an encoder, have the connection manager inform the manager when the
   // downstream buffers are overrun. This may result in immediate watermark callbacks referencing
   // the encoder.
@@ -405,14 +403,14 @@ void UpstreamRequest::setRequestEncoder(Http::RequestEncoder& request_encoder) {
 
 void UpstreamRequest::clearRequestEncoder() {
   // Before clearing the encoder, unsubscribe from callbacks.
-  if (request_encoder_) {
+  if (upstream_) {
     parent_.callbacks_->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
   }
-  request_encoder_ = nullptr;
+  upstream_.reset();
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
-  ASSERT(parent_.request_encoder_);
+  ASSERT(parent_.upstream_);
 
   // There are two states we should get this callback in: 1) the watermark was
   // hit due to writes from a different filter instance over a shared
@@ -426,16 +424,16 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // If there are multiple calls to readDisable either the codec (H2) or the underlying
   // Network::Connection (H1) will handle reference counting.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
-  parent_.request_encoder_->getStream().readDisable(true);
+  parent_.upstream_->readDisable(true);
 }
 
 void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
-  ASSERT(parent_.request_encoder_);
+  ASSERT(parent_.upstream_);
 
   // One source of connection blockage has buffer available. Pass this on to the stream, which
   // will resume reads if this was the last remaining high watermark.
   parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
-  parent_.request_encoder_->getStream().readDisable(false);
+  parent_.upstream_->readDisable(false);
 }
 
 void UpstreamRequest::disableDataFromDownstreamForFlowControl() {

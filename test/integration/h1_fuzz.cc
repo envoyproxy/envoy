@@ -10,9 +10,14 @@
 
 namespace Envoy {
 
-void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase& input) {
-  initialize();
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase& input,
+                                   bool ignore_response) {
+  PERSISTENT_FUZZ_VAR bool initialized = [this]() -> bool {
+    initialize();
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+    return true;
+  }();
+  UNREFERENCED_PARAMETER(initialized);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
   FakeRawConnectionPtr fake_upstream_connection;
   for (int i = 0; i < input.events().size(); ++i) {
@@ -31,6 +36,9 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
       // TODO(htuch): Should we wait for some data?
       break;
     case test::integration::Event::kUpstreamSendBytes:
+      if (ignore_response) {
+        break;
+      }
       if (fake_upstream_connection == nullptr) {
         if (!fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection, max_wait_ms_)) {
           // If we timed out, we fail out.

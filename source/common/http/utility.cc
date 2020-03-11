@@ -212,7 +212,7 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   return cookie_value;
 }
 
-uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
+uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.Status()->value().getStringView(), &response_code)) {
@@ -221,7 +221,7 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   return response_code;
 }
 
-bool Utility::isUpgrade(const HeaderMap& headers) {
+bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
   // In firefox the "Connection" request header value is "keep-alive, Upgrade",
   // we should check if it contains the "Upgrade" token.
   return (headers.Connection() && headers.Upgrade() &&
@@ -229,7 +229,7 @@ bool Utility::isUpgrade(const HeaderMap& headers) {
                                            Http::Headers::get().ConnectionValues.Upgrade.c_str()));
 }
 
-bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
+bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
   return headers.Method() &&
          headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect &&
          headers.Protocol() && !headers.Protocol()->value().empty();
@@ -393,7 +393,7 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   }
 }
 
-bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
+bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
   static const size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
   static const size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
 
@@ -602,7 +602,7 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
+void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
   ASSERT(Utility::isUpgrade(headers));
 
   const HeaderString& upgrade = headers.Upgrade()->value();
@@ -618,7 +618,7 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
   }
 }
 
-void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
+void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
     headers.setStatus(200);
   }
@@ -630,7 +630,7 @@ void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   }
 }
 
-void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
+void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
   const HeaderString& protocol = headers.Protocol()->value();
@@ -640,7 +640,8 @@ void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
   headers.removeProtocol();
 }
 
-void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
+void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
+                                                 absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
     headers.setUpgrade(upgrade);
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);

@@ -367,17 +367,10 @@ def _io_opentracing_cpp():
     )
 
 def _com_lightstep_tracer_cpp():
-    location = REPOSITORY_LOCATIONS["com_lightstep_tracer_cpp"]
     _repository_impl("com_lightstep_tracer_cpp")
-    http_archive(
-        name = "com_lightstep_tracer_cpp",
-        patch_args = ["-p0"],
-        patches = ["@envoy//bazel/foreign_cc:com_lightstep_tracer_cpp.patch"],
-        **location
-    )
     native.bind(
         name = "lightstep",
-        actual = "@com_lightstep_tracer_cpp//:lightstep_tracer",
+        actual = "@com_lightstep_tracer_cpp//:manual_tracer_lib",
     )
 
 def _com_github_datadog_dd_opentracing_cpp():

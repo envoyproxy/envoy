@@ -7,6 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/mutex_tracer.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/context.h"
@@ -241,6 +242,17 @@ public:
    * @return Configuration::TransportSocketFactoryContext& factory context for transport sockets.
    */
   virtual Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() PURE;
+
+  /**
+   * Set the default server-wide tracer provider configuration that will be used as a fallback
+   * if an "envoy.filters.network.http_connection_manager" filter that has tracing enabled doesn't
+   * define a tracer provider in-place.
+   *
+   * Once deprecation window for the tracer provider configuration in the bootstrap config is over,
+   * this method will no longer be necessary.
+   */
+  virtual void
+  setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) PURE;
 };
 
 } // namespace Server
