@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.udp.dns_filter.v3;
+package envoy.config.filter.udp.dns_filter.v3;
 
 import "envoy/config/core/v3/base.proto";
 
@@ -10,12 +10,12 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.udp.dns_filter.v3";
+option java_package = "io.envoyproxy.envoy.config.filter.udp.dns_filter.v3";
 option java_outer_classname = "DnsFilterProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: DNS Filter]
-// UDP proxy :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.
+// DNS Filter :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.
 // [#extension: envoy.filters.udp_listener.dns_filter]
 
 // Configuration for the DNS filter.
@@ -47,7 +47,7 @@ message DnsFilterConfig {
         "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.DnsVirtualDomain";
 
     // The domain name for which Envoy will respond to query requests
-    string name = 1 [(validate.rules).string = {min_len: 2}];
+    string name = 1 [(validate.rules).string = {min_len: 2 well_known_regex: HTTP_HEADER_NAME}];
 
     // The configuration containing the method to determine the address
     // of this endpoint
@@ -70,7 +70,7 @@ message DnsFilterConfig {
     repeated DnsVirtualDomain virtual_domains = 2 [(validate.rules).repeated = {min_items: 1}];
 
     // Seed the virtual domain configuration from an external path
-    config.core.v3.DataSource virtual_domain_cfg = 4;
+    core.v3.DataSource virtual_domain_cfg = 4;
   }
 
   // The stat prefix used when emitting DNS filter stats.
