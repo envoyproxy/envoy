@@ -12,11 +12,11 @@ echo "disk space at beginning of build:"
 df -h
 
 pushd /
-/c/windows/system32/cmd.exe "/c cd"
-/c/windows/system32/cmd.exe "/c dir"
-/c/windows/system32/cmd.exe "/c rmdir /s /q tmp"
-/c/windows/system32/cmd.exe "/c mkdir D:\tmp"
-/c/windows/system32/cmd.exe "/c mklink /d tmp D:\tmp"
+/c/windows/system32/cmd.exe "/c" "cd"
+/c/windows/system32/cmd.exe "/c" "dir"
+/c/windows/system32/cmd.exe "/c" "rmdir /s /q tmp"
+/c/windows/system32/cmd.exe "/c" "mkdir D:\tmp"
+/c/windows/system32/cmd.exe "/c" "mklink /d tmp D:\tmp"
 popd
 
 echo "check on the directory setup"
