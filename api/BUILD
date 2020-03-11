@@ -163,11 +163,8 @@ proto_library(
         "//envoy/extensions/common/tap/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg",
-<<<<<<< HEAD
         "//envoy/extensions/filters/http/admission_control/v3alpha:pkg",
-=======
         "//envoy/extensions/filters/http/aws_lambda/v3:pkg",
->>>>>>> upstream/master
         "//envoy/extensions/filters/http/aws_request_signing/v3:pkg",
         "//envoy/extensions/filters/http/buffer/v3:pkg",
         "//envoy/extensions/filters/http/cache/v3alpha:pkg",
