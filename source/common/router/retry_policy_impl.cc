@@ -2,14 +2,14 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
-#include "common/config/utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/http/header_utility.h"
 
 namespace Envoy {
 namespace Router {

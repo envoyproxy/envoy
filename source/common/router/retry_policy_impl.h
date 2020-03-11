@@ -1,8 +1,7 @@
 #pragma once
 
-#include "envoy/router/router.h"
-
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/router/router.h"
 
 namespace Envoy {
 namespace Router {
