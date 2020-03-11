@@ -43,11 +43,11 @@ fault configuration. The currently supported header controls are:
 * Request delay configuration via the *x-envoy-fault-delay-request* header. The header value
   should be an integer that specifies the number of milliseconds to throttle the latency for.
   In order for the header to work, :ref:`header_delay
-  <envoy_api_field_config.filter.common.fault.v2.FaultDelay.header_delay>` needs to be set.
+  <envoy_api_field_config.filter.http.fault.v2.FaultDelay.header_delay>` needs to be set.
 * Response rate limit configuration via the *x-envoy-fault-throughput-response* header. The
   header value should be an integer that specified the limit in KiB/s and must be > 0. In order
   for the header to work, :ref:`header_limit
-  <envoy_api_field_config.filter.common.fault.v2.FaultRateLimit.header_limit>` needs to be set.
+  <envoy_api_field_config.filter.http.fault.v2.FaultRateLimit.header_limit>` needs to be set.
 
 .. attention::
 
