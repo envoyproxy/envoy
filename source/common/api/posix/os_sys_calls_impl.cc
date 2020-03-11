@@ -66,6 +66,7 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
 }
 
 bool OsSysCallsImpl::supportMmsg() const {
+  std::cerr << "============ OsSysCallsImpl:supportMmsg\n";
 #if ENVOY_MMSG_MORE
   return true;
 #else

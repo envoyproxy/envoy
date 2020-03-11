@@ -364,6 +364,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 }
 
 bool IoSocketHandleImpl::supportMmsg() const {
+  std::cerr << "========= IoSocketHandleImpl::supportMmsg\n";
   return Api::OsSysCallsSingleton::get().supportMmsg();
 }
 
