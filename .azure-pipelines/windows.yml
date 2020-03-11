@@ -41,7 +41,7 @@ jobs:
         mkdir "C:\tmp" || true
         dir /n
         rmdir /s /q "tmp"
-        mklink /d "tmp" "C:\tmp"
+        mklink /j "tmp" "C:\tmp"
         dir /n
         rmdir /s /q "D:\tmp"
         mklink /j "D:\tmp" "C:\tmp"
