@@ -20,16 +20,17 @@ jobs:
     - bash: |
         set -ex
         mkdir -p /c/tmp
+        touch /c/tmp/created
         ls -lah /c && ls -lah /c/tmp
         # demonstrate rm not working
         rm -rf /tmp
-        cd / && cmd.exe "/c cd && dir"
+        cd / && /c/windows/system32/cmd.exe "/d /c cd && dir"
         ls -lah / && ls -lah /tmp
         # demonstrate cmd.exe rmdir not working
-        cd / && cmd.exe "/c rmdir /s /q tmp"
+        cd / && /c/windows/system32/cmd.exe "/d /c rmdir /s /q tmp"
         ls -lah / && ls -lah /tmp
         # symlink /tmp to /c/tmp
-        cmd.exe "/c mklink /d tmp C:\\tmp && cd && dir"
+        /c/windows/system32/cmd.exe "/d /c mklink /d tmp C:\\tmp && cd && dir /n"
         ls -lah / && ls -lah /tmp && ls -lah /c/tmp
       displayName: "Resolve bash /tmp to c:\\tmp"
 
