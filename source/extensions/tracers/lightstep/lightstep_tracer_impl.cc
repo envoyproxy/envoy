@@ -141,6 +141,8 @@ LightStepDriver::TlsLightStepTracer::TlsLightStepTracer(
   enableTimer();
 }
 
+LightStepDriver::TlsLightStepTracer::~TlsLightStepTracer() { flush_timer_->disableTimer(); }
+
 lightstep::LightStepTracer& LightStepDriver::TlsLightStepTracer::tracer() { return *tracer_; }
 
 void LightStepDriver::TlsLightStepTracer::enableTimer() {

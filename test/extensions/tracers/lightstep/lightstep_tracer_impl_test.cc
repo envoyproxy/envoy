@@ -450,6 +450,16 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   driver_.reset();
 }
 
+TEST_F(LightStepDriverTest, DisableFlushTimerOnDestruction) {
+  setupValidDriver();
+
+  // Must disable flush timer on destruction.
+  EXPECT_CALL(*timer_, disableTimer());
+
+  // Trigger destruction.
+  driver_.reset();
+}
+
 TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
   for (Common::Ot::OpenTracingDriver::PropagationMode propagation_mode :
        {Common::Ot::OpenTracingDriver::PropagationMode::SingleHeader,

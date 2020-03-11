@@ -78,7 +78,6 @@ private:
   class LightStepTransporter : public lightstep::AsyncTransporter, Http::AsyncClient::Callbacks {
   public:
     explicit LightStepTransporter(LightStepDriver& driver);
-
     ~LightStepTransporter() override;
 
     // lightstep::AsyncTransporter
@@ -116,6 +115,7 @@ private:
   public:
     TlsLightStepTracer(const std::shared_ptr<lightstep::LightStepTracer>& tracer,
                        LightStepDriver& driver, Event::Dispatcher& dispatcher);
+    ~TlsLightStepTracer() override;
 
     lightstep::LightStepTracer& tracer();
 
