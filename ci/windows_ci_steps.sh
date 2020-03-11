@@ -1,6 +1,6 @@
 #!/usr/bin/bash.exe
 
-set -e
+set -ex
 
 function finish {
   echo "disk space at end of build:"
@@ -10,6 +10,11 @@ trap finish EXIT
 
 echo "disk space at beginning of build:"
 df -h
+
+echo "check on the directory setup"
+ls -lah / && ls -lah /tmp
+ls -lah /c && ls -lah /c/tmp
+ls -lah /d && ls -lah /d/tmp
 
 . "$(dirname "$0")"/setup_cache.sh
 
