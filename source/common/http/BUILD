@@ -107,7 +107,6 @@ envoy_cc_library(
         ":codes_lib",
         ":user_agent_lib",
         "//include/envoy/http:context_interface",
-        "//source/common/tracing:http_tracer_lib",
     ],
 )
 

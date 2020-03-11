@@ -7,6 +7,7 @@ HTTP filters
   :maxdepth: 2
 
   adaptive_concurrency_filter
+  aws_lambda_filter
   aws_request_signing_filter
   buffer_filter
   cors_filter

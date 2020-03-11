@@ -284,6 +284,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/config:utility_lib",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
