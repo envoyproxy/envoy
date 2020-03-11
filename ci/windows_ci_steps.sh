@@ -11,22 +11,12 @@ trap finish EXIT
 echo "disk space at beginning of build:"
 df -h
 
-pushd /
-ls -lah
-/c/windows/system32/cmd.exe "/c rmdir /s /q tmp"
-ls -lah
-/c/windows/system32/cmd.exe "/c mkdir D:\tmp"
-/c/windows/system32/cmd.exe "/c mklink /d tmp D:\tmp"
-popd
-
-echo "check on the directory setup"
-ls -lah / && ls -lah /tmp
-ls -lah /d && ls -lah /d/tmp
-
 . "$(dirname "$0")"/setup_cache.sh
 
 # TODO(dio): Put in windows/.bazelrc.
 export PATH="/c/Program Files (x86)/Windows Kits/10/bin/10.0.17763.0/x64":$PATH
+
+env
 
 BAZEL_STARTUP_OPTIONS="--noworkspace_rc --bazelrc=windows/.bazelrc --output_base=c:/_eb"
 BAZEL_BUILD_OPTIONS="-c fastbuild --config=msvc-cl --show_task_finish --verbose_failures \
