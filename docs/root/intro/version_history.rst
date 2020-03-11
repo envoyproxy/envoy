@@ -19,6 +19,7 @@ Version history
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * ext_authz: disabled the use of lowercase string matcher for headers matching in HTTP-based `ext_authz`.
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher` to false.
+* fault: added support for controlling abort faults with :ref:`HTTP header fault configuration <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * http: added HTTP/1.1 flood protection. Can be temporarily disabled using the runtime feature `envoy.reloadable_features.http1_flood_protection`
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * http: fixed a bug that could send extra METADATA frames and underflow memory when encoding METADATA frames on a connection that was dispatching data.

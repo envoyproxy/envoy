@@ -90,6 +90,13 @@ public:
     http_status: 503
   )EOF";
 
+  const std::string header_abort_only_yaml = R"EOF(
+  abort:
+    header_abort: {}
+    percentage:
+      numerator: 100
+  )EOF";
+
   const std::string fixed_delay_and_abort_match_headers_yaml = R"EOF(
   delay:
     type: fixed
@@ -272,6 +279,53 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
 }
 
+TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
+  SetUpTest(header_abort_only_yaml);
+
+  request_headers_.addCopy("x-envoy-fault-abort-request", "429");
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
+      .Times(0);
+
+  // Abort related calls
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled("fault.http.abort.abort_percent",
+                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
+      .WillOnce(Return(429));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"}, {"content-length", "18"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details_);
+}
+
 TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   SetUpTest(fixed_delay_only_yaml);
 
@@ -288,12 +342,6 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   // Return 0ms delay
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(0));
-
-  // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
-      .WillOnce(Return(false));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -351,12 +399,6 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
-      .WillOnce(Return(false));
-
   // Delay only case
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -400,12 +442,6 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
-
-  // Abort related calls.
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.cluster.abort.abort_percent",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
-      .WillOnce(Return(false));
 
   // Delay only case, no aborts.
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.abort.http_status", _)).Times(0);
@@ -773,12 +809,6 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
-      .WillOnce(Return(false));
-
   // Delay only case
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -893,12 +923,6 @@ void FaultFilterTest::TestPerFilterConfigFault(
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
-      .WillOnce(Return(false));
-
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   timer_->invokeCallback();
 
@@ -949,10 +973,6 @@ public:
                 featureEnabled("fault.http.rate_limit.response_percent",
                                Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
         .WillOnce(Return(enable_runtime));
-    EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("fault.http.abort.abort_percent",
-                               Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
-        .WillOnce(Return(false));
   }
 };
 
