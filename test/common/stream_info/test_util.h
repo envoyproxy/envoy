@@ -209,10 +209,6 @@ public:
 
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
-  void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
-
-  uint32_t attemptCount() const override { return attempt_count_; }
-
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -249,7 +245,6 @@ public:
   std::string upstream_transport_failure_reason_;
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
-  uint32_t attempt_count_;
 };
 
 } // namespace Envoy

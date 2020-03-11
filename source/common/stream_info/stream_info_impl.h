@@ -246,10 +246,6 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
-
-  uint32_t attemptCount() const override { return attempt_count_; }
-
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
@@ -291,7 +287,6 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
-  uint32_t attempt_count_{1};
 };
 
 } // namespace StreamInfo
