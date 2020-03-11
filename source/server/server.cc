@@ -217,9 +217,10 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
-InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
-    envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                       const Options& options,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
@@ -242,7 +243,6 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
-  return BootstrapVersion::V2;
 }
 
 void InstanceImpl::initialize(const Options& options,
