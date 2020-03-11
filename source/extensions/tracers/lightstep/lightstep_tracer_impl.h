@@ -10,6 +10,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/grpc/context_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/message_impl.h"
@@ -31,6 +32,7 @@ namespace Lightstep {
 
 #define LIGHTSTEP_TRACER_STATS(COUNTER)                                                            \
   COUNTER(spans_sent)                                                                              \
+  COUNTER(spans_dropped)                                                                           \
   COUNTER(timer_flushed)
 
 struct LightstepTracerStats {
@@ -66,6 +68,8 @@ public:
 
   static const size_t DefaultMinFlushSpans;
 
+  void flush();
+
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
   PropagationMode propagationMode() const override { return propagation_mode_; }
@@ -78,25 +82,31 @@ private:
     ~LightStepTransporter() override;
 
     // lightstep::AsyncTransporter
-    void Send(const Protobuf::Message& request, Protobuf::Message& response,
-              lightstep::AsyncTransporter::Callback& callback) override;
+    void OnSpanBufferFull() noexcept override;
+
+    void Send(std::unique_ptr<lightstep::BufferChain>&& message,
+              Callback& callback) noexcept override;
 
     // Http::AsyncClient::Callbacks
     void onSuccess(Http::ResponseMessagePtr&& response) override;
-    void onFailure(Http::AsyncClient::FailureReason) override;
+    void onFailure(Http::AsyncClient::FailureReason failure_reason) override;
 
   private:
+    std::unique_ptr<lightstep::BufferChain> active_report_;
+    Callback* active_callback_ = nullptr;
     Http::AsyncClient::Request* active_request_ = nullptr;
-    lightstep::AsyncTransporter::Callback* active_callback_ = nullptr;
-    Protobuf::Message* active_response_ = nullptr;
     LightStepDriver& driver_;
+
+    void reset();
   };
 
   class LightStepMetricsObserver : public ::lightstep::MetricsObserver {
   public:
     explicit LightStepMetricsObserver(LightStepDriver& driver);
 
-    void OnSpansSent(int num_spans) override;
+    void OnSpansSent(int num_spans) noexcept override;
+
+    void OnSpansDropped(int num_spans) noexcept override;
 
   private:
     LightStepDriver& driver_;
@@ -107,11 +117,11 @@ private:
     TlsLightStepTracer(const std::shared_ptr<lightstep::LightStepTracer>& tracer,
                        LightStepDriver& driver, Event::Dispatcher& dispatcher);
 
-    opentracing::Tracer& tracer();
+    lightstep::LightStepTracer& tracer();
 
-  private:
     void enableTimer();
 
+  private:
     std::shared_ptr<lightstep::LightStepTracer> tracer_;
     LightStepDriver& driver_;
     Event::TimerPtr flush_timer_;
