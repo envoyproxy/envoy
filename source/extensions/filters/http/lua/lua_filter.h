@@ -248,7 +248,9 @@ private:
 
   /**
    * Timestamp.
-   * @return timestamp in millis
+   * @param1 (string) optional format (e.g. milliseconds_from_epoch, nanoseconds_from_epoch).
+   * Defaults to milliseconds_from_epoch.
+   * @return timestamp
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestamp);
 

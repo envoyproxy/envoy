@@ -501,10 +501,22 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaTimestamp(lua_State* state) {
-  auto millis_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                time_source_.systemTime().time_since_epoch())
-                                .count();
-  lua_pushnumber(state, millis_since_epoch);
+  auto now = time_source_.systemTime().time_since_epoch();
+
+  auto time_unit = luaL_optstring(state, 2, "");
+  if (strcmp(time_unit, "") == 0 || strcmp(time_unit, "milliseconds_since_epoch") == 0) {
+    auto milliseconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    lua_pushnumber(state, milliseconds_since_epoch);
+  } else if (strcmp(time_unit, "nanoseconds_since_epoch") == 0) {
+    auto nanoseconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
+    lua_pushnumber(state, nanoseconds_since_epoch);
+  } else {
+    luaL_error(state,
+               "timestamp format must be milliseconds_since_epoch or nanoseconds_since_epoch.");
+  }
+
   return 1;
 }
 

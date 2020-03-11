@@ -348,9 +348,11 @@ timestamp()
 
 .. code-block:: lua
 
-  timestamp = timestamp()
+  timestamp = timestamp(format)
 
-High resolution timestamp function. The function returns timestamp in milliseconds since epoch.
+High resolution timestamp function. *format* is an optional string parameter to indicate the format of the timestamp.
+*milliseconds_since_epoch* and *nanoseconds_since_epoch* are supported.
+The function returns timestamp in milliseconds since epoch by default if format is not set.
 
 .. _config_http_filters_lua_header_wrapper:
 
