@@ -41,11 +41,15 @@ jobs:
         mkdir "C:\tmp" || true
         dir /n
         rmdir /s /q "tmp"
+        dir /n
+        dir /n tmp || true
         mklink /j "tmp" "C:\tmp"
         dir /n
+        dir /n tmp
         rmdir /s /q "D:\tmp"
         mklink /j "D:\tmp" "C:\tmp"
         dir /n "D:\"
+        dir /n "D:\tmp"
       workingDirectory: "C:\\Program Files\\Git"
       failOnStderr: false
       displayName: "Resolve bash /tmp to c:\\tmp"
