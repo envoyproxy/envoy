@@ -1,6 +1,6 @@
 #!/usr/bin/bash.exe
 
-set -ex
+set -e
 
 function finish {
   echo "disk space at end of build:"
@@ -21,8 +21,6 @@ export PATH="/c/Program Files (x86)/Windows Kits/10/bin/10.0.17763.0/x64":$PATH
 # same path
 drive="$(readlink -f $TMPDIR | cut -d '/' -f2)"
 /c/windows/system32/cmd.exe "/c mklink /d $drive:\\$drive $drive:\\"
-
-ls -lah /d && ls -lah /d/d
 
 BAZEL_STARTUP_OPTIONS="--noworkspace_rc --bazelrc=windows/.bazelrc --output_base=c:/_eb"
 BAZEL_BUILD_OPTIONS="-c fastbuild --config=msvc-cl --show_task_finish --verbose_failures \
