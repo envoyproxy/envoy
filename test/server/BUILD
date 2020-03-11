@@ -417,5 +417,6 @@ envoy_cc_benchmark_binary(
 
 envoy_benchmark_test(
     name = "filter_chain_benchmark_test_benchmark_test",
+    timeout = "long",
     benchmark_binary = "filter_chain_benchmark_test",
 )
