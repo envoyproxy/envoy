@@ -160,11 +160,6 @@ public:
   virtual bool healthCheckFailed() PURE;
 
   /**
-   * @return the server-wide http tracer.
-   */
-  virtual Tracing::HttpTracer& httpTracer() PURE;
-
-  /**
    * @return the server's init manager. This can be used for extensions that need to initialize
    *         after cluster manager init but before the server starts listening. All extensions
    *         should register themselves during configuration load. initialize() will be called on

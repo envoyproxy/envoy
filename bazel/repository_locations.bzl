@@ -102,11 +102,11 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_gperftools_gperftools = dict(
         # TODO(cmluciano): Bump to release 2.8
-        # This sha is specifically chosen to fix ppc64le builds that require inclusion
-        # of asm/ptrace.h
-        sha256 = "18574813a062eee487bc1b761e8024a346075a7cb93da19607af362dc09565ef",
-        strip_prefix = "gperftools-fc00474ddc21fff618fc3f009b46590e241e425e",
-        urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
+        # The currently used version is specifically chosen to fix ppc64le builds that require inclusion
+        # of asm/ptrace.h, and also s390x builds that require special handling of mmap syscall.
+        sha256 = "97f0bc2b389c29305f5d1d8cc4d95e9212c33b55827ae65476fc761d78e3ec5d",
+        strip_prefix = "gperftools-gperftools-2.7.90",
+        urls = ["https://github.com/gperftools/gperftools/archive/gperftools-2.7.90.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
         # TODO(JimmyCYJ): Bump to release 1.27
