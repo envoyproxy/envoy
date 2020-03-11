@@ -959,17 +959,27 @@ if __name__ == "__main__":
   if os.path.isfile(target_path):
     error_messages += checkFormat("./" + target_path)
   else:
-    pool = multiprocessing.Pool(processes=args.num_workers)
     results = []
-    # For each file in target_path, start a new task in the pool and collect the
-    # results (results is passed by reference, and is used as an output).
-    for root, _, files in os.walk(target_path):
-      checkFormatVisitor((pool, results, owned_directories, error_messages), root, files)
 
-    # Close the pool to new tasks, wait for all of the running tasks to finish,
-    # then collect the error messages.
-    pool.close()
-    pool.join()
+    def PooledCheckFormat(path_predicate):
+      pool = multiprocessing.Pool(processes=args.num_workers)
+      # For each file in target_path, start a new task in the pool and collect the
+      # results (results is passed by reference, and is used as an output).
+      for root, _, files in os.walk(target_path):
+        checkFormatVisitor((pool, results, owned_directories, error_messages), root,
+                           [f for f in files if path_predicate(f)])
+
+      # Close the pool to new tasks, wait for all of the running tasks to finish,
+      # then collect the error messages.
+      pool.close()
+      pool.join()
+
+    # We first run formatting on non-BUILD files, since the BUILD file format
+    # requires analysis of srcs/hdrs in the BUILD file, and we don't want these
+    # to be rewritten by other multiprocessing pooled processes.
+    PooledCheckFormat(lambda f: not isBuildFile(f))
+    PooledCheckFormat(lambda f: isBuildFile(f))
+
     error_messages += sum((r.get() for r in results), [])
 
   if checkErrorMessages(error_messages):
