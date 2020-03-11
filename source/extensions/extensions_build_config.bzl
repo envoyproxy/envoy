@@ -34,6 +34,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.http.adaptive_concurrency":          "//source/extensions/filters/http/adaptive_concurrency:config",
+    "envoy.filters.http.aws_lambda":                    "//source/extensions/filters/http/aws_lambda:config",
     "envoy.filters.http.aws_request_signing":           "//source/extensions/filters/http/aws_request_signing:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
@@ -81,6 +82,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":            "//source/extensions/filters/network/client_ssl_auth:config",
+    "envoy.filters.network.direct_response":            "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:config",
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",

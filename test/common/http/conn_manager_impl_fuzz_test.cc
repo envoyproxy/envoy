@@ -140,6 +140,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
+  Tracing::HttpTracerSharedPtr tracer() override { return http_tracer_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
@@ -178,6 +179,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
   bool preserve_external_request_id_{false};

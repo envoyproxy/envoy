@@ -137,6 +137,12 @@ public:
    * @return whether a time_point contains a valid, not default constructed time.
    */
   static bool timePointValid(MonotonicTime time_point);
+
+  /**
+   * @param time_source time keeping source.
+   * @return uint64_t the number of milliseconds since the epoch.
+   */
+  static uint64_t nowToMilliseconds(TimeSource& time_source);
 };
 
 /**

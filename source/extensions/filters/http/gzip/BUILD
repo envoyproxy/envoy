@@ -17,14 +17,10 @@ envoy_cc_library(
     srcs = ["gzip_filter.cc"],
     hdrs = ["gzip_filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/json:json_object_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//source/common/buffer:buffer_lib",
         "//source/common/compressor:compressor_lib",
-        "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
+        "//source/extensions/filters/http/common/compressor:compressor_lib",
         "@envoy_api//envoy/extensions/filters/http/gzip/v3:pkg_cc_proto",
     ],
 )
@@ -35,7 +31,6 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/gzip:gzip_filter_lib",
