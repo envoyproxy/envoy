@@ -478,7 +478,7 @@ private:
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
-  bool include_attempt_count_ : 1;
+  bool include_request_attempt_count_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};

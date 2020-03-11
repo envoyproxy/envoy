@@ -585,8 +585,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
 
-  include_attempt_count_ = route_entry_->includeAttemptCount();
-  if (include_attempt_count_) {
+  include_request_attempt_count_ = route_entry_->includeRequestAttemptCount();
+  if (include_request_attempt_count_) {
     headers.setEnvoyAttemptCount(attempt_count_);
   }
 
@@ -1235,7 +1235,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // This could be moved, if desired, by charging callbacks_->streamInfo with the attempt count.
   // Adding the information to the stream info would also be necessary if we wanted this header to
   // be added on sendLocalReply.
-  if (include_attempt_count_) {
+  if (include_request_attempt_count_) {
     headers->setEnvoyAttemptCount(attempt_count_);
   }
 
@@ -1422,7 +1422,7 @@ void Filter::doRetry() {
     return;
   }
 
-  if (include_attempt_count_) {
+  if (include_request_attempt_count_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 

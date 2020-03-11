@@ -1279,7 +1279,7 @@ TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
   EXPECT_TRUE(route_impl_.routeEntry()->virtualHost().rateLimitPolicy().empty());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().corsPolicy());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().perFilterConfig("bar"));
-  EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeAttemptCount());
+  EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeRequestAttemptCount());
   EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().routeConfig().usesVhds());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->tlsContextMatchCriteria());
 }

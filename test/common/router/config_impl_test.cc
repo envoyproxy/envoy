@@ -2830,7 +2830,7 @@ virtual_hosts:
 
   EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                   ->routeEntry()
-                  ->includeAttemptCount());
+                  ->includeRequestAttemptCount());
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCode) {
