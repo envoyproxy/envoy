@@ -60,7 +60,7 @@ envoy_cc_library(
     hdrs = ["context.h"],
     deps = [
         ":codes_interface",
-        "//include/envoy/tracing:http_tracer_interface",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -77,6 +77,7 @@ envoy_cc_library(
         "//include/envoy/grpc:status",
         "//include/envoy/router:router_interface",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/tracing:http_tracer_interface",
     ],
 )

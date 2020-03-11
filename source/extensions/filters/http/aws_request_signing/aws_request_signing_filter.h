@@ -45,6 +45,11 @@ public:
    * @return the filter stats.
    */
   virtual FilterStats& stats() PURE;
+
+  /**
+   * @return the host rewrite value.
+   */
+  virtual const std::string& hostRewrite() const PURE;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -55,14 +60,16 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
-                   Stats::Scope& scope);
+                   Stats::Scope& scope, const std::string& host_rewrite);
 
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
+  const std::string& hostRewrite() const override;
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
+  std::string host_rewrite_;
 };
 
 /**
