@@ -20,12 +20,16 @@ jobs:
     - bash: |
         set -ex
         mkdir -p /c/tmp
+        ls -lah /c && ls -lah /c/tmp
+        # demonstrate rm not working
+        rm -rf /tmp
+        ls -lah / && ls -lah /tmp
+        # demonstrate cmd.exe rmdir not working
         cd / && cmd.exe "/c rmdir /s /q tmp"
-        ls -lah /tmp
-        ls -lah /c/tmp
+        ls -lah / && ls -lah /tmp
+        # symlink /tmp to /c/tmp
         cmd.exe "/c mklink /d tmp C:\\tmp"
-        ls -lah /tmp
-        ls -lah /c/tmp
+        ls -lah / && ls -lah /tmp && ls -lah /c/tmp
       displayName: "Resolve bash /tmp to c:\\tmp"
 
     - bash: ci/windows_ci_steps.sh
