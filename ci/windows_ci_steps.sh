@@ -13,9 +13,6 @@ df -h
 
 . "$(dirname "$0")"/setup_cache.sh
 
-# TODO(dio): Put in windows/.bazelrc.
-export PATH="/c/Program Files (x86)/Windows Kits/10/bin/10.0.17763.0/x64":$PATH
-
 # Set up TMPDIR so bash and non-bash can access
 # e.g. TMPDIR=/d/tmp, make a link from /d/d to /d so both bash and Windows programs resolve the
 # same path
