@@ -25,7 +25,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
+using AdmissionControlProto::DefaultSuccessCriteria;
 using GrpcStatus = Grpc::Status::GrpcStatus;
+
 static constexpr double defaultAggression = 2.0;
 static constexpr std::chrono::seconds defaultHistoryGranularity{1};
 
@@ -53,15 +55,38 @@ double AdmissionControlFilterConfig::aggression() const {
   return std::max<double>(1.0, aggression_ ? aggression_->value() : defaultAggression);
 }
 
-DefaultResponseEvaluator::DefaultResponseEvaluator(
-    AdmissionControlProto::DefaultSuccessCriteria success_criteria) {
+DefaultResponseEvaluator::DefaultResponseEvaluator(DefaultSuccessCriteria success_criteria) {
   // HTTP status.
-  if (success_criteria.http_status_size() > 0) {
+  switch (success_criteria.http_status_specification_case()) {
+  case DefaultSuccessCriteria::HttpStatusSpecificationCase::HTTP_STATUS_SPECIFICATION_NOT_SET:
+    // HTTP status isn't specified, so we'll count all 2xx as successes.
+    for (const auto& code : {Http::Code::OK, Http::Code::MultipleChoices}) {
+      // TODO @tallen make sure 300 isn't added. Remove if tests pass.
+      ASSERT(code != 300);
+      http_status_codes_.emplace(code);
+    }
+    break;
+  case DefaultSuccessCriteria::HttpStatusSpecificationCase::HTTP_STATUS:
+    // Individual HTTP status codes are specified.
     for (const auto& status : success_criteria.http_status()) {
       http_status_codes_.emplace(enumToInt(status.code()));
     }
-  } else {
-    http_status_codes_.emplace(enumToInt(Http::Code::OK));
+    break;
+  case DefaultSuccessCriteria::HttpStatusSpecificationCase::HTTP_STATUS_RANGE:
+    for (const auto& code : Http::Code::All) {
+      // We must check against every range since they can be specified in any order.
+      for (const auto& range : success_criteria.http_status_range()) {
+        ASSERT(range.start() > 0);
+        ASSERT(range.start() <= range.end());
+        if (range.start() <= enumToInt(code) && enumToInt(code) < range.end()) {
+          http_status_codes_.emplace(enumToInt(code));
+          break;
+        }
+      }
+    }
+    break;
+  default:
+    NOT_REACHED_GCOVOR_EXCL_LINE;
   }
 
   // GRPC status.

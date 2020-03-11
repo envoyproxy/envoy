@@ -5,6 +5,7 @@ package envoy.config.filter.http.admission_control.v2alpha;
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/grpc/grpc_status.proto";
 import "envoy/type/http_status.proto";
+import "envoy/type/range.proto"
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -30,11 +31,17 @@ message AdmissionControl {
   // indicate a successful request must be explicitly specified if not relying on the default
   // values.
   message DefaultSuccessCriteria {
-    // HTTP status codes to consider as request successes. If unspecified, defaults to "200".
-    repeated type.HttpStatus http_status = 1;
+    // If HTTP statuses are unspecified, defaults to codes in the range [200, 300).
+    oneof http_status_specification {
+      // HTTP status codes to consider as request successes.
+      repeated type.HttpStatus http_status = 1;
+
+      // Ranges of HTTP status codes (in integer representation) to consider as successes.
+      repeated type.Int32Range http_status_range = 2;
+    }
 
     // GRPC status codes to consider as request successes. If unspecified, defaults to "OK".
-    repeated type.grpc.GrpcStatus grpc_status = 2;
+    repeated type.grpc.GrpcStatus grpc_status = 3;
   }
 
   // If set to false, the admission control filter will operate as a pass-through filter. If the
