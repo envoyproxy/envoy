@@ -104,8 +104,15 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             proto_config);
 
-    Config::Utility::validateTerminalFilters(filters[i].name(), "network",
-                                             factory.isTerminalFilter(), i == filters.size() - 1);
+    if (filters[i].has_typed_config()) {
+      const std::string& filter_type =
+          std::string(TypeUtil::typeUrlToDescriptorFullName(filters[i].typed_config().type_url()));
+      Config::Utility::validateTerminalFilters(filters[i].name(), filter_type, "network",
+                                               factory.isTerminalFilter(), i == filters.size() - 1);
+    } else {
+      Config::Utility::validateTerminalFilters(filters[i].name(), filters[i].name(), "network",
+                                               factory.isTerminalFilter(), i == filters.size() - 1);
+    }
 
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);

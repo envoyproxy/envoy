@@ -383,8 +383,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   for (int32_t i = 0; i < filters.size(); i++) {
     bool is_terminal = false;
     processFilter(filters[i], i, "http", filter_factories_, is_terminal);
-    Config::Utility::validateTerminalFilters(filters[i].name(), "http", is_terminal,
-                                             i == filters.size() - 1);
+    if (filters[i].has_typed_config()) {
+      const std::string& filter_type =
+          std::string(TypeUtil::typeUrlToDescriptorFullName(filters[i].typed_config().type_url()));
+      Config::Utility::validateTerminalFilters(filters[i].name(), filter_type, "http", is_terminal,
+                                               i == filters.size() - 1);
+    } else {
+      Config::Utility::validateTerminalFilters(filters[i].name(), filters[i].name(), "http",
+                                               is_terminal, i == filters.size() - 1);
+    }
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -400,9 +407,17 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
         bool is_terminal = false;
         processFilter(upgrade_config.filters(j), j, name, *factories, is_terminal);
-        Config::Utility::validateTerminalFilters(upgrade_config.filters(j).name(), "http upgrade",
-                                                 is_terminal,
-                                                 j == upgrade_config.filters().size() - 1);
+        if (upgrade_config.filters(j).has_typed_config()) {
+          const std::string& filter_type = std::string(TypeUtil::typeUrlToDescriptorFullName(
+              upgrade_config.filters(j).typed_config().type_url()));
+          Config::Utility::validateTerminalFilters(upgrade_config.filters(j).name(), filter_type,
+                                                   "http upgrade", is_terminal,
+                                                   j == upgrade_config.filters().size() - 1);
+        } else {
+          Config::Utility::validateTerminalFilters(
+              upgrade_config.filters(j).name(), upgrade_config.filters(j).name(), "http upgrade",
+              is_terminal, j == upgrade_config.filters().size() - 1);
+        }
       }
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
