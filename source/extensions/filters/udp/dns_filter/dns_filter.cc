@@ -21,9 +21,9 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   for (const auto& virtual_domain : config.server_config().virtual_domains()) {
     DnsAddressList addresses{};
 
-    if (virtual_domain.endpoint().type() == DnsFilterConfig::STATIC) {
-      addresses.reserve(virtual_domain.endpoint().address().size());
-      for (const auto& configured_address : virtual_domain.endpoint().address()) {
+    if (virtual_domain.endpoint().has_addresslist()) {
+      addresses.reserve(virtual_domain.endpoint().addresslist().address().size());
+      for (const auto& configured_address : virtual_domain.endpoint().addresslist().address()) {
         addresses.push_back(configured_address);
       }
     }
