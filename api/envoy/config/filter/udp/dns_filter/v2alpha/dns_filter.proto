@@ -16,6 +16,10 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.udp.dns_filter.v3";
 option (udpa.annotations.file_status).work_in_progress = true;
 
+// [#protodoc-title: DNS Filter]
+// UDP proxy :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.
+// [#extension: envoy.filters.udp_listener.dns_filter]
+
 // Configuration for the DNS filter.
 message DnsFilterConfig {
   // Specify the method of determining the address of a given endpoint
