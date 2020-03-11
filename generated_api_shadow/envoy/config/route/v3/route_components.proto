@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.route.v3;
 
+import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -1054,26 +1055,6 @@ message RetryPolicy {
     }
   }
 
-  message RetryBackOff {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.route.RetryPolicy.RetryBackOff";
-
-    // Specifies the base interval between retries. This parameter is required and must be greater
-    // than zero. Values less than 1 ms are rounded up to 1 ms.
-    // See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion of Envoy's
-    // back-off algorithm.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
-      required: true
-      gt {}
-    }];
-
-    // Specifies the maximum interval between retries. This parameter is optional, but must be
-    // greater than or equal to the `base_interval` if set. The default is 10 times the
-    // `base_interval`. See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion
-    // of Envoy's back-off algorithm.
-    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
-  }
-
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
   // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
@@ -1121,7 +1102,7 @@ message RetryPolicy {
   // `upstream.base_retry_backoff_ms` runtime parameter. The default maximum interval is 10 times
   // the base interval. The documentation for :ref:`config_http_filters_router_x-envoy-max-retries`
   // describes Envoy's back-off algorithm.
-  RetryBackOff retry_back_off = 8;
+  core.v3.BackoffStrategy retry_back_off = 8;
 
   // HTTP response headers that trigger a retry if present in the response. A retry will be
   // triggered if any of the header matches match the upstream response headers.

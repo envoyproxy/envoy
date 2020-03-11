@@ -3289,8 +3289,8 @@ virtual_hosts:
       cluster: www2
       retry_policy:
         retry_back_off:
-          base_interval: 0.0001s # < 1 ms
-          max_interval: 0.0001s
+          base_interval: 0.001s
+          max_interval: 0.001s
   - match:
       prefix: "/"
     route:
@@ -3324,7 +3324,6 @@ virtual_hosts:
                 ->retryPolicy()
                 .maxInterval());
 
-  // Sub-millisecond interval converted to 1 ms.
   EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
             config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
                 ->routeEntry()
@@ -3346,6 +3345,49 @@ virtual_hosts:
                                ->routeEntry()
                                ->retryPolicy()
                                .maxInterval());
+}
+
+// Test route-specific retry back-off intervals.
+TEST_F(RouteMatcherTest, RetryBackOffInvalidIntervals) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.050s
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.100s
+          max_interval: 0.500s
+  - match:
+      prefix: "/baz"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.0001s # < 1 ms
+          max_interval: 0.0001s
+  - match:
+      prefix: "/"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_on: connect-failure
+  )EOF";
+
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 // Test invalid route-specific retry back-off configs.
