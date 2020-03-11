@@ -52,7 +52,11 @@ void QuicHttpServerConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWate
 }
 
 void QuicHttpServerConnectionImpl::goAway() {
-  quic_server_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
+  if (quic::VersionUsesHttp3(quic_server_session_.transport_version())) {
+    quic_server_session_.SendHttp3GoAway();
+  } else {
+    quic_server_session_.SendGoAway(quic::QUIC_PEER_GOING_AWAY, "server shutdown imminent");
+  }
 }
 
 QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(EnvoyQuicClientSession& session,
