@@ -28,13 +28,18 @@ namespace Server {
 
 class ListenerHandle {
 public:
-  ListenerHandle() { EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0); }
+  ListenerHandle(bool need_local_drain_manager = true) {
+    if (need_local_drain_manager) {
+      drain_manager_ = new MockDrainManager();
+      EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0);
+    }
+  }
   ~ListenerHandle() { onDestroy(); }
 
   MOCK_METHOD(void, onDestroy, ());
 
   Init::ExpectableTargetImpl target_;
-  MockDrainManager* drain_manager_ = new MockDrainManager();
+  MockDrainManager* drain_manager_{};
   Configuration::FactoryContext* context_{};
 };
 
@@ -105,6 +110,28 @@ protected:
     auto raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
+    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillOnce(Invoke(
+            [raw_listener, need_init](
+                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
+              std::shared_ptr<ListenerHandle> notifier(raw_listener);
+              raw_listener->context_ = &filter_chain_factory_context;
+              if (need_init) {
+                filter_chain_factory_context.initManager().add(notifier->target_);
+              }
+              return {[notifier](Network::FilterManager&) -> void {}};
+            }));
+
+    return raw_listener;
+  }
+
+  ListenerHandle* expectListenerOverridden(bool need_init) {
+    auto raw_listener = new ListenerHandle(/*need_local_drain_manager=*/false);
+    // TODO(lambdai): precisely decalre drain manager
+    // EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
+    //    .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(
             [raw_listener, need_init](
