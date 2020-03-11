@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.filter.udp.dns_filter.v2alpha;
 
+import "envoy/api/v2/core/base.proto";
+
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
@@ -22,17 +24,17 @@ option (udpa.annotations.file_status).work_in_progress = true;
 
 // Configuration for the DNS filter.
 message DnsFilterConfig {
-  // Specify the method of determining the address of a given endpoint
-  enum EndpointType { STATIC = 0; }
+  message AddressList {
+    repeated string address = 1;
+  }
 
   // This message type is extensible and can contain a list of addresses
   // or dictate some other method for resolving the addresses for an
   // endpoint
   message DnsEndpoint {
-    EndpointType type = 1;
-
-    // A list of IP addresses Envoy returns to queries for the given domain
-    repeated string address = 2;
+    oneof endpoint_config {
+      AddressList addresslist = 1;
+    }
   }
 
   message DnsVirtualDomain {
@@ -42,6 +44,9 @@ message DnsFilterConfig {
     // The configuration containing the method to determine the address
     // of this endpoint
     DnsEndpoint endpoint = 2;
+
+    // Sets the TTL in dns answers from Envoy returned to the client
+    google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gt {}}];
   }
 
   // This message contains the configuration for the Dns Filter operating
@@ -53,11 +58,8 @@ message DnsFilterConfig {
     // Fully qualified domain names for which Envoy will respond to queries
     repeated DnsVirtualDomain virtual_domains = 2 [(validate.rules).repeated = {min_items: 1}];
 
-    // Sets the TTL in dns answers from Envoy returned to the client
-    google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gt {}}];
-
     // Seed the virtual domain configuration from an external path
-    string virtual_domain_cfg = 4;
+    api.v2.core.DataSource virtual_domain_cfg = 4;
   }
 
   // The stat prefix used when emitting DNS filter stats.
