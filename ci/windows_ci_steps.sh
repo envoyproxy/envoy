@@ -16,7 +16,11 @@ df -h
 # TODO(dio): Put in windows/.bazelrc.
 export PATH="/c/Program Files (x86)/Windows Kits/10/bin/10.0.17763.0/x64":$PATH
 
-env
+# Set up TMPDIR so bash and non-bash can access
+# e.g. TMPDIR=/d/tmp, make a link from /d/d to /d so both bash and Windows programs resolve the
+# same path
+drive="$(readlink -f $TMPDIR | cut -d '/' -f2)"
+cmd.exe "/c /d mklink /d $drive:\\$drive $drive:\\"
 
 BAZEL_STARTUP_OPTIONS="--noworkspace_rc --bazelrc=windows/.bazelrc --output_base=c:/_eb"
 BAZEL_BUILD_OPTIONS="-c fastbuild --config=msvc-cl --show_task_finish --verbose_failures \
