@@ -10,8 +10,16 @@ envoy_package()
 
 envoy_cc_library(
     name = "admin_lib",
-    srcs = ["admin.cc"],
-    hdrs = ["admin.h"],
+    srcs = [
+        "admin.cc",
+        "admin_filter.cc",
+        "utils.cc",
+    ],
+    hdrs = [
+        "admin.h",
+        "admin_filter.h",
+        "utils.h",
+    ],
     deps = [
         ":config_tracker_lib",
         "//include/envoy/filesystem:filesystem_interface",

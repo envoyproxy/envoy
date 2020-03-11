@@ -42,11 +42,6 @@
 namespace Envoy {
 namespace Server {
 
-namespace Utility {
-envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
-                                                bool health_check_failed);
-} // namespace Utility
-
 class AdminInternalAddressConfig : public Http::InternalAddressConfig {
   bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
 };
@@ -466,50 +461,6 @@ private:
   Network::ListenSocketFactorySharedPtr socket_factory_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
-};
-
-/**
- * A terminal HTTP filter that implements server admin functionality.
- */
-class AdminFilter : public Http::StreamDecoderFilter,
-                    public AdminStream,
-                    Logger::Loggable<Logger::Id::admin> {
-public:
-  AdminFilter(AdminImpl& parent);
-
-  // Http::StreamFilterBase
-  void onDestroy() override;
-
-  // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-  }
-
-  // AdminStream
-  void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
-  void addOnDestroyCallback(std::function<void()> cb) override;
-  Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
-  const Buffer::Instance* getRequestBody() const override;
-  const Http::RequestHeaderMap& getRequestHeaders() const override;
-
-private:
-  /**
-   * Called when an admin request has been completely received.
-   */
-  void onComplete();
-
-  AdminImpl& parent_;
-  // Handlers relying on the reference should use addOnDestroyCallback()
-  // to add a callback that will notify them when the reference is no
-  // longer valid.
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
-  Http::RequestHeaderMap* request_headers_{};
-  std::list<std::function<void()>> on_destroy_callbacks_;
-  bool end_stream_on_complete_ = true;
 };
 
 /**
