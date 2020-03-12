@@ -27,13 +27,6 @@ if ! brew update; then
     exit 1
 fi
 
-# Required as bazel is installed in the latest macos vm image, we have to unlink it to
-# install bazelisk
-if is_installed "bazelbuild/tap/bazel" && ! brew unlink bazelbuild/tap/bazel; then
-    echo "Failed to unlink bazelbuild/tap/bazel"
-    exit 1
-fi
-
 DEPS="automake bazelbuild/tap/bazelisk cmake coreutils go libtool wget ninja"
 for DEP in ${DEPS}
 do
