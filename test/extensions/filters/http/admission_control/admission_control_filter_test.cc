@@ -77,6 +77,34 @@ public:
     filter_->encodeHeaders(headers, true);
   }
 
+  void expectHttpSuccess(std::string&& code) {
+    Http::RequestHeaderMapImpl request_headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_CALL(controller_, recordSuccess());
+    sampleHttpRequest(std::move(code));
+  }
+
+  void expectHttpFail(std::string&& code) {
+    Http::RequestHeaderMapImpl request_headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_CALL(controller_, recordFailure());
+    sampleHttpRequest(std::move(code));
+  }
+
+  void expectGrpcSuccess(std::string&& code) {
+    Http::RequestHeaderMapImpl request_headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_CALL(controller_, recordSuccess());
+    sampleGrpcRequest(std::move(code));
+  }
+
+  void expectGrpcFail(std::string&& code) {
+    Http::RequestHeaderMapImpl request_headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_CALL(controller_, recordFailure());
+    sampleGrpcRequest(std::move(code));
+  }
+
 protected:
   std::string stats_prefix_{""};
   NiceMock<Runtime::MockLoader> runtime_;
@@ -199,29 +227,64 @@ default_success_criteria:
   auto config = makeConfig(yaml);
   setupFilter(config);
 
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
+
+  setupFilter(config);
+  expectHttpSuccess("300");
+
+  setupFilter(config);
+  expectHttpSuccess("301");
+
+  setupFilter(config);
+  expectHttpSuccess("302");
+
+  setupFilter(config);
+  expectHttpFail("200");
+
+  setupFilter(config);
+  expectHttpFail("400");
+
+  setupFilter(config);
+  expectHttpFail("500");
+}
+
+TEST_F(AdmissionControlTest, DefaultBehaviorTest) {
+  const std::string yaml = R"EOF(
+default_success_criteria:
+  http_status:
+  grpc_status:
+)EOF";
+
+  auto config = makeConfig(yaml);
+
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
   EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
 
   setupFilter(config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordFailure());
-  sampleHttpRequest("200");
+  expectGrpcSuccess("0");
+  setupFilter(config);
+  expectGrpcFail("7");
+  setupFilter(config);
+  expectGrpcFail("14");
+
+  // Test 200 range.
+  setupFilter(config);
+  expectHttpSuccess("200");
+  setupFilter(config);
+  expectHttpSuccess("201");
+  setupFilter(config);
+  expectHttpSuccess("204");
 
   setupFilter(config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordSuccess());
-  sampleHttpRequest("301");
-
+  expectHttpFail("300");
   setupFilter(config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordFailure());
-  sampleHttpRequest("400");
-
+  expectHttpFail("301");
   setupFilter(config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordFailure());
-  sampleHttpRequest("500");
+  expectHttpFail("404");
+  setupFilter(config);
+  expectHttpFail("500");
 }
 
 TEST_F(AdmissionControlTest, HttpCodeInfluence) {
@@ -250,6 +313,35 @@ default_success_criteria:
   filter_->encodeHeaders(headers, true);
 }
 
+TEST_F(AdmissionControlTest, HttpCodeInfluence2) {
+  const std::string yaml = R"EOF(
+default_success_criteria:
+  http_status:
+    - Http3xx
+  grpc_status:
+    - status: PERMISSION_DENIED
+    - status: UNIMPLEMENTED
+)EOF";
+
+  auto config = makeConfig(yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_CALL(controller_, requestTotalCount()).WillRepeatedly(Return(0));
+  EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
+
+  setupFilter(config);
+
+  // HTTP 2xx is not considered a success, but it's returned for all of the GRPC messages, so let's
+  // make sure GRPC still gets evaluated correctly.
+  expectGrpcSuccess("7");
+  expectGrpcFail("0");
+
+  // Verify that the HTTP behaves correctly as well. A code of 200 counts as a failure in the
+  // config, so let's make sure it actually fails without a GRPC message type.
+  expectHttpFail("200");
+  expectHttpSuccess("301");
+}
+
 TEST_F(AdmissionControlTest, GrpcErrorCodes) {
   const std::string yaml = R"EOF(
 default_success_criteria:
@@ -266,14 +358,10 @@ default_success_criteria:
   EXPECT_CALL(controller_, requestSuccessCount()).WillRepeatedly(Return(0));
 
   setupFilter(config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordFailure());
-  sampleGrpcRequest("0");
+  expectGrpcFail("0");
 
   setupFilter(config);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-  EXPECT_CALL(controller_, recordSuccess());
-  sampleGrpcRequest("7");
+  expectGrpcSuccess("7");
 }
 
 } // namespace
