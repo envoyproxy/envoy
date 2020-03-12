@@ -745,12 +745,14 @@ def _com_github_gperftools_gperftools():
 
 def _proxy_wasm_cpp_sdk():
     _repository_impl(
-        name = "proxy_wasm_cpp_host",
+        name = "proxy_wasm_cpp_sdk",
+        build_file = "@envoy//bazel/external:proxy_wasm_cpp_sdk.BUILD",
     )
 
 def _proxy_wasm_cpp_host():
     _repository_impl(
-        name = "proxy_wasm_cpp_sdk",
+        name = "proxy_wasm_cpp_host",
+        build_file = "@envoy//bazel/external:proxy_wasm_cpp_host.BUILD",
     )
 
 def _kafka_deps():
