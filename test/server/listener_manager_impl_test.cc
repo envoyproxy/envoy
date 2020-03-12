@@ -43,7 +43,7 @@ namespace {
 
 #define CHECKSTATS(...)                                                                            \
   {                                                                                                \
-    SCOPED_TRACE("HERE");                                                                          \
+    SCOPED_TRACE(__LINE__);                                                                        \
     checkStats(__VA_ARGS__);                                                                       \
   }
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
@@ -503,7 +503,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
       expectListenerCreate(false, true, envoy::config::listener::v3::Listener::MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -527,7 +527,7 @@ drain_type: default
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   // Update foo listener, but with a different address. Should throw.
   const std::string listener_foo_different_address_yaml = R"EOF(
@@ -582,7 +582,7 @@ drain_type: default
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
 
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
@@ -614,7 +614,7 @@ drain_type: default
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
 
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
@@ -638,7 +638,7 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(false, false);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", false));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
   checkConfigDump(R"EOF(
 static_listeners:
   listener:
@@ -669,11 +669,11 @@ filter_chains:
 
   EXPECT_FALSE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", false));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   // Remove foo listener. Should be blocked.
   EXPECT_FALSE(manager_->removeListener("foo"));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   EXPECT_CALL(*listener_foo, onDestroy());
 }
@@ -707,7 +707,7 @@ filter_chains: {}
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version1", true));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version1"));
   checkConfigDump(R"EOF(
 version_info: version1
@@ -731,7 +731,7 @@ dynamic_listeners:
 
   // Update duplicate should be a NOP.
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   // Update foo listener. Should share socket.
   const std::string listener_foo_update1_yaml = R"EOF(
@@ -750,7 +750,7 @@ per_connection_buffer_limit_bytes: 10
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml),
                                             "version2", true));
-  CHECKSTATS(1, 1, 0, 0, 1, 0);
+  CHECKSTATS(1, 1, 0, 0, 1, 0, 0);
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version2"));
   checkConfigDump(R"EOF(
 version_info: version2
@@ -798,7 +798,7 @@ dynamic_listeners:
   // Update duplicate should be a NOP.
   EXPECT_FALSE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
-  CHECKSTATS(1, 1, 0, 0, 1, 0);
+  CHECKSTATS(1, 1, 0, 0, 1, 0, 0);
 
   time_system_.setSystemTime(std::chrono::milliseconds(3003003003003));
 
@@ -811,7 +811,7 @@ dynamic_listeners:
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version3", true));
   worker_->callAddCompletion(true);
-  CHECKSTATS(1, 2, 0, 0, 1, 1);
+  CHECKSTATS(1, 2, 0, 0, 1, 1, 0);
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version3"));
   checkConfigDump(R"EOF(
 version_info: version3
@@ -849,10 +849,10 @@ dynamic_listeners:
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo_update1->drain_manager_->drain_sequence_completion_();
-  CHECKSTATS(1, 2, 0, 0, 1, 1);
+  CHECKSTATS(1, 2, 0, 0, 1, 1, 0);
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   worker_->callRemovalCompletion();
-  CHECKSTATS(1, 2, 0, 0, 1, 0);
+  CHECKSTATS(1, 2, 0, 0, 1, 0, 0);
 
   time_system_.setSystemTime(std::chrono::milliseconds(4004004004004));
 
@@ -873,7 +873,7 @@ filter_chains: {}
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_bar_yaml), "version4", true));
   EXPECT_EQ(2UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
-  CHECKSTATS(2, 2, 0, 0, 2, 0);
+  CHECKSTATS(2, 2, 0, 0, 2, 0, 0);
 
   time_system_.setSystemTime(std::chrono::milliseconds(5005005005005));
 
@@ -893,7 +893,7 @@ filter_chains: {}
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "version5", true));
   EXPECT_EQ(2UL, manager_->listeners().size());
-  CHECKSTATS(3, 2, 0, 1, 2, 0);
+  CHECKSTATS(3, 2, 0, 1, 2, 0, 0);
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version5"));
   checkConfigDump(R"EOF(
 version_info: version5
@@ -944,7 +944,7 @@ dynamic_listeners:
 
   // Update a duplicate baz that is currently warming.
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "", true));
-  CHECKSTATS(3, 2, 0, 1, 2, 0);
+  CHECKSTATS(3, 2, 0, 1, 2, 0, 0);
 
   // Update baz while it is warming.
   const std::string listener_baz_update1_yaml = R"EOF(
@@ -968,14 +968,14 @@ filter_chains:
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_update1_yaml), "", true));
   EXPECT_EQ(2UL, manager_->listeners().size());
-  CHECKSTATS(3, 3, 0, 1, 2, 0);
+  CHECKSTATS(3, 3, 0, 1, 2, 0, 0);
 
   // Finish initialization for baz which should make it active.
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_baz_update1->target_.ready();
   EXPECT_EQ(3UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
-  CHECKSTATS(3, 3, 0, 0, 3, 0);
+  CHECKSTATS(3, 3, 0, 0, 3, 0, 0);
 
   EXPECT_CALL(*listener_foo_update2, onDestroy());
   EXPECT_CALL(*listener_bar, onDestroy());
@@ -1008,7 +1008,7 @@ filter_chains:
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   // Remove foo into draining.
   std::function<void()> stop_completion;
@@ -1020,24 +1020,24 @@ filter_chains:
           }));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
-  CHECKSTATS(1, 0, 1, 0, 0, 1);
+  CHECKSTATS(1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
-  CHECKSTATS(1, 0, 1, 0, 0, 1);
+  CHECKSTATS(1, 0, 1, 0, 0, 1, 0);
 
   // Add foo again. We should use the socket from draining.
   ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
-  CHECKSTATS(2, 0, 1, 0, 1, 1);
+  CHECKSTATS(2, 0, 1, 0, 1, 1, 0);
 
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(0);
   stop_completion();
 
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
-  CHECKSTATS(2, 0, 1, 0, 1, 0);
+  CHECKSTATS(2, 0, 1, 0, 1, 0, 0);
 
   EXPECT_CALL(*listener_foo2, onDestroy());
 }
@@ -1068,17 +1068,17 @@ filter_chains:
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   // Remove foo into draining.
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
-  CHECKSTATS(1, 0, 1, 0, 0, 1);
+  CHECKSTATS(1, 0, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
-  CHECKSTATS(1, 0, 1, 0, 0, 1);
+  CHECKSTATS(1, 0, 1, 0, 0, 1, 0);
 
   // Add foo again. We should use the socket from draining.
   ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
@@ -1086,11 +1086,11 @@ filter_chains:
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
-  CHECKSTATS(2, 0, 1, 0, 1, 1);
+  CHECKSTATS(2, 0, 1, 0, 1, 1, 0);
 
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
-  CHECKSTATS(2, 0, 1, 0, 1, 0);
+  CHECKSTATS(2, 0, 1, 0, 1, 0, 0);
 
   EXPECT_CALL(*listener_foo2, onDestroy());
 }
@@ -1290,7 +1290,7 @@ filter_chains:
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion(true);
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
@@ -1299,7 +1299,7 @@ filter_chains:
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
-  CHECKSTATS(1, 0, 1, 0, 0, 1);
+  CHECKSTATS(1, 0, 1, 0, 0, 1, 0);
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(true));
@@ -1307,7 +1307,7 @@ filter_chains:
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
-  CHECKSTATS(1, 0, 1, 0, 0, 1);
+  CHECKSTATS(1, 0, 1, 0, 0, 1, 0);
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(true));
@@ -1316,7 +1316,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
-  CHECKSTATS(1, 0, 1, 0, 0, 0);
+  CHECKSTATS(1, 0, 1, 0, 0, 0, 0);
 }
 
 TEST_F(ListenerManagerImplTest, RemoveListener) {
@@ -1344,25 +1344,25 @@ filter_chains:
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   EXPECT_EQ(0UL, manager_->listeners().size());
-  CHECKSTATS(1, 0, 0, 1, 0, 0);
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
 
   // Remove foo.
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->removeListener("foo"));
   EXPECT_EQ(0UL, manager_->listeners().size());
-  CHECKSTATS(1, 0, 1, 0, 0, 0);
+  CHECKSTATS(1, 0, 1, 0, 0, 0, 0);
 
   // Add foo again and initialize it.
   listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(2, 0, 1, 1, 0, 0);
+  CHECKSTATS(2, 0, 1, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
-  CHECKSTATS(2, 0, 1, 0, 1, 0);
+  CHECKSTATS(2, 0, 1, 0, 1, 0, 0);
 
   // Update foo into warming.
   const std::string listener_foo_update1_yaml = R"EOF(
@@ -1383,7 +1383,7 @@ filter_chains:
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   EXPECT_EQ(1UL, manager_->listeners().size());
-  CHECKSTATS(2, 1, 1, 1, 1, 0);
+  CHECKSTATS(2, 1, 1, 1, 1, 0, 0);
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
@@ -1391,14 +1391,14 @@ filter_chains:
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
-  CHECKSTATS(2, 1, 2, 0, 0, 1);
+  CHECKSTATS(2, 1, 2, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
-  CHECKSTATS(2, 1, 2, 0, 0, 1);
+  CHECKSTATS(2, 1, 2, 0, 0, 1, 0);
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
-  CHECKSTATS(2, 1, 2, 0, 0, 0);
+  CHECKSTATS(2, 1, 2, 0, 0, 0, 0);
 }
 
 // Validates that StopListener functionality works correctly when only inbound listeners are
@@ -1425,12 +1425,12 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 1, 0, 0);
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   // Add a listener in outbound direction.
   const std::string listener_foo_outbound_yaml = R"EOF(
@@ -1519,12 +1519,12 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 1, 0, 0);
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_factory_.socket_, close());
@@ -1568,12 +1568,12 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 1, 0, 0);
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   // Update foo into warming.
   const std::string listener_foo_update1_yaml = R"EOF(
@@ -1743,12 +1743,12 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 1, 0, 0);
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
-  CHECKSTATS(1, 0, 0, 0, 1, 0);
+  CHECKSTATS(1, 0, 0, 0, 1, 0, 0);
 
   // Update foo into warming.
   const std::string listener_foo_update1_yaml = R"EOF(
@@ -1801,7 +1801,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 1, 0, 0);
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
   worker_->callAddCompletion(true);
@@ -1826,7 +1826,7 @@ filter_chains:
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   EXPECT_EQ(1UL, manager_->listeners().size());
-  CHECKSTATS(1, 1, 0, 1, 1, 0);
+  CHECKSTATS(1, 1, 0, 1, 1, 0, 0);
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
@@ -1834,14 +1834,14 @@ filter_chains:
   EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
-  CHECKSTATS(1, 1, 1, 0, 0, 1);
+  CHECKSTATS(1, 1, 1, 0, 0, 1, 0);
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
-  CHECKSTATS(1, 1, 1, 0, 0, 1);
+  CHECKSTATS(1, 1, 1, 0, 0, 1, 0);
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();
   EXPECT_EQ(0UL, manager_->listeners().size());
-  CHECKSTATS(1, 1, 1, 0, 0, 0);
+  CHECKSTATS(1, 1, 1, 0, 0, 0, 0);
 }
 
 TEST_F(ListenerManagerImplTest, UpdateInplaceWarmingListener) {
@@ -1866,7 +1866,7 @@ filter_chains:
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
-  CHECKSTATS(1, 0, 0, 1, 0, 0);
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _, _));
   listener_foo->target_.ready();
   worker_->callAddCompletion(true);
@@ -1891,7 +1891,7 @@ filter_chains:
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   EXPECT_EQ(1UL, manager_->listeners().size());
-  CHECKSTATS(1, 1, 0, 1, 1, 0);
+  CHECKSTATS(1, 1, 0, 1, 1, 0, 0);
 
   // listener warmed up.
   EXPECT_CALL(*worker_, addListener(_, _, _));
@@ -1899,6 +1899,75 @@ filter_chains:
   listener_foo_update1->target_.ready();
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+}
+
+TEST_F(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_));
+  manager_->startWorkers(guard_dog_);
+
+  // Add foo listener into warming.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
+  CHECKSTATS(1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion(true);
+  EXPECT_EQ(1UL, manager_->listeners().size());
+
+  // Update foo into warming.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+traffic_direction: INBOUND
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters:
+  filter_chain_match:
+    destination_port: 1234
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerOverridden(true);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  CHECKSTATS(1, 1, 0, 1, 1, 0, 0);
+
+  // The warmed up start the drain timer
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
+  EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
+  listener_foo_update1->target_.ready();
+  CHECKSTATS(1, 1, 0, 0, 1, 0, /* draining filter chains=*/1);
+
+  // Timer expires, worker close connections if any.
+  EXPECT_CALL(*worker_, removeFilterChains(_, _));
+  filter_chain_drain_timer->invokeCallback();
+
+  // Once worker clean up is done, master thread is safe to remove original listener.
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callDrainFilterChainsComplete();
+  CHECKSTATS(1, 1, 0, 0, 1, 0, /* draining filter chains=*/0);
 
   EXPECT_CALL(*listener_foo_update1, onDestroy());
 }

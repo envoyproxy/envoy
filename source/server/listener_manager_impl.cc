@@ -752,6 +752,7 @@ void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
         draining_group->draining_filter_chains_.push_back(&filter_chain);
       });
   int filter_chain_size = draining_group->draining_filter_chains_.size();
+
   // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
   // restart. Same below inside the lambda.
   // TODO(lambdai): Currently the number of DrainFilterChains objects are tracked:

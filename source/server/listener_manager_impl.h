@@ -141,6 +141,7 @@ struct DrainingFilterChains : public Network::DrainingFilterChains {
   }
   void startDrainSequence(std::chrono::seconds drain_time, Event::Dispatcher& dispatcher,
                           std::function<void()> completion) {
+    ENVOY_LOG_MISC(debug, "draintime = {}", drain_time.count());
     drain_sequence_completion_ = completion;
     ASSERT(!drain_timer_);
 

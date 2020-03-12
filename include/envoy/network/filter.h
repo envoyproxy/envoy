@@ -456,5 +456,7 @@ public:
   virtual const std::list<const FilterChain*>& getDrainingFilterChains() const PURE;
 };
 
+using DrainingFilterChainsPtr = std::unique_ptr<DrainingFilterChains>;
+
 } // namespace Network
 } // namespace Envoy

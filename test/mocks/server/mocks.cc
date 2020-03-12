@@ -141,6 +141,13 @@ MockWorker::MockWorker() {
           completion();
         }
       }));
+
+  ON_CALL(*this, removeFilterChains(_, _))
+      .WillByDefault(Invoke(
+          [this](const Network::DrainingFilterChains&, std::function<void()> completion) -> void {
+            EXPECT_EQ(nullptr, remove_filter_chains_completion_);
+            remove_filter_chains_completion_ = completion;
+          }));
 }
 MockWorker::~MockWorker() = default;
 
