@@ -333,7 +333,7 @@ verifySignature()
 
 .. code-block:: lua
 
-  ok, error = verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
+  ok, error = handle:verifySignature(hashFunction, pubkey, signature, signatureLength, data, dataLength)
 
 Verify signature using provided parameters. *hashFunction* is the variable for hash function which be used
 for verifying signature. *SHA1*, *SHA224*, *SHA256*, *SHA384* and *SHA512* are supported.
@@ -348,7 +348,7 @@ timestamp()
 
 .. code-block:: lua
 
-  timestamp = timestamp(format)
+  timestamp = handle:timestamp(format)
 
 High resolution timestamp function. *format* is an optional string parameter to indicate the format of the timestamp.
 *milliseconds_since_epoch* and *nanoseconds_since_epoch* are supported.
