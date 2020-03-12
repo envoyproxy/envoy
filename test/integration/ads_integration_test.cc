@@ -889,4 +889,236 @@ TEST_P(AdsClusterFromFileIntegrationTest, BasicTestWidsAdsEndpointLoadedFromFile
                                       {"ads_eds_cluster"}, {}, {}));
 }
 
+namespace {
+static std::string AdsIntegrationConfigWithRdts(const std::string& api_type) {
+  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
+  return fmt::format(R"EOF(
+layered_runtime:
+  layers:
+    - name: foobar
+      rtds_layer:
+        name: ads_rtds_layer
+        rtds_config:
+          ads: {{}}
+dynamic_resources:
+  lds_config:
+    ads: {{}}
+  cds_config:
+    ads: {{}}
+  ads_config:
+    api_type: {}
+    set_node_on_first_message_only: true
+static_resources:
+  clusters:
+    name: dummy_cluster
+    connect_timeout:
+      seconds: 5
+    type: STATIC
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {{}}
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+)EOF",
+                     api_type);
+}
+} // namespace
+
+class AdsIntegrationTestWithRtds : public AdsIntegrationTest {
+public:
+  AdsIntegrationTestWithRtds()
+      : AdsIntegrationTest(AdsIntegrationConfigWithRdts(
+            sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {}
+
+  void testBasicFlow() {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"ads_rtds_layer"},
+                                        {"ads_rtds_layer"}, {}, true));
+    auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+      name: ads_rtds_layer
+      layer:
+        foo: bar
+        baz: meh
+    )EOF");
+    sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+        Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+    // Send initial configuration, validate we can process a request.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, false));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {buildCluster("cluster_0")}, {buildCluster("cluster_0")},
+        {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {},
+                                        {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                        {"cluster_0"}, {"cluster_0"}, {}, false));
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+        {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false));
+    sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+        Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+        {buildListener("listener_0", "route_config_0")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                        {"cluster_0"}, {}, {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                        {"route_config_0"}, {"route_config_0"}, {}, false));
+    sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+        Config::TypeUrl::get().RouteConfiguration,
+        {buildRouteConfig("route_config_0", "cluster_0")},
+        {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+                                        {"route_config_0"}, {}, {}, false));
+
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    makeSingleRequest();
+    const ProtobufWkt::Timestamp first_active_listener_ts_1 =
+        getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();
+    const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
+        getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+    const ProtobufWkt::Timestamp first_route_config_ts_1 =
+        getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTestWithRtds,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(AdsIntegrationTestWithRtds, Basic) {
+  initialize();
+  testBasicFlow();
+}
+
+class AdsIntegrationTestWithRtdsAndSecondaryClusters : public AdsIntegrationTest {
+public:
+  AdsIntegrationTestWithRtdsAndSecondaryClusters()
+      : AdsIntegrationTest(AdsIntegrationConfigWithRdts(
+            sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      auto* grpc_service = ads_config->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ads_cluster->set_name("ads_cluster");
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext context;
+      auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      validation_context->add_match_subject_alt_names()->set_suffix("lyft.com");
+      if (clientType() == Grpc::ClientType::GoogleGrpc) {
+        auto* google_grpc = grpc_service->mutable_google_grpc();
+        auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
+        ssl_creds->mutable_root_certs()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      }
+      ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
+
+      auto* eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      eds_cluster->set_name("eds_cluster");
+      eds_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
+      auto* eds_cluster_config = eds_cluster->mutable_eds_cluster_config();
+      eds_cluster_config->mutable_eds_config()->mutable_ads();
+    });
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    HttpIntegrationTest::initialize();
+    if (xds_stream_ == nullptr) {
+      createXdsConnection();
+      AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+    }
+  }
+
+  void testBasicFlow() {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"ads_rtds_layer"},
+                                        {"ads_rtds_layer"}, {}, true));
+    auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+      name: ads_rtds_layer
+      layer:
+        foo: bar
+        baz: meh
+    )EOF");
+    sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+        Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                        {"eds_cluster"}, {"eds_cluster"}, {}, false));
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("eds_cluster")},
+        {buildClusterLoadAssignment("eds_cluster")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"ads_rtds_layer"}, {},
+                                        {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, false));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {buildCluster("cluster_0")}, {buildCluster("cluster_0")},
+        {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                        {"eds_cluster"}, {}, {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                        {"cluster_0", "eds_cluster"}, {"cluster_0"}, {}, false));
+
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+        {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false));
+    sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+        Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+        {buildListener("listener_0", "route_config_0")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+                                        {"cluster_0", "eds_cluster"}, {}, {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                        {"route_config_0"}, {"route_config_0"}, {}, false));
+    sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+        Config::TypeUrl::get().RouteConfiguration,
+        {buildRouteConfig("route_config_0", "cluster_0")},
+        {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}, false));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+                                        {"route_config_0"}, {}, {}, false));
+
+    test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+    makeSingleRequest();
+    const ProtobufWkt::Timestamp first_active_listener_ts_1 =
+        getListenersConfigDump().dynamic_listeners(0).active_state().last_updated();
+    const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
+        getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+    const ProtobufWkt::Timestamp first_route_config_ts_1 =
+        getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTestWithRtdsAndSecondaryClusters,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
+  initialize();
+  testBasicFlow();
+}
+
 } // namespace Envoy

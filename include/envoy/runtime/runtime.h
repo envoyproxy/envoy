@@ -259,6 +259,8 @@ class Loader {
 public:
   virtual ~Loader() = default;
 
+  using ReadyCallback = std::function<void()>;
+
   /**
    * Post-construction initialization. Runtime will be generally available after
    * the constructor is finished, with the exception of dynamic RTDS layers,
@@ -286,6 +288,12 @@ public:
    * @param values the values to merge
    */
   virtual void mergeValues(const std::unordered_map<std::string, std::string>& values) PURE;
+
+  /**
+   * Initiate all RTDS subscriptions. The `on_done` callback is invoked when all RTDS requests
+   * have either received and applied their responses or timed out.
+   */
+  virtual void startRtdsSubscriptions(ReadyCallback on_done) PURE;
 };
 
 using LoaderPtr = std::unique_ptr<Loader>;

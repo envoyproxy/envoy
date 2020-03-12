@@ -73,6 +73,15 @@ class ClusterManagerFactory;
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
+ * Cluster manager is initialed in two phases. In the first phase which begins at the construction
+ * all primary (i.e. not provisioned through xDS) clusters are initialized.
+ * After the first phase the RTDS (if configured) initialization begins. This allows runtime
+ * overrides to be fully configured before the rest of xDS configuration is provisioned.
+ * The second phase of cluster manager initialized begins after RTDS has initialized. In the second
+ * phase all secondary clusters are initialized and then the rest of the configuration provisioned
+ * through xDS.
+ * Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
+ * provisioned through ADS then ADS must use primary cluster as well.
  */
 class ClusterManager {
 public:
@@ -95,6 +104,15 @@ public:
    * Set a callback that will be invoked when all owned clusters have been initialized.
    */
   virtual void setInitializedCb(std::function<void()> callback) PURE;
+
+  /**
+   * Start initialization of secondary clusters and then dynamically configured clusters.
+   * This method is called after RTDS initialization has completed.
+   * The "initialized callback" set in the method above is invoked when secondary and
+   * dynamically provisioned clusters have finished initializing.
+   */
+  virtual void
+  initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   using ClusterInfoMap = std::unordered_map<std::string, std::reference_wrapper<const Cluster>>;
 

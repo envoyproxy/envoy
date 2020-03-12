@@ -20,15 +20,17 @@ using testing::AssertionResult;
 
 namespace Envoy {
 
-AdsIntegrationTest::AdsIntegrationTest()
-    : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, ipVersion(),
-          AdsIntegrationConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+AdsIntegrationTest::AdsIntegrationTest(const std::string& config)
+    : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
   sotw_or_delta_ = sotwOrDelta();
 }
+
+AdsIntegrationTest::AdsIntegrationTest()
+    : AdsIntegrationTest(
+          AdsIntegrationConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {}
 
 void AdsIntegrationTest::TearDown() {
   cleanUpXdsConnection();

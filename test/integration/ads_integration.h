@@ -56,6 +56,7 @@ admin:
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
   AdsIntegrationTest();
+  AdsIntegrationTest(const std::string& config);
 
   void TearDown() override;
 

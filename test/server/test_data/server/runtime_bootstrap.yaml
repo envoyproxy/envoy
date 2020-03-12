@@ -7,12 +7,3 @@ layered_runtime:
       disk_layer: { symlink_root: {{ test_rundir }}/test/server/test_data/runtime/primary }
     - name: overlay_disk_layer
       disk_layer: { symlink_root: {{ test_rundir }}/test/server/test_data/runtime/override, append_service_cluster: true }
-    - name: foobar
-      rtds_layer:
-        name: foobar
-        rtds_config:
-          api_config_source:
-            api_type: GRPC
-            grpc_services:
-              envoy_grpc:
-                cluster_name: xds_cluster

@@ -129,7 +129,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   }
 
   // If we are still waiting for primary clusters to initialize, do nothing.
-  ASSERT(state_ == State::WaitingForStaticInitialize || state_ == State::CdsInitialized);
+  ASSERT(state_ == State::WaitingForSecondaryInitialize || state_ == State::CdsInitialized);
   ENVOY_LOG(debug, "maybe finish initialize primary init clusters empty: {}",
             primary_init_clusters_.empty());
   if (!primary_init_clusters_.empty()) {
@@ -163,7 +163,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // directly to initialized.
   started_secondary_initialize_ = false;
   ENVOY_LOG(debug, "maybe finish initialize cds api ready: {}", cds_ != nullptr);
-  if (state_ == State::WaitingForStaticInitialize && cds_) {
+  if (state_ == State::WaitingForSecondaryInitialize && cds_) {
     ENVOY_LOG(info, "cm init: initializing cds");
     state_ = State::WaitingForCdsInitialize;
     cds_->initialize();
@@ -178,7 +178,14 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
 
 void ClusterManagerInitHelper::onStaticLoadComplete() {
   ASSERT(state_ == State::Loading);
-  state_ = State::WaitingForStaticInitialize;
+  // After initialization of primary clusters has completed, transition to
+  // waiting for signal to initialize secondary clusters and then CDS.
+  state_ = State::WaitingForSecondaryInitialize;
+}
+
+void ClusterManagerInitHelper::startInitializingSecondaryClusters() {
+  ASSERT(state_ == State::WaitingForSecondaryInitialize);
+  ENVOY_LOG(debug, "continue initializing secondary clusters");
   maybeFinishInitialize();
 }
 
@@ -339,15 +346,21 @@ ClusterManagerImpl::ClusterManagerImpl(
   init_helper_.onStaticLoadComplete();
 
   ads_mux_->start();
+}
 
+void ClusterManagerImpl::initializeSecondaryClusters(
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  init_helper_.startInitializingSecondaryClusters();
+
+  const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info, *this, stats,
-        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
-                                                       stats)
-            ->create(),
-        load_stats_config.transport_api_version(), main_thread_dispatcher);
+    load_stats_reporter_ =
+        std::make_unique<LoadStatsReporter>(local_info_, *this, stats_,
+                                            Config::Utility::factoryForGrpcApiConfigSource(
+                                                *async_client_manager_, load_stats_config, stats_)
+                                                ->create(),
+                                            load_stats_config.transport_api_version(), dispatcher_);
   }
 }
 
