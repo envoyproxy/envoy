@@ -1164,7 +1164,7 @@ http2_protocol_options:
   // This will throw when Http2ProtocolOptions validation fails.
   HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                               date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_);
+                              scoped_routes_config_provider_manager_, http_tracer_manager_);
 }
 
 // Validates that named and user defined parameter collisions will trigger a config validation
@@ -1198,7 +1198,7 @@ http2_protocol_options:
   EXPECT_THROW_WITH_REGEX(
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_),
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException,
       R"(the \{hpack_table_size,max_concurrent_streams\} HTTP/2 SETTINGS parameter\(s\) can not be)"
       " configured");
@@ -1226,7 +1226,7 @@ http2_protocol_options:
   )EOF";
   HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string2), context_,
                               date_provider_, route_config_provider_manager_,
-                              scoped_routes_config_provider_manager_);
+                              scoped_routes_config_provider_manager_, http_tracer_manager_);
 }
 
 // Validates that setting the server push parameter via user defined parameters is disallowed.
@@ -1254,7 +1254,7 @@ http2_protocol_options:
   EXPECT_THROW_WITH_REGEX(
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_),
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException,
       "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
 
@@ -1288,7 +1288,7 @@ http2_protocol_options:
   EXPECT_THROW_WITH_REGEX(
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_),
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException,
       "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
 }

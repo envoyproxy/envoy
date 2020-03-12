@@ -265,7 +265,7 @@ message Http2ProtocolOptions {
   //
   // Collisions will trigger config validation failure on load/update.
   // The only exception is '0x8 allow_connect', for which the named parameter field will be
-  // overriden by the value set in this field.
+  // overridden by the value set in this field.
   //
   // See `IANA HTTP/2 Settings
   // <https://www.iana.org/assignments/http2-parameters/http2-parameters.xhtml#settings>`_ for

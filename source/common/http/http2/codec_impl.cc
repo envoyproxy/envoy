@@ -958,7 +958,7 @@ void ConnectionImpl::sendSettings(
   for (const auto& descriptor : descriptors) {
     if (descriptor.entry.value != descriptor.default_value) {
       auto result = settings.insert(descriptor.entry);
-      // Config validation should ensure a collision with user defined parameters is not posible.
+      // Config validation should ensure a collision with user defined parameters is not possible.
       // There is one exception, `allow_connect`, which requires a breaking API change to enable
       // presence checks during validation.
       if (!result.second) {
