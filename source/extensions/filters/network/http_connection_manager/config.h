@@ -20,7 +20,6 @@
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
-#include "common/stats/symbol_table_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/network/common/factory_base.h"
