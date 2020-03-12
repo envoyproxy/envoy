@@ -21,6 +21,19 @@ namespace Http {
 class AsyncClient {
 public:
   /**
+   * An in-flight HTTP request.
+   */
+  class Request {
+  public:
+    virtual ~Request() = default;
+
+    /**
+     * Signals that the request should be cancelled.
+     */
+    virtual void cancel() PURE;
+  };
+
+  /**
    * Async Client failure reasons.
    */
   enum class FailureReason {
@@ -37,14 +50,51 @@ public:
 
     /**
      * Called when the async HTTP request succeeds.
+     * @param request  request handle or nullptr if no request could be created.
+     *                 NOTE: request handle is passed for correlation purposes only, e.g.
+     *                 for client code to be able to exclude that handle from a list of
+     *                 requests in progress.
+     * @param response the HTTP response
+     */
+    virtual void onSuccess(const Request* request, ResponseMessagePtr&& response) PURE;
+
+    /**
+     * Called when the async HTTP request fails.
+     * @param request request handle or nullptr if no request could be created.
+     *                NOTE: request handle is passed for correlation purposes only, e.g.
+     *                for client code to be able to exclude that handle from a list of
+     *                requests in progress.
+     * @param reason  failure reason
+     */
+    virtual void onFailure(const Request* request, FailureReason reason) PURE;
+  };
+
+  /**
+   * Notifies caller of async HTTP request status.
+   */
+  class RequestCallbacks : public Callbacks {
+  public:
+    virtual ~RequestCallbacks() override = default;
+
+    /**
+     * Called when the async HTTP request succeeds.
      * @param response the HTTP response
      */
     virtual void onSuccess(ResponseMessagePtr&& response) PURE;
 
     /**
      * Called when the async HTTP request fails.
+     * @param reason failure reason
      */
     virtual void onFailure(FailureReason reason) PURE;
+
+    // Callbacks
+
+    virtual void onSuccess(const Request*, ResponseMessagePtr&& response) override {
+      onSuccess(std::forward<ResponseMessagePtr>(response));
+    }
+
+    virtual void onFailure(const Request*, FailureReason reason) override { onFailure(reason); }
   };
 
   /**
@@ -90,19 +140,6 @@ public:
      * Called when the async HTTP stream is reset.
      */
     virtual void onReset() PURE;
-  };
-
-  /**
-   * An in-flight HTTP request.
-   */
-  class Request {
-  public:
-    virtual ~Request() = default;
-
-    /**
-     * Signals that the request should be cancelled.
-     */
-    virtual void cancel() PURE;
   };
 
   /**

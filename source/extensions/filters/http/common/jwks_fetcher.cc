@@ -16,7 +16,7 @@ namespace {
 
 class JwksFetcherImpl : public JwksFetcher,
                         public Logger::Loggable<Logger::Id::filter>,
-                        public Http::AsyncClient::Callbacks {
+                        public Http::AsyncClient::RequestCallbacks {
 public:
   JwksFetcherImpl(Upstream::ClusterManager& cm) : cm_(cm) { ENVOY_LOG(trace, "{}", __func__); }
 

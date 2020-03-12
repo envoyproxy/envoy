@@ -78,7 +78,7 @@ class Filter;
  * The script interacts with Envoy entirely through this handle.
  */
 class StreamHandleWrapper : public Filters::Common::Lua::BaseLuaObject<StreamHandleWrapper>,
-                            public Http::AsyncClient::Callbacks {
+                            public Http::AsyncClient::RequestCallbacks {
 public:
   /**
    * The state machine for a stream handler. In the current implementation everything the filter
@@ -252,7 +252,7 @@ private:
     public_key_wrapper_.reset();
   }
 
-  // Http::AsyncClient::Callbacks
+  // Http::AsyncClient::RequestCallbacks
   void onSuccess(Http::ResponseMessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
@@ -280,9 +280,9 @@ private:
 /**
  * An empty Callbacks client. It will ignore everything, including successes and failures.
  */
-class NoopCallbacks : public Http::AsyncClient::Callbacks {
+class NoopCallbacks : public Http::AsyncClient::RequestCallbacks {
 public:
-  // Http::AsyncClient::Callbacks
+  // Http::AsyncClient::RequestCallbacks
   void onSuccess(Http::ResponseMessagePtr&&) override {}
   void onFailure(Http::AsyncClient::FailureReason) override {}
 };

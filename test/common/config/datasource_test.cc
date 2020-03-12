@@ -33,6 +33,7 @@ protected:
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
+  NiceMock<Http::MockAsyncClientRequest> request_{&cm_.async_client_};
 
   Config::DataSource::LocalAsyncDataProviderPtr local_data_provider_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
@@ -115,7 +116,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
 
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
+    callbacks.onFailure(&request_, Envoy::Http::AsyncClient::FailureReason::Reset);
     return nullptr;
   });
 
@@ -155,9 +156,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
 
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-    return nullptr;
+    callbacks.onSuccess(
+        &request_,
+        Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+    return &request_;
   });
 
   std::string async_data = "non-empty";
@@ -196,9 +199,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
 
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})});
-    return nullptr;
+    callbacks.onSuccess(
+        &request_,
+        Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})});
+    return &request_;
   });
 
   std::string async_data = "non-empty";
@@ -243,8 +248,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
     response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
-    callbacks.onSuccess(std::move(response));
-    return nullptr;
+    callbacks.onSuccess(&request_, std::move(response));
+    return &request_;
   });
 
   std::string async_data = "non-empty";
@@ -288,8 +293,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
     response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
-    callbacks.onSuccess(std::move(response));
-    return nullptr;
+    callbacks.onSuccess(&request_, std::move(response));
+    return &request_;
   });
 
   std::string async_data = "non-empty";
@@ -325,9 +330,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
 
   initialize([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                  const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-    callbacks.onSuccess(Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-    return nullptr;
+    callbacks.onSuccess(
+        &request_,
+        Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+    return &request_;
   });
 
   std::string async_data = "non-empty";
@@ -369,8 +376,8 @@ TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
           Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
       response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
-      callbacks.onSuccess(std::move(response));
-      return nullptr;
+      callbacks.onSuccess(&request_, std::move(response));
+      return &request_;
     });
 
     remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
@@ -413,9 +420,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
   initialize(
       [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-        callbacks.onSuccess(Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
-            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-        return nullptr;
+        callbacks.onSuccess(
+            &request_,
+            Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+        return &request_;
       },
       num_retries);
 
@@ -442,8 +451,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
                             new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
                     response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
-                    callbacks.onSuccess(std::move(response));
-                    return nullptr;
+                    callbacks.onSuccess(&request_, std::move(response));
+                    return &request_;
                   }));
         }
 

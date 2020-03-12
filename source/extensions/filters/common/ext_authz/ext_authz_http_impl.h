@@ -142,7 +142,7 @@ using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;
  * setting a path prefix witch is not available for gRPC.
  */
 class RawHttpClientImpl : public Client,
-                          public Http::AsyncClient::Callbacks,
+                          public Http::AsyncClient::RequestCallbacks,
                           Logger::Loggable<Logger::Id::config> {
 public:
   explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
@@ -151,10 +151,10 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
-             Tracing::Span&) override;
+  void check(Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span&) override;
 
-  // Http::AsyncClient::Callbacks
+  // Http::AsyncClient::RequestCallbacks
   void onSuccess(Http::ResponseMessagePtr&& message) override;
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
@@ -163,7 +163,7 @@ private:
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
-  RequestCallbacks* callbacks_{};
+  Filters::Common::ExtAuthz::RequestCallbacks* callbacks_{};
   TimeSource& time_source_;
   Tracing::SpanPtr span_;
 };

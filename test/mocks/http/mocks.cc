@@ -138,6 +138,9 @@ MockAsyncClient::~MockAsyncClient() = default;
 MockAsyncClientCallbacks::MockAsyncClientCallbacks() = default;
 MockAsyncClientCallbacks::~MockAsyncClientCallbacks() = default;
 
+MockAsyncClientRequestCallbacks::MockAsyncClientRequestCallbacks() = default;
+MockAsyncClientRequestCallbacks::~MockAsyncClientRequestCallbacks() = default;
+
 MockAsyncClientStreamCallbacks::MockAsyncClientStreamCallbacks() = default;
 MockAsyncClientStreamCallbacks::~MockAsyncClientStreamCallbacks() = default;
 

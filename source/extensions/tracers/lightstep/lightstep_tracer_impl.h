@@ -75,7 +75,8 @@ public:
   PropagationMode propagationMode() const override { return propagation_mode_; }
 
 private:
-  class LightStepTransporter : public lightstep::AsyncTransporter, Http::AsyncClient::Callbacks {
+  class LightStepTransporter : public lightstep::AsyncTransporter,
+                               Http::AsyncClient::RequestCallbacks {
   public:
     explicit LightStepTransporter(LightStepDriver& driver);
 
@@ -87,7 +88,7 @@ private:
     void Send(std::unique_ptr<lightstep::BufferChain>&& message,
               Callback& callback) noexcept override;
 
-    // Http::AsyncClient::Callbacks
+    // Http::AsyncClient::RequestCallbacks
     void onSuccess(Http::ResponseMessagePtr&& response) override;
     void onFailure(Http::AsyncClient::FailureReason failure_reason) override;
 

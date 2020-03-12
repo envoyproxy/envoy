@@ -15,7 +15,7 @@ namespace Http {
  * A helper base class used to fetch a REST API at a jittered periodic interval. Once initialize()
  * is called, the API will be fetched and events raised.
  */
-class RestApiFetcher : public Http::AsyncClient::Callbacks {
+class RestApiFetcher : public Http::AsyncClient::RequestCallbacks {
 protected:
   RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
@@ -61,7 +61,7 @@ private:
   void refresh();
   void requestComplete();
 
-  // Http::AsyncClient::Callbacks
+  // Http::AsyncClient::RequestCallbacks
   void onSuccess(Http::ResponseMessagePtr&& response) override;
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 

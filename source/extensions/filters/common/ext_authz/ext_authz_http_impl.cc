@@ -220,7 +220,7 @@ void RawHttpClientImpl::cancel() {
 }
 
 // Client
-void RawHttpClientImpl::check(RequestCallbacks& callbacks,
+void RawHttpClientImpl::check(Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                               const envoy::service::auth::v3::CheckRequest& request,
                               Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
