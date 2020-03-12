@@ -82,8 +82,9 @@ INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest,
 // Just make sure that all configs can be ingested without a crash. Processing of config files
 // may not be successful, but there should be no crash.
 TEST_P(ValidationServerTest_1, RunWithoutCrash) {
-  validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_,
-                 Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+  auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+  validateConfig(options_, local_address, component_factory_, Thread::threadFactoryForTest(),
+                 Filesystem::fileSystemForTest());
   SUCCEED();
 }
 
