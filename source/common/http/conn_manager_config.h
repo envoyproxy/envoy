@@ -5,6 +5,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/date_provider.h"
@@ -360,6 +361,11 @@ public:
    *         the same user agent will be written to the x-envoy-downstream-service-cluster header.
    */
   virtual const absl::optional<std::string>& userAgent() PURE;
+
+  /**
+   *  @return HttpTracerSharedPtr HttpTracer to use.
+   */
+  virtual Tracing::HttpTracerSharedPtr tracer() PURE;
 
   /**
    * @return tracing config.
