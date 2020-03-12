@@ -667,7 +667,7 @@ void HttpIntegrationTest::testRetry() {
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
-  host.set_include_response_attempt_count(true);
+  host.set_include_attempt_count_in_response(true);
   config_helper_.addVirtualHost(host);
 
   initialize();

@@ -300,7 +300,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
-  host.set_include_response_attempt_count(true);
+  host.set_include_attempt_count_in_response(true);
   config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

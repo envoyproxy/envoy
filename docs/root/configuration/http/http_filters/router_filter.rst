@@ -325,7 +325,7 @@ flag is set to true.
 Sent to the downstream to indicate how many upstream requests took place. The header will be absent if
 the router did not send any upstream requests. The value will be "1" if only the original upstream
 request was sent, incrementing by one for each retry. Only set if the
-:ref:`include_response_attempt_count <envoy_api_field_route.VirtualHost.include_response_attempt_count>`
+:ref:`include_attempt_count_in_response <envoy_api_field_route.VirtualHost.include_attempt_count_in_response>`
 flag is set to true.
 
 .. _config_http_filters_router_x-envoy-expected-rq-timeout-ms:

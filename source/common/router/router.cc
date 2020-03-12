@@ -585,15 +585,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
 
-  include_request_attempt_count_ = route_entry_->includeRequestAttemptCount();
-  if (include_request_attempt_count_) {
+  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
+  if (include_attempt_count_in_request_) {
     headers.setEnvoyAttemptCount(attempt_count_);
   }
 
   // The router has reached a point where it is going to try to send a request upstream,
-  // so now modify_headers should attach x-envoy-attempt-count to downstream response if the config
+  // so now modify_headers should attach x-envoy-attempt-count to the downstream response if the config
   // flag is true.
-  if (route_entry_->includeResponseAttemptCount()) {
+  if (route_entry_->includeAttemptCountInResponse()) {
     modify_headers = [modify_headers, this](Http::ResponseHeaderMap& headers) {
       modify_headers(headers);
 
@@ -1425,7 +1425,7 @@ void Filter::doRetry() {
     return;
   }
 
-  if (include_request_attempt_count_) {
+  if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 

@@ -234,8 +234,8 @@ public:
         .WillByDefault(Return(max_internal_redirects));
   }
 
-  void setIncludeResponseAttemptCount(bool include) {
-    ON_CALL(callbacks_.route_->route_entry_, includeResponseAttemptCount())
+  void setIncludeAttemptCountInResponse(bool include) {
+    ON_CALL(callbacks_.route_->route_entry_, includeAttemptCountInResponse())
         .WillByDefault(Return(include));
   }
 
@@ -875,7 +875,7 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
 
 // Validate that x-envoy-attempt-count is added when option is true.
 TEST_F(RouterTest, EnvoyAttemptCountInResponse) {
-  setIncludeResponseAttemptCount(true);
+  setIncludeAttemptCountInResponse(true);
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -908,7 +908,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponse) {
 // Validate that x-envoy-attempt-count is overwritten by the router on response headers, if the
 // header is sent from the upstream and the option is set to true.
 TEST_F(RouterTest, EnvoyAttemptCountInResponseOverwritten) {
-  setIncludeResponseAttemptCount(true);
+  setIncludeAttemptCountInResponse(true);
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -941,7 +941,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseOverwritten) {
 // Validate that x-envoy-attempt-count is not overwritten by the router on response headers, if the
 // header is sent from the upstream and the option is not set to true.
 TEST_F(RouterTest, EnvoyAttemptCountInResponseNotOverwritten) {
-  setIncludeResponseAttemptCount(false);
+  setIncludeAttemptCountInResponse(false);
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -973,7 +973,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseNotOverwritten) {
 
 // Validate that we don't set x-envoy-attempt-count in responses before an upstream attempt is made.
 TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyAttemptCountInResponseNotPresent) {
-  setIncludeResponseAttemptCount(true);
+  setIncludeAttemptCountInResponse(true);
 
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, maintenanceMode()).WillOnce(Return(true));
 
@@ -989,7 +989,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyAttemptCountInResponseNotPresent) {
 }
 
 TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
-  setIncludeResponseAttemptCount(true);
+  setIncludeAttemptCountInResponse(true);
   // ON_CALL(callbacks_.route_->route_entry_, priority())
   //     .WillByDefault(Return(Upstream::ResourcePriority::High));
   // EXPECT_CALL(cm_, httpConnPoolForCluster(_, Upstream::ResourcePriority::High, _, &router_));
