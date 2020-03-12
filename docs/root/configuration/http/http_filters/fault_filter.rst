@@ -45,7 +45,7 @@ fault configuration. The currently supported header controls are:
   In order for the header to work, :ref:`header_delay
   <envoy_api_field_config.filter.fault.v2.FaultDelay.header_delay>` needs to be set.
 * Response rate limit configuration via the *x-envoy-fault-throughput-response* header. The
-  header value should be an integer that specified the limit in KiB/s and must be > 0. In order
+  header value should be an integer that specifies the limit in KiB/s and must be > 0. In order
   for the header to work, :ref:`header_limit
   <envoy_api_field_config.filter.fault.v2.FaultRateLimit.header_limit>` needs to be set.
 
