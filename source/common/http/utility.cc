@@ -29,10 +29,66 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http2 {
 namespace Utility {
+
+namespace {
+
+void validateCustomSettingsParameters(
+    const envoy::config::core::v3::Http2ProtocolOptions& options) {
+  std::vector<std::string> duplicate_parameters;
+  // User defined and named parameters with the same SETTINGS identifier can not both be set.
+  for (const auto it : options.custom_settings_parameters()) {
+    ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
+    switch (it.identifier().value()) {
+    case NGHTTP2_SETTINGS_ENABLE_PUSH:
+      if (it.value().value() == 1) {
+        throw EnvoyException("server push is not supported by Envoy and can not be enabled via a "
+                             "SETTINGS parameter.");
+      }
+      break;
+    case NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL:
+      // This parameter can not be validated due to the use of proto3 bool, which doesn't allow
+      // checking for presence.
+      // TODO: This can be fixed via a breaking API change of the type to
+      // `google.protobuf.BoolValue`.
+      break;
+    case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
+      if (options.has_hpack_table_size()) {
+        duplicate_parameters.push_back("hpack_table_size");
+      }
+      break;
+    case NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS:
+      if (options.has_max_concurrent_streams()) {
+        duplicate_parameters.push_back("max_concurrent_streams");
+      }
+      break;
+    case NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE:
+      if (options.has_initial_stream_window_size()) {
+        duplicate_parameters.push_back("initial_stream_window_size");
+      }
+      break;
+    default:
+      // Ignore unknown parameters.
+      break;
+    }
+  }
+
+  if (!duplicate_parameters.empty()) {
+    throw EnvoyException(fmt::format(
+        "the {{{}}} HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
+        "custom "
+        "parameters",
+        absl::StrJoin(duplicate_parameters, ",", [](std::string* out, const std::string& str) {
+          absl::StrAppend(out, str);
+        })));
+  }
+}
+
+} // namespace
 
 const uint32_t OptionsLimits::MIN_HPACK_TABLE_SIZE;
 const uint32_t OptionsLimits::DEFAULT_HPACK_TABLE_SIZE;
@@ -55,6 +111,9 @@ const uint32_t OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_
 envoy::config::core::v3::Http2ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options) {
   envoy::config::core::v3::Http2ProtocolOptions options_clone(options);
+  // This will throw an exception when a custom parameter and a named parameter collide.
+  validateCustomSettingsParameters(options);
+
   if (!options_clone.has_hpack_table_size()) {
     options_clone.mutable_hpack_table_size()->set_value(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE);
   }

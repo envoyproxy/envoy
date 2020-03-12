@@ -956,6 +956,161 @@ access_log:
                           "bad_type: Cannot find field");
 }
 
+// Validates that HttpConnectionManagerConfig construction succeeds when there are no collisions
+// between named and user defined parameters, and server push is not modified.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsNoCollision) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.router
+  typed_config: {}
+http2_protocol_options:
+  hpack_table_size: 1024
+  custom_settings_parameters: { identifier: 3, value: 2048 }
+  )EOF";
+  // This will throw when Http2ProtocolOptions validation fails.
+  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                              date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_);
+}
+
+// Validates that named and user defined parameter collisions will trigger a config validation
+// failure.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsNamedParameterCollision) {
+  // Override both hpack_table_size (id = 0x1) and max_concurrent_streams (id = 0x3) with custom
+  // parameters of the same and different values (respectively).
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  typed_config: {}
+http2_protocol_options:
+  hpack_table_size: 2048
+  max_concurrent_streams: 4096
+  custom_settings_parameters:
+    - { identifier: 1, value: 2048 }
+    - { identifier: 3, value: 1024 }
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException,
+      R"(the \{hpack_table_size,max_concurrent_streams\} HTTP/2 SETTINGS parameter\(s\) can not be)"
+      " configured");
+
+  const std::string yaml_string2 = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.router
+  typed_config: {}
+http2_protocol_options:
+  allow_connect: true
+  custom_settings_parameters:
+    - { identifier: 8, value: 0 }
+  )EOF";
+  HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string2), context_,
+                              date_provider_, route_config_provider_manager_,
+                              scoped_routes_config_provider_manager_);
+}
+
+// Validates that setting the server push parameter via user defined parameters is disallowed.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsDisallowServerPush) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  typed_config: {}
+http2_protocol_options:
+  custom_settings_parameters: { identifier: 2, value: 1 }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException,
+      "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
+
+  // Specify both the server push parameter and colliding named and user defined parameters.
+  const std::string yaml_string2 = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  typed_config: {}
+http2_protocol_options:
+  hpack_table_size: 2048
+  max_concurrent_streams: 4096
+  custom_settings_parameters:
+    - { identifier: 1, value: 2048 }
+    - { identifier: 2, value: 1 }
+    - { identifier: 3, value: 1024 }
+  )EOF";
+
+  // The server push exception is thrown first.
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_),
+      EnvoyException,
+      "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
+}
+
 // Test that the deprecated extension name still functions.
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.http_connection_manager";

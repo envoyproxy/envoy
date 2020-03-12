@@ -891,7 +891,6 @@ void ConnectionImpl::sendPendingFrames() {
 
 void ConnectionImpl::sendSettings(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options, bool disable_push) {
-  // Custom parameters override named parameters, so they must be inserted first into this set.
   std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals> settings;
 
   // Universally disable receiving push promise frames as we don't currently support
@@ -943,8 +942,14 @@ void ConnectionImpl::sendSettings(
   for (const auto& descriptor : descriptors) {
     if (descriptor.entry.value != descriptor.default_value) {
       auto result = settings.insert(descriptor.entry);
+      // Config validation should ensure a collision with user defined parameters is not posible.
+      // There is one exception, `allow_connect`, which requires a breaking API change to enable
+      // presence checks during validation.
       if (!result.second) {
-        ENVOY_CONN_LOG(debug, "duplicate named settings parameter with id {:#x}, value {}",
+        ASSERT(descriptor.entry.settings_id == NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL);
+        ENVOY_CONN_LOG(debug,
+                       "overriding named settings parameter with id {:#x}, value {} due to "
+                       "collision with user defined parameter",
                        connection_, descriptor.entry.settings_id, descriptor.entry.value);
         continue;
       }
