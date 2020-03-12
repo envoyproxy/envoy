@@ -405,7 +405,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Initialize the `modify_headers` function as a no-op (so we don't have to remember to check it
   // against nullptr before calling it), and feed it behavior later if/when we have cluster info
   // headers to append.
-  std::function<void(Http::HeaderMap&)> modify_headers = [](Http::HeaderMap&) {};
+  std::function<void(Http::ResponseHeaderMap&)> modify_headers = [](Http::ResponseHeaderMap&) {};
 
   // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
@@ -453,7 +453,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   callbacks_->streamInfo().setRouteName(route_entry_->routeName());
   if (debug_config && debug_config->append_cluster_) {
     // The cluster name will be appended to any local or upstream responses from this point.
-    modify_headers = [this, debug_config](Http::HeaderMap& headers) {
+    modify_headers = [this, debug_config](Http::ResponseHeaderMap& headers) {
       headers.addCopy(debug_config->cluster_header_.value_or(Http::Headers::get().EnvoyCluster),
                       route_entry_->clusterName());
     };
@@ -550,7 +550,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (debug_config && debug_config->append_upstream_host_) {
     // The hostname and address will be appended to any local or upstream responses from this point,
     // possibly in addition to the cluster name.
-    modify_headers = [modify_headers, debug_config, conn_pool](Http::HeaderMap& headers) {
+    modify_headers = [modify_headers, debug_config, conn_pool](Http::ResponseHeaderMap& headers) {
       modify_headers(headers);
       headers.addCopy(
           debug_config->hostname_header_.value_or(Http::Headers::get().EnvoyUpstreamHostname),
@@ -563,7 +563,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // If we've been instructed not to forward the request upstream, send an empty local response.
   if (debug_config && debug_config->do_not_forward_) {
-    modify_headers = [modify_headers, debug_config](Http::HeaderMap& headers) {
+    modify_headers = [modify_headers, debug_config](Http::ResponseHeaderMap& headers) {
       modify_headers(headers);
       headers.addCopy(
           debug_config->not_forwarded_header_.value_or(Http::Headers::get().EnvoyNotForwarded),
@@ -588,6 +588,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   include_request_attempt_count_ = route_entry_->includeRequestAttemptCount();
   if (include_request_attempt_count_) {
     headers.setEnvoyAttemptCount(attempt_count_);
+  }
+
+  // The router has reached a point where it is going to try to send a request upstream,
+  // so now modify_headers should attach x-envoy-attempt-count to downstream response if the config
+  // flag is true.
+  if (route_entry_->includeResponseAttemptCount()) {
+    modify_headers = [modify_headers, this](Http::ResponseHeaderMap& headers) {
+      modify_headers(headers);
+
+      // This header is added without checking for config_.suppress_envoy_headers_ to mirror what is
+      // done for upstream requests.
+      headers.setEnvoyAttemptCount(attempt_count_);
+    };
   }
 
   // Inject the active span's tracing context into the request headers.
@@ -1227,16 +1240,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // Append routing cookies
   for (const auto& header_value : downstream_set_cookies_) {
     headers->addReferenceKey(Http::Headers::get().SetCookie, header_value);
-  }
-
-  // This header is added without checking for config_.suppress_envoy_headers_ to mirror what is
-  // done for upstream requests. Note: this work is done here instead of in
-  // route_entry_->finalizeResponse headers because the attempt_count_ data pertains to the router.
-  // This could be moved, if desired, by charging callbacks_->streamInfo with the attempt count.
-  // Adding the information to the stream info would also be necessary if we wanted this header to
-  // be added on sendLocalReply.
-  if (include_request_attempt_count_) {
-    headers->setEnvoyAttemptCount(attempt_count_);
   }
 
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside

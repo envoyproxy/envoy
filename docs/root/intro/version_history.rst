@@ -38,6 +38,8 @@ Version history
 * router: added support for :ref:`regex_rewrite
   <envoy_api_field_route.RouteAction.regex_rewrite>` for path rewriting using regular expressions and capture groups.
 * router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
+* router: added ability to set attempt count in downstream response, see :ref:`virtual host's include response
+  attempt count flag <envoy_api_field_route.VirtualHost.include_response_attempt_count>`.
 * runtime: enabling the runtime feature "envoy.deprecated_features.allow_deprecated_extension_names"
   disables the use of deprecated extension names.
 * runtime: integer values may now be parsed as booleans.

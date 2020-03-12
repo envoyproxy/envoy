@@ -318,9 +318,14 @@ x-envoy-attempt-count
 ^^^^^^^^^^^^^^^^^^^^^
 
 Sent to the upstream to indicate which attempt the current request is in a series of retries. The value
-will be "1" on the initial request, incrementing by one for each retry.
-Also sent on downstream response headers if a response is received from upstream. Only set if the
-:ref:`include_attempt_count_header <envoy_api_field_route.VirtualHost.include_request_attempt_count>`
+will be "1" on the initial request, incrementing by one for each retry. Only set if the
+:ref:`include_request_attempt_count <envoy_api_field_route.VirtualHost.include_request_attempt_count>`
+flag is set to true.
+
+Sent to the downstream to indicate how many upstream requests took place. The header will be absent if
+the router did not send any upstream requests. The value will be "1" if only the original upstream
+request was sent, incrementing by one for each retry. Only set if the
+:ref:`include_response_attempt_count <envoy_api_field_route.VirtualHost.include_response_attempt_count>`
 flag is set to true.
 
 .. _config_http_filters_router_x-envoy-expected-rq-timeout-ms:

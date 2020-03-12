@@ -2820,6 +2820,7 @@ virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
     include_request_attempt_count: true
+    include_response_attempt_count: true
     routes:
       - match: { prefix: "/"}
         route:
@@ -2831,6 +2832,10 @@ virtual_hosts:
   EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                   ->routeEntry()
                   ->includeRequestAttemptCount());
+
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->includeResponseAttemptCount());
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCode) {

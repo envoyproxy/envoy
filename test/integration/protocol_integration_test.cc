@@ -295,11 +295,12 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
 }
 
-// Tests that the x-envoy-attempt-count header is properly set on the upstream request
-// and updated after the request is retried.
+// Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
+// downstream response, and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
+  host.set_include_response_attempt_count(true);
   config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

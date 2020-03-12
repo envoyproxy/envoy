@@ -469,7 +469,7 @@ private:
   MonotonicTime downstream_request_complete_time_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   MetadataMatchCriteriaConstPtr metadata_match_;
-  std::function<void(Http::HeaderMap&)> modify_headers_;
+  std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
 
   // list of cookies to add to upstream headers
