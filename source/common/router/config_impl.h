@@ -451,8 +451,12 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
-  bool includeAttemptCountInRequest() const override { return vhost_.includeAttemptCountInRequest(); }
-  bool includeAttemptCountInResponse() const override { return vhost_.includeAttemptCountInResponse(); }
+  bool includeAttemptCountInRequest() const override {
+    return vhost_.includeAttemptCountInRequest();
+  }
+  bool includeAttemptCountInResponse() const override {
+    return vhost_.includeAttemptCountInResponse();
+  }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;

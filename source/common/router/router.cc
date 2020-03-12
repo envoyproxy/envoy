@@ -591,8 +591,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   // The router has reached a point where it is going to try to send a request upstream,
-  // so now modify_headers should attach x-envoy-attempt-count to the downstream response if the config
-  // flag is true.
+  // so now modify_headers should attach x-envoy-attempt-count to the downstream response if the
+  // config flag is true.
   if (route_entry_->includeAttemptCountInResponse()) {
     modify_headers = [modify_headers, this](Http::ResponseHeaderMap& headers) {
       modify_headers(headers);
