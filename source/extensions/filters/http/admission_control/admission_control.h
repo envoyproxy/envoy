@@ -44,7 +44,7 @@ struct AdmissionControlStats {
  * data for the time window is kept recent via a circular buffer that phases out old request/success
  * counts when recording new samples.
  *
- * The lookback window for request samples is accurate up to a hard-coded 1-second granularity.
+ * The look-back window for request samples is accurate up to a hard-coded 1-second granularity.
  * TODO (tonya11en): Allow the granularity to be configurable.
  */
 class ThreadLocalController {
@@ -88,7 +88,7 @@ private:
   TimeSource& time_source_;
   std::deque<std::pair<MonotonicTime, RequestData>> historical_data_;
 
-  // Request data aggregated for the whole lookback window.
+  // Request data aggregated for the whole look-back window.
   RequestData global_data_;
 
   // The rolling time window size.
