@@ -106,7 +106,6 @@ envoy_cc_library(
     deps = [
         ":codes_lib",
         "//include/envoy/http:context_interface",
-        "//source/common/tracing:http_tracer_lib",
     ],
 )
 

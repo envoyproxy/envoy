@@ -13,6 +13,33 @@ namespace Common {
 namespace Fault {
 namespace {
 
+TEST(FaultConfigTest, FaultAbortHeaderConfig) {
+  envoy::extensions::filters::http::fault::v3::FaultAbort proto_config;
+  proto_config.mutable_header_abort();
+  FaultAbortConfig config(proto_config);
+
+  // No header.
+  EXPECT_EQ(absl::nullopt, config.statusCode(nullptr));
+
+  // Header with bad data.
+  Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-abort-request", "abc"}};
+  EXPECT_EQ(absl::nullopt, config.statusCode(bad_headers.get(HeaderNames::get().AbortRequest)));
+
+  // Out of range header - value too low.
+  Http::TestHeaderMapImpl too_low_headers{{"x-envoy-fault-abort-request", "199"}};
+  EXPECT_EQ(absl::nullopt, config.statusCode(too_low_headers.get(HeaderNames::get().AbortRequest)));
+
+  // Out of range header - value too high.
+  Http::TestHeaderMapImpl too_high_headers{{"x-envoy-fault-abort-request", "600"}};
+  EXPECT_EQ(absl::nullopt,
+            config.statusCode(too_high_headers.get(HeaderNames::get().AbortRequest)));
+
+  // Valid header.
+  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-abort-request", "401"}};
+  EXPECT_EQ(Http::Code::Unauthorized,
+            config.statusCode(good_headers.get(HeaderNames::get().AbortRequest)).value());
+}
+
 TEST(FaultConfigTest, FaultDelayHeaderConfig) {
   envoy::extensions::filters::common::fault::v3::FaultDelay proto_config;
   proto_config.mutable_header_delay();
