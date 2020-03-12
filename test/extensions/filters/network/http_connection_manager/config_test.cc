@@ -178,6 +178,41 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, TracingConfigurationWithInlinedTracerProvider) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing:
+  operation_name: ingress
+  max_path_tag_length: 128
+  provider:                # notice inlined tracing provider configuration
+    name: zipkin
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
+      collector_cluster: zipkin
+      collector_endpoint: "/api/v1/spans"
+      collector_endpoint_version: HTTP_JSON
+http_filters:
+- name: envoy.filters.http.router
+  )EOF";
+
+  auto config = parseHttpConnectionManagerFromV2Yaml(yaml_string);
+
+  // Verify that inlined tracing provider configuration is actually parsed.
+  EXPECT_EQ("zipkin", config.tracing().provider().name());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, TracingNotEnabledAndNoTracingConfigInBootstrap) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -1315,9 +1350,9 @@ TEST_F(FilterChainTest, InvalidConfig) {
       EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
 }
 
-class UtilityTest : public testing::Test {
+class HcmUtilityTest : public testing::Test {
 public:
-  UtilityTest() {
+  HcmUtilityTest() {
     // Although different Listeners will have separate FactoryContexts,
     // those contexts must share the same SingletonManager.
     ON_CALL(context_two_, singletonManager()).WillByDefault([&]() -> Singleton::Manager& {
@@ -1328,7 +1363,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_two_;
 };
 
-TEST_F(UtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
+TEST_F(HcmUtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   // Simulate `HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped()`
   // call for filter instance "one".
   auto singletons_one = Utility::createSingletons(context_one_);
