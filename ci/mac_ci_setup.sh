@@ -2,6 +2,9 @@
 
 # Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
+# See:
+# https://github.com/actions/virtual-environments/blob/master/images/macos/macos-10.15-Readme.md for
+# a list of pre-installed tools in the macOS image.
 
 # Setup bazelbuild tap
 brew tap bazelbuild/tap
