@@ -1350,9 +1350,9 @@ TEST_F(FilterChainTest, InvalidConfig) {
       EnvoyException, "Error: multiple upgrade configs with the same name: 'websocket'");
 }
 
-class UtilityTest : public testing::Test {
+class HcmUtilityTest : public testing::Test {
 public:
-  UtilityTest() {
+  HcmUtilityTest() {
     // Although different Listeners will have separate FactoryContexts,
     // those contexts must share the same SingletonManager.
     ON_CALL(context_two_, singletonManager()).WillByDefault([&]() -> Singleton::Manager& {
@@ -1363,7 +1363,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_two_;
 };
 
-TEST_F(UtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
+TEST_F(HcmUtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   // Simulate `HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped()`
   // call for filter instance "one".
   auto singletons_one = Utility::createSingletons(context_one_);
