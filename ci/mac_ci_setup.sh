@@ -23,7 +23,7 @@ if ! brew update; then
     exit 1
 fi
 
-DEPS="automake bazelisk cmake coreutils go libtool wget ninja"
+DEPS="automake cmake coreutils go libtool wget ninja"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
@@ -42,4 +42,9 @@ if is_installed "bazelbuild/tap/bazel" && ! brew unlink bazelbuild/tap/bazel; th
     echo "Failed to unlink bazelbuild/tap/bazel"
     exit 1
 fi
-ln -s `which bazelisk` $bazel_path
+bazelisk_path=`which bazel`
+if [ -z "$bazelisk_path" ]; then
+    echo "bazelisk not installed"
+    exit 1
+fi
+ln -s $bazelisk_path $bazel_path
