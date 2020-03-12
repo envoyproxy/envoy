@@ -43,7 +43,7 @@ public:
    * Constructor. It adds itself and a newly-created Datadog::Tracer object to a thread-local store.
    */
   Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
-         Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+         Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime);
 
   // Getters to return the DatadogDriver's key members.

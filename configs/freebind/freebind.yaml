@@ -28,7 +28,7 @@ static_resources:
               - match: { prefix: "/" }
                 route: { cluster: service_local }
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
   clusters:
   - name: service_local
     connect_timeout: 30s

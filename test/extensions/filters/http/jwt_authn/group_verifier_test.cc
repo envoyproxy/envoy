@@ -174,7 +174,7 @@ rules:
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"sec-istio-auth-userinfo", ""},
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
@@ -211,7 +211,7 @@ rules:
   createVerifier();
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
@@ -228,7 +228,7 @@ TEST_F(GroupVerifierTest, TestRequiresAll) {
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
@@ -247,7 +247,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllBadFormat) {
   // onComplete with failure status, not payload
   EXPECT_CALL(mock_cb_, setPayload(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtBadFormat)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
@@ -271,7 +271,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllMissing) {
   // onComplete with failure status, not payload
   EXPECT_CALL(mock_cb_, setPayload(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
@@ -295,7 +295,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllBothFailed) {
   // onComplete with failure status, not payload
   EXPECT_CALL(mock_cb_, setPayload(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
@@ -317,7 +317,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
@@ -338,7 +338,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
@@ -359,7 +359,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyAllAuthFailed) {
   // onComplete with failure status, not payload
   EXPECT_CALL(mock_cb_, setPayload(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{
+  auto headers = Http::TestRequestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
@@ -380,7 +380,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
@@ -398,7 +398,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
   }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
@@ -413,7 +413,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyIsOk) {
   // AsyncMockVerifier doesn't set payload
   EXPECT_CALL(mock_cb_, setPayload(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   callbacks["provider_1"](Status::Ok);
@@ -430,7 +430,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyFailed) {
 
   EXPECT_CALL(mock_cb_, setPayload(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(Status::JwksFetchFail)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   callbacks["provider_1"](Status::JwksFetchFail);
@@ -448,7 +448,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllFailed) {
 
   EXPECT_CALL(mock_cb_, setPayload(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
 }
@@ -463,7 +463,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyFirstAllIsOk) {
   // AsyncMockVerifier doesn't set payload
   EXPECT_CALL(mock_cb_, setPayload(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   callbacks["provider_2"](Status::Ok);
@@ -479,7 +479,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyLastAllIsOk) {
       std::vector<std::string>{"provider_1", "provider_2", "provider_3", "provider_4"});
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   callbacks["provider_3"](Status::Ok);
@@ -495,7 +495,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllAreOk) {
       std::vector<std::string>{"provider_1", "provider_2", "provider_3", "provider_4"});
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   callbacks["provider_1"](Status::Ok);
@@ -525,7 +525,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowAll) {
   mock_auths_[allowfailed] = std::move(mock_auth);
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
 
-  auto headers = Http::TestHeaderMapImpl{};
+  auto headers = Http::TestRequestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   callbacks[allowfailed](Status::Ok);

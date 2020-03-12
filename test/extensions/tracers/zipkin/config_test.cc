@@ -18,15 +18,17 @@ namespace Zipkin {
 namespace {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
 
-  EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
+      .WillRepeatedly(
+          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.zipkin
-    config:
+    name: zipkin
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster
       collector_endpoint: /api/v1/spans
       collector_endpoint_version: HTTP_JSON
@@ -38,19 +40,20 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
-  NiceMock<Server::MockInstance> server;
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
 
-  EXPECT_CALL(server.cluster_manager_, get(Eq("fake_cluster")))
-      .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
+      .WillRepeatedly(
+          Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
   const std::string yaml_string = R"EOF(
   http:
-    name: envoy.tracers.zipkin
+    name: zipkin
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: fake_cluster
@@ -64,7 +67,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   ZipkinTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
+  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, context);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 

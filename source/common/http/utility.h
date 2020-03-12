@@ -126,21 +126,21 @@ private:
  * @param headers supplies the headers to append to.
  * @param remote_address supplies the remote address to append.
  */
-void appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address);
+void appendXff(RequestHeaderMap& headers, const Network::Address::Instance& remote_address);
 
 /**
  * Append to via header.
  * @param headers supplies the headers to append to.
  * @param via supplies the via header to append.
  */
-void appendVia(HeaderMap& headers, const std::string& via);
+void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
 
 /**
  * Creates an SSL (https) redirect path based on the input host and path headers.
  * @param headers supplies the request headers.
  * @return std::string the redirect path.
  */
-std::string createSslRedirectPath(const HeaderMap& headers);
+std::string createSslRedirectPath(const RequestHeaderMap& headers);
 
 /**
  * Parse a URL into query parameters.
@@ -200,7 +200,7 @@ std::string makeSetCookieValue(const std::string& key, const std::string& value,
  * @param headers supplies the headers to get the status from.
  * @return uint64_t the response code or throws an exception if the headers are invalid.
  */
-uint64_t getResponseStatus(const HeaderMap& headers);
+uint64_t getResponseStatus(const ResponseHeaderMap& headers);
 
 /**
  * Determine whether these headers are a valid Upgrade request or response.
@@ -208,12 +208,12 @@ uint64_t getResponseStatus(const HeaderMap& headers);
  * - Connection: Upgrade
  * - Upgrade: [any value]
  */
-bool isUpgrade(const HeaderMap& headers);
+bool isUpgrade(const RequestOrResponseHeaderMap& headers);
 
 /**
  * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
  */
-bool isH2UpgradeRequest(const HeaderMap& headers);
+bool isH2UpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * Determine whether this is a WebSocket Upgrade request.
@@ -221,7 +221,7 @@ bool isH2UpgradeRequest(const HeaderMap& headers);
  * - Connection: Upgrade
  * - Upgrade: websocket
  */
-bool isWebSocketUpgradeRequest(const HeaderMap& headers);
+bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
 
 /**
  * @return Http1Settings An Http1Settings populated from the
@@ -282,7 +282,7 @@ struct GetLastAddressFromXffInfo {
  * @return GetLastAddressFromXffInfo information about the last address in the XFF header.
  *         @see GetLastAddressFromXffInfo for more information.
  */
-GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_headers,
+GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
                                                 uint32_t num_to_skip = 0);
 
 /**
@@ -292,7 +292,7 @@ GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_h
  * @param headers the client request headers
  * @return whether the headers were sanitized successfully
  */
-bool sanitizeConnectionHeader(Http::HeaderMap& headers);
+bool sanitizeConnectionHeader(Http::RequestHeaderMap& headers);
 
 /**
  * Get the string for the given http protocol.
@@ -332,28 +332,28 @@ const std::string resetReasonToString(const Http::StreamResetReason reset_reason
  * Changes the method to connection, moves the Upgrade to a :protocol header,
  * @param headers the headers to convert.
  */
-void transformUpgradeRequestFromH1toH2(HeaderMap& headers);
+void transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers);
 
 /**
  * Transforms the supplied headers from an HTTP/1 Upgrade response to an H2 style upgrade response.
  * Changes the 101 upgrade response to a 200 for the CONNECT response.
  * @param headers the headers to convert.
  */
-void transformUpgradeResponseFromH1toH2(HeaderMap& headers);
+void transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers);
 
 /**
  * Transforms the supplied headers from an H2 "CONNECT"-with-:protocol-header to an HTTP/1 style
  * Upgrade response.
  * @param headers the headers to convert.
  */
-void transformUpgradeRequestFromH2toH1(HeaderMap& headers);
+void transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers);
 
 /**
  * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
  * The caller is responsible for ensuring this only happens on upgraded streams.
  * @param headers the headers to convert.
  */
-void transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade);
+void transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers, absl::string_view upgrade);
 
 /**
  * The non template implementation of resolveMostSpecificPerFilterConfig. see

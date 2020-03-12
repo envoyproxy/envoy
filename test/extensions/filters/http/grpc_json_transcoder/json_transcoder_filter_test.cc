@@ -43,6 +43,9 @@ namespace {
 class GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterTestBase() : api_(Api::createApiForTest()) {}
+  ~GrpcJsonTranscoderFilterTestBase() {
+    TestEnvironment::removePath(TestEnvironment::temporaryPath("envoy_test/proto.descriptor"));
+  }
 
   Api::ApiPtr api_;
 };
@@ -616,7 +619,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryError) {
   Buffer::OwnedImpl request_data{"{\"theme\": \"Children\""};
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
-      .WillOnce(Invoke([](Http::HeaderMap& headers, bool end_stream) {
+      .WillOnce(Invoke([](Http::ResponseHeaderMap& headers, bool end_stream) {
         EXPECT_EQ("400", headers.Status()->value().getStringView());
         EXPECT_FALSE(end_stream);
       }));

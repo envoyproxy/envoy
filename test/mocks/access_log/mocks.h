@@ -28,8 +28,9 @@ public:
 
   // AccessLog::Filter
   MOCK_METHOD(bool, evaluate,
-              (const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-               const Http::HeaderMap& response_headers, const Http::HeaderMap& response_trailers));
+              (const StreamInfo::StreamInfo& info, const Http::RequestHeaderMap& request_headers,
+               const Http::ResponseHeaderMap& response_headers,
+               const Http::ResponseTrailerMap& response_trailers));
 };
 
 class MockAccessLogManager : public AccessLogManager {
@@ -51,8 +52,9 @@ public:
 
   // AccessLog::Instance
   MOCK_METHOD(void, log,
-              (const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-               const Http::HeaderMap* response_trailers,
+              (const Http::RequestHeaderMap* request_headers,
+               const Http::ResponseHeaderMap* response_headers,
+               const Http::ResponseTrailerMap* response_trailers,
                const StreamInfo::StreamInfo& stream_info));
 };
 

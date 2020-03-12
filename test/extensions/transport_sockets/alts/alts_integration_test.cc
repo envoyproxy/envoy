@@ -203,7 +203,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
 
 // Verifies that when client receives peer service account which does not match
 // any account in config, the handshake will fail and client closes connection.
-TEST_P(AltsIntegrationTestClientInvalidPeer, clientValidationFail) {
+TEST_P(AltsIntegrationTestClientInvalidPeer, ClientValidationFail) {
   initialize();
   codec_client_ = makeRawHttpConnection(makeAltsConnection());
   EXPECT_FALSE(codec_client_->connected());

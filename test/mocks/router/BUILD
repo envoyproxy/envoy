@@ -23,6 +23,7 @@ envoy_cc_mock(
         "//include/envoy/router:shadow_writer_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/stats:fake_symbol_table_lib",

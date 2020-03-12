@@ -206,13 +206,7 @@ private:
 };
 class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  ClusterMemoryTestRunner() : save_use_fakes_(Stats::SymbolTableCreator::useFakeSymbolTables()) {}
-  ~ClusterMemoryTestRunner() override {
-    Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(save_use_fakes_);
-  }
-
-private:
-  const bool save_use_fakes_;
+  Stats::TestUtil::SymbolTableCreatorTestPeer symbol_table_creator_test_peer_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
@@ -220,7 +214,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(true);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(true);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
@@ -292,7 +286,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
@@ -347,7 +341,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
-  Stats::TestUtil::SymbolTableCreatorTestPeer::setUseFakeSymbolTables(false);
+  symbol_table_creator_test_peer_.setUseFakeSymbolTables(false);
 
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption

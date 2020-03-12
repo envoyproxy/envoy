@@ -18,7 +18,7 @@ public:
 
   const std::string upstream_rate_limit_config_ =
       R"EOF(
-name: envoy.fault
+name: fault
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
   response_rate_limit:
@@ -30,9 +30,13 @@ typed_config:
 
   const std::string header_fault_config_ =
       R"EOF(
-name: envoy.fault
+name: fault
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
+  abort:
+    header_abort: {}
+    percentage:
+      numerator: 100
   delay:
     header_delay: {}
     percentage:
@@ -55,7 +59,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FaultIntegrationTestAllProtocols,
 TEST_P(FaultIntegrationTestAllProtocols, NoFault) {
   const std::string filter_config =
       R"EOF(
-name: envoy.fault
+name: fault
 typed_config:
   "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
 )EOF";
@@ -65,6 +69,7 @@ typed_config:
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 1024);
 
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
@@ -88,6 +93,7 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   decoder->waitForBodyData(127);
   decoder->waitForEndStream();
 
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
@@ -122,8 +128,30 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
   decoder->waitForBodyData(128);
   decoder->waitForEndStream();
 
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+}
+
+// Request abort controlled via header configuration.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortConfig) {
+  initializeFilter(header_fault_config_);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-envoy-fault-abort-request", "429"}});
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Envoy::Http::HttpStatusIs("429"));
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
 
 // Header configuration with no headers, so no fault injection.
@@ -133,6 +161,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfigNoHeaders) {
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 1024);
 
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
@@ -168,6 +197,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   decoder->waitForEndStream();
   EXPECT_NE(nullptr, decoder->trailers());
 
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
@@ -194,6 +224,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
   decoder->waitForEndStream();
   EXPECT_NE(nullptr, decoder->trailers());
 
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.aborts_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }

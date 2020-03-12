@@ -15,7 +15,8 @@ public:
    * @param headers a header map to canonicalize.
    * @return a std::map of canonicalized headers to be used in building a canonical request.
    */
-  static std::map<std::string, std::string> canonicalizeHeaders(const Http::HeaderMap& headers);
+  static std::map<std::string, std::string>
+  canonicalizeHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * Creates an AWS Signature V4 canonical request string.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <string>
@@ -205,20 +206,13 @@ public:
                               const envoy::type::v3::FractionalPercent& default_value,
                               uint64_t random_value) const PURE;
 
+  using ConstStringOptRef = absl::optional<std::reference_wrapper<const std::string>>;
   /**
    * Fetch raw runtime data based on key.
    * @param key supplies the key to fetch.
-   * @return const std::string& the value or empty string if the key does not exist.
+   * @return absl::nullopt if the key does not exist or reference to the value std::string.
    */
-  virtual const std::string& get(absl::string_view key,
-                                 const std::string& default_value) const PURE;
-
-  /**
-   * Returns whether the key has any value set.
-   * @param key supplies the key to check.
-   * @return bool if the key exists.
-   */
-  virtual bool exists(absl::string_view key) const PURE;
+  virtual ConstStringOptRef get(absl::string_view key) const PURE;
 
   /**
    * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted

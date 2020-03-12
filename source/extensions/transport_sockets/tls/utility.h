@@ -7,6 +7,7 @@
 
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"
+#include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,12 +24,19 @@ namespace Utility {
 std::string getSerialNumberFromCertificate(X509& cert);
 
 /**
- * Retrieves the subject alternate names of a certificate of type DNS.
+ * Retrieves the subject alternate names of a certificate.
  * @param cert the certificate
- * @param type type of subject alternate name either GEN_DNS or GEN_URI
+ * @param type type of subject alternate name
  * @return std::vector returns the list of subject alternate names.
  */
 std::vector<std::string> getSubjectAltNames(X509& cert, int type);
+
+/**
+ * Converts the Subject Alternate Name to string.
+ * @param general_name the subject alternate name
+ * @return std::string returns the string representation of subject alt names.
+ */
+std::string generalNameAsString(const GENERAL_NAME* general_name);
 
 /**
  * Retrieves the issuer from certificate.
@@ -43,6 +51,15 @@ std::string getIssuerFromCertificate(X509& cert);
  * @return std::string the subject field for the certificate.
  */
 std::string getSubjectFromCertificate(X509& cert);
+
+/**
+ * Retrieves the value of a specific X509 extension from the cert, if present.
+ * @param cert the certificate.
+ * @param extension_name the name of the extension to extract.
+ * @return absl::optional<std::string> the value of the extension field, if present.
+ */
+absl::optional<std::string> getX509ExtensionValue(const X509& cert,
+                                                  absl::string_view extension_name);
 
 /**
  * Returns the days until this certificate is valid.

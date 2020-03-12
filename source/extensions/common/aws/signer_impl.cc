@@ -24,10 +24,20 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers) {
-  sign(headers, SignatureConstants::get().HashedEmptyString);
+  // S3 payloads require special treatment.
+  if (service_name_ == "s3") {
+    headers.setReference(SignatureHeaders::get().ContentSha256,
+                         SignatureConstants::get().UnsignedPayload);
+    sign(headers, SignatureConstants::get().UnsignedPayload);
+  } else {
+    headers.setReference(SignatureHeaders::get().ContentSha256,
+                         SignatureConstants::get().HashedEmptyString);
+    sign(headers, SignatureConstants::get().HashedEmptyString);
+  }
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash) {
+  headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
@@ -76,7 +86,6 @@ std::string SignerImpl::createContentHash(Http::RequestMessage& message, bool si
   const auto content_hash = message.body()
                                 ? Hex::encode(crypto_util.getSha256Digest(*message.body()))
                                 : SignatureConstants::get().HashedEmptyString;
-  message.headers().addCopy(SignatureHeaders::get().ContentSha256, content_hash);
   return content_hash;
 }
 
