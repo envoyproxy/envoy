@@ -242,7 +242,6 @@ public:
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
-   * @param extension_name name of extension corresponding to config.
    * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
    * provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
@@ -266,6 +265,30 @@ public:
     translateOpaqueConfig(enclosing_message.typed_config(),
                           enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
                           *config);
+    return config;
+  }
+
+  /**
+   * Translate the typed any field into a proto message provided by the implementation factory.
+   * @param typed_config typed configuration.
+   * @param validation_visitor message validation visitor instance.
+   * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
+   * proto to be filled with the translated configuration.
+   */
+  template <class Factory>
+  static ProtobufTypes::MessagePtr
+  translateAnyToFactoryConfig(const ProtobufWkt::Any& typed_config,
+                              ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr, "");
+
+    // Check that the config type is not google.protobuf.Empty
+    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+
+    translateOpaqueConfig(typed_config, ProtobufWkt::Struct(), validation_visitor, *config);
     return config;
   }
 
