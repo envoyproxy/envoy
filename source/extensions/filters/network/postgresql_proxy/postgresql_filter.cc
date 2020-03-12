@@ -15,7 +15,7 @@ PostgreSQLFilterConfig::PostgreSQLFilterConfig(const std::string& stat_prefix, S
 
 PostgreSQLFilter::PostgreSQLFilter(PostgreSQLFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
-    decoder_ = createDecoder(*this);
+    decoder_ = createDecoder(this);
   }
 }
 
@@ -48,7 +48,7 @@ Network::FilterStatus PostgreSQLFilter::onWrite(Buffer::Instance& data, bool) {
   return Network::FilterStatus::Continue;
 }
 
-DecoderPtr PostgreSQLFilter::createDecoder(DecoderCallbacks& callbacks) {
+DecoderPtr PostgreSQLFilter::createDecoder(DecoderCallbacks* callbacks) {
   return std::make_unique<DecoderImpl>(callbacks);
 }
 
@@ -57,6 +57,9 @@ void PostgreSQLFilter::incErrors() { config_->stats_.errors_.inc(); }
 void PostgreSQLFilter::incSessions() { config_->stats_.sessions_.inc(); }
 
 void PostgreSQLFilter::incStatements() { config_->stats_.statements_.inc(); }
+
+void PostgreSQLFilter::incFrontend() {config_->stats_.frontend_commands_.inc(); }
+void PostgreSQLFilter::incUnrecognized() {config_->stats_.unrecognized_.inc(); }
 
 void PostgreSQLFilter::incStatementsDelete() {
   config_->stats_.statements_delete_.inc();

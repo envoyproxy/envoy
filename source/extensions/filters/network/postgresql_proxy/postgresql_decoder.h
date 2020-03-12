@@ -20,6 +20,9 @@ class DecoderCallbacks {
 public:
   virtual ~DecoderCallbacks() = default;
 
+  virtual void incFrontend() PURE;
+  virtual void incUnrecognized() PURE;
+
   virtual void incErrors() PURE;
   virtual void incSessions() PURE;
   virtual void incStatements() PURE;
@@ -43,29 +46,35 @@ public:
 
   virtual void onData(Buffer::Instance& data) PURE;
   virtual PostgreSQLSession& getSession() PURE;
+
+  // decode frontend messages
+  virtual void onFrontendData(Buffer::Instance& data) PURE;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
-  DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
+  DecoderImpl(DecoderCallbacks* callbacks) : callbacks_(callbacks) {}
 
   // PostgreSQLProxy::Decoder
+  void onFrontendData(Buffer::Instance& data) override;
   void onData(Buffer::Instance& data) override;
   PostgreSQLSession& getSession() override { return session_; }
 
   // Temp stuff for testing purposes
-  void setCommand(std::string command) { command_ = command; }
-  std::string getCommand() { return command_; }
+//  void setCommand(std::string command) { command_ = command; }
+//  std::string getCommand() { return command_; }
 
   void setMessage(std::string message) { message_ = message; }
   std::string getMessage() { return message_; }
   
   void setMessageLength(uint32_t message_len) { message_len_ = message_len; }
   uint32_t getMessageLength() { return message_len_; }
+
+  void setInitial(bool initial) { initial_ = initial; }
 private:
-  void parseMessage(Buffer::Instance& data);
+  bool parseMessage(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
   void decodeBackend();
   void decodeBackendStatements();
@@ -77,13 +86,14 @@ private:
   bool isFrontend();
   bool isBackend();
 
-  DecoderCallbacks& callbacks_;
+  DecoderCallbacks* callbacks_;
   PostgreSQLSession session_;
 
-  std::string command_;
+  char command_;
   std::string message_;
   uint32_t message_len_;
   bool in_transaction_{false};
+  bool initial_{true}; // initial stage does not have 1st byte command
 };
 
 } // namespace PostgreSQLProxy
