@@ -15,9 +15,9 @@ function is_installed {
 
 function install {
     echo "Installing $1"
-    if ! brew install "$1"
-    then
-        echo "Failed to install $1"
+    brew install "$1"
+    if ! brew link --overwrite "$1"; then
+        echo "Failed to install and link $1"
         exit 1
     fi
 }
