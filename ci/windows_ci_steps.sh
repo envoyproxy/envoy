@@ -16,6 +16,9 @@ df -h
 # Set up TMPDIR so bash and non-bash can access
 # e.g. TMPDIR=/d/tmp, make a link from /d/d to /d so both bash and Windows programs resolve the
 # same path
+# This is due to this issue: https://github.com/bazelbuild/rules_foreign_cc/issues/334
+# rules_foreign_cc does not currently use bazel output/temp directories by default, it uses mktemp
+# which respects the value of the TMPDIR environment variable
 drive="$(readlink -f $TMPDIR | cut -d '/' -f2)"
 /c/windows/system32/cmd.exe "/c mklink /d $drive:\\$drive $drive:\\"
 
