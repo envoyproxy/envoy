@@ -102,11 +102,11 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_gperftools_gperftools = dict(
         # TODO(cmluciano): Bump to release 2.8
-        # This sha is specifically chosen to fix ppc64le builds that require inclusion
-        # of asm/ptrace.h
-        sha256 = "18574813a062eee487bc1b761e8024a346075a7cb93da19607af362dc09565ef",
-        strip_prefix = "gperftools-fc00474ddc21fff618fc3f009b46590e241e425e",
-        urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
+        # The currently used version is specifically chosen to fix ppc64le builds that require inclusion
+        # of asm/ptrace.h, and also s390x builds that require special handling of mmap syscall.
+        sha256 = "97f0bc2b389c29305f5d1d8cc4d95e9212c33b55827ae65476fc761d78e3ec5d",
+        strip_prefix = "gperftools-gperftools-2.7.90",
+        urls = ["https://github.com/gperftools/gperftools/archive/gperftools-2.7.90.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
         # TODO(JimmyCYJ): Bump to release 1.27
@@ -131,9 +131,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz"],
     ),
     com_lightstep_tracer_cpp = dict(
-        sha256 = "defbf471facfebde6523ca1177529b63784893662d4ef2c60db074be8aef0634",
-        strip_prefix = "lightstep-tracer-cpp-0.8.0",
-        urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
+        sha256 = "1ed7faaad1deabddb83791b2b7f2ec79d25b47009994c1a8bb6da85244c60e4f",
+        strip_prefix = "lightstep-tracer-cpp-665d8388aafbbbb44994f4fa12b3b65b9dcea613",
+        # 2019-03-11
+        urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/665d8388aafbbbb44994f4fa12b3b65b9dcea613.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
         sha256 = "6dc1088ab7f788b6c849fbaa6300517c8fdf88991a70b778be79c284c36857bf",
@@ -270,9 +271,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/38cc1ee6a89a4d0b52cf2a611bdc09312bcd2c5c.tar.gz
-        sha256 = "aadef7fd47d35d2a690e0238bf61cb2394a9a290023233f0a4736772a738d437",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/38cc1ee6a89a4d0b52cf2a611bdc09312bcd2c5c.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4f6ba16cf16505f12dc8d2f23cfc6e13c1aa5806.tar.gz
+        sha256 = "2990ca4434a6fc1b63560b1aa000f5765c174ad906642e123a92498f1ad6c03d",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/4f6ba16cf16505f12dc8d2f23cfc6e13c1aa5806.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "326ec397b55e39f48bd5380ccded1af5b04653ee96e769cd4d694f9a3bacef50",

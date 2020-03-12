@@ -34,6 +34,7 @@ public:
 };
 
 using SpecifierConstants = ConstSingleton<SpecifierConstantValues>;
+using UnsignedMilliseconds = std::chrono::duration<uint64_t, std::milli>;
 
 } // namespace
 
@@ -213,6 +214,11 @@ bool DateUtil::timePointValid(SystemTime time_point) {
 bool DateUtil::timePointValid(MonotonicTime time_point) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch())
              .count() != 0;
+}
+
+uint64_t DateUtil::nowToMilliseconds(TimeSource& time_source) {
+  const SystemTime& now = time_source.systemTime();
+  return std::chrono::time_point_cast<UnsignedMilliseconds>(now).time_since_epoch().count();
 }
 
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
