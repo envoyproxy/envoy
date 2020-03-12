@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.http.admission_control.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/type/grpc/grpc_status.proto";
+import "envoy/type/grpc/v2/grpc_status.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -41,7 +41,7 @@ message AdmissionControl {
     repeated HttpStatusRange http_status = 1;
 
     // GRPC status codes to consider as request successes. If unspecified, defaults to "OK".
-    repeated type.grpc.GrpcStatus grpc_status = 2;
+    repeated type.grpc.v2.GrpcStatus grpc_status = 2;
   }
 
   // If set to false, the admission control filter will operate as a pass-through filter. If the

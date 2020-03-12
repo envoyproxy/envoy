@@ -35,7 +35,7 @@ enum Status {
 
 // GRPC status.
 message GrpcStatus {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.type.grpc.GrpcStatus";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.grpc.v2.GrpcStatus";
 
   // Supplies GRPC response code.
   Status status = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
