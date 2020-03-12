@@ -151,7 +151,7 @@ public:
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
-  void
+  Server::Configuration::NamedHttpFilterConfigFactory&
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
                 int i, absl::string_view prefix, FilterFactoriesList& filter_factories,

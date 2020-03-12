@@ -141,7 +141,7 @@ http_filters:
                                   scoped_routes_config_provider_manager_),
       EnvoyException,
       "Error: non-terminal filter named health_check of type "
-      "envoy.config.filter.http.health_check.v2.HealthCheck is the last filter in a http filter "
+      "envoy.filters.http.health_check is the last filter in a http filter "
       "chain.");
 }
 
