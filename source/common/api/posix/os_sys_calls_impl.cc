@@ -4,6 +4,7 @@
 
 #include <cerrno>
 #include <string>
+#include <iostream>
 
 #include "common/api/os_sys_calls_impl.h"
 
