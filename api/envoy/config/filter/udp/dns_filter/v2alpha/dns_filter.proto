@@ -24,6 +24,7 @@ option (udpa.annotations.file_status).work_in_progress = true;
 
 // Configuration for the DNS filter.
 message DnsFilterConfig {
+  // This message contains a list of IP addresses returned for a query for a known name
   message AddressList {
     repeated string address = 1;
   }
@@ -49,20 +50,35 @@ message DnsFilterConfig {
     google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gt {}}];
   }
 
-  // This message contains the configuration for the Dns Filter operating
-  // in a server context. This message will contain the virtual hosts and
-  // associated addresses with which Envoy will respond to queries
-  message ServerCtxConfig {
-    uint32 retry_count = 1;
+  // This message contains the configuration for the DNS Filter if populated
+  // from the control plane
+  message ControlPlaneConfig {
+    // Control how many times envoy makes an attempt to forward a query to
+    // an external server
+    uint32 external_retry_count = 1;
 
     // Fully qualified domain names for which Envoy will respond to queries
     repeated DnsVirtualDomain virtual_domains = 2 [(validate.rules).repeated = {min_items: 1}];
 
-    // Seed the virtual domain configuration from an external path
-    api.v2.core.DataSource virtual_domain_cfg = 4;
+    // This field serves to help Envoy determine whether a name belongs
+    // to a known resource or whether the query should be forwarded externally
+    repeated string known_domains = 3;
   }
 
-  // The stat prefix used when emitting DNS filter stats.
+  // This message contains the configuration for the Dns Filter operating
+  // in a server context. This message will contain the virtual hosts and
+  // associated addresses with which Envoy will respond to queries
+  message ServerCtxConfig {
+    oneof config_source {
+      // Load the configuration specified from the control plane
+      ControlPlaneConfig control_plane_cfg = 1;
+
+      // Seed the filter configuration from an external path
+      api.v2.core.DataSource filter_server_cfg = 2;
+    }
+  }
+
+  // The stat prefix used when emitting DNS filter statistics
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // Server context configuration

@@ -15,20 +15,27 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   using envoy::config::filter::udp::dns_filter::v2alpha::DnsFilterConfig;
 
   // store configured data for server context
-  const size_t entries = config.server_config().virtual_domains().size();
+  const auto& server_config = config.server_config();
 
-  virtual_domains_.reserve(entries);
-  for (const auto& virtual_domain : config.server_config().virtual_domains()) {
-    DnsAddressList addresses{};
+  if (server_config.has_control_plane_cfg()) {
 
-    if (virtual_domain.endpoint().has_addresslist()) {
-      addresses.reserve(virtual_domain.endpoint().addresslist().address().size());
-      for (const auto& configured_address : virtual_domain.endpoint().addresslist().address()) {
-        addresses.push_back(configured_address);
+    const auto& cfg = server_config.control_plane_cfg();
+    const size_t entries = cfg.virtual_domains().size();
+
+    virtual_domains_.reserve(entries);
+    for (const auto& virtual_domain : cfg.virtual_domains()) {
+      DnsAddressList addresses{};
+
+      if (virtual_domain.endpoint().has_addresslist()) {
+        const auto& address_list = virtual_domain.endpoint().addresslist().address();
+        addresses.reserve(address_list.size());
+        for (const auto& configured_address : address_list) {
+          addresses.push_back(configured_address);
+        }
       }
-    }
 
-    virtual_domains_.emplace(std::make_pair(virtual_domain.name(), addresses));
+      virtual_domains_.emplace(std::make_pair(virtual_domain.name(), addresses));
+    }
   }
 }
 
