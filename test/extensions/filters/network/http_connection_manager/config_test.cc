@@ -31,7 +31,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
-namespace {
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
 parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
@@ -1387,7 +1386,6 @@ TEST_F(UtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   EXPECT_EQ(singletons_two.http_tracer_manager_, singletons_one.http_tracer_manager_);
 }
 
-} // namespace
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters
 } // namespace Extensions
