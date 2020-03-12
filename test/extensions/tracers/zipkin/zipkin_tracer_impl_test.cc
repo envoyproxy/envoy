@@ -111,14 +111,14 @@ public:
     Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "202"}}}));
 
-    callback->onSuccess(&request, std::move(msg));
+    callback->onRequestSuccess(&request, std::move(msg));
 
     EXPECT_EQ(2U, stats_.counter("tracing.zipkin.spans_sent").value());
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_sent").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_dropped").value());
     EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_failed").value());
 
-    callback->onFailure(&request, Http::AsyncClient::FailureReason::Reset);
+    callback->onRequestFailure(&request, Http::AsyncClient::FailureReason::Reset);
 
     EXPECT_EQ(1U, stats_.counter("tracing.zipkin.reports_failed").value());
   }
@@ -236,7 +236,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "404"}}}));
 
   // AsyncClient can fail with valid HTTP headers
-  callback->onSuccess(&request, std::move(msg));
+  callback->onRequestSuccess(&request, std::move(msg));
 
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
   EXPECT_EQ(0U, stats_.counter("tracing.zipkin.reports_sent").value());

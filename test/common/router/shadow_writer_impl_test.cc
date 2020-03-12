@@ -51,14 +51,14 @@ TEST_F(ShadowWriterImplTest, Success) {
 
   expectShadowWriter("cluster1", "cluster1-shadow");
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl());
-  callback_->onSuccess(&request_, std::move(response));
+  callback_->onRequestSuccess(&request_, std::move(response));
 }
 
 TEST_F(ShadowWriterImplTest, Failure) {
   InSequence s;
 
   expectShadowWriter("cluster1:8000", "cluster1-shadow:8000");
-  callback_->onFailure(&request_, Http::AsyncClient::FailureReason::Reset);
+  callback_->onRequestFailure(&request_, Http::AsyncClient::FailureReason::Reset);
 }
 
 TEST_F(ShadowWriterImplTest, NoCluster) {

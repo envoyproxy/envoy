@@ -53,7 +53,7 @@ public:
   }
 
   void expectSuccess(uint64_t code) {
-    EXPECT_CALL(callbacks_, onSuccess_(_, _))
+    EXPECT_CALL(callbacks_, onRequestSuccess_(_, _))
         .WillOnce(Invoke([code](const AsyncClient::Request*, ResponseMessage* response) -> void {
           EXPECT_EQ(code, Utility::getResponseStatus(response->headers()));
         }));
@@ -482,7 +482,7 @@ TEST_F(AsyncClientImplTest, MultipleRequests) {
 
   // Finish request 2.
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "503"}});
-  EXPECT_CALL(callbacks2, onSuccess_(_, _));
+  EXPECT_CALL(callbacks2, onRequestSuccess_(_, _));
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 
   // Finish request 1.
@@ -820,7 +820,7 @@ TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
       }));
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
-  EXPECT_CALL(callbacks_, onFailure(_, _));
+  EXPECT_CALL(callbacks_, onRequestFailure(_, _));
 
   client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
@@ -918,7 +918,7 @@ TEST_F(AsyncClientImplTest, DestroyWithActiveRequest) {
 
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message_->headers()), true));
   EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
-  EXPECT_CALL(callbacks_, onFailure(_, _));
+  EXPECT_CALL(callbacks_, onRequestFailure(_, _));
   client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
 }
 
@@ -939,7 +939,7 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   EXPECT_CALL(*child_span, injectContext(_));
   client_.send(std::move(message_), callbacks_, options);
 
-  EXPECT_CALL(callbacks_, onFailure(_, _));
+  EXPECT_CALL(callbacks_, onRequestFailure(_, _));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));

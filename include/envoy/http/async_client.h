@@ -43,6 +43,9 @@ public:
 
   /**
    * Notifies caller of async HTTP request status.
+   *
+   * To support a use case where a caller makes multiple requests in parallel,
+   * individual callback methods provide request context corresponding to that response.
    */
   class Callbacks {
   public:
@@ -56,7 +59,7 @@ public:
      *                 requests in progress.
      * @param response the HTTP response
      */
-    virtual void onSuccess(const Request* request, ResponseMessagePtr&& response) PURE;
+    virtual void onRequestSuccess(const Request* request, ResponseMessagePtr&& response) PURE;
 
     /**
      * Called when the async HTTP request fails.
@@ -66,7 +69,7 @@ public:
      *                requests in progress.
      * @param reason  failure reason
      */
-    virtual void onFailure(const Request* request, FailureReason reason) PURE;
+    virtual void onRequestFailure(const Request* request, FailureReason reason) PURE;
   };
 
   /**
@@ -90,11 +93,11 @@ public:
 
     // Callbacks
 
-    virtual void onSuccess(const Request*, ResponseMessagePtr&& response) override {
+    void onRequestSuccess(const Request*, ResponseMessagePtr&& response) override {
       onSuccess(std::forward<ResponseMessagePtr>(response));
     }
 
-    virtual void onFailure(const Request*, FailureReason reason) override { onFailure(reason); }
+    void onRequestFailure(const Request*, FailureReason reason) override { onFailure(reason); }
   };
 
   /**
