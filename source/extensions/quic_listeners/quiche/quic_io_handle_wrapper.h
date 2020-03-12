@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "envoy/network/io_handle.h"
 
 #include "common/network/io_socket_error_impl.h"
@@ -58,7 +60,10 @@ public:
     }
     return io_handle_.recvmmsg(slices, self_port, output);
   }
-  bool supportMmsg() const override { return io_handle_.supportMmsg(); }
+  bool supportMmsg() const override {
+    std::cerr << "========== QuicIoHandleWrapper::supportMmsg\n";
+    return io_handle_.supportMmsg();
+  }
 
 private:
   Network::IoHandle& io_handle_;
