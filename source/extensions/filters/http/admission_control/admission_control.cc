@@ -16,6 +16,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
+#include "common/http/codes.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -25,7 +26,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
-using AdmissionControlProto::DefaultSuccessCriteria;
 using GrpcStatus = Grpc::Status::GrpcStatus;
 
 static constexpr double defaultAggression = 2.0;
@@ -55,145 +55,149 @@ double AdmissionControlFilterConfig::aggression() const {
   return std::max<double>(1.0, aggression_ ? aggression_->value() : defaultAggression);
 }
 
-DefaultResponseEvaluator::DefaultResponseEvaluator(DefaultSuccessCriteria success_criteria) {
+DefaultResponseEvaluator::DefaultResponseEvaluator(AdmissionControlProto::DefaultSuccessCriteria success_criteria) {
   // HTTP status.
-  switch (success_criteria.http_status_specification_case()) {
-  case DefaultSuccessCriteria::HttpStatusSpecificationCase::HTTP_STATUS_SPECIFICATION_NOT_SET:
-    // HTTP status isn't specified, so we'll count all 2xx as successes.
-    for (const auto& code : {Http::Code::OK, Http::Code::MultipleChoices}) {
-      // TODO @tallen make sure 300 isn't added. Remove if tests pass.
-      ASSERT(code != 300);
-      http_status_codes_.emplace(code);
-    }
-    break;
-  case DefaultSuccessCriteria::HttpStatusSpecificationCase::HTTP_STATUS:
-    // Individual HTTP status codes are specified.
-    for (const auto& status : success_criteria.http_status()) {
-      http_status_codes_.emplace(enumToInt(status.code()));
-    }
-    break;
-  case DefaultSuccessCriteria::HttpStatusSpecificationCase::HTTP_STATUS_RANGE:
-    for (const auto& code : Http::Code::All) {
-      // We must check against every range since they can be specified in any order.
-      for (const auto& range : success_criteria.http_status_range()) {
-        ASSERT(range.start() > 0);
-        ASSERT(range.start() <= range.end());
-        if (range.start() <= enumToInt(code) && enumToInt(code) < range.end()) {
-          http_status_codes_.emplace(enumToInt(code));
-          break;
-        }
+  if (success_criteria.http_status_size() != 0) {
+    for (const auto& range : success_criteria.http_status()) {
+      switch (range) {
+      case AdmissionControlProto::Http1xx:
+        http_success_fns_.emplace_back(Http::CodeUtility::is1xx);
+        break;
+      case AdmissionControlProto::Http2xx:
+        http_success_fns_.emplace_back(Http::CodeUtility::is2xx);
+        break;
+      case AdmissionControlProto::Http3xx:
+        http_success_fns_.emplace_back(Http::CodeUtility::is3xx);
+        break;
+      case AdmissionControlProto::Http4xx:
+        http_success_fns_.emplace_back(Http::CodeUtility::is4xx);
+        break;
+      case AdmissionControlProto::Http5xx:
+        http_success_fns_.emplace_back(Http::CodeUtility::is5xx);
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
       }
     }
-    break;
-  default:
-    NOT_REACHED_GCOVOR_EXCL_LINE;
+  } else {
+    // We default to 2xx indicating success if unspecified.
+    http_success_fns_.emplace_back(Http::CodeUtility::is2xx);
   }
 
   // GRPC status.
   if (success_criteria.grpc_status_size() > 0) {
     for (const auto& status : success_criteria.grpc_status()) {
-      grpc_status_codes_.emplace(enumToSignedInt(status.status()));
+      grpc_success_codes_.emplace(enumToSignedInt(status.status()));
     }
   } else {
-    grpc_status_codes_.emplace(enumToSignedInt(Grpc::Status::WellKnownGrpcStatus::Ok));
+    grpc_success_codes_.emplace(enumToSignedInt(Grpc::Status::WellKnownGrpcStatus::Ok));
   }
 }
 
-bool DefaultResponseEvaluator::isSuccess(Http::ResponseHeaderMap& headers) const {
-  if (Grpc::Common::hasGrpcContentType(headers)) {
-    // The HTTP status code is meaningless if the request has a GRPC content type.
-    absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
-    return grpc_status && grpc_status_codes_.count(enumToSignedInt(grpc_status.value())) > 0;
+  bool DefaultResponseEvaluator::isSuccess(Http::ResponseHeaderMap & headers) const {
+    if (Grpc::Common::hasGrpcContentType(headers)) {
+      // The HTTP status code is meaningless if the request has a GRPC content type.
+      absl::optional<GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
+      return grpc_status && grpc_success_codes_.count(enumToSignedInt(grpc_status.value())) > 0;
+    }
+
+    // If any of the HTTP success functions return a match to the response status, the request was a
+    // success.
+    const uint64_t http_status = Http::Utility::getResponseStatus(headers);
+    for (const auto& fn : http_success_fns_) {
+      if (fn(http_status)) {
+        return true;
+      }
+    }
+    return false;
   }
 
-  const uint64_t http_status = Http::Utility::getResponseStatus(headers);
-  return http_status_codes_.count(enumToInt(http_status)) > 0;
-}
+  AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
+                                                 const std::string& stats_prefix)
+      : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
 
-AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
-                                               const std::string& stats_prefix)
-    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
+  Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&,
+                                                                  bool end_stream) {
+    if (!end_stream || !config_->filterEnabled() ||
+        decoder_callbacks_->streamInfo().healthCheck()) {
+      return Http::FilterHeadersStatus::Continue;
+    }
 
-Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&,
-                                                                bool end_stream) {
-  if (!end_stream || !config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
+    if (shouldRejectRequest()) {
+      decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+                                         "denied by admission control");
+      stats_.rq_rejected_.inc();
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+
+    deferred_record_failure_ =
+        std::make_unique<Cleanup>([this]() { config_->getController().recordFailure(); });
+
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (shouldRejectRequest()) {
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
-                                       "denied by admission control");
-    stats_.rq_rejected_.inc();
-    return Http::FilterHeadersStatus::StopIteration;
+  Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap & headers,
+                                                                  bool end_stream) {
+    if (end_stream) {
+      if (config_->response_evaluator()->isSuccess(headers)) {
+        config_->getController().recordSuccess();
+        ASSERT(deferred_record_failure_);
+        deferred_record_failure_->cancel();
+      } else {
+        deferred_record_failure_.reset();
+      }
+    }
+    return Http::FilterHeadersStatus::Continue;
   }
 
-  deferred_record_failure_ =
-      std::make_unique<Cleanup>([this]() { config_->getController().recordFailure(); });
+  bool AdmissionControlFilter::shouldRejectRequest() const {
+    const double total = config_->getController().requestTotalCount();
+    const double success = config_->getController().requestSuccessCount();
+    const double probability = (total - config_->aggression() * success) / (total + 1);
 
-  return Http::FilterHeadersStatus::Continue;
-}
+    // Choosing an accuracy of 4 significant figures for the probability.
+    static constexpr uint64_t accuracy = 1e4;
+    auto r = config_->random().random();
+    return (accuracy * std::max(probability, 0.0)) > (r % accuracy);
+  }
 
-Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                                                bool end_stream) {
-  if (end_stream) {
-    if (config_->response_evaluator()->isSuccess(headers)) {
-      config_->getController().recordSuccess();
-      ASSERT(deferred_record_failure_);
-      deferred_record_failure_->cancel();
-    } else {
-      deferred_record_failure_.reset();
+  ThreadLocalControllerImpl::ThreadLocalControllerImpl(TimeSource & time_source,
+                                                       std::chrono::seconds sampling_window)
+      : time_source_(time_source), sampling_window_(sampling_window) {}
+
+  void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {
+    const MonotonicTime now = time_source_.monotonicTime();
+
+    // Purge stale samples.
+    while (!historical_data_.empty() &&
+           (now - historical_data_.front().first) >= sampling_window_) {
+      global_data_.successes -= historical_data_.front().second.successes;
+      global_data_.requests -= historical_data_.front().second.requests;
+      historical_data_.pop_front();
+    }
+
+    // It's possible we purged stale samples from the history and are left with nothing, so it's
+    // necessary to add an empty entry. We will also need to roll over into a new entry in the
+    // historical data if we've exceeded the time specified by the granularity.
+    if (historical_data_.empty() ||
+        (now - historical_data_.back().first) >= defaultHistoryGranularity) {
+      historical_data_.emplace_back(time_source_.monotonicTime(), RequestData());
     }
   }
-  return Http::FilterHeadersStatus::Continue;
-}
 
-bool AdmissionControlFilter::shouldRejectRequest() const {
-  const double total = config_->getController().requestTotalCount();
-  const double success = config_->getController().requestSuccessCount();
-  const double probability = (total - config_->aggression() * success) / (total + 1);
+  void ThreadLocalControllerImpl::recordRequest(const bool success) {
+    maybeUpdateHistoricalData();
 
-  // Choosing an accuracy of 4 significant figures for the probability.
-  static constexpr uint64_t accuracy = 1e4;
-  auto r = config_->random().random();
-  return (accuracy * std::max(probability, 0.0)) > (r % accuracy);
-}
-
-ThreadLocalControllerImpl::ThreadLocalControllerImpl(TimeSource& time_source,
-                                                     std::chrono::seconds sampling_window)
-    : time_source_(time_source), sampling_window_(sampling_window) {}
-
-void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {
-  const MonotonicTime now = time_source_.monotonicTime();
-
-  // Purge stale samples.
-  while (!historical_data_.empty() && (now - historical_data_.front().first) >= sampling_window_) {
-    global_data_.successes -= historical_data_.front().second.successes;
-    global_data_.requests -= historical_data_.front().second.requests;
-    historical_data_.pop_front();
+    // The back of the deque will be the most recent samples.
+    ++historical_data_.back().second.requests;
+    ++global_data_.requests;
+    if (success) {
+      ++historical_data_.back().second.successes;
+      ++global_data_.successes;
+    }
   }
 
-  // It's possible we purged stale samples from the history and are left with nothing, so it's
-  // necessary to add an empty entry. We will also need to roll over into a new entry in the
-  // historical data if we've exceeded the time specified by the granularity.
-  if (historical_data_.empty() ||
-      (now - historical_data_.back().first) >= defaultHistoryGranularity) {
-    historical_data_.emplace_back(time_source_.monotonicTime(), RequestData());
-  }
-}
-
-void ThreadLocalControllerImpl::recordRequest(const bool success) {
-  maybeUpdateHistoricalData();
-
-  // The back of the deque will be the most recent samples.
-  ++historical_data_.back().second.requests;
-  ++global_data_.requests;
-  if (success) {
-    ++historical_data_.back().second.successes;
-    ++global_data_.successes;
-  }
-}
-
+} // namespace AdmissionControl
 } // namespace AdmissionControl
 } // namespace HttpFilters
 } // namespace Extensions
-} // namespace Envoy

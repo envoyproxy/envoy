@@ -11,9 +11,11 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/http/codes.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/cleanup.h"
+#include "common/http/codes.h"
 #include "common/grpc/common.h"
 #include "common/grpc/status.h"
 #include "common/runtime/runtime_protos.h"
@@ -111,9 +113,8 @@ public:
   virtual bool isSuccess(Http::ResponseHeaderMap& headers) const;
 
 private:
-  // Status codes that determine a successful response.
-  std::unordered_set<uint64_t> http_status_codes_;
-  std::unordered_set<int64_t> grpc_status_codes_;
+  std::vector<std::function<bool(uint64_t)>> http_success_fns_;
+  std::unordered_set<uint64_t> grpc_success_codes_;
 };
 
 /**

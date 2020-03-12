@@ -4,7 +4,6 @@ package envoy.config.filter.http.admission_control.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/grpc/grpc_status.proto";
-import "envoy/type/http_status.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -26,12 +25,20 @@ option (udpa.annotations.file_migrate).move_to_package =
 // [#extension: envoy.filters.http.admission_control]
 
 message AdmissionControl {
+  enum HttpStatusRange {
+    Http1xx = 0;
+    Http2xx = 1;
+    Http3xx = 2;
+    Http4xx = 3;
+    Http5xx = 4;
+  }
+
   // Default method of specifying what constitutes a successful request. All status codes that
   // indicate a successful request must be explicitly specified if not relying on the default
   // values.
   message DefaultSuccessCriteria {
-    // HTTP status codes to consider as request successes. If unspecified, defaults to "200".
-    repeated type.HttpStatus http_status = 1;
+    // If HTTP statuses are unspecified, defaults to 2xx.
+    repeated HttpStatusRange http_status = 1;
 
     // GRPC status codes to consider as request successes. If unspecified, defaults to "OK".
     repeated type.grpc.GrpcStatus grpc_status = 2;

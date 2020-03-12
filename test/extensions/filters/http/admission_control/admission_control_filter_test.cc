@@ -192,7 +192,7 @@ TEST_F(AdmissionControlTest, HttpErrorCodes) {
   const std::string yaml = R"EOF(
 default_success_criteria:
   http_status:
-    - code: MovedPermanently
+    - Http3xx
   grpc_status:
 )EOF";
 
