@@ -19,6 +19,8 @@ namespace PostgreSQLProxy {
  * All PostgreSQL proxy stats. @see stats_macros.h
  */
 #define ALL_POSTGRESQL_PROXY_STATS(COUNTER)   \
+  COUNTER(frontend_commands)                  \
+  COUNTER(unrecognized)                       \
   COUNTER(sessions)                           \
   COUNTER(errors)                             \
   COUNTER(statements)                         \
@@ -72,6 +74,8 @@ public:
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
 
   // PostgreSQLProxy::DecoderCallback
+  void incFrontend() override;
+  void incUnrecognized() override;
   void incErrors() override;
   void incSessions() override;
   void incStatements() override;
@@ -86,7 +90,7 @@ public:
   void incWarnings() override;
 
   void doDecode(Buffer::Instance& data);
-  DecoderPtr createDecoder(DecoderCallbacks& callbacks);
+  DecoderPtr createDecoder(DecoderCallbacks* callbacks);
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   PostgreSQLFilterConfigSharedPtr config_;
