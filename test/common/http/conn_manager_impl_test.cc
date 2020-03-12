@@ -303,7 +303,7 @@ public:
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return max_stream_duration_timer_;
+    return max_stream_duration_;
   }
   bool use_srds_{};
   Router::RouteConfigProvider* routeConfigProvider() override {
@@ -379,7 +379,7 @@ public:
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
-  absl::optional<std::chrono::milliseconds> max_stream_duration_timer_{};
+  absl::optional<std::chrono::milliseconds> max_stream_duration_{};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -2403,12 +2403,12 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
 }
 
 TEST_F(HttpConnectionManagerImplTest, StreamAliveDurationExpired) {
-  max_stream_duration_timer_ = absl::make_optional<std::chrono::milliseconds>(10);
+  max_stream_duration_ = std::chrono::milliseconds(10);
   setup(false, "");
   Event::MockTimer* duration_timer = setUpTimer();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_timer_.value(), _)).Times(1);
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(1);
     conn_manager_->newStream(response_encoder_);
   }));
 

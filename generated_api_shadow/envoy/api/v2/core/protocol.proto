@@ -59,6 +59,9 @@ message HttpProtocolOptions {
   // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
   // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
+
+  // Specify duration to keep alive HTTP/2 stream and request/response pair. If not specified, this value is not set.
+  google.protobuf.Duration max_stream_duration = 4;
 }
 
 // [#next-free-field: 6]
@@ -112,7 +115,7 @@ message Http1ProtocolOptions {
   bool enable_trailers = 5;
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 13]
 message Http2ProtocolOptions {
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
@@ -216,9 +219,6 @@ message Http2ProtocolOptions {
   //
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12;
-
-  // Specify duration to keep alive HTTP/2 stream. If not specified, this value is not set.
-  google.protobuf.Duration max_stream_duration = 13;
 }
 
 // [#not-implemented-hide:]

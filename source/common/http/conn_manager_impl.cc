@@ -187,6 +187,11 @@ void ConnectionManagerImpl::checkForDeferredClose() {
 }
 
 void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
+  if (stream.max_stream_duration_timer_) {
+    stream.max_stream_duration_timer_->disableTimer();
+    stream.max_stream_duration_timer_.reset();
+  }
+
   // The order of what happens in this routine is important and a little complicated. We first see
   // if the stream needs to be reset. If it needs to be, this will end up invoking reset callbacks
   // and then moving the stream to the deferred destruction list. If the stream has not been reset,
@@ -602,15 +607,15 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     request_timer_->enableTimer(request_timeout_ms_, this);
   }
 
-  if (connection_manager_.config_.maxStreamDuration().has_value()) {
+  if (connection_manager_.config_.maxStreamDuration()) {
     std::chrono::milliseconds max_stream_duration_ms_ =
         connection_manager_.config_.maxStreamDuration().value();
     max_stream_duration_timer_ =
-        connection_manager.read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-          onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
-        });
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { connection_manager_.doEndStream(*this); });
     max_stream_duration_timer_->enableTimer(max_stream_duration_ms_, this);
   }
+
   stream_info_.setRequestedServerName(
       connection_manager_.read_callbacks_->connection().requestedServerName());
 }
@@ -1916,11 +1921,6 @@ bool ConnectionManagerImpl::ActiveStream::handleDataIfStopAll(ActiveStreamFilter
 }
 
 void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl::string_view) {
-  if (max_stream_duration_timer_) {
-    max_stream_duration_timer_->disableTimer();
-    max_stream_duration_timer_.reset();
-  }
-
   // NOTE: This function gets called in all of the following cases:
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset
