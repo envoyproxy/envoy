@@ -129,6 +129,7 @@ default_success_criteria:
 )EOF"};
 };
 
+// Ensure the filter can be disabled.
 TEST_F(AdmissionControlTest, FilterDisabled) {
   const std::string yaml = R"EOF(
 enabled:
@@ -156,6 +157,7 @@ default_success_criteria:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+// Ensure the filter disregards healthcheck traffic.
 TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   auto config = makeConfig(default_yaml_);
   setupFilter(config);
@@ -173,6 +175,7 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+// Validate simple behavioral cases.
 TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
   auto config = makeConfig(default_yaml_);
   setupFilter(config);
@@ -214,8 +217,7 @@ TEST_F(AdmissionControlTest, FilterBehaviorBasic) {
             filter_->decodeHeaders(request_headers, true));
 }
 
-// TODO (tonya11en) more tests around logic of specifying error codes. Still WIP.
-
+// Ensure the HTTP error code range configurations are honored.
 TEST_F(AdmissionControlTest, HttpErrorCodes) {
   const std::string yaml = R"EOF(
 default_success_criteria:
@@ -249,6 +251,7 @@ default_success_criteria:
   expectHttpFail("500");
 }
 
+// Verify default behavior of the filter.
 TEST_F(AdmissionControlTest, DefaultBehaviorTest) {
   const std::string yaml = R"EOF(
 default_success_criteria:
@@ -287,6 +290,7 @@ default_success_criteria:
   expectHttpFail("500");
 }
 
+// Ensure that HTTP status codes are not considered when evaluating a GRPC request.
 TEST_F(AdmissionControlTest, HttpCodeInfluence) {
   const std::string yaml = R"EOF(
 default_success_criteria:
@@ -313,6 +317,7 @@ default_success_criteria:
   filter_->encodeHeaders(headers, true);
 }
 
+// Ensure that HTTP status codes are not considered when evaluating a GRPC request.
 TEST_F(AdmissionControlTest, HttpCodeInfluence2) {
   const std::string yaml = R"EOF(
 default_success_criteria:
@@ -342,6 +347,7 @@ default_success_criteria:
   expectHttpSuccess("301");
 }
 
+// Check that GRPC error code configurations are honored.
 TEST_F(AdmissionControlTest, GrpcErrorCodes) {
   const std::string yaml = R"EOF(
 default_success_criteria:
