@@ -2,11 +2,14 @@
 
 set -e
 
-# This works only on Linux-x86_64 and macOS-x86_64.
-if [[ ( `uname` != "Linux" && `uname` != "Darwin" ) || `uname -m` != "x86_64" ]]; then
-  echo "ERROR: wee8 is currently supported only on Linux-x86_64 and macOS-x86_64."
+# This works only on Linux-{x86_64,s390x} and macOS-x86_64.
+case "$$(uname -s)-$$(uname -m)" in
+Linux-x86_64|Linux-s390x|Darwin-x86_64)
+  ;;
+*)
+  echo "ERROR: wee8 is currently supported only on Linux-{x86_64,s390x} and macOS-x86_64." >&2
   exit 1
-fi
+esac
 
 # Bazel magic.
 ROOT=$$(dirname $(rootpath wee8/BUILD.gn))/..
