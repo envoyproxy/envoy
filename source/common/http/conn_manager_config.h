@@ -10,6 +10,7 @@
 
 #include "common/http/date_provider.h"
 #include "common/network/utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -80,8 +81,16 @@ struct ConnectionManagerNamedStats {
 };
 
 struct ConnectionManagerStats {
+  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, const std::string& prefix,
+                         Stats::Scope& scope)
+      : named_(std::move(named_stats)), prefix_(prefix),
+        prefix_stat_name_storage_(prefix, scope.symbolTable()), scope_(scope) {}
+
+  Stats::StatName prefixStatName() const { return prefix_stat_name_storage_.statName(); }
+
   ConnectionManagerNamedStats named_;
   std::string prefix_;
+  Stats::StatNameManagedStorage prefix_stat_name_storage_;
   Stats::Scope& scope_;
 };
 

@@ -3,6 +3,7 @@
 #include "envoy/http/context.h"
 
 #include "common/http/codes.h"
+#include "common/http/user_agent.h"
 
 namespace Envoy {
 namespace Http {
@@ -25,9 +26,12 @@ public:
     default_tracing_config_ = tracing_config;
   }
 
+  const UserAgentContext& userAgentContext() const override { return user_agent_context_; }
+
 private:
+  CodeStatsImpl code_stats_;
+  UserAgentContext user_agent_context_;
   envoy::config::trace::v3::Tracing default_tracing_config_;
-  Http::CodeStatsImpl code_stats_;
 };
 
 } // namespace Http
