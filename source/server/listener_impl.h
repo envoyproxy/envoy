@@ -99,17 +99,17 @@ enum class UpdateDecision {
 
 /**
  * The immutable factory context during the intelligent listener update. The continous intelligent
- * listeners share the same XXFactoryContextImpl. With XXFactoryContext, the number of listener
- * config at runtime is restricted to 1, despite the active filter chains could spread among
- * multiple listener configs.
+ * listeners share the same ListenerFactoryContextBaseImpl. With ListenerFactoryContextBase, the
+ * number of listener config at runtime is restricted to 1, despite the active filter chains could
+ * spread among multiple listener configs.
  */
-class XXFactoryContextImpl final : public Configuration::FactoryContext,
-                                   public Network::DrainDecision {
+class ListenerFactoryContextBaseImpl final : public Configuration::FactoryContext,
+                                             public Network::DrainDecision {
 public:
-  XXFactoryContextImpl(Envoy::Server::Instance& server,
-                       ProtobufMessage::ValidationVisitor& validation_visitor,
-                       const envoy::config::listener::v3::Listener& config,
-                       Server::DrainManagerPtr drain_manager);
+  ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor,
+                                 const envoy::config::listener::v3::Listener& config,
+                                 Server::DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
@@ -155,8 +155,8 @@ private:
 };
 
 class ListenerImpl;
-// TODO(lambdai): refactor: ListenerFactroyContext provides very small value since the listener
-// filter chain lifetime is different from network filter chain.
+// TODO(lambdai): Strip the interface since ListenerFactoryContext only need to support
+// ListenerFilterChain creation.
 class ListenerFactoryContextImpl : public Configuration::ListenerFactoryContext {
 public:
   ListenerFactoryContextImpl(Envoy::Server::Instance& server,
@@ -164,14 +164,14 @@ public:
                              const envoy::config::listener::v3::Listener& config_message,
                              const Network::ListenerConfig* listener_config,
                              ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
-      : xx_factory_context_(std::make_shared<XXFactoryContextImpl>(
+      : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
             server, validation_visitor, config_message, std::move(drain_manager))),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
-  ListenerFactoryContextImpl(std::shared_ptr<XXFactoryContextImpl> xx_factory_context,
-                             const Network::ListenerConfig* listener_config,
-                             ListenerImpl& listener_impl)
-      : xx_factory_context_(xx_factory_context), listener_config_(listener_config),
-        listener_impl_(listener_impl) {}
+  ListenerFactoryContextImpl(
+      std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
+      const Network::ListenerConfig* listener_config, ListenerImpl& listener_impl)
+      : listener_factory_context_base_(listener_factory_context_base),
+        listener_config_(listener_config), listener_impl_(listener_impl) {}
 
   // FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
@@ -206,11 +206,13 @@ public:
   // ListenerFactoryContext
   const Network::ListenerConfig& listenerConfig() const override;
 
-  XXFactoryContextImpl& parent_factory_context() { return *xx_factory_context_; }
+  ListenerFactoryContextBaseImpl& parent_factory_context() {
+    return *listener_factory_context_base_;
+  }
   friend class ListenerImpl;
 
 private:
-  std::shared_ptr<XXFactoryContextImpl> xx_factory_context_;
+  std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base_;
   const Network::ListenerConfig* listener_config_;
   ListenerImpl& listener_impl_;
 };
@@ -291,7 +293,7 @@ public:
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const {
-    return listener_factory_context_->xx_factory_context_->drainManager();
+    return listener_factory_context_->listener_factory_context_base_->drainManager();
   }
   void setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);

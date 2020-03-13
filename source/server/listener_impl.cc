@@ -123,10 +123,9 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
   return createListenSocketAndApplyOptions();
 }
 
-XXFactoryContextImpl::XXFactoryContextImpl(Envoy::Server::Instance& server,
-                                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           const envoy::config::listener::v3::Listener& config,
-                                           DrainManagerPtr drain_manager)
+ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
+    Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
+    const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
       global_scope_(server.stats().createScope("")),
       // Not ideal
@@ -134,54 +133,67 @@ XXFactoryContextImpl::XXFactoryContextImpl(Envoy::Server::Instance& server,
           "listener.{}.", Network::Address::resolveProtoAddress(config.address())->asString()))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
 
-AccessLog::AccessLogManager& XXFactoryContextImpl::accessLogManager() {
+AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
   return server_.accessLogManager();
 }
-Upstream::ClusterManager& XXFactoryContextImpl::clusterManager() {
+Upstream::ClusterManager& ListenerFactoryContextBaseImpl::clusterManager() {
   return server_.clusterManager();
 }
-Event::Dispatcher& XXFactoryContextImpl::dispatcher() { return server_.dispatcher(); }
-Grpc::Context& XXFactoryContextImpl::grpcContext() { return server_.grpcContext(); }
-bool XXFactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
-Tracing::HttpTracer& XXFactoryContextImpl::httpTracer() { return httpContext().tracer(); }
-Http::Context& XXFactoryContextImpl::httpContext() { return server_.httpContext(); }
-const LocalInfo::LocalInfo& XXFactoryContextImpl::localInfo() const { return server_.localInfo(); }
-Envoy::Runtime::RandomGenerator& XXFactoryContextImpl::random() { return server_.random(); }
-Envoy::Runtime::Loader& XXFactoryContextImpl::runtime() { return server_.runtime(); }
-Stats::Scope& XXFactoryContextImpl::scope() { return *global_scope_; }
-Singleton::Manager& XXFactoryContextImpl::singletonManager() { return server_.singletonManager(); }
-OverloadManager& XXFactoryContextImpl::overloadManager() { return server_.overloadManager(); }
-ThreadLocal::Instance& XXFactoryContextImpl::threadLocal() { return server_.threadLocal(); }
-Admin& XXFactoryContextImpl::admin() { return server_.admin(); }
+Event::Dispatcher& ListenerFactoryContextBaseImpl::dispatcher() { return server_.dispatcher(); }
+Grpc::Context& ListenerFactoryContextBaseImpl::grpcContext() { return server_.grpcContext(); }
+bool ListenerFactoryContextBaseImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
+Tracing::HttpTracer& ListenerFactoryContextBaseImpl::httpTracer() { return httpContext().tracer(); }
+Http::Context& ListenerFactoryContextBaseImpl::httpContext() { return server_.httpContext(); }
+const LocalInfo::LocalInfo& ListenerFactoryContextBaseImpl::localInfo() const {
+  return server_.localInfo();
+}
+Envoy::Runtime::RandomGenerator& ListenerFactoryContextBaseImpl::random() {
+  return server_.random();
+}
+Envoy::Runtime::Loader& ListenerFactoryContextBaseImpl::runtime() { return server_.runtime(); }
+Stats::Scope& ListenerFactoryContextBaseImpl::scope() { return *global_scope_; }
+Singleton::Manager& ListenerFactoryContextBaseImpl::singletonManager() {
+  return server_.singletonManager();
+}
+OverloadManager& ListenerFactoryContextBaseImpl::overloadManager() {
+  return server_.overloadManager();
+}
+ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
+  return server_.threadLocal();
+}
+Admin& ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
 // TODO(lambdai): consider moving away from factory context
-const envoy::config::core::v3::Metadata& XXFactoryContextImpl::listenerMetadata() const {
+const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };
-envoy::config::core::v3::TrafficDirection XXFactoryContextImpl::direction() const {
+envoy::config::core::v3::TrafficDirection ListenerFactoryContextBaseImpl::direction() const {
   return direction_;
 };
-TimeSource& XXFactoryContextImpl::timeSource() { return api().timeSource(); }
-ProtobufMessage::ValidationVisitor& XXFactoryContextImpl::messageValidationVisitor() {
+TimeSource& ListenerFactoryContextBaseImpl::timeSource() { return api().timeSource(); }
+ProtobufMessage::ValidationVisitor& ListenerFactoryContextBaseImpl::messageValidationVisitor() {
   return validation_visitor_;
 }
-Api::Api& XXFactoryContextImpl::api() { return server_.api(); }
-ServerLifecycleNotifier& XXFactoryContextImpl::lifecycleNotifier() {
+Api::Api& ListenerFactoryContextBaseImpl::api() { return server_.api(); }
+ServerLifecycleNotifier& ListenerFactoryContextBaseImpl::lifecycleNotifier() {
   return server_.lifecycleNotifier();
 }
-ProcessContextOptRef XXFactoryContextImpl::processContext() { return server_.processContext(); }
-Configuration::ServerFactoryContext& XXFactoryContextImpl::getServerFactoryContext() const {
+ProcessContextOptRef ListenerFactoryContextBaseImpl::processContext() {
+  return server_.processContext();
+}
+Configuration::ServerFactoryContext&
+ListenerFactoryContextBaseImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
 }
 Configuration::TransportSocketFactoryContext&
-XXFactoryContextImpl::getTransportSocketFactoryContext() const {
+ListenerFactoryContextBaseImpl::getTransportSocketFactoryContext() const {
   return server_.transportSocketFactoryContext();
 }
-Stats::Scope& XXFactoryContextImpl::listenerScope() { return *listener_scope_; }
-Network::DrainDecision& XXFactoryContextImpl::drainDecision() { return *this; }
-Server::DrainManager& XXFactoryContextImpl::drainManager() { return *drain_manager_; }
+Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener_scope_; }
+Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
+Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 
 // Must be overridden
-Init::Manager& XXFactoryContextImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 /*
 filter_chain_manager_, watcher_ vary from plain constructor
 */
@@ -208,7 +220,7 @@ ListenerImpl::ListenerImpl(const ListenerImpl& origin,
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<ListenerFactoryContextImpl>(
-          origin.listener_factory_context_->xx_factory_context_, this, *this)),
+          origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parent_factory_context(),
                             initManager(), origin.filter_chain_manager_) {
   Network::Address::SocketType socket_type =
@@ -556,53 +568,55 @@ ListenerImpl::~ListenerImpl() {
 }
 
 AccessLog::AccessLogManager& ListenerFactoryContextImpl::accessLogManager() {
-  return xx_factory_context_->accessLogManager();
+  return listener_factory_context_base_->accessLogManager();
 }
 Upstream::ClusterManager& ListenerFactoryContextImpl::clusterManager() {
-  return xx_factory_context_->clusterManager();
+  return listener_factory_context_base_->clusterManager();
 }
 Event::Dispatcher& ListenerFactoryContextImpl::dispatcher() {
-  return xx_factory_context_->dispatcher();
+  return listener_factory_context_base_->dispatcher();
 }
 Network::DrainDecision& ListenerFactoryContextImpl::drainDecision() {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 Grpc::Context& ListenerFactoryContextImpl::grpcContext() {
-  return xx_factory_context_->grpcContext();
+  return listener_factory_context_base_->grpcContext();
 }
 bool ListenerFactoryContextImpl::healthCheckFailed() {
-  return xx_factory_context_->healthCheckFailed();
+  return listener_factory_context_base_->healthCheckFailed();
 }
 Tracing::HttpTracer& ListenerFactoryContextImpl::httpTracer() { return httpContext().tracer(); }
 Http::Context& ListenerFactoryContextImpl::httpContext() {
-  return xx_factory_context_->httpContext();
+  return listener_factory_context_base_->httpContext();
 }
 
 const LocalInfo::LocalInfo& ListenerFactoryContextImpl::localInfo() const {
-  return xx_factory_context_->localInfo();
+  return listener_factory_context_base_->localInfo();
 }
 Envoy::Runtime::RandomGenerator& ListenerFactoryContextImpl::random() {
-  return xx_factory_context_->random();
+  return listener_factory_context_base_->random();
 }
 Envoy::Runtime::Loader& ListenerFactoryContextImpl::runtime() {
-  return xx_factory_context_->runtime();
+  return listener_factory_context_base_->runtime();
 }
-Stats::Scope& ListenerFactoryContextImpl::scope() { return xx_factory_context_->scope(); }
+Stats::Scope& ListenerFactoryContextImpl::scope() {
+  return listener_factory_context_base_->scope();
+}
 Singleton::Manager& ListenerFactoryContextImpl::singletonManager() {
-  return xx_factory_context_->singletonManager();
+  return listener_factory_context_base_->singletonManager();
 }
 OverloadManager& ListenerFactoryContextImpl::overloadManager() {
-  return xx_factory_context_->overloadManager();
+  return listener_factory_context_base_->overloadManager();
 }
 ThreadLocal::Instance& ListenerFactoryContextImpl::threadLocal() {
-  return xx_factory_context_->threadLocal();
+  return listener_factory_context_base_->threadLocal();
 }
-Admin& ListenerFactoryContextImpl::admin() { return xx_factory_context_->admin(); }
+Admin& ListenerFactoryContextImpl::admin() { return listener_factory_context_base_->admin(); }
 const envoy::config::core::v3::Metadata& ListenerFactoryContextImpl::listenerMetadata() const {
-  return xx_factory_context_->listenerMetadata();
+  return listener_factory_context_base_->listenerMetadata();
 };
 envoy::config::core::v3::TrafficDirection ListenerFactoryContextImpl::direction() const {
-  return xx_factory_context_->direction();
+  return listener_factory_context_base_->direction();
 };
 TimeSource& ListenerFactoryContextImpl::timeSource() { return api().timeSource(); }
 
@@ -610,24 +624,24 @@ const Network::ListenerConfig& ListenerFactoryContextImpl::listenerConfig() cons
   return *listener_config_;
 }
 ProtobufMessage::ValidationVisitor& ListenerFactoryContextImpl::messageValidationVisitor() {
-  return xx_factory_context_->messageValidationVisitor();
+  return listener_factory_context_base_->messageValidationVisitor();
 }
-Api::Api& ListenerFactoryContextImpl::api() { return xx_factory_context_->api(); }
+Api::Api& ListenerFactoryContextImpl::api() { return listener_factory_context_base_->api(); }
 ServerLifecycleNotifier& ListenerFactoryContextImpl::lifecycleNotifier() {
-  return xx_factory_context_->lifecycleNotifier();
+  return listener_factory_context_base_->lifecycleNotifier();
 }
 ProcessContextOptRef ListenerFactoryContextImpl::processContext() {
-  return xx_factory_context_->processContext();
+  return listener_factory_context_base_->processContext();
 }
 Configuration::ServerFactoryContext& ListenerFactoryContextImpl::getServerFactoryContext() const {
-  return xx_factory_context_->getServerFactoryContext();
+  return listener_factory_context_base_->getServerFactoryContext();
 }
 Configuration::TransportSocketFactoryContext&
 ListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return xx_factory_context_->getTransportSocketFactoryContext();
+  return listener_factory_context_base_->getTransportSocketFactoryContext();
 }
 Stats::Scope& ListenerFactoryContextImpl::listenerScope() {
-  return xx_factory_context_->listenerScope();
+  return listener_factory_context_base_->listenerScope();
 }
 Init::Manager& ListenerFactoryContextImpl::initManager() { return listener_impl_.initManager(); }
 
