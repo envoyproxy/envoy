@@ -80,11 +80,10 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
-  return {
+  return ConnectionManagerStats(
       {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
                                POOL_HISTOGRAM_PREFIX(scope, prefix))},
-      prefix,
-      scope};
+      prefix, scope);
 }
 
 ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
@@ -108,8 +107,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
-      drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
-      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
+      drain_close_(drain_close), user_agent_(http_context.userAgentContext()),
+      random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
+      local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
       overload_stop_accepting_requests_ref_(
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
@@ -792,8 +792,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     request_headers_->removeExpect();
   }
 
-  connection_manager_.user_agent_.initializeFromHeaders(
-      *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_);
+  connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
+                                                        connection_manager_.stats_.prefixStatName(),
+                                                        connection_manager_.stats_.scope_);
 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
