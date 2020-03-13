@@ -28,7 +28,7 @@ namespace DnsFilter {
 /**
  * Struct definition for all Dns Filter stats. @see stats_macros.h
  */
-struct DnsProxyFilterStats {
+struct DnsFilterStats {
   ALL_DNS_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
@@ -41,18 +41,18 @@ public:
       Server::Configuration::ListenerFactoryContext& context,
       const envoy::config::filter::udp::dns_filter::v2alpha::DnsFilterConfig& config);
 
-  DnsProxyFilterStats& stats() const { return stats_; }
-  DnsVirtualDomainConfig domains() const { return virtual_domains_; }
+  DnsFilterStats& stats() const { return stats_; }
+  DnsVirtualDomainConfig& domains() const { return virtual_domains_; }
 
 private:
-  static DnsProxyFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
+  static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
     const auto final_prefix = absl::StrCat("dns_filter.", stat_prefix);
     return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
   Stats::Scope& root_scope;
-  mutable DnsProxyFilterStats stats_;
-  DnsVirtualDomainConfig virtual_domains_;
+  mutable DnsFilterStats stats_;
+  mutable DnsVirtualDomainConfig virtual_domains_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;

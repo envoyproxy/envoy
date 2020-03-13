@@ -23,7 +23,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     const size_t entries = cfg.virtual_domains().size();
 
     virtual_domains_.reserve(entries);
-    for (const auto& virtual_domain : cfg.virtual_domains()) {
+    for (const auto virtual_domain : cfg.virtual_domains()) {
       DnsAddressList addresses{};
 
       if (virtual_domain.endpoint().has_addresslist()) {
