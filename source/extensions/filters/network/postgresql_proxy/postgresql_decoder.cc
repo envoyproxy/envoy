@@ -34,12 +34,13 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
     return false;
   }
 
-  initial_ = false;
 
   setMessageLength(length);
 
+  if(!initial_) {
   BufferHelper::readStringBySize(data, 1, cmd);
   command_ = cmd[0];
+  }
   //setCommand(cmd);
 
   data.drain(4); // this is length which we already know.
@@ -47,15 +48,16 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   BufferHelper::readStringBySize(data, length - 4, message);
   setMessage(message);
 
+  initial_ = false;
   ENVOY_LOG(trace, "postgresql_proxy: msg parsed");
   return true;
 }
 
-void DecoderImpl::decode(Buffer::Instance& data) {
+bool DecoderImpl::onData(Buffer::Instance& data) {
   ENVOY_LOG(trace, "postgresql_proxy: decoding {} bytes", data.length());
 
   if(!parseMessage(data)) {
-    return;
+    return false;
   }
 
   std::string command_type = "(Backend)";
@@ -112,6 +114,8 @@ void DecoderImpl::decode(Buffer::Instance& data) {
   }
 */
   ENVOY_LOG(trace, "postgresql_proxy: {} bytes remaining in buffer", data.length());
+
+  return true;
 }
 
 
@@ -235,10 +239,11 @@ bool DecoderImpl::isBackend() {
 bool DecoderImpl::isFrontend() {
   return (session_.getProtocolDirection() == PostgreSQLSession::ProtocolDirection::Frontend);
 }
-
+#if 0
 void DecoderImpl::onData(Buffer::Instance& data) {
   decode(data);
 }
+#endif
 
 } // namespace PostgreSQLProxy
 } // namespace NetworkFilters

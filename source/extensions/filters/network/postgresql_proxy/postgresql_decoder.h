@@ -44,7 +44,7 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
 
-  virtual void onData(Buffer::Instance& data) PURE;
+  virtual bool onData(Buffer::Instance& data) PURE;
   virtual PostgreSQLSession& getSession() PURE;
 
   // decode frontend messages
@@ -59,7 +59,7 @@ public:
 
   // PostgreSQLProxy::Decoder
   void onFrontendData(Buffer::Instance& data) override;
-  void onData(Buffer::Instance& data) override;
+  bool onData(Buffer::Instance& data) override;
   PostgreSQLSession& getSession() override { return session_; }
 
   // Temp stuff for testing purposes

@@ -37,8 +37,38 @@ public:
 protected:
   ::testing::NiceMock<DecoderCallbacksMock> callbacks_;
   std::unique_ptr<DecoderImpl> decoder_;
+
+  // fields offen used
   Buffer::OwnedImpl data;
+  uint32_t length_;
+  char buf_[256];
 };
+
+// Test processing the initial message from a client.
+// For historical reasons, the first message does not include
+// command (ats byte). It starts with length. The initial 
+// message contains the protocol version. After processing the 
+// initial message the server should start using message format
+// with command as 1st byte.
+TEST_F(PostgreSQLProxyDecoderTest, InitialMessage) {
+  decoder_->setInitial(true);
+
+  // start with length
+  length_ = htonl(12);
+  data.add(&length_, sizeof(length_));
+  // add 8 bytes of some data
+  data.add(buf_, 8);
+  decoder_->onData(data);
+  ASSERT_THAT(data.length(), 0);
+
+  // Now feed normal message with 1bytes as command
+  data.add("P");
+  length_ = htonl(6); // 4 bytes of length + 2 bytes of data
+  data.add(&length_, sizeof(length_));
+  data.add("AB");
+  decoder_->onData(data);
+  ASSERT_THAT(data.length(), 0);
+}
 
 // Test processing messages which map 1:1 with buffer.
 // The buffer contains just a single entire message and
@@ -56,17 +86,16 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferSingleMessages) {
 
   // Add length of 4 bytes. It would mean completely empty message.
   // but it should be consumed.
-  uint32_t length = htonl(4);
-  data.add(&length, sizeof(length));
+  length_ = htonl(4);
+  data.add(&length_, sizeof(length_));
   decoder_->onData(data);
   ASSERT_THAT(data.length(), 0);
 
   // Create a message with 5 additional bytes.
   data.add("P");
-  length = htonl(9); // 4 bytes of length field + 5 of data
-  data.add(&length, sizeof(length));
-  std::unique_ptr<char[]> buf = std::make_unique<char[]>(5); 
-  data.add(buf.get(), 5);
+  length_ = htonl(9); // 4 bytes of length field + 5 of data
+  data.add(&length_, sizeof(length_));
+  data.add(buf_, 5);
   decoder_->onData(data);
   ASSERT_THAT(data.length(), 0);
 }
@@ -79,10 +108,9 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferLargeMessages) {
   // but the buffer contains only 98 bytes.
   // It should not be processed.
   data.add("P");
-  uint32_t length = htonl(100); // This also includes length field
-  data.add(&length, sizeof(length));
-  auto buf = std::make_unique<char[]>(94);
-  data.add(buf.get(), 94);
+  length_ = htonl(100); // This also includes length field
+  data.add(&length_, sizeof(length_));
+  data.add(buf_, 94);
   decoder_->onData(data);
   // The buffer contains command (1 byte), length (4 bytes) and 94 bytes of message
   ASSERT_THAT(data.length(), 99);
@@ -97,21 +125,18 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferLargeMessages) {
 // message. Call to the decoder should consume only one message
 // at a time and only when the buffer contains the entire message.
 TEST_F(PostgreSQLProxyDecoderTest, TwoMessagesInOneBuffer) {
-  uint32_t length;
-
   // create the first message of 50 bytes long (+1 for command)
   data.add("P");
-  length = htonl(50);
-  data.add(&length, sizeof(length));
-  auto buf = std::make_unique<char[]>(46);
-  data.add(buf.get(), 46);
+  length_ = htonl(50);
+  data.add(&length_, sizeof(length_));
+  data.add(buf_, 46);
 
   // create the second message of 50 + 46 bytes (+1 for command)
   data.add("P");
-  length = htonl(96);
-  data.add(&length, sizeof(length));
-  data.add(buf.get(), 46);
-  data.add(buf.get(), 46);
+  length_ = htonl(96);
+  data.add(&length_, sizeof(length_));
+  data.add(buf_, 46);
+  data.add(buf_, 46);
 
   // The buffer contains two messaged:
   // 1st: command (1 byte), length (4 bytes), 46 bytes of data

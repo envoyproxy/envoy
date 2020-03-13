@@ -25,7 +25,7 @@ Network::FilterStatus PostgreSQLFilter::onData(Buffer::Instance& data, bool) {
 
   // Frontend Buffer
   frontend_buffer_.add(data);
-  decoder_->getSession().setProtocolDirection(PostgreSQLSession::ProtocolDirection::Frontend);
+  //decoder_->getSession().setProtocolDirection(PostgreSQLSession::ProtocolDirection::Frontend);
   doDecode(frontend_buffer_);
 
   return Network::FilterStatus::Continue;
@@ -42,7 +42,7 @@ Network::FilterStatus PostgreSQLFilter::onWrite(Buffer::Instance& data, bool) {
 
   // Backend Buffer
   backend_buffer_.add(data);
-  decoder_->getSession().setProtocolDirection(PostgreSQLSession::ProtocolDirection::Backend);
+//  decoder_->getSession().setProtocolDirection(PostgreSQLSession::ProtocolDirection::Backend);
   doDecode(backend_buffer_);
 
   return Network::FilterStatus::Continue;
@@ -107,14 +107,11 @@ void PostgreSQLFilter::incTransactionsRollback() {
 void PostgreSQLFilter::incWarnings() { config_->stats_.warnings_.inc(); }
 
 void PostgreSQLFilter::doDecode(Buffer::Instance& data) {
-  try {
-    decoder_->onData(data);
-  } catch (EnvoyException& e) {
-    ENVOY_LOG(info, "postgresql_proxy: decoding error: {}", e.what());
-    frontend_buffer_.drain(frontend_buffer_.length());
-    backend_buffer_.drain(backend_buffer_.length());
+  // Keep processing data until buffer is empty or decoder says
+  // that it cannot process data in the buffer.
+  while((0 < data.length()) && (decoder_->onData(data))) {
+    ;
   }
-
 }
 
 } // namespace PostgreSQLProxy
