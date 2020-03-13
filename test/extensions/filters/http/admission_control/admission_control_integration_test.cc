@@ -62,11 +62,6 @@ protected:
     codec_client->close();
     return response;
   }
-
-  void sendGrpcRequest(Grpc::Status::GrpcStatus status) {
-    fake_upstreams_.front()->startGrpcStream();
-    fake_upstreams_.front()->finishGrpcStream(status);
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdmissionControlIntegrationTest,
