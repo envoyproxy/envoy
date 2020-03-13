@@ -54,6 +54,7 @@ configure_make(
     static_libraries = [
         "libluajit-5.1.a",
     ],
+    tags = ["skip_on_windows"],
 )
 
 configure_make(
