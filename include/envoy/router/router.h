@@ -145,9 +145,101 @@ public:
 };
 
 /**
- * Route level retry policy.
+ * Base route level retry policy.
  */
 class RetryPolicy {
+public:
+  virtual ~RetryPolicy() = default;
+
+  /**
+   * Called when the router receives requests. The function is expected to be called when
+   * initializing retry policy.
+   * @param request_header request header.
+   */
+  virtual void recordRequestHeader(Http::RequestHeaderMap& request_header) PURE;
+
+  /**
+   * Called when an upstream request has been completed with headers.
+   * @param response_header response header.
+   */
+  virtual void recordResponseHeaders(const Http::ResponseHeaderMap& response_header) PURE;
+
+  /**
+   * Called when an upstream request failed due to a reset.
+   * @param reset_reason reset reason.
+   */
+  virtual void recordReset(Http::StreamResetReason reset_reason) PURE;
+
+  /*
+   * @return uint32_t the number of remaining retries.
+   */
+  virtual uint32_t& remainingRetries() PURE;
+
+  /**
+   * @return if the retry policy is enabled.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
+   * Determine if the request should be retried. The plugin can make the decision based on the
+   * response records.
+   * @param response_header response header.
+   * @return a boolean value indicating if the request should be retried.
+   */
+  virtual bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_header) const PURE;
+
+  /**
+   * Determine if the request should be retried. The plugin can make the decision based on the
+   * response records.
+   * @param reset_reason reset reason.
+   * @return a boolean value indicating if the request should be retried.
+   */
+  virtual bool wouldRetryFromReset(Http::StreamResetReason reset_reason) const PURE;
+
+  /**
+   * @return std::chrono::milliseconds timeout per retry attempt.
+   */
+  virtual std::chrono::milliseconds perTryTimeout() const PURE;
+
+  /**
+   * Initializes a new set of RetryHostPredicates to be used when retrying with this retry policy.
+   * @return list of RetryHostPredicates to use
+   */
+  virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
+  /**
+   * Initializes a RetryPriority to be used when retrying with this retry policy.
+   * @return the RetryPriority to use when determining priority load for retries, or nullptr
+   * if none should be used.
+   */
+  virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
+
+  /**
+   * Return how many times host selection should be reattempted during host selection.
+   */
+  virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  /*
+   * @return uint32_t the number of retries to allow against the route.
+   */
+  virtual uint32_t numRetries() const PURE;
+
+  /**
+   * @return absl::optional<std::chrono::milliseconds> base retry interval
+   */
+  virtual absl::optional<std::chrono::milliseconds> baseInterval() const PURE;
+
+  /**
+   * @return absl::optional<std::chrono::milliseconds> maximum retry interval
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
+};
+
+using RetryPolicySharedPtr = std::shared_ptr<RetryPolicy>;
+
+/**
+ * Route level retry policy.
+ */
+class CoreRetryPolicy : public RetryPolicy {
 public:
   // clang-format off
   static const uint32_t RETRY_ON_5XX                     = 0x1;
@@ -165,41 +257,12 @@ public:
   static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
   // clang-format on
 
-  virtual ~RetryPolicy() = default;
-
-  /**
-   * @return std::chrono::milliseconds timeout per retry attempt.
-   */
-  virtual std::chrono::milliseconds perTryTimeout() const PURE;
-
-  /**
-   * @return uint32_t the number of retries to allow against the route.
-   */
-  virtual uint32_t numRetries() const PURE;
+  virtual ~CoreRetryPolicy() = default;
 
   /**
    * @return uint32_t a local OR of RETRY_ON values above.
    */
   virtual uint32_t retryOn() const PURE;
-
-  /**
-   * Initializes a new set of RetryHostPredicates to be used when retrying with this retry policy.
-   * @return list of RetryHostPredicates to use
-   */
-  virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
-
-  /**
-   * Initializes a RetryPriority to be used when retrying with this retry policy.
-   * @return the RetryPriority to use when determining priority load for retries, or nullptr
-   * if none should be used.
-   */
-  virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
-
-  /**
-   * Number of times host selection should be reattempted when selecting a host
-   * for a retry attempt.
-   */
-  virtual uint32_t hostSelectionMaxAttempts() const PURE;
 
   /**
    * List of status codes that should trigger a retry when the retriable-status-codes retry
@@ -218,16 +281,6 @@ public:
    * matchers that will be checked before enabling retries.
    */
   virtual const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const PURE;
-
-  /**
-   * @return absl::optional<std::chrono::milliseconds> base retry interval
-   */
-  virtual absl::optional<std::chrono::milliseconds> baseInterval() const PURE;
-
-  /**
-   * @return absl::optional<std::chrono::milliseconds> maximum retry interval
-   */
-  virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
 };
 
 /**
@@ -651,10 +704,11 @@ public:
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
 
   /**
-   * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
-   *         if it is empty and does not allow retries.
+   * @return RetryPolicy& the retry policy for the route. All routes have a retry policy even
+   *         if it is empty and does not allow retries. The retry policy object is mutable during
+   *         the lifecycle of upstream requests.
    */
-  virtual const RetryPolicy& retryPolicy() const PURE;
+  virtual RetryPolicy& retryPolicy() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.

@@ -24,8 +24,7 @@ namespace Router {
  */
 class RetryStateImpl : public RetryState {
 public:
-  static RetryStatePtr create(const RetryPolicy& route_policy,
-                              Http::RequestHeaderMap& request_headers,
+  static RetryStatePtr create(RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                               const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                               Upstream::ResourcePriority priority);
@@ -50,7 +49,7 @@ public:
   static std::pair<uint32_t, bool> parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
   // Router::RetryState
-  bool enabled() override { return retry_on_ != 0; }
+  bool enabled() override { return retry_policy_.enabled(); }
   RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                  DoRetryCallback callback) override;
   // Returns true if the retry policy would retry the passed headers. Does not
@@ -86,7 +85,7 @@ public:
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
 
 private:
-  RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
+  RetryStateImpl(RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  Upstream::ResourcePriority priority);
@@ -100,8 +99,6 @@ private:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
-  uint32_t retry_on_{};
-  uint32_t retries_remaining_{};
   DoRetryCallback callback_;
   Event::TimerPtr retry_timer_;
   Upstream::ResourcePriority priority_;
@@ -109,8 +106,7 @@ private:
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_max_attempts_;
-  std::vector<uint32_t> retriable_status_codes_;
-  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
+  RetryPolicy& retry_policy_;
 };
 
 } // namespace Router

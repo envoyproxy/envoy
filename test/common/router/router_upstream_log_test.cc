@@ -60,7 +60,7 @@ public:
   using Filter::Filter;
 
   // Filter
-  RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
+  RetryStatePtr createRetryState(RetryPolicy&, Http::RequestHeaderMap&,
                                  const Upstream::ClusterInfo&, Runtime::Loader&,
                                  Runtime::RandomGenerator&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {

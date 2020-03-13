@@ -165,6 +165,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "retry_policy_impl_test",
+    srcs = ["retry_policy_impl_test.cc"],
+    deps = [
+        "//source/common/router:retry_policy_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_proto_library(
     name = "route_fuzz_proto",
     srcs = ["route_fuzz.proto"],

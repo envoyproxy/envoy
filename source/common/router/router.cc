@@ -1460,7 +1460,7 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 }
 
 RetryStatePtr
-ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
+ProdFilter::createRetryState(RetryPolicy& policy, Http::RequestHeaderMap& request_headers,
                              const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                              Upstream::ResourcePriority priority) {
