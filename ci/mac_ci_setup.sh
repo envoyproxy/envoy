@@ -37,6 +37,7 @@ fi
 
 # Required as bazel and a foreign bazelisk are installed in the latest macos vm image, we have
 # to unlink/overwrite them to install bazelisk
+echo "Installing bazelbuild/tap/bazelisk"
 brew install --force bazelbuild/tap/bazelisk
 if ! brew link --overwrite bazelbuild/tap/bazelisk; then
     echo "Failed to install and link bazelbuild/tap/bazelisk"
