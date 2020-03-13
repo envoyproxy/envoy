@@ -144,6 +144,16 @@ message VirtualHost {
   // [#next-major-version: rename to include_attempt_count_in_request.]
   bool include_request_attempt_count = 14;
 
+  // Decides whether the :ref:`x-envoy-attempt-count
+  // <config_http_filters_router_x-envoy-attempt-count>` header should be included
+  // in the downstream response. Setting this option will cause the router to override any existing header
+  // value, so in the case of two Envoys on the request path with this option enabled, the downstream
+  // will see the attempt count as perceived by the Envoy closest upstream from itself. Defaults to false.
+  // This header is unaffected by the
+  // :ref:`suppress_envoy_headers
+  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  bool include_attempt_count_in_response = 19;
+
   // Indicates the retry policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
@@ -158,16 +168,6 @@ message VirtualHost {
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
-
-  // Decides whether the :ref:`x-envoy-attempt-count
-  // <config_http_filters_router_x-envoy-attempt-count>` header should be included
-  // in the downstream response. Setting this option will cause the router to override any existing header
-  // value, so in the case of two Envoys on the request path with this option enabled, the downstream
-  // will see the attempt count as perceived by the Envoy closest upstream from itself. Defaults to false.
-  // This header is unaffected by the
-  // :ref:`suppress_envoy_headers
-  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
-  bool include_attempt_count_in_response = 19;
 }
 
 // A filter-defined action type.
