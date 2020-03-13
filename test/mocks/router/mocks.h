@@ -190,19 +190,19 @@ public:
 class TestShadowPolicy : public ShadowPolicy {
 public:
   TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
-                   envoy::type::v3::FractionalPercent default_value = {}, bool sampled = true)
+                   envoy::type::v3::FractionalPercent default_value = {}, bool trace_sampled = true)
       : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value),
-        sampled_(sampled) {}
+        trace_sampled_(trace_sampled) {}
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
-  bool sampled() const override { return sampled_; }
+  bool traceSampled() const override { return trace_sampled_; }
 
   std::string cluster_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
-  bool sampled_;
+  bool trace_sampled_;
 };
 
 class MockShadowWriter : public ShadowWriter {

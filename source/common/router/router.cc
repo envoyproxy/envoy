@@ -754,7 +754,7 @@ void Filter::maybeDoShadowing() {
                        .setTimeout(timeout_.global_timeout_)
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
-                       .setSampled(shadow_policy.sampled());
+                       .setSampled(shadow_policy.traceSampled());
     config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request), options);
   }
 }

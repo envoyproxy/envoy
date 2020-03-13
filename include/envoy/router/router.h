@@ -365,7 +365,7 @@ public:
   /**
    * @return true if the trace span should be sampled.
    */
-  virtual bool sampled() const PURE;
+  virtual bool traceSampled() const PURE;
 };
 
 using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;

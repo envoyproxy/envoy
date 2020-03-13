@@ -548,7 +548,7 @@ message RouteAction {
     core.v3.RuntimeFractionalPercent runtime_fraction = 3;
 
     // Determines if the trace span should be sampled. Defaults to true.
-    google.protobuf.BoolValue tracing_sampled = 4;
+    google.protobuf.BoolValue trace_sampled = 4;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
