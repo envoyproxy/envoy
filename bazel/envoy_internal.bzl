@@ -18,10 +18,10 @@ def envoy_copts(repository, test = False):
     ]
 
     # Windows options for cleanest service compilation;
-    #   General MSVC C++ options
-    #   Streamline windows.h behavior for Win8+ API (for ntohll, see;
-    #     https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx )
-    #   Minimize Win32 API, dropping GUI-oriented features
+    #   General MSVC C++ options for Envoy current expectations.
+    #   Target windows.h for all Windows 10 (0x0A) API prototypes (ntohll etc)
+    #   (See https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx )
+    #   Optimize Windows headers by dropping GUI-oriented features from compilation
     msvc_options = [
         "-WX",
         "-Zc:__cplusplus",
