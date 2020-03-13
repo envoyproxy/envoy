@@ -5150,8 +5150,8 @@ TEST_P(RouterTestStrictCheckOneHeader, SingleInvalidHeader) {
       {"X-envoy-Upstream-rq-timeout-ms", "10.0"},
       {"x-envoy-upstream-rq-per-try-timeout-ms", "1.0"},
       {"x-envoy-max-retries", "2.0"},
-      {"x-envoy-retry-on", "5xx,cancelled"},            // 'cancelled' is an invalid entry
-      {"x-envoy-retry-grpc-on", "cancelled, internal"}, // spaces are considered errors
+      {"x-envoy-retry-on", "5xx,cancelled"},                // 'cancelled' is an invalid entry
+      {"x-envoy-retry-grpc-on", "5xx,cancelled, internal"}, // '5xx' is an invalid entry
   };
   HttpTestUtility::addDefaultHeaders(req_headers);
   auto checked_header = GetParam();
@@ -5256,9 +5256,9 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       {"x-envoy-max-retries", "2"},
       {"not-checked", "always passes"},
       {"x-envoy-retry-on", "5xx,gateway-error,retriable-4xx,refused-stream,connect-failure,"
-                           "retriable-status-codes,reset"},
+                           "retriable-status-codes , reset"}, // space is allowed
       {"x-envoy-retry-grpc-on",
-       "cancelled,internal,deadline-exceeded,resource-exhausted,unavailable"},
+       "cancelled,internal,deadline-exceeded,resource-exhausted , unavailable"}, // space is allowed
   };
 
   for (const auto& target : SUPPORTED_STRICT_CHECKED_HEADERS) {
@@ -5272,8 +5272,8 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       {"X-envoy-Upstream-rq-timeout-ms", "10.0"},
       {"x-envoy-upstream-rq-per-try-timeout-ms", "1.0"},
       {"x-envoy-max-retries", "2.0"},
-      {"x-envoy-retry-on", "5xx,cancelled"},            // 'cancelled' is an invalid entry
-      {"x-envoy-retry-grpc-on", "cancelled, internal"}, // spaces are considered errors
+      {"x-envoy-retry-on", "5xx,cancelled"},                // 'cancelled' is an invalid entry
+      {"x-envoy-retry-grpc-on", "5xx,cancelled, internal"}, // '5xx' is an invalid entry
   };
 
   for (const auto& target : SUPPORTED_STRICT_CHECKED_HEADERS) {
