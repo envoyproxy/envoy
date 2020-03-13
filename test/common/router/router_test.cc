@@ -205,6 +205,29 @@ public:
     router_.onDestroy();
   }
 
+  void verifyAttemptCountBasic(bool set_include_attempt_count, absl::optional<int> preset_count,
+                               int expected_count) {
+    setIncludeAttemptCount(set_include_attempt_count);
+
+    EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+    expectResponseTimerCreate();
+
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    if (preset_count) {
+      headers.setEnvoyAttemptCount(preset_count.value());
+    }
+    router_.decodeHeaders(headers, true);
+
+    EXPECT_EQ(expected_count,
+              atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+
+    // When the router filter gets reset we should cancel the pool request.
+    EXPECT_CALL(cancellable_, cancel());
+    router_.onDestroy();
+    EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  }
+
   void sendRequest(bool end_stream = true) {
     if (end_stream) {
       EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(1);
@@ -872,63 +895,30 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
-// Validate that x-envoy-attempt-count is added to request headers when option is true.
+// Validate that x-envoy-attempt-count is added to request headers when the option is true.
 TEST_F(RouterTest, EnvoyAttemptCountInRequest) {
-  setIncludeAttemptCount(true);
-
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  EXPECT_EQ(1, atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
-
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
-  router_.onDestroy();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  verifyAttemptCountBasic(
+      /* set_include_attempt_count */ true,
+      /* preset_count*/ absl::nullopt,
+      /* expected_count */ 1);
 }
 
 // Validate that x-envoy-attempt-count is overwritten by the router on request headers, if the
 // header is sent from the downstream and the option is set to true.
 TEST_F(RouterTest, EnvoyAttemptCountInRequestOverwritten) {
-  setIncludeAttemptCount(true);
-
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  headers.setEnvoyAttemptCount(123);
-  router_.decodeHeaders(headers, true);
-
-  EXPECT_EQ(1, atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
-
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
-  router_.onDestroy();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  verifyAttemptCountBasic(
+      /* set_include_attempt_count */ true,
+      /* preset_count*/ 123,
+      /* expected_count */ 1);
 }
 
 // Validate that x-envoy-attempt-count is not overwritten by the router on request headers, if the
 // header is sent from the downstream and the option is set to false.
 TEST_F(RouterTest, EnvoyAttemptCountInRequestNotOverwritten) {
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  headers.setEnvoyAttemptCount(123);
-  router_.decodeHeaders(headers, true);
-
-  EXPECT_EQ(123, atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
-
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
-  router_.onDestroy();
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  verifyAttemptCountBasic(
+      /* set_include_attempt_count */ false,
+      /* preset_count*/ 123,
+      /* expected_count */ 123);
 }
 
 TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
