@@ -16,7 +16,7 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./envoy/ci/mac_ci_setup.sh
       - name: 'Build Envoy.framework distributable'
         run: bazel build --config=ios //:ios_dist
       - name: 'Zip Envoy.framework.zip distributable'
@@ -36,7 +36,7 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./envoy/ci/mac_ci_setup.sh
       - uses: actions/download-artifact@v1
         with:
           name: Envoy.framework.zip
@@ -64,7 +64,7 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./envoy/ci/mac_ci_setup.sh
       - uses: actions/download-artifact@v1
         with:
           name: Envoy.framework.zip
@@ -91,6 +91,6 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./envoy/ci/mac_ci_setup.sh
       - name: 'Run swift library tests'
         run: bazel test --test_output=all --config=ios --build_tests_only //library/swift/test/...

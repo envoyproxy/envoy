@@ -43,7 +43,7 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./envoy/ci/mac_ci_setup.sh
       - name: 'Build Envoy.framework distributable'
         run: bazel build --config=release-ios --ios_multi_cpus=i386,x86_64,armv7,arm64 //:ios_dist
       - name: 'Create temporary directory for artifact to produce properly named zip'
@@ -62,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: ./envoy/ci/mac_ci_setup.sh
       - uses: actions/download-artifact@v1
         with:
           name: envoy_ios_framework
