@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package envoy.extensions.filter.udp.dns_filter.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/versioning.proto";
+
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filter.udp.dns_filter.v3";
+option java_outer_classname = "DnsFilterProto";
+option java_multiple_files = true;
+
+// [#protodoc-title: DNS Filter]
+// DNS Filter :ref:`configuration overview <config_udp_listener_filters_dns_filter>`.
+// [#extension: envoy.filters.udp_listener.dns_filter]
+
+// Configuration for the DNS filter.
+message DnsFilterConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig";
+
+  // This message contains a list of IP addresses returned for a query for a known name
+  message AddressList {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.AddressList";
+
+    repeated string address = 1;
+  }
+
+  // This message type is extensible and can contain a list of addresses
+  // or dictate some other method for resolving the addresses for an
+  // endpoint
+  message DnsEndpoint {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.DnsEndpoint";
+
+    oneof endpoint_config {
+      AddressList addresslist = 1;
+    }
+  }
+
+  message DnsVirtualDomain {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.DnsVirtualDomain";
+
+    // The domain name for which Envoy will respond to query requests
+    string name = 1 [(validate.rules).string = {min_len: 2 well_known_regex: HTTP_HEADER_NAME}];
+
+    // The configuration containing the method to determine the address
+    // of this endpoint
+    DnsEndpoint endpoint = 2;
+
+    // Sets the TTL in dns answers from Envoy returned to the client
+    google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gt {}}];
+  }
+
+  // This message contains the configuration for the DNS Filter if populated
+  // from the control plane
+  message ControlPlaneConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.ControlPlaneConfig";
+
+    // Control how many times envoy makes an attempt to forward a query to
+    // an external server
+    uint32 external_retry_count = 1;
+
+    // Fully qualified domain names for which Envoy will respond to queries
+    repeated DnsVirtualDomain virtual_domains = 2 [(validate.rules).repeated = {min_items: 1}];
+
+    // This field serves to help Envoy determine whether a name belongs
+    // to a known resource or whether the query should be forwarded externally
+    repeated string known_domains = 3;
+  }
+
+  // This message contains the configuration for the Dns Filter operating
+  // in a server context. This message will contain the virtual hosts and
+  // associated addresses with which Envoy will respond to queries
+  message ServerCtxConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.ServerCtxConfig";
+
+    oneof config_source {
+      // Load the configuration specified from the control plane
+      ControlPlaneConfig control_plane_cfg = 1;
+
+      // Seed the filter configuration from an external path
+      config.core.v3.DataSource filter_server_cfg = 2;
+    }
+  }
+
+  // The stat prefix used when emitting DNS filter statistics
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Server context configuration
+  ServerCtxConfig server_config = 2;
+}
