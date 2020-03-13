@@ -91,6 +91,11 @@ public:
 
   void doDecode(Buffer::Instance& data);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);
+  void setDecoder(std::unique_ptr<Decoder> decoder) { decoder_ = std::move(decoder); }
+  Decoder* getDecoder() const {return decoder_.get(); }
+
+  uint32_t getFrontendBufLength() const { return frontend_buffer_.length(); }
+  uint32_t getBackendBufLength() const { return backend_buffer_.length(); }
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   PostgreSQLFilterConfigSharedPtr config_;
