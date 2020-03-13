@@ -7,8 +7,10 @@ Version history
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
-* aws_request_signing: a few fixes so that it works with S3.
 * admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
+* aws_lambda: added :ref:`AWS Lambda filter <config_http_filters_aws_lambda>` that converts HTTP requests to Lambda
+  invokes. This effectively makes Envoy act as an egress gateway to AWS Lambda.
+* aws_request_signing: a few fixes so that it works with S3.
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * datasource: added retry policy for remote async data source.
