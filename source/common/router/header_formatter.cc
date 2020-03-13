@@ -242,6 +242,16 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
           *stream_info.downstreamLocalAddress());
     };
+  } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+      const Network::Address::InstanceConstSharedPtr& address =
+          stream_info.downstreamLocalAddress();
+      std::string port;
+      if (address->type() == Network::Address::Type::Ip) {
+        port = std::to_string(address->ip()->port());
+      }
+      return port;
+    };
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
     field_extractor_ =
         sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
