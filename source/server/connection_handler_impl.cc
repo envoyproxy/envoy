@@ -324,6 +324,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
 
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket) {
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
   // Find matching filter chain.
   const auto filter_chain = config_.filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
@@ -335,10 +336,11 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
-  ActiveTcpConnectionPtr active_connection(new ActiveTcpConnection(
-      active_connections,
-      parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket)),
-      parent_.dispatcher_.timeSource()));
+  ActiveTcpConnectionPtr active_connection(
+      new ActiveTcpConnection(active_connections,
+                              parent_.dispatcher_.createServerConnection(
+                                  std::move(socket), std::move(transport_socket), *stream_info),
+                              parent_.dispatcher_.timeSource(), config_, std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_.perConnectionBufferLimitBytes());
 
   const bool empty_filter_chain = !config_.filterChainFactory().createNetworkFilterChain(
@@ -414,10 +416,12 @@ ConnectionHandlerImpl::ActiveConnections::~ActiveConnections() {
 
 ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
     ActiveConnections& active_connections, Network::ConnectionPtr&& new_connection,
-    TimeSource& time_source)
+    TimeSource& time_source, Network::ListenerConfig& config,
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
     : active_connections_(active_connections), connection_(std::move(new_connection)),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
-          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
+          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)),
+      config_(config), stream_info_(std::move(stream_info)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
@@ -434,6 +438,10 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
+  for (const auto& access_log : config_.accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, *stream_info_);
+  }
+
   active_connections_.listener_.stats_.downstream_cx_active_.dec();
   active_connections_.listener_.stats_.downstream_cx_destroy_.inc();
   active_connections_.listener_.per_worker_stats_.downstream_cx_active_.dec();

@@ -16,6 +16,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/non_copyable.h"
@@ -175,7 +176,9 @@ private:
                                public Event::DeferredDeletable,
                                public Network::ConnectionCallbacks {
     ActiveTcpConnection(ActiveConnections& active_connections,
-                        Network::ConnectionPtr&& new_connection, TimeSource& time_system);
+                        Network::ConnectionPtr&& new_connection, TimeSource& time_system,
+                        Network::ListenerConfig& config,
+                        std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
     ~ActiveTcpConnection() override;
 
     // Network::ConnectionCallbacks
@@ -192,6 +195,8 @@ private:
     ActiveConnections& active_connections_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;
+    Network::ListenerConfig& config_;
+    std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   };
 
   /**
