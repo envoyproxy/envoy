@@ -15,6 +15,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
+#include "common/grpc/common.h"
 #include "common/grpc/status.h"
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -865,30 +866,22 @@ GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
 std::string GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
                                         const Http::ResponseHeaderMap& response_headers,
                                         const Http::ResponseTrailerMap& response_trailers,
-                                        const StreamInfo::StreamInfo&) const {
-  std::string grpc_status_code_str = HeaderFormatter::format(response_trailers);
-  if (grpc_status_code_str == UnspecifiedValueString) {
-    grpc_status_code_str = HeaderFormatter::format(response_headers);
-  }
-  int32_t grpc_status_code;
-  if (!absl::SimpleAtoi(grpc_status_code_str, &grpc_status_code)) {
+                                        const StreamInfo::StreamInfo& info) const {
+  const auto grpc_status = Grpc::Common::getGrpcStatus(response_trailers, response_headers, info);
+  if (!grpc_status.has_value()) {
     return UnspecifiedValueString;
   }
-  return std::string(Grpc::Utility::grpcStatusToString(grpc_status_code));
+  return Grpc::Utility::grpcStatusToString(grpc_status.value());
 }
 
 ProtobufWkt::Value GrpcStatusFormatter::formatValue(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo&) const {
-  std::string grpc_status_code_str = HeaderFormatter::format(response_trailers);
-  if (grpc_status_code_str == UnspecifiedValueString) {
-    grpc_status_code_str = HeaderFormatter::format(response_headers);
-  }
-  int32_t grpc_status_code;
-  if (!absl::SimpleAtoi(grpc_status_code_str, &grpc_status_code)) {
+    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info) const {
+  const auto grpc_status = Grpc::Common::getGrpcStatus(response_trailers, response_headers, info);
+  if (!grpc_status.has_value()) {
     return unspecifiedValue();
   }
-  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status_code);
+  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
   return ValueUtil::stringValue(grpc_status_message);
 }
 

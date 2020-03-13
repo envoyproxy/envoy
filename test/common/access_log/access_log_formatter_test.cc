@@ -1319,7 +1319,7 @@ TEST(AccessLogFormatterTest, GrpcStatusFormatterTest) {
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
 
-  std::array<std::string, 18> grpc_statuses{
+  std::array<std::string, 17> grpc_statuses{
       "OK",       "Canceled",       "Unknown",          "InvalidArgument",   "DeadlineExceeded",
       "NotFound", "AlreadyExists",  "PermissionDenied", "ResourceExhausted", "FailedPrecondition",
       "Aborted",  "OutOfRange",     "Unimplemented",    "Internal",          "Unavailable",
@@ -1340,10 +1340,11 @@ TEST(AccessLogFormatterTest, GrpcStatusFormatterTest) {
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
         ProtoEq(ValueUtil::stringValue("InvalidCode")));
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("", formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_EQ("InvalidCode",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-        ProtoEq(ValueUtil::stringValue("")));
+        ProtoEq(ValueUtil::stringValue("InvalidCode")));
     response_trailer.clear();
   }
   {
@@ -1354,10 +1355,11 @@ TEST(AccessLogFormatterTest, GrpcStatusFormatterTest) {
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
         ProtoEq(ValueUtil::stringValue("InvalidCode")));
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("", formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_EQ("InvalidCode",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-        ProtoEq(ValueUtil::stringValue("")));
+        ProtoEq(ValueUtil::stringValue("InvalidCode")));
     response_header.clear();
   }
 }
