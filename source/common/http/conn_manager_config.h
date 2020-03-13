@@ -58,6 +58,7 @@ namespace Http {
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_tx_reset)                                                                  \
+  COUNTER(downstream_rq_max_duration_reached)                                                      \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
   COUNTER(rs_too_large)                                                                            \
   GAUGE(downstream_cx_active, Accumulate)                                                          \

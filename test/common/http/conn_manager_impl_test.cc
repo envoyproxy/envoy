@@ -2415,8 +2415,27 @@ TEST_F(HttpConnectionManagerImplTest, StreamAliveDurationExpired) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false); // kick off request
 
-  EXPECT_CALL(*duration_timer, disableTimer()).Times(1);
+  EXPECT_CALL(*duration_timer, disableTimer());
   duration_timer->invokeCallback();
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, NotInvokeDeferredStreamDeletion) {
+  max_stream_duration_ = std::chrono::milliseconds(5000);
+  setup(false, "");
+  Event::MockTimer* duration_timer = setUpTimer();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _)).Times(1);
+    conn_manager_->newStream(response_encoder_);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false); // kick off request
+
+  EXPECT_CALL(*duration_timer, disableTimer());
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
+
   EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());
 }
 

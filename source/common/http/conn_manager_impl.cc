@@ -187,11 +187,6 @@ void ConnectionManagerImpl::checkForDeferredClose() {
 }
 
 void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
-  if (stream.max_stream_duration_timer_) {
-    stream.max_stream_duration_timer_->disableTimer();
-    stream.max_stream_duration_timer_.reset();
-  }
-
   // The order of what happens in this routine is important and a little complicated. We first see
   // if the stream needs to be reset. If it needs to be, this will end up invoking reset callbacks
   // and then moving the stream to the deferred destruction list. If the stream has not been reset,
@@ -235,6 +230,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  if (stream.max_stream_duration_timer_) {
+    stream.max_stream_duration_timer_->disableTimer();
+    stream.max_stream_duration_timer_ = nullptr;
+  }
   if (stream.stream_idle_timer_ != nullptr) {
     stream.stream_idle_timer_->disableTimer();
     stream.stream_idle_timer_ = nullptr;
@@ -608,12 +607,11 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
 
   if (connection_manager_.config_.maxStreamDuration()) {
-    std::chrono::milliseconds max_stream_duration_ms_ =
-        connection_manager_.config_.maxStreamDuration().value();
     max_stream_duration_timer_ =
         connection_manager.read_callbacks_->connection().dispatcher().createTimer(
-            [this]() -> void { connection_manager_.doEndStream(*this); });
-    max_stream_duration_timer_->enableTimer(max_stream_duration_ms_, this);
+            [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
+                                            this);
   }
 
   stream_info_.setRequestedServerName(
@@ -685,6 +683,11 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, state_.is_head_request_,
                  absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+}
+
+void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
+  connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
+  connection_manager_.doEndStream(*this);
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(

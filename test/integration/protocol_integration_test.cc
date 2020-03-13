@@ -1499,11 +1499,15 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->startRequest(default_request_headers_);
-  timeSystem().sleep(std::chrono::milliseconds(550));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
 
-  codec_client_->close();
-  EXPECT_FALSE(response.second->complete());
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
+  response->waitForReset();
+  EXPECT_FALSE(response->complete());
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
