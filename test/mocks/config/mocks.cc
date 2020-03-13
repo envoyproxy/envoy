@@ -39,7 +39,5 @@ MockSubscriptionCallbacks::MockSubscriptionCallbacks() {
 
 MockSubscriptionCallbacks::~MockSubscriptionCallbacks() = default;
 
-MockTypedFactory::~MockTypedFactory() = default;
-
 } // namespace Config
 } // namespace Envoy
