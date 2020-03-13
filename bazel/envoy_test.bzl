@@ -93,6 +93,7 @@ def envoy_cc_fuzz_test(
         srcs = tar_src,
         testonly = 1,
     )
+    fuzz_copts = ["-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION"]
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
@@ -105,7 +106,7 @@ def envoy_cc_fuzz_test(
     )
     native.cc_test(
         name = name,
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts(),
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
@@ -129,7 +130,7 @@ def envoy_cc_fuzz_test(
     # provide a path to FuzzingEngine.
     native.cc_binary(
         name = name + "_driverless",
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-lFuzzingEngine"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
@@ -139,7 +140,7 @@ def envoy_cc_fuzz_test(
 
     native.cc_test(
         name = name + "_with_libfuzzer",
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
