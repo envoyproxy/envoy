@@ -5,7 +5,7 @@ gRPC HTTP/1.1 bridge
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
 * :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
-* This filter should be configured with the name *envoy.grpc_http1_bridge*.
+* This filter should be configured with the name *envoy.filters.http.grpc_http1_bridge*.
 
 This is a simple filter which enables the bridging of an HTTP/1.1 client which does not support
 response trailers to a compliant gRPC server. It works by doing the following:
@@ -35,6 +35,12 @@ This filter also collects stats for all gRPC requests that transit, even if thos
 normal gRPC requests over HTTP/2.
 
 More info: wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
+
+.. attention::
+
+   Note that statistics are also collected by the dedicated :ref:`gRPC stats filter
+   <config_http_filters_grpc_stats>`. The use of this filter for gRPC telemetry
+   has been deprecated.
 
 Statistics
 ----------

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
@@ -43,7 +44,7 @@ public:
    * @return const Http::HeaderMap* the incoming headers or nullptr to use during load
    * balancing.
    */
-  virtual const Http::HeaderMap* downstreamHeaders() const PURE;
+  virtual const Http::RequestHeaderMap* downstreamHeaders() const PURE;
 
   /**
    * Called to retrieve a reference to the priority load data that should be used when selecting a
@@ -76,6 +77,11 @@ public:
    * Returns the set of socket options which should be applied on upstream connections
    */
   virtual Network::Socket::OptionsSharedPtr upstreamSocketOptions() const PURE;
+
+  /**
+   * Returns the transport socket options which should be applied on upstream connections
+   */
+  virtual Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const PURE;
 };
 
 /**

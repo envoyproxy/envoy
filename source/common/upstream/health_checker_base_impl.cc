@@ -1,6 +1,8 @@
 #include "common/upstream/health_checker_base_impl.h"
 
-#include "envoy/data/core/v2alpha/health_check_event.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"
@@ -10,7 +12,7 @@ namespace Envoy {
 namespace Upstream {
 
 HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
-                                             const envoy::api::v2::core::HealthCheck& config,
+                                             const envoy::config::core::v3::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random,
@@ -32,11 +34,25 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       unhealthy_edge_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, unhealthy_edge_interval, unhealthy_interval_.count())),
       healthy_edge_interval_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())) {
+          PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())),
+      transport_socket_options_(initTransportSocketOptions(config)) {
   cluster_.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         onClusterMemberUpdate(hosts_added, hosts_removed);
       });
+}
+
+std::shared_ptr<const Network::TransportSocketOptionsImpl>
+HealthCheckerImplBase::initTransportSocketOptions(
+    const envoy::config::core::v3::HealthCheck& config) {
+  if (config.has_tls_options()) {
+    std::vector<std::string> protocols{config.tls_options().alpn_protocols().begin(),
+                                       config.tls_options().alpn_protocols().end()};
+    return std::make_shared<const Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::move(protocols));
+  }
+
+  return std::make_shared<const Network::TransportSocketOptionsImpl>();
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
@@ -203,7 +219,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host) {
       return;
     }
 
-    session->second->setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType::PASSIVE);
+    session->second->setUnhealthy(envoy::data::core::v3::PASSIVE);
   });
 }
 
@@ -302,13 +318,13 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
 }
 
 HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
-    envoy::data::core::v2alpha::HealthCheckFailureType type) {
+    envoy::data::core::v3::HealthCheckFailureType type) {
   // If we are unhealthy, reset the # of healthy to zero.
   num_healthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    if (type != envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK ||
+    if (type != envoy::data::core::v3::NETWORK ||
         ++num_unhealthy_ == parent_.unhealthy_threshold_) {
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
@@ -328,9 +344,9 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
   }
 
   parent_.stats_.failure_.inc();
-  if (type == envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK) {
+  if (type == envoy::data::core::v3::NETWORK) {
     parent_.stats_.network_failure_.inc();
-  } else if (type == envoy::data::core::v2alpha::HealthCheckFailureType::PASSIVE) {
+  } else if (type == envoy::data::core::v3::PASSIVE) {
     parent_.stats_.passive_failure_.inc();
   }
 
@@ -340,7 +356,7 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
-    envoy::data::core::v2alpha::HealthCheckFailureType type) {
+    envoy::data::core::v3::HealthCheckFailureType type) {
   HealthTransition changed_state = setUnhealthy(type);
   // It's possible that the previous call caused this session to be deferred deleted.
   if (timeout_timer_ != nullptr) {
@@ -372,7 +388,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   onTimeout();
-  handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
+  handleFailure(envoy::data::core::v3::NETWORK);
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {
@@ -385,18 +401,18 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onInitialInterval() {
 }
 
 void HealthCheckEventLoggerImpl::logEjectUnhealthy(
-    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    envoy::data::core::v3::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
-    envoy::data::core::v2alpha::HealthCheckFailureType failure_type) {
+    envoy::data::core::v3::HealthCheckFailureType failure_type) {
   createHealthCheckEvent(health_checker_type, *host, [&failure_type](auto& event) {
     event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
   });
 }
 
 void HealthCheckEventLoggerImpl::logUnhealthy(
-    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    envoy::data::core::v3::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
-    envoy::data::core::v2alpha::HealthCheckFailureType failure_type, bool first_check) {
+    envoy::data::core::v3::HealthCheckFailureType failure_type, bool first_check) {
   createHealthCheckEvent(health_checker_type, *host, [&first_check, &failure_type](auto& event) {
     event.mutable_health_check_failure_event()->set_failure_type(failure_type);
     event.mutable_health_check_failure_event()->set_first_check(first_check);
@@ -404,7 +420,7 @@ void HealthCheckEventLoggerImpl::logUnhealthy(
 }
 
 void HealthCheckEventLoggerImpl::logAddHealthy(
-    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    envoy::data::core::v3::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host, bool first_check) {
   createHealthCheckEvent(health_checker_type, *host, [&first_check](auto& event) {
     event.mutable_add_healthy_event()->set_first_check(first_check);
@@ -412,27 +428,27 @@ void HealthCheckEventLoggerImpl::logAddHealthy(
 }
 
 void HealthCheckEventLoggerImpl::logDegraded(
-    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    envoy::data::core::v3::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host) {
   createHealthCheckEvent(health_checker_type, *host,
                          [](auto& event) { event.mutable_degraded_healthy_host(); });
 }
 
 void HealthCheckEventLoggerImpl::logNoLongerDegraded(
-    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    envoy::data::core::v3::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host) {
   createHealthCheckEvent(health_checker_type, *host,
                          [](auto& event) { event.mutable_no_longer_degraded_host(); });
 }
 
 void HealthCheckEventLoggerImpl::createHealthCheckEvent(
-    envoy::data::core::v2alpha::HealthCheckerType health_checker_type, const HostDescription& host,
-    std::function<void(envoy::data::core::v2alpha::HealthCheckEvent&)> callback) const {
-  envoy::data::core::v2alpha::HealthCheckEvent event;
+    envoy::data::core::v3::HealthCheckerType health_checker_type, const HostDescription& host,
+    std::function<void(envoy::data::core::v3::HealthCheckEvent&)> callback) const {
+  envoy::data::core::v3::HealthCheckEvent event;
   event.set_cluster_name(host.cluster().name());
   event.set_health_checker_type(health_checker_type);
 
-  envoy::api::v2::core::Address address;
+  envoy::config::core::v3::Address address;
   Network::Utility::addressToProtobufAddress(*host.address(), address);
   *event.mutable_host() = std::move(address);
 

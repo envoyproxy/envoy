@@ -7,6 +7,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/utility.h"
@@ -73,8 +74,7 @@ class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
   static const std::string& protocolToString(const absl::optional<Http::Protocol>& protocol);
-  static std::string durationToString(const absl::optional<std::chrono::nanoseconds>& time);
-  static std::string durationToString(const std::chrono::nanoseconds& time);
+  static const std::string getHostname();
 
 private:
   AccessLogFormatUtils();
@@ -90,9 +90,9 @@ public:
   FormatterImpl(const std::string& format);
 
   // Formatter::format
-  std::string format(const Http::HeaderMap& request_headers,
-                     const Http::HeaderMap& response_headers,
-                     const Http::HeaderMap& response_trailers,
+  std::string format(const Http::RequestHeaderMap& request_headers,
+                     const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
@@ -101,107 +101,138 @@ private:
 
 class JsonFormatterImpl : public Formatter {
 public:
-  JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping);
+  JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping,
+                    bool preserve_types);
 
   // Formatter::format
-  std::string format(const Http::HeaderMap& request_headers,
-                     const Http::HeaderMap& response_headers,
-                     const Http::HeaderMap& response_trailers,
+  std::string format(const Http::RequestHeaderMap& request_headers,
+                     const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
-  std::vector<FormatterProviderPtr> providers_;
-  std::map<const std::string, Envoy::AccessLog::FormatterPtr> json_output_format_;
+  const bool preserve_types_;
+  std::map<const std::string, const std::vector<FormatterProviderPtr>> json_output_format_;
 
-  std::unordered_map<std::string, std::string>
-  toMap(const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-        const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const;
+  ProtobufWkt::Struct toStruct(const Http::RequestHeaderMap& request_headers,
+                               const Http::ResponseHeaderMap& response_headers,
+                               const Http::ResponseTrailerMap& response_trailers,
+                               const StreamInfo::StreamInfo& stream_info) const;
 };
 
 /**
- * Formatter for string literal. It ignores headers and stream info and returns string by which it
- * was initialized.
+ * FormatterProvider for string literals. It ignores headers and stream info and returns string by
+ * which it was initialized.
  */
 class PlainStringFormatter : public FormatterProvider {
 public:
   PlainStringFormatter(const std::string& str);
 
-  // Formatter::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
 
 private:
-  std::string str_;
+  ProtobufWkt::Value str_;
 };
 
+/**
+ * Base formatter for headers.
+ */
 class HeaderFormatter {
 public:
   HeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                   absl::optional<size_t> max_length);
 
+protected:
   std::string format(const Http::HeaderMap& headers) const;
+  ProtobufWkt::Value formatValue(const Http::HeaderMap& headers) const;
 
 private:
+  const Http::HeaderEntry* findHeader(const Http::HeaderMap& headers) const;
+
   Http::LowerCaseString main_header_;
   Http::LowerCaseString alternative_header_;
   absl::optional<size_t> max_length_;
 };
 
 /**
- * Formatter based on request header.
+ * FormatterProvider for request headers.
  */
 class RequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   RequestHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                          absl::optional<size_t> max_length);
 
-  // Formatter::format
-  std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                     const Http::HeaderMap&, const StreamInfo::StreamInfo&) const override;
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
 };
 
 /**
- * Formatter based on the response header.
+ * FormatterProvider for response headers.
  */
 class ResponseHeaderFormatter : public FormatterProvider, HeaderFormatter {
 public:
   ResponseHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
                           absl::optional<size_t> max_length);
 
-  // Formatter::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,
-                     const Http::HeaderMap&, const StreamInfo::StreamInfo&) const override;
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
 };
 
 /**
- * Formatter based on the response trailer.
+ * FormatterProvider for response trailers.
  */
 class ResponseTrailerFormatter : public FormatterProvider, HeaderFormatter {
 public:
   ResponseTrailerFormatter(const std::string& main_header, const std::string& alternative_header,
                            absl::optional<size_t> max_length);
 
-  // Formatter::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
-                     const Http::HeaderMap& response_trailers,
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap& response_trailers,
                      const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
 };
 
 /**
- * Formatter based on the StreamInfo field.
+ * FormatterProvider based on StreamInfo fields.
  */
 class StreamInfoFormatter : public FormatterProvider {
 public:
   StreamInfoFormatter(const std::string& field_name);
 
-  // Formatter::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo& stream_info) const override;
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
 
-  using FieldExtractor = std::function<std::string(const StreamInfo::StreamInfo&)>;
+  class FieldExtractor {
+  public:
+    virtual ~FieldExtractor() = default;
+
+    virtual std::string extract(const StreamInfo::StreamInfo&) const PURE;
+    virtual ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo&) const PURE;
+  };
+  using FieldExtractorPtr = std::unique_ptr<FieldExtractor>;
 
 private:
-  FieldExtractor field_extractor_;
+  FieldExtractorPtr field_extractor_;
 };
 
 /**
@@ -212,7 +243,9 @@ public:
   MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
                     absl::optional<size_t> max_length);
 
-  std::string format(const envoy::api::v2::core::Metadata& metadata) const;
+protected:
+  std::string formatMetadata(const envoy::config::core::v3::Metadata& metadata) const;
+  ProtobufWkt::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
 
 private:
   std::string filter_namespace_;
@@ -221,26 +254,55 @@ private:
 };
 
 /**
- * Formatter based on the DynamicMetadata from StreamInfo.
+ * FormatterProvider for DynamicMetadata from StreamInfo.
  */
 class DynamicMetadataFormatter : public FormatterProvider, MetadataFormatter {
 public:
   DynamicMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
 
-  // FormatterProvider::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo& stream_info) const override;
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
 };
 
 /**
- * Formatter
+ * FormatterProvider for FilterState from StreamInfo.
+ */
+class FilterStateFormatter : public FormatterProvider {
+public:
+  FilterStateFormatter(const std::string& key, absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
+
+private:
+  ProtobufTypes::MessagePtr filterState(const StreamInfo::StreamInfo& stream_info) const;
+
+  std::string key_;
+  absl::optional<size_t> max_length_;
+};
+
+/**
+ * FormatterProvider for request start time from StreamInfo.
  */
 class StartTimeFormatter : public FormatterProvider {
 public:
   StartTimeFormatter(const std::string& format);
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
-                     const StreamInfo::StreamInfo&) const override;
+
+  // FormatterProvider
+  std::string format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo&) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;

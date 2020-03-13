@@ -11,7 +11,9 @@ class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
   Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          spdlog::logger& logger, Network::ListenerConfig& config) const override;
+                          Network::ListenerConfig& config) override;
+
+  bool isTransportConnectionless() const override { return true; }
 };
 
 // This class uses a protobuf config to create a UDP listener factory which
@@ -19,10 +21,12 @@ public:
 // This is the default UDP listener if not specified in config.
 class ActiveRawUdpListenerConfigFactory : public ActiveUdpListenerConfigFactory {
 public:
-  Network::ActiveUdpListenerFactoryPtr
-  createActiveUdpListenerFactory(const Protobuf::Message&) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  std::string name() override;
+  Network::ActiveUdpListenerFactoryPtr
+  createActiveUdpListenerFactory(const Protobuf::Message&, uint32_t concurrency) override;
+
+  std::string name() const override;
 };
 
 DECLARE_FACTORY(ActiveRawUdpListenerConfigFactory);

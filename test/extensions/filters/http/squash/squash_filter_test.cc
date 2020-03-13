@@ -1,8 +1,9 @@
 #include <chrono>
 #include <memory>
+#include <string>
 
-#include "common/config/filter_json.h"
-#include "common/config/json_utility.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
+
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 
@@ -31,11 +32,10 @@ namespace HttpFilters {
 namespace Squash {
 namespace {
 
-SquashFilterConfig constructSquashFilterConfigFromJson(
-    const Envoy::Json::Object& json,
-    NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {
-  envoy::config::filter::http::squash::v2::Squash proto_config;
-  Config::FilterJson::translateSquashConfig(json, proto_config);
+SquashFilterConfig constructSquashFilterConfigFromYaml(
+    const std::string& yaml, NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {
+  envoy::extensions::filters::http::squash::v3::Squash proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
   return SquashFilterConfig(proto_config, context.cluster_manager_);
 }
 
@@ -51,22 +51,20 @@ void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
 
 } // namespace
 
-TEST(SoloFilterConfigTest, V1ApiConversion) {
-  std::string json = R"EOF(
-    {
-      "cluster" : "fake_cluster",
-      "attachment_template" : {"a":"b"},
-      "request_timeout_ms" : 1001,
-      "attachment_poll_period_ms" : 2002,
-      "attachment_timeout_ms" : 3003
-    }
-    )EOF";
+TEST(SoloFilterConfigTest, V2ApiConversion) {
+  const std::string yaml = R"EOF(
+  cluster: fake_cluster
+  attachment_template:
+    a: b
+  request_timeout: 1.001s
+  attachment_poll_period: 2.002s
+  attachment_timeout: 3.003s
+  )EOF";
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("fake_cluster"))).Times(1);
 
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_EQ("fake_cluster", config.clusterName());
   EXPECT_JSON_EQ("{\"a\":\"b\"}", config.attachmentJson());
   EXPECT_EQ(std::chrono::milliseconds(1001), config.requestTimeout());
@@ -75,93 +73,85 @@ TEST(SoloFilterConfigTest, V1ApiConversion) {
 }
 
 TEST(SoloFilterConfigTest, NoCluster) {
-  std::string json = R"EOF(
-    {
-      "cluster" : "fake_cluster",
-      "attachment_template" : {}
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  cluster: fake_cluster
+  attachment_template: {}
+  )EOF";
 
-  Envoy::Json::ObjectSharedPtr config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
 
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("fake_cluster"))).WillOnce(Return(nullptr));
 
-  EXPECT_THROW_WITH_MESSAGE(constructSquashFilterConfigFromJson(*config, factory_context),
+  EXPECT_THROW_WITH_MESSAGE(constructSquashFilterConfigFromYaml(yaml, factory_context),
                             Envoy::EnvoyException,
                             "squash filter: unknown cluster 'fake_cluster' in squash config");
 }
 
 TEST(SoloFilterConfigTest, ParsesEnvironment) {
-  std::string json = R"EOF(
-    {
-      "cluster" : "squash",
-      "attachment_template" : {"a":"{{ MISSING_ENV }}"}
-    }
-    )EOF";
-  std::string expected_json = "{\"a\":\"\"}";
+  const std::string yaml = R"EOF(
+  cluster: squash
+  attachment_template:
+    a: "{{ MISSING_ENV }}"
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
+  )EOF";
+  const std::string expected_json = "{\"a\":\"\"}";
+
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
 
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 TEST(SoloFilterConfigTest, ParsesAndEscapesEnvironment) {
   TestEnvironment::setEnvVar("ESCAPE_ENV", "\"", 1);
 
-  std::string json = R"EOF(
-    {
-      "cluster" : "squash",
-      "attachment_template" : {"a":"{{ ESCAPE_ENV }}"}
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  cluster: squash
+  attachment_template:
+    a: "{{ ESCAPE_ENV }}"
+  )EOF";
 
-  std::string expected_json = "{\"a\":\"\\\"\"}";
+  const std::string expected_json = "{\"a\":\"\\\"\"}";
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 TEST(SoloFilterConfigTest, TwoEnvironmentVariables) {
   TestEnvironment::setEnvVar("ENV1", "1", 1);
   TestEnvironment::setEnvVar("ENV2", "2", 1);
 
-  std::string json = R"EOF(
-    {
-      "cluster" : "squash",
-      "attachment_template" : {"a":"{{ ENV1 }}-{{ ENV2 }}"}
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  cluster: squash
+  attachment_template:
+    a: "{{ ENV1 }}-{{ ENV2 }}"
+  )EOF";
 
-  std::string expected_json = "{\"a\":\"1-2\"}";
+  const std::string expected_json = "{\"a\":\"1-2\"}";
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
 TEST(SoloFilterConfigTest, ParsesEnvironmentInComplexTemplate) {
   TestEnvironment::setEnvVar("CONF_ENV", "some-config-value", 1);
 
-  std::string json = R"EOF(
-    {
-      "cluster" : "squash",
-      "attachment_template" : {"a":[{"e": "{{ CONF_ENV }}"},{"c":"d"}]}
-    }
-    )EOF";
+  const std::string yaml = R"EOF(
+  cluster: squash
+  attachment_template:
+    a:
+    - e: "{{ CONF_ENV }}"
+    - c: d
+  )EOF";
 
-  std::string expected_json = R"EOF({"a":[{"e": "some-config-value"},{"c":"d"}]})EOF";
+  const std::string expected_json = R"EOF({"a":[{"e": "some-config-value"},{"c":"d"}]})EOF";
 
-  Envoy::Json::ObjectSharedPtr json_config = Envoy::Json::Factory::loadFromString(json);
   NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_CALL(factory_context.cluster_manager_, get(Eq("squash"))).Times(1);
-  auto config = constructSquashFilterConfigFromJson(*json_config, factory_context);
+  const auto config = constructSquashFilterConfigFromYaml(yaml, factory_context);
   EXPECT_JSON_EQ(expected_json, config.attachmentJson());
 }
 
@@ -173,7 +163,7 @@ protected:
   void SetUp() override {}
 
   void initFilter() {
-    envoy::config::filter::http::squash::v2::Squash p;
+    envoy::extensions::filters::http::squash::v3::Squash p;
     p.set_cluster("squash");
     config_ = std::make_shared<SquashFilterConfig>(p, factory_context_.cluster_manager_);
 
@@ -198,10 +188,10 @@ protected:
 
     EXPECT_CALL(*attachmentTimeout_timer_, enableTimer(config_->attachmentTimeout(), _));
 
-    Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
-                                           {":authority", "www.solo.io"},
-                                           {"x-squash-debug", "true"},
-                                           {":path", "/getsomething"}};
+    Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                                  {":authority", "www.solo.io"},
+                                                  {"x-squash-debug", "true"},
+                                                  {":path", "/getsomething"}};
     EXPECT_EQ(Envoy::Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(headers, false));
   }
@@ -211,7 +201,7 @@ protected:
 
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
     EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
-    Envoy::Http::TestHeaderMapImpl trailers{};
+    Http::TestRequestTrailerMapImpl trailers;
     // Complete a full request cycle
     Envoy::Buffer::OwnedImpl buffer("nothing here");
     EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationAndBuffer,
@@ -222,7 +212,7 @@ protected:
   void expectAsyncClientSend() {
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(Invoke(
-            [&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
+            [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& cb,
                 const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
               callbacks_.push_back(&cb);
               return &request_;
@@ -230,8 +220,8 @@ protected:
   }
 
   void completeRequest(const std::string& status, const std::string& body) {
-    Http::MessagePtr msg(new Http::ResponseMessageImpl(
-        Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", status}}}));
+    Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", status}}}));
     msg->body() = std::make_unique<Buffer::OwnedImpl>(body);
     popPendingCallback()->onSuccess(std::move(msg));
   }
@@ -273,13 +263,13 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke(
-          [&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
+          [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
             callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
             return nullptr;
           }));
 
-  Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
                                          {"x-squash-debug", "true"},
                                          {":path", "/getsomething"}};
@@ -287,7 +277,8 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
   Envoy::Buffer::OwnedImpl data("nothing here");
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  Http::TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 }
 
 TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
@@ -299,7 +290,7 @@ TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
 
   Envoy::Buffer::OwnedImpl data("nothing here");
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  Envoy::Http::TestHeaderMapImpl trailers{};
+  Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 }
 
@@ -307,7 +298,7 @@ TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
   initFilter();
   EXPECT_CALL(cm_, httpAsyncClientForCluster(_)).Times(0);
 
-  Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
                                          {"x-not-squash-debug", "true"},
                                          {":path", "/getsomething"}};
@@ -315,7 +306,8 @@ TEST_F(SquashFilterTest, DoesNothingWithNoHeader) {
   Envoy::Buffer::OwnedImpl data("nothing here");
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
-  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+  Http::TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(Envoy::Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
 }
 
 TEST_F(SquashFilterTest, Timeout) {
@@ -352,8 +344,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachment) {
   expectAsyncClientSend();
   completeCreateRequest();
 
-  NiceMock<Envoy::Event::MockTimer>* retry_timer;
-  retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
 
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   completeGetStatusRequest("attaching");
@@ -372,8 +363,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
   expectAsyncClientSend();
   completeCreateRequest();
 
-  NiceMock<Envoy::Event::MockTimer>* retry_timer;
-  retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
+  auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
   popPendingCallback()->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
 
@@ -443,12 +433,12 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
       }));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([&](Envoy::Http::MessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
+      .WillOnce(Invoke([&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks&,
                            const Http::AsyncClient::RequestOptions&)
                            -> Envoy::Http::AsyncClient::Request* { return &request_; }));
 
   EXPECT_CALL(request_, cancel());
-  Envoy::Http::TestHeaderMapImpl headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
                                          {":authority", "www.solo.io"},
                                          {"x-squash-debug", "true"},
                                          {":path", "/getsomething"}};

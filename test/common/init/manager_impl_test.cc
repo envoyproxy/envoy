@@ -5,7 +5,6 @@
 #include "gtest/gtest.h"
 
 using ::testing::InSequence;
-using ::testing::InvokeWithoutArgs;
 
 namespace Envoy {
 namespace Init {

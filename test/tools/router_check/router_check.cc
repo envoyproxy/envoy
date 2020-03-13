@@ -2,24 +2,30 @@
 #include <iostream>
 #include <string>
 
+#include "exe/platform_impl.h"
+
 #include "test/tools/router_check/router.h"
 
 int main(int argc, char* argv[]) {
   Envoy::Options options(argc, argv);
 
   const bool enforce_coverage = options.failUnder() != 0.0;
+  // We need this to ensure WSAStartup is called on Windows
+  Envoy::PlatformImpl platform_impl_;
+
   try {
     Envoy::RouterCheckTool checktool =
-        options.isProto() ? Envoy::RouterCheckTool::create(options.configPath())
-                          : Envoy::RouterCheckTool::create(options.unlabelledConfigPath());
+        Envoy::RouterCheckTool::create(options.configPath(), options.disableDeprecationCheck());
 
     if (options.isDetailed()) {
       checktool.setShowDetails();
     }
 
-    bool is_equal = options.isProto()
-                        ? checktool.compareEntries(options.testPath())
-                        : checktool.compareEntriesInJson(options.unlabelledTestPath());
+    if (options.onlyShowFailures()) {
+      checktool.setOnlyShowFailures();
+    }
+
+    bool is_equal = checktool.compareEntries(options.testPath());
     // Test fails if routes do not match what is expected
     if (!is_equal) {
       return EXIT_FAILURE;

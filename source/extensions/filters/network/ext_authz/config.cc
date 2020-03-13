@@ -3,7 +3,9 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -19,7 +21,7 @@ namespace NetworkFilters {
 namespace ExtAuthz {
 
 Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::ext_authz::v2::ExtAuthz& proto_config,
+    const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& proto_config,
     Server::Configuration::FactoryContext& context) {
   ConfigSharedPtr ext_authz_config(new Config(proto_config, context.scope()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
@@ -40,7 +42,8 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(ExtAuthzConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory);
+REGISTER_FACTORY(ExtAuthzConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.ext_authz"};
 
 } // namespace ExtAuthz
 } // namespace NetworkFilters

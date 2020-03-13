@@ -14,8 +14,9 @@ static_resources:
         port_value: 0
     filter_chains:
     - filters:
-      - name: envoy.http_connection_manager
-        config:
+      - name: http
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: AUTO
           route_config:
@@ -33,4 +34,9 @@ static_resources:
     # Comment out the following line to test on v6 networks
     dns_lookup_family: {{ dns_lookup_family }}
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: service_google
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address: { socket_address: { address: google.com, port_value: 443 }}

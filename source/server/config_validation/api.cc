@@ -16,7 +16,7 @@ Event::DispatcherPtr ValidationImpl::allocateDispatcher() {
 }
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher(Buffer::WatermarkFactoryPtr&&) {
-  NOT_REACHED_GCOVR_EXCL_LINE
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Api

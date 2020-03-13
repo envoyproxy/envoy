@@ -13,9 +13,9 @@ namespace Upstream {
 #define EDF_DEBUG 0
 
 #if EDF_DEBUG
-#define EDF_TRACE(fmt...) ENVOY_LOG_MISC(trace, fmt)
+#define EDF_TRACE(...) ENVOY_LOG_MISC(trace, __VA_ARGS__)
 #else
-#define EDF_TRACE(fmt...)
+#define EDF_TRACE(...)
 #endif
 
 // Earliest Deadline First (EDF) scheduler

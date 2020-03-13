@@ -18,14 +18,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Tcp {
@@ -85,8 +82,8 @@ public:
     EXPECT_EQ(0U, pending_requests_.size());
   }
 
-  MOCK_METHOD0(onConnReleasedForTest, void());
-  MOCK_METHOD0(onConnDestroyedForTest, void());
+  MOCK_METHOD(void, onConnReleasedForTest, ());
+  MOCK_METHOD(void, onConnDestroyedForTest, ());
 
   struct TestConnection {
     Network::MockClientConnection* connection_;

@@ -8,25 +8,18 @@
 
 #include "common/common/lock_guard.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/escaping.h"
+#include "absl/strings/strip.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Logger {
 
-#define GENERATE_LOGGER(X) Logger(#X),
+StandardLogger::StandardLogger(const std::string& name)
+    : Logger(std::make_shared<spdlog::logger>(name, Registry::getSink())) {}
 
-const char* Logger::DEFAULT_LOG_FORMAT = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
-
-Logger::Logger(const std::string& name) {
-  logger_ = std::make_shared<spdlog::logger>(name, Registry::getSink());
-  logger_->set_pattern(DEFAULT_LOG_FORMAT);
-  logger_->set_level(spdlog::level::trace);
-
-  // Ensure that critical errors, especially ASSERT/PANIC, get flushed
-  logger_->flush_on(spdlog::level::critical);
-}
-
-SinkDelegate::SinkDelegate(DelegatingLogSinkPtr log_sink)
+SinkDelegate::SinkDelegate(DelegatingLogSinkSharedPtr log_sink)
     : previous_delegate_(log_sink->delegate()), log_sink_(log_sink) {
   log_sink->setDelegate(this);
 }
@@ -36,7 +29,8 @@ SinkDelegate::~SinkDelegate() {
   log_sink_->setDelegate(previous_delegate_);
 }
 
-StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkPtr log_sink) : SinkDelegate(log_sink) {}
+StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink)
+    : SinkDelegate(log_sink) {}
 
 void StderrSinkDelegate::log(absl::string_view msg) {
   Thread::OptionalLockGuard guard(lock_);
@@ -55,20 +49,37 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
 
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
-  if (!formatter_) {
-    lock.Release();
-    sink_->log(absl::string_view(msg.payload.data(), msg.payload.size()));
-    return;
-  }
+  absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
 
+  // This memory buffer must exist in the scope of the entire function,
+  // otherwise the string_view will refer to memory that is already free.
   fmt::memory_buffer formatted;
-  formatter_->format(msg, formatted);
+  if (formatter_) {
+    formatter_->format(msg, formatted);
+    msg_view = absl::string_view(formatted.data(), formatted.size());
+  }
   lock.Release();
-  sink_->log(absl::string_view(formatted.data(), formatted.size()));
+
+  if (should_escape_) {
+    sink_->log(escapeLogLine(msg_view));
+  } else {
+    sink_->log(msg_view);
+  }
 }
 
-DelegatingLogSinkPtr DelegatingLogSink::init() {
-  DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
+std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
+  // Split the actual message from the trailing whitespace.
+  auto eol_it = std::find_if_not(msg_view.rbegin(), msg_view.rend(), absl::ascii_isspace);
+  absl::string_view msg_leading = msg_view.substr(0, msg_view.rend() - eol_it);
+  absl::string_view msg_trailing_whitespace =
+      msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
+
+  // Escape the message, but keep the whitespace unescaped.
+  return absl::StrCat(absl::CEscape(msg_leading), msg_trailing_whitespace);
+}
+
+DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
+  DelegatingLogSinkSharedPtr delegating_sink(new DelegatingLogSink);
   delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
   return delegating_sink;
 }
@@ -76,8 +87,9 @@ DelegatingLogSinkPtr DelegatingLogSink::init() {
 static Context* current_context = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
-                 Thread::BasicLockable& lock)
-    : log_level_(log_level), log_format_(log_format), lock_(lock), save_context_(current_context) {
+                 Thread::BasicLockable& lock, bool should_escape)
+    : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
+      save_context_(current_context) {
   current_context = this;
   activate();
 }
@@ -93,6 +105,7 @@ Context::~Context() {
 
 void Context::activate() {
   Registry::getSink()->setLock(lock_);
+  Registry::getSink()->set_should_escape(should_escape_);
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
 }

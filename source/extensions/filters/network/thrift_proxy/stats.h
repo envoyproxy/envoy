@@ -29,10 +29,10 @@ namespace ThriftProxy {
   COUNTER(response_reply)                                                                          \
   COUNTER(response_success)                                                                        \
   GAUGE(request_active, Accumulate)                                                                \
-  HISTOGRAM(request_time_ms)
+  HISTOGRAM(request_time_ms, Milliseconds)
 
 /**
- * Struct definition for all mongo proxy stats. @see stats_macros.h
+ * Struct definition for all thrift proxy stats. @see stats_macros.h
  */
 struct ThriftFilterStats {
   ALL_THRIFT_FILTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)

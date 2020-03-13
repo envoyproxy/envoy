@@ -1,5 +1,6 @@
 #include <chrono>
 #include <memory>
+#include <string>
 
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -68,17 +69,17 @@ TEST_F(TcpStatsdSinkTest, EmptyFlush) {
 
 TEST_F(TcpStatsdSinkTest, BasicFlow) {
   InSequence s;
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->latch_ = 1;
-  counter->used_ = true;
-  snapshot_.counters_.push_back({1, *counter});
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.latch_ = 1;
+  counter.used_ = true;
+  snapshot_.counters_.push_back({1, counter});
 
-  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
-  gauge->name_ = "test_gauge";
-  gauge->value_ = 2;
-  gauge->used_ = true;
-  snapshot_.gauges_.push_back(*gauge);
+  NiceMock<Stats::MockGauge> gauge;
+  gauge.name_ = "test_gauge";
+  gauge.value_ = 2;
+  gauge.used_ = true;
+  snapshot_.gauges_.push_back(gauge);
 
   expectCreateConnection();
   EXPECT_CALL(*connection_,
@@ -102,15 +103,51 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
   tls_.shutdownThread();
 }
 
+TEST_F(TcpStatsdSinkTest, SiSuffix) {
+  InSequence s;
+  expectCreateConnection();
+
+  NiceMock<Stats::MockHistogram> items;
+  items.name_ = "items";
+  items.unit_ = Stats::Histogram::Unit::Unspecified;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.items:1|ms\n"), _));
+  sink_->onHistogramComplete(items, 1);
+
+  NiceMock<Stats::MockHistogram> information;
+  information.name_ = "information";
+  information.unit_ = Stats::Histogram::Unit::Bytes;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.information:2|ms\n"), _));
+  sink_->onHistogramComplete(information, 2);
+
+  NiceMock<Stats::MockHistogram> duration_micro;
+  duration_micro.name_ = "duration";
+  duration_micro.unit_ = Stats::Histogram::Unit::Microseconds;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:3|ms\n"), _));
+  sink_->onHistogramComplete(duration_micro, 3);
+
+  NiceMock<Stats::MockHistogram> duration_milli;
+  duration_milli.name_ = "duration";
+  duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:4|ms\n"), _));
+  sink_->onHistogramComplete(duration_milli, 4);
+
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  tls_.shutdownThread();
+}
+
 // Verify that when there is no statsd host we correctly empty all output buffers so we don't
 // infinitely buffer.
 TEST_F(TcpStatsdSinkTest, NoHost) {
   InSequence s;
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->latch_ = 1;
-  counter->used_ = true;
-  snapshot_.counters_.push_back({1, *counter});
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.latch_ = 1;
+  counter.used_ = true;
+  snapshot_.counters_.push_back({1, counter});
 
   Upstream::MockHost::MockCreateConnectionData conn_info;
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _))
@@ -127,11 +164,11 @@ TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
       local_info_, "fake_cluster", tls_, cluster_manager_,
       cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_, "test_prefix");
 
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->latch_ = 1;
-  counter->used_ = true;
-  snapshot_.counters_.push_back({1, *counter});
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.latch_ = 1;
+  counter.used_ = true;
+  snapshot_.counters_.push_back({1, counter});
 
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(BufferStringEqual("test_prefix.test_counter:1|c\n"), _));
@@ -141,12 +178,12 @@ TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
 TEST_F(TcpStatsdSinkTest, BufferReallocate) {
   InSequence s;
 
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->latch_ = 1;
-  counter->used_ = true;
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.latch_ = 1;
+  counter.used_ = true;
 
-  snapshot_.counters_.resize(2000, {1, *counter});
+  snapshot_.counters_.resize(2000, {1, counter});
 
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(_, _))
@@ -164,11 +201,11 @@ TEST_F(TcpStatsdSinkTest, BufferReallocate) {
 TEST_F(TcpStatsdSinkTest, Overflow) {
   InSequence s;
 
-  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
-  counter->name_ = "test_counter";
-  counter->latch_ = 1;
-  counter->used_ = true;
-  snapshot_.counters_.push_back({1, *counter});
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.latch_ = 1;
+  counter.used_ = true;
+  snapshot_.counters_.push_back({1, counter});
 
   // Synthetically set buffer above high watermark. Make sure we don't write anything.
   cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(

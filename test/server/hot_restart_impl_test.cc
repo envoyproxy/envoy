@@ -20,8 +20,6 @@ using testing::_;
 using testing::AnyNumber;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Return;
-using testing::ReturnRef;
 using testing::WithArg;
 
 namespace Envoy {
@@ -58,7 +56,7 @@ public:
   std::unique_ptr<HotRestartImpl> hot_restart_;
 };
 
-TEST_F(HotRestartImplTest, versionString) {
+TEST_F(HotRestartImplTest, VersionString) {
   // Tests that the version-string will be consistent and HOT_RESTART_VERSION,
   // between multiple instantiations.
   std::string version;

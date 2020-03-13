@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -25,7 +26,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = [
         "config.cc",
@@ -33,13 +34,15 @@ envoy_cc_library(
     hdrs = [
         "config.h",
     ],
+    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":tsi_handshaker",
         ":tsi_socket",
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
+        "//source/common/grpc:google_grpc_context_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:alts_cc",
+        "@envoy_api//envoy/extensions/transport_sockets/alts/v3:pkg_cc_proto",
     ],
 )
 

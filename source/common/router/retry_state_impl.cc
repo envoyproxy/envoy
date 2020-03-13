@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/route/v3/route_components.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
@@ -21,6 +23,7 @@ const uint32_t RetryPolicy::RETRY_ON_5XX;
 const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
+const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
 const uint32_t RetryPolicy::RETRY_ON_RESET;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
@@ -29,7 +32,7 @@ const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
-                                     Http::HeaderMap& request_headers,
+                                     Http::RequestHeaderMap& request_headers,
                                      const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                      Runtime::RandomGenerator& random,
                                      Event::Dispatcher& dispatcher,
@@ -49,17 +52,17 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   return ret;
 }
 
-RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
+RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
+                               Http::RequestHeaderMap& request_headers,
                                const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
-      retriable_status_codes_(route_policy.retriableStatusCodes()) {
-
-  retry_on_ = route_policy.retryOn();
-  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
+      retriable_status_codes_(route_policy.retriableStatusCodes()),
+      retriable_headers_(route_policy.retriableHeaders()) {
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
@@ -86,6 +89,22 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     retry_on_ |=
         parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
   }
+
+  const auto& retriable_request_headers = route_policy.retriableRequestHeaders();
+  if (!retriable_request_headers.empty()) {
+    // If this route limits retries by request headers, make sure there is a match.
+    bool request_header_match = false;
+    for (const auto& retriable_header : retriable_request_headers) {
+      if (retriable_header->matchesHeaders(request_headers)) {
+        request_header_match = true;
+        break;
+      }
+    }
+
+    if (!request_header_match) {
+      retry_on_ = 0;
+    }
+  }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     uint64_t temp;
     if (absl::SimpleAtoi(request_headers.EnvoyMaxRetries()->value().getStringView(), &temp)) {
@@ -93,13 +112,29 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       retries_remaining_ = temp;
     }
   }
+
   if (request_headers.EnvoyRetriableStatusCodes()) {
     for (const auto code : StringUtil::splitToken(
              request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
-      uint64_t out;
+      unsigned int out;
       if (absl::SimpleAtoi(code, &out)) {
         retriable_status_codes_.emplace_back(out);
       }
+    }
+  }
+
+  if (request_headers.EnvoyRetriableHeaderNames()) {
+    // Retriable headers in the configuration are specified via HeaderMatcher.
+    // Giving the same flexibility via request header would require the user
+    // to provide HeaderMatcher serialized into a string. To avoid this extra
+    // complexity we only support name-only header matchers via request
+    // header. Anything more sophisticated needs to be provided via config.
+    for (const auto header_name : StringUtil::splitToken(
+             request_headers.EnvoyRetriableHeaderNames()->value().getStringView(), ",")) {
+      envoy::config::route::v3::HeaderMatcher header_matcher;
+      header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
+      retriable_headers_.emplace_back(
+          std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher));
     }
   }
 }
@@ -131,6 +166,8 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableHeaders) {
+      ret |= RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.Reset) {
       ret |= RetryPolicy::RETRY_ON_RESET;
     } else {
@@ -207,7 +244,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
   return RetryStatus::Yes;
 }
 
-RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_headers,
+RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                                DoRetryCallback callback) {
   return shouldRetry(wouldRetryFromHeaders(response_headers), callback);
 }
@@ -228,7 +265,7 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
   return shouldRetry(true, callback);
 }
 
-bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {
+bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) {
   if (response_headers.EnvoyOverloaded() != nullptr) {
     return false;
   }
@@ -260,6 +297,14 @@ bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_heade
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
     for (auto code : retriable_status_codes_) {
       if (Http::Utility::getResponseStatus(response_headers) == code) {
+        return true;
+      }
+    }
+  }
+
+  if (retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_HEADERS) {
+    for (const auto& retriable_header : retriable_headers_) {
+      if (retriable_header->matchesHeaders(response_headers)) {
         return true;
       }
     }

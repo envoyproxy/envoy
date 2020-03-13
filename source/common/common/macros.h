@@ -30,12 +30,16 @@ namespace Envoy {
  * See https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use.
  */
 #define CONSTRUCT_ON_FIRST_USE(type, ...)                                                          \
-  static const type* objectptr = new type{__VA_ARGS__};                                            \
-  return *objectptr;
+  do {                                                                                             \
+    static const type* objectptr = new type{__VA_ARGS__};                                          \
+    return *objectptr;                                                                             \
+  } while (0)
 
 #define MUTABLE_CONSTRUCT_ON_FIRST_USE(type, ...)                                                  \
-  static type* objectptr = new type{__VA_ARGS__};                                                  \
-  return *objectptr;
+  do {                                                                                             \
+    static type* objectptr = new type{__VA_ARGS__};                                                \
+    return *objectptr;                                                                             \
+  } while (0)
 
 /**
  * Have a generic fall-through for different versions of C++

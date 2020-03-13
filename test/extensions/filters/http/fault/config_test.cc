@@ -1,14 +1,16 @@
-#include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "extensions/filters/http/fault/config.h"
 
+#include "test/extensions/filters/http/fault/utility.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -18,37 +20,35 @@ namespace {
 
 TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  envoy::config::filter::http::fault::v2::HTTPFault fault;
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   fault.mutable_abort();
   EXPECT_THROW(FaultFilterFactory().createFilterFactoryFromProto(fault, "stats", context),
                ProtoValidationException);
 }
 
 TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "delay" : {
-      "type" : "fixed",
-      "fixed_delay_percent" : 100,
-      "fixed_duration_ms" : 5000
-    }
-  }
+  const std::string yaml_string = R"EOF(
+  delay:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  const auto proto_config = convertYamlStrToProtoConfig(yaml_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
 TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
-  envoy::config::filter::http::fault::v2::HTTPFault config{};
+  envoy::extensions::filters::http::fault::v3::HTTPFault config;
   config.mutable_delay()->mutable_percentage()->set_numerator(100);
   config.mutable_delay()->mutable_percentage()->set_denominator(
-      envoy::type::FractionalPercent::HUNDRED);
+      envoy::type::v3::FractionalPercent::HUNDRED);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -67,6 +67,16 @@ TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(FaultFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.fault";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

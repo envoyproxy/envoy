@@ -14,12 +14,10 @@ namespace Envoy {
 /**
  * All stats for user agents. @see stats_macros.h
  */
-// clang-format off
 #define ALL_USER_AGENTS_STATS(COUNTER)                                                             \
   COUNTER(downstream_cx_total)                                                                     \
   COUNTER(downstream_cx_destroy_remote_active_rq)                                                  \
   COUNTER(downstream_rq_total)
-// clang-format on
 
 /**
  * Wrapper struct for user agent stats. @see stats_macros.h
@@ -48,7 +46,7 @@ public:
    * @param prefix supplies the stat prefix for the UA stats.
    * @param scope supplies the backing stat scope.
    */
-  void initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,
+  void initializeFromHeaders(const RequestHeaderMap& headers, const std::string& prefix,
                              Stats::Scope& scope);
 
   /**
@@ -59,7 +57,12 @@ public:
   void onConnectionDestroy(Network::ConnectionEvent event, bool active_streams);
 
 private:
-  enum class Type { NotInitialized, iOS, Android, Unknown };
+  enum class Type {
+    NotInitialized,
+    iOS, // NOLINT(readability-identifier-naming)
+    Android,
+    Unknown
+  };
 
   Type type_{Type::NotInitialized};
   std::unique_ptr<UserAgentStats> stats_;

@@ -55,7 +55,7 @@ Configuration
 -------------
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
-* This filter should be configured with the name *envoy.lua*.
+* This filter should be configured with the name *envoy.filters.http.lua*.
 
 Script examples
 ---------------
@@ -233,13 +233,16 @@ httpCall()
 
 .. code-block:: lua
 
-  headers, body = handle:httpCall(cluster, headers, body, timeout)
+  headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
 
-Makes an HTTP call to an upstream host. Envoy will yield the script until the call completes or
-has an error. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
+Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
 the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
 data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
+
+*asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
+regardless of response success or failure. If this is set to false, or not set, Envoy will yield the script
+until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.
@@ -277,14 +280,14 @@ metadata()
   metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
-under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
+under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
 :ref:`route entry <envoy_api_msg_route.Route>`.
 
 .. code-block:: yaml
 
   metadata:
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         foo: bar
         baz:
           - bad
@@ -504,7 +507,25 @@ set()
   dynamicMetadata:set(filterName, key, value)
 
 Sets key-value pair of a *filterName*'s metadata. *filterName* is a key specifying the target filter name,
-e.g. *envoy.lb*. The type of *key* and *value* is *string*.
+e.g. *envoy.lb*. The type of *key* is *string*. The type of *value* is any Lua type that can be mapped
+to a metadata value: *table*, *numeric*, *boolean*, *string* and *nil*. When using a *table* as an argument,
+its keys can only be *string* or *numeric*.
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local headers = request_handle:headers()
+    request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
+      auth: headers:get("authorization),
+      token: headers:get("x-request-token"),
+    })
+  end
+
+  function envoy_on_response(response_handle)
+    local meta = response_handle:streamInfo():dynamicMetadata()["request.info"]
+    response_handle:logInfo("Auth: "..meta.auth..", token: "..meta.token)
+  end
+
 
 __pairs()
 ^^^^^^^^^

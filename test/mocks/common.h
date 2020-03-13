@@ -37,7 +37,7 @@ public:
   ReadyWatcher();
   ~ReadyWatcher();
 
-  MOCK_METHOD0(ready, void());
+  MOCK_METHOD(void, ready, ());
 };
 
 // TODO(jmarantz): get rid of this and use SimulatedTimeSystem in its place.
@@ -56,11 +56,11 @@ public:
   void sleep(const Duration& duration) override { real_time_.sleep(duration); }
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+          const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
     return real_time_.waitFor(mutex, condvar, duration); // NO_CHECK_FORMAT(real_time)
   }
-  MOCK_METHOD0(systemTime, SystemTime());
-  MOCK_METHOD0(monotonicTime, MonotonicTime());
+  MOCK_METHOD(SystemTime, systemTime, ());
+  MOCK_METHOD(MonotonicTime, monotonicTime, ());
 
   Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
 };
@@ -89,7 +89,7 @@ inline bool operator==(const StringViewSaver& saver, const char* str) {
 
 class MockScopedTrackedObject : public ScopeTrackedObject {
 public:
-  MOCK_CONST_METHOD2(dumpState, void(std::ostream&, int));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
 } // namespace Envoy

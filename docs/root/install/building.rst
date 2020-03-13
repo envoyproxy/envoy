@@ -83,6 +83,6 @@ is to use Docker. This guide will walk through the process of building your own
 Envoy binary, and putting the binary in an Ubuntu container.
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     sandboxes/local_docker_build

@@ -1,0 +1,28 @@
+diff --git a/BUILD b/BUILD
+index d7c731bf6..315cdeca0 100644
+--- a/BUILD
++++ b/BUILD
+@@ -88,6 +88,7 @@ boringssl_copts = select({
+     ":windows_x86_64": [
+         "-DWIN32_LEAN_AND_MEAN",
+         "-DOPENSSL_NO_ASM",
++        "-DBORINGSSL_IMPLEMENTATION",
+     ],
+     "//conditions:default": ["-DOPENSSL_NO_ASM"],
+ })
+@@ -141,6 +142,7 @@ cc_library(
+         ":windows_x86_64": ["-defaultlib:advapi32.lib"],
+         "//conditions:default": ["-lpthread"],
+     }),
++    linkstatic = True,
+     visibility = ["//visibility:public"],
+ )
+ 
+@@ -150,6 +152,7 @@ cc_library(
+     hdrs = ssl_headers,
+     copts = boringssl_copts_cxx,
+     includes = ["src/include"],
++    linkstatic = True,
+     visibility = ["//visibility:public"],
+     deps = [
+         ":crypto",

@@ -1,6 +1,9 @@
 #include "common/config/filesystem_subscription_impl.h"
 
+#include "envoy/service/discovery/v3/discovery.pb.h"
+
 #include "common/common/macros.h"
+#include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -27,29 +30,37 @@ void FilesystemSubscriptionImpl::start(const std::set<std::string>&) {
   refresh();
 }
 
-void FilesystemSubscriptionImpl::updateResources(const std::set<std::string>&) {
-  // Bump stats for consistence behavior with other xDS.
+void FilesystemSubscriptionImpl::updateResourceInterest(const std::set<std::string>&) {
+  // Bump stats for consistent behavior with other xDS.
   stats_.update_attempt_.inc();
+}
+
+void FilesystemSubscriptionImpl::configRejected(const EnvoyException& e,
+                                                const std::string& message) {
+  ENVOY_LOG(warn, "Filesystem config update rejected: {}", e.what());
+  ENVOY_LOG(debug, "Failed configuration:\n{}", message);
+  stats_.update_rejected_.inc();
+  callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
 void FilesystemSubscriptionImpl::refresh() {
   ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
   stats_.update_attempt_.inc();
   bool config_update_available = false;
-  envoy::api::v2::DiscoveryResponse message;
+  envoy::service::discovery::v3::DiscoveryResponse message;
   try {
     MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
     config_update_available = true;
     callbacks_.onConfigUpdate(message.resources(), message.version_info());
+    stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(message.version_info()));
     stats_.update_success_.inc();
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_, message.DebugString());
+  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
+    configRejected(e, message.DebugString());
   } catch (const EnvoyException& e) {
     if (config_update_available) {
-      ENVOY_LOG(warn, "Filesystem config update rejected: {}", e.what());
-      ENVOY_LOG(debug, "Failed configuration:\n{}", message.DebugString());
-      stats_.update_rejected_.inc();
-      callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
+      configRejected(e, message.DebugString());
     } else {
       ENVOY_LOG(warn, "Filesystem config update failure: {}", e.what());
       stats_.update_failure_.inc();

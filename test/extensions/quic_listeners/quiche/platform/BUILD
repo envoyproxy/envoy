@@ -2,15 +2,22 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 envoy_package()
+
+envoy_cc_test(
+    name = "quiche_platform_test",
+    srcs = ["quiche_platform_test.cc"],
+    external_deps = ["quiche_common_platform"],
+    deps = [
+        "@com_googlesource_quiche//:quiche_common_platform",
+        "@com_googlesource_quiche//:quiche_common_platform_endian",
+    ],
+)
 
 envoy_cc_test(
     name = "http2_platform_test",
@@ -20,7 +27,6 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:http2_platform_reconstruct_object",
         "@com_googlesource_quiche//:http2_test_tools_random",
     ],
 )
@@ -34,6 +40,7 @@ envoy_cc_test(
     copts = ["-Wno-unused-parameter"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     external_deps = ["quiche_quic_platform"],
+    tags = ["nofips"],
     deps = [
         ":quic_platform_epoll_clock_lib",
         "//source/common/memory:stats_lib",
@@ -99,11 +106,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "http2_platform_reconstruct_object_impl_lib",
-    hdrs = ["http2_reconstruct_object_impl.h"],
-)
-
-envoy_cc_test_library(
     name = "quic_platform_epoll_clock_lib",
     srcs = select({
         "//bazel:linux": ["quic_epoll_clock.cc"],
@@ -113,7 +115,9 @@ envoy_cc_test_library(
         "//bazel:linux": ["quic_epoll_clock.h"],
         "//conditions:default": [],
     }),
+    tags = ["nofips"],
     deps = [
+        "@com_googlesource_quiche//:quic_core_clock_lib",
         "@com_googlesource_quiche//:quic_platform",
         "@com_googlesource_quiche//:quic_platform_epoll_lib",
     ],
@@ -122,12 +126,14 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quic_platform_epoll_impl_lib",
     hdrs = ["quic_epoll_impl.h"],
+    tags = ["nofips"],
     deps = ["@com_googlesource_quiche//:epoll_server_lib"],
 )
 
 envoy_cc_test_library(
     name = "quic_platform_expect_bug_impl_lib",
     hdrs = ["quic_expect_bug_impl.h"],
+    tags = ["nofips"],
     deps = [
         "@com_googlesource_quiche//:quic_platform_base",
         "@com_googlesource_quiche//:quic_platform_mock_log",
@@ -137,6 +143,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quic_platform_mock_log_impl_lib",
     hdrs = ["quic_mock_log_impl.h"],
+    tags = ["nofips"],
     deps = ["@com_googlesource_quiche//:quic_platform_base"],
 )
 
@@ -144,6 +151,7 @@ envoy_cc_test_library(
     name = "quic_platform_port_utils_impl_lib",
     srcs = ["quic_port_utils_impl.cc"],
     hdrs = ["quic_port_utils_impl.h"],
+    tags = ["nofips"],
     deps = [
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",
@@ -153,6 +161,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quic_platform_test_mem_slice_vector_impl_lib",
     hdrs = ["quic_test_mem_slice_vector_impl.h"],
+    tags = ["nofips"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "@com_googlesource_quiche//:quic_platform_mem_slice_span",
@@ -162,17 +171,20 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quic_platform_sleep_impl_lib",
     hdrs = ["quic_sleep_impl.h"],
+    tags = ["nofips"],
     deps = ["@com_googlesource_quiche//:quic_core_time_lib"],
 )
 
 envoy_cc_test_library(
     name = "quic_platform_system_event_loop_impl_lib",
     hdrs = ["quic_system_event_loop_impl.h"],
+    tags = ["nofips"],
 )
 
 envoy_cc_test_library(
     name = "quic_platform_thread_impl_lib",
     hdrs = ["quic_thread_impl.h"],
+    tags = ["nofips"],
     deps = [
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
@@ -183,6 +195,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quic_platform_test_impl_lib",
     hdrs = ["quic_test_impl.h"],
+    tags = ["nofips"],
     deps = ["//source/common/common:assert_lib"],
 )
 
@@ -190,9 +203,11 @@ envoy_cc_test_library(
     name = "quic_platform_test_output_impl_lib",
     srcs = ["quic_test_output_impl.cc"],
     hdrs = ["quic_test_output_impl.h"],
+    tags = ["nofips"],
     deps = [
         "//source/common/filesystem:filesystem_lib",
         "@com_googlesource_quiche//:quic_platform_base",
+        "@com_googlesource_quiche//:quiche_common_platform",
     ],
 )
 
@@ -217,6 +232,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "envoy_quic_clock_test",
     srcs = ["envoy_quic_clock_test.cc"],
+    tags = ["nofips"],
     deps = [
         "//source/extensions/quic_listeners/quiche/platform:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",

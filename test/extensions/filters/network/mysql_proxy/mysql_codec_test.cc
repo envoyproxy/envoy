@@ -937,12 +937,12 @@ TEST_F(MySQLCodecTest, MySQLCommandError) {
   Command mysql_cmd_decode{};
   decode_data->drain(4);
   mysql_cmd_decode.decode(*decode_data, 0, 0);
-  EXPECT_EQ(mysql_cmd_decode.getCmd(), Command::Cmd::COM_NULL);
+  EXPECT_EQ(mysql_cmd_decode.getCmd(), Command::Cmd::Null);
 }
 
 TEST_F(MySQLCodecTest, MySQLCommandInitDb) {
   Command mysql_cmd_encode{};
-  mysql_cmd_encode.setCmd(Command::Cmd::COM_INIT_DB);
+  mysql_cmd_encode.setCmd(Command::Cmd::InitDb);
   std::string db = "mysqlDB";
   mysql_cmd_encode.setData(db);
   std::string data = mysql_cmd_encode.encode();
@@ -958,7 +958,7 @@ TEST_F(MySQLCodecTest, MySQLCommandInitDb) {
 
 TEST_F(MySQLCodecTest, MySQLCommandCreateDb) {
   Command mysql_cmd_encode{};
-  mysql_cmd_encode.setCmd(Command::Cmd::COM_CREATE_DB);
+  mysql_cmd_encode.setCmd(Command::Cmd::CreateDb);
   std::string db = "mysqlDB";
   mysql_cmd_encode.setData(db);
   std::string data = mysql_cmd_encode.encode();
@@ -974,7 +974,7 @@ TEST_F(MySQLCodecTest, MySQLCommandCreateDb) {
 
 TEST_F(MySQLCodecTest, MySQLCommandDropDb) {
   Command mysql_cmd_encode{};
-  mysql_cmd_encode.setCmd(Command::Cmd::COM_DROP_DB);
+  mysql_cmd_encode.setCmd(Command::Cmd::DropDb);
   std::string db = "mysqlDB";
   mysql_cmd_encode.setData(db);
   std::string data = mysql_cmd_encode.encode();
@@ -990,7 +990,7 @@ TEST_F(MySQLCodecTest, MySQLCommandDropDb) {
 
 TEST_F(MySQLCodecTest, MySQLCommandOther) {
   Command mysql_cmd_encode{};
-  mysql_cmd_encode.setCmd(Command::Cmd::COM_FIELD_LIST);
+  mysql_cmd_encode.setCmd(Command::Cmd::FieldList);
   std::string data = mysql_cmd_encode.encode();
 
   std::string mysql_msg = BufferHelper::encodeHdr(data, 0);
@@ -999,7 +999,7 @@ TEST_F(MySQLCodecTest, MySQLCommandOther) {
   Command mysql_cmd_decode{};
   decode_data->drain(4);
   mysql_cmd_decode.decode(*decode_data, 0, 0);
-  EXPECT_EQ(mysql_cmd_decode.getCmd(), Command::Cmd::COM_FIELD_LIST);
+  EXPECT_EQ(mysql_cmd_decode.getCmd(), Command::Cmd::FieldList);
 }
 
 } // namespace MySQLProxy

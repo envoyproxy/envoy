@@ -27,7 +27,7 @@
 #include "absl/strings/match.h"
 
 namespace Envoy {
-void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void BufferingStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
   headers_ = std::move(headers);
@@ -45,7 +45,7 @@ void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream)
   }
 }
 
-void BufferingStreamDecoder::decodeTrailers(Http::HeaderMapPtr&&) {
+void BufferingStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
@@ -81,16 +81,16 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     client.close();
     dispatcher->exit();
   }));
-  Http::StreamEncoder& encoder = client.newStream(*response);
+  Http::RequestEncoder& encoder = client.newStream(*response);
   encoder.getStream().addCallbacks(*response);
 
-  Http::HeaderMapImpl headers;
-  headers.insertMethod().value(method);
-  headers.insertPath().value(url);
-  headers.insertHost().value(host);
-  headers.insertScheme().value(Http::Headers::get().SchemeValues.Http);
+  Http::RequestHeaderMapImpl headers;
+  headers.setMethod(method);
+  headers.setPath(url);
+  headers.setHost(host);
+  headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
   if (!content_type.empty()) {
-    headers.insertContentType().value(content_type);
+    headers.setContentType(content_type);
   }
   encoder.encodeHeaders(headers, body.empty());
   if (!body.empty()) {

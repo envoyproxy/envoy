@@ -79,7 +79,7 @@ TEST_F(AccessLogManagerImplTest, OpenFileWithRightFlags) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
+TEST_F(AccessLogManagerImplTest, FlushToLogFilePeriodically) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -148,7 +148,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFilePeriodically) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
+TEST_F(AccessLogManagerImplTest, FlushToLogFileOnDemand) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -220,7 +220,7 @@ TEST_F(AccessLogManagerImplTest, flushToLogFileOnDemand) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, flushCountsIOErrors) {
+TEST_F(AccessLogManagerImplTest, FlushCountsIOErrors) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
@@ -250,7 +250,7 @@ TEST_F(AccessLogManagerImplTest, flushCountsIOErrors) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, reopenFile) {
+TEST_F(AccessLogManagerImplTest, ReopenFile) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   Sequence sq;
@@ -306,7 +306,56 @@ TEST_F(AccessLogManagerImplTest, reopenFile) {
   }
 }
 
-TEST_F(AccessLogManagerImplTest, reopenThrows) {
+// Test that the flush timer will trigger file reopen even if no data is waiting.
+TEST_F(AccessLogManagerImplTest, ReopenFileOnTimerOnly) {
+  NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+
+  Sequence sq;
+  EXPECT_CALL(*file_, open_(_))
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
+
+  EXPECT_CALL(*file_, write_(_))
+      .InSequence(sq)
+      .WillOnce(Invoke([](absl::string_view data) -> Api::IoCallSizeResult {
+        EXPECT_EQ(0, data.compare("before"));
+        return Filesystem::resultSuccess<ssize_t>(static_cast<ssize_t>(data.length()));
+      }));
+
+  log_file->write("before");
+  timer->invokeCallback();
+
+  {
+    Thread::LockGuard lock(file_->write_mutex_);
+    while (file_->num_writes_ != 1) {
+      file_->write_event_.wait(file_->write_mutex_);
+    }
+  }
+
+  EXPECT_CALL(*file_, close_())
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+  EXPECT_CALL(*file_, open_(_))
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+
+  EXPECT_CALL(*file_, close_())
+      .InSequence(sq)
+      .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
+
+  log_file->reopen();
+  timer->invokeCallback();
+
+  {
+    Thread::LockGuard lock(file_->open_mutex_);
+    while (file_->num_opens_ != 2) {
+      file_->open_event_.wait(file_->open_mutex_);
+    }
+  }
+}
+
+TEST_F(AccessLogManagerImplTest, ReopenThrows) {
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher_);
 
   EXPECT_CALL(*file_, write_(_))
@@ -354,7 +403,7 @@ TEST_F(AccessLogManagerImplTest, reopenThrows) {
   waitForCounterEq("filesystem.reopen_failed", 1);
 }
 
-TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
+TEST_F(AccessLogManagerImplTest, BigDataChunkShouldBeFlushedWithoutTimer) {
   EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
   AccessLogFileSharedPtr log_file = access_log_manager_.createAccessLog("foo");
 
@@ -394,7 +443,7 @@ TEST_F(AccessLogManagerImplTest, bigDataChunkShouldBeFlushedWithoutTimer) {
   EXPECT_CALL(*file_, close_()).WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
-TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
+TEST_F(AccessLogManagerImplTest, ReopenAllFiles) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).WillRepeatedly(ReturnNew<NiceMock<Event::MockTimer>>());
 
   Sequence sq;

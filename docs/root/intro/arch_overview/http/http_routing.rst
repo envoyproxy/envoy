@@ -30,6 +30,7 @@ request. The router filter supports the following features:
 * :ref:`Automatic host rewriting <envoy_api_field_route.RouteAction.auto_host_rewrite>` based on
   the DNS name of the selected upstream host.
 * :ref:`Prefix rewriting <envoy_api_field_route.RedirectAction.prefix_rewrite>`.
+* :ref:`Path rewriting using a regular expression and capture groups <envoy_api_field_route.RouteAction.regex_rewrite>`.
 * :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
   route configuration.
 * Request timeout specified either via :ref:`HTTP
@@ -49,6 +50,40 @@ request. The router filter supports the following features:
 * :ref:`Priority <arch_overview_http_routing_priority>` based routing.
 * :ref:`Hash policy <envoy_api_field_route.RouteAction.hash_policy>` based routing.
 * :ref:`Absolute urls <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.http_protocol_options>` are supported for non-tls forward proxies.
+
+.. _arch_overview_http_routing_route_scope:
+
+Route Scope
+-----------
+
+Scoped routing enables Envoy to put constraints on search space of domains and route rules.
+A :ref:`Route Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
+For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table<envoy_api_msg_RouteConfiguration>`.
+
+The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_api_msg_ScopedRouteConfiguration>` resources, each defining independent routing configuration,
+along with a :ref:`ScopeKeyBuilder <envoy_api_msg_config.filter.network.http_connection_manager.v2.ScopedRoutes.ScopeKeyBuilder>`
+defining the key construction algorithm used by Envoy to look up the scope corresponding to each request.
+
+For example, for the following scoped route configuration, Envoy will look into the "addr" header value, split the header value by ";" first, and use the first value for key 'x-foo-key' as the scope key.
+If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", then "127.0.0.1" will be computed as the scope key to look up for corresponding route configuration.
+
+.. code-block:: yaml
+
+  name: scope_by_addr
+  fragments:
+    - header_value_extractor:
+        name: Addr
+        element_separator: ;
+        element:
+          key: x-foo-key
+          separator: =
+
+.. _arch_overview_http_routing_route_table:
+
+For a key to match a :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`, the number of fragments in the computed key has to match that of
+the :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`.
+Then fragments are matched in order. A missing fragment(treated as NULL) in the built key makes the request unable to match any scope,
+i.e. no route entry can be found for the request.
 
 Route table
 -----------
@@ -77,6 +112,8 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
   etc.
+* **Retry budgets**: Envoy can limit the proportion of active requests via :ref:`retry budgets <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>` that can be retries to
+  prevent their contribution to large increases in traffic volume.
 * **Host selection retry plugins**: Envoy can be configured to apply additional logic to the host
   selection logic when selecting hosts for retries. Specifying a
   :ref:`retry host predicate <envoy_api_field_route.RetryPolicy.retry_host_predicate>`

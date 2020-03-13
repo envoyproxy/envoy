@@ -107,7 +107,7 @@ bool supportsIpVersion(const Address::IpVersion version);
  * @param type the type of socket to be bound.
  * @returns the address and the fd of the socket bound to that address.
  */
-std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
+std::pair<Address::InstanceConstSharedPtr, IoHandlePtr>
 bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type);
 
 /**
@@ -133,7 +133,7 @@ public:
       : transport_socket_factory_(std::move(transport_socket_factory)) {}
 
   // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
+  const TransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
 
@@ -149,16 +149,44 @@ private:
 /**
  * Create an empty filter chain for testing purposes.
  * @param transport_socket_factory transport socket factory to use when creating transport sockets.
- * @return const Network::FilterChainSharedPtr filter chain.
+ * @return const FilterChainSharedPtr filter chain.
  */
-const Network::FilterChainSharedPtr
+const FilterChainSharedPtr
 createEmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory);
 
 /**
  * Create an empty filter chain creating raw buffer sockets for testing purposes.
- * @return const Network::FilterChainSharedPtr filter chain.
+ * @return const FilterChainSharedPtr filter chain.
  */
-const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
+const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
+
+/**
+ * Wrapper for Utility::readFromSocket() which reads a single datagram into the supplied
+ * UdpRecvData without worrying about the packet processor interface. The function will
+ * instantiate the buffer returned in data.
+ */
+Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
+                                       UdpRecvData& data);
+
+/**
+ * A synchronous UDP peer that can be used for testing.
+ */
+class UdpSyncPeer {
+public:
+  UdpSyncPeer(Network::Address::IpVersion version);
+
+  // Writer a datagram to a remote peer.
+  void write(const std::string& buffer, const Network::Address::Instance& peer);
+
+  // Receive a datagram.
+  void recv(Network::UdpRecvData& datagram);
+
+  // Return the local peer's socket address.
+  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+
+private:
+  const Network::SocketPtr socket_;
+};
 
 } // namespace Test
 } // namespace Network

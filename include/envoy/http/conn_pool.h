@@ -58,9 +58,10 @@ public:
    * @param encoder supplies the request encoder to use.
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
+   * @param info supplies the stream info object associated with the upstream connection.
    */
-  virtual void onPoolReady(Http::StreamEncoder& encoder,
-                           Upstream::HostDescriptionConstSharedPtr host) PURE;
+  virtual void onPoolReady(RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
+                           const StreamInfo::StreamInfo& info) PURE;
 };
 
 /**
@@ -117,7 +118,8 @@ public:
    * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
    *          the callbacks are called.
    */
-  virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks) PURE;
+  virtual Cancellable* newStream(Http::ResponseDecoder& response_decoder,
+                                 Callbacks& callbacks) PURE;
 
   /**
    * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.

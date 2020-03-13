@@ -4,7 +4,7 @@ External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
 * :ref:`HTTP filter v2 API reference <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`
-* This filter should be configured with the name *envoy.ext_authz*.
+* This filter should be configured with the name *envoy.filters.http.ext_authz*.
 
 The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
 HTTP request is authorized or not.
@@ -29,14 +29,16 @@ A sample filter configuration for a gRPC authorization server:
 .. code-block:: yaml
 
   http_filters:
-    - name: envoy.ext_authz
-      config:
+    - name: envoy.filters.http.ext_authz
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
         grpc_service:
           envoy_grpc:
             cluster_name: ext-authz
 
           # Default is 200ms; override if your server needs e.g. warmup time.
           timeout: 0.5s
+        include_peer_certificate: true
 
 .. code-block:: yaml
 
@@ -63,14 +65,16 @@ A sample filter configuration for a raw HTTP authorization server:
 .. code-block:: yaml
 
   http_filters:
-    - name: envoy.ext_authz
-      config:
+    - name: envoy.filters.http.ext_authz
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
         http_service:
             server_uri:
               uri: 127.0.0.1:10003
               cluster: ext-authz
               timeout: 0.25s
               failure_mode_allow: false
+        include_peer_certificate: true
 
 .. code-block:: yaml
 
@@ -103,7 +107,7 @@ In this example we add additional context on the virtual host, and disabled the 
     - name: local_service
       domains: ["*"]
       per_filter_config:
-        envoy.ext_authz:
+        envoy.filters.http.ext_authz:
           check_settings:
             context_extensions:
               virtual_host: local_service
@@ -111,7 +115,7 @@ In this example we add additional context on the virtual host, and disabled the 
       - match: { prefix: "/static" }
         route: { cluster: some_service }
         per_filter_config:
-          envoy.ext_authz:
+          envoy.filters.http.ext_authz:
             disabled: true
       - match: { prefix: "/" }
         route: { cluster: some_service }
@@ -131,3 +135,9 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."
+
+Runtime
+-------
+The fraction of requests for which the filter is enabled can be configured via the :ref:`runtime_key
+<envoy_api_field_core.RuntimeFractionalPercent.runtime_key>` value of the :ref:`filter_enabled
+<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.filter_enabled>` field.

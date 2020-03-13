@@ -1,7 +1,8 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "grpcpp/grpcpp.h"
 
@@ -9,10 +10,10 @@ namespace Envoy {
 namespace Grpc {
 
 grpc::SslCredentialsOptions buildSslOptionsFromConfig(
-    const envoy::api::v2::core::GrpcService::GoogleGrpc::SslCredentials& ssl_config);
+    const envoy::config::core::v3::GrpcService::GoogleGrpc::SslCredentials& ssl_config);
 
 std::shared_ptr<grpc::ChannelCredentials>
-getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service,
+getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service,
                                 Api::Api& api);
 
 class CredsUtility {
@@ -26,7 +27,7 @@ public:
    *         will be returned in the absence of any configured credentials.
    */
   static std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc,
+  getChannelCredentials(const envoy::config::core::v3::GrpcService::GoogleGrpc& google_grpc,
                         Api::Api& api);
 
   /**
@@ -36,7 +37,7 @@ public:
    * @return std::vector<std::shared_ptr<grpc::CallCredentials>> call credentials.
    */
   static std::vector<std::shared_ptr<grpc::CallCredentials>>
-  callCredentials(const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc);
+  callCredentials(const envoy::config::core::v3::GrpcService::GoogleGrpc& google_grpc);
 
   /**
    * Default translation from envoy::api::v2::core::GrpcService to grpc::ChannelCredentials for SSL
@@ -48,7 +49,7 @@ public:
    *         forcing the channel to SSL.
    */
   static std::shared_ptr<grpc::ChannelCredentials>
-  defaultSslChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+  defaultSslChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
                                Api::Api& api);
 
   /**
@@ -61,7 +62,7 @@ public:
    *         channel to SSL.
    */
   static std::shared_ptr<grpc::ChannelCredentials>
-  defaultChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+  defaultChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
                             Api::Api& api);
 };
 

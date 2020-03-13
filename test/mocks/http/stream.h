@@ -13,14 +13,16 @@ public:
   ~MockStream() override;
 
   // Http::Stream
-  MOCK_METHOD1(addCallbacks, void(StreamCallbacks& callbacks));
-  MOCK_METHOD1(removeCallbacks, void(StreamCallbacks& callbacks));
-  MOCK_METHOD1(resetStream, void(StreamResetReason reason));
-  MOCK_METHOD1(readDisable, void(bool disable));
-  MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t, uint32_t));
-  MOCK_METHOD0(bufferLimit, uint32_t());
+  MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
+  MOCK_METHOD(void, removeCallbacks, (StreamCallbacks & callbacks));
+  MOCK_METHOD(void, resetStream, (StreamResetReason reason));
+  MOCK_METHOD(void, readDisable, (bool disable));
+  MOCK_METHOD(void, setWriteBufferWatermarks, (uint32_t, uint32_t));
+  MOCK_METHOD(uint32_t, bufferLimit, ());
+  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, connectionLocalAddress, ());
 
   std::list<StreamCallbacks*> callbacks_{};
+  Network::Address::InstanceConstSharedPtr connection_local_address_;
 
   void runHighWatermarkCallbacks() {
     for (auto* callback : callbacks_) {

@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/common/lua/wrappers.h"
@@ -23,8 +25,8 @@ public:
     state_->registerType<MetadataMapIterator>();
   }
 
-  envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
-    envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
+    envoy::config::core::v3::Metadata metadata;
     TestUtility::loadFromYaml(yaml_string, metadata);
     return metadata;
   }
@@ -35,6 +37,7 @@ public:
   void setup(const std::string& script) override {
     LuaWrappersTestBase<ConnectionWrapper>::setup(script);
     state_->registerType<SslConnectionWrapper>();
+    ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   }
 
 protected:
@@ -53,17 +56,17 @@ protected:
     setup(SCRIPT);
 
     // Setup secure connection if required.
-    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? &ssl_ : nullptr));
+    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
 
     ConnectionWrapper::create(coroutine_->luaState(), &connection_);
     EXPECT_CALL(*this, testPrint(secure ? "secure" : "plain"));
-    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? &ssl_ : nullptr));
+    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? ssl_ : nullptr));
     EXPECT_CALL(*this, testPrint(secure ? "userdata" : "nil"));
     start("callMe");
   }
 
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
+  std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
 };
 
 // Basic buffer wrapper methods test.
@@ -138,7 +141,7 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
 
   const std::string yaml = R"EOF(
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         make.delicious.bread:
           name: pulla
           origin: finland
@@ -162,8 +165,8 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
           value: ~
     )EOF";
 
-  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
-  const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
+  envoy::config::core::v3::Metadata metadata = parseMetadataFromYaml(yaml);
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
   EXPECT_CALL(*this, testPrint("pulla"));
@@ -199,7 +202,7 @@ TEST_F(LuaMetadataMapWrapperTest, Iterators) {
 
   const std::string yaml = R"EOF(
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         make.delicious.bread:
           name: pulla
         make.delicious.cookie:
@@ -218,8 +221,8 @@ TEST_F(LuaMetadataMapWrapperTest, Iterators) {
   // The underlying map is unordered.
   setup(SCRIPT);
 
-  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
-  const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
+  envoy::config::core::v3::Metadata metadata = parseMetadataFromYaml(yaml);
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
   EXPECT_CALL(*this, testPrint("'make.delicious.bread' 'pulla'"));
@@ -246,7 +249,7 @@ TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
 
   const std::string yaml = R"EOF(
     filter_metadata:
-      envoy.lua:
+      envoy.filters.http.lua:
         make.delicious.bread:
           name: pulla
         make.delicious.cookie:
@@ -255,8 +258,8 @@ TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
           name: nothing
     )EOF";
 
-  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
-  const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
+  envoy::config::core::v3::Metadata metadata = parseMetadataFromYaml(yaml);
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.filters.http.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
   EXPECT_THROW_WITH_MESSAGE(
       start("callMe"), LuaException,

@@ -1,12 +1,11 @@
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
-#include <arpa/inet.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
@@ -23,6 +22,10 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
+// Min/max TLS version recognized by the underlying TLS/SSL library.
+const unsigned Config::TLS_MIN_SUPPORTED_VERSION = TLS1_VERSION;
+const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
+
 Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
@@ -33,6 +36,8 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
                                      max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
   }
 
+  SSL_CTX_set_min_proto_version(ssl_ctx_.get(), TLS_MIN_SUPPORTED_VERSION);
+  SSL_CTX_set_max_proto_version(ssl_ctx_.get(), TLS_MAX_SUPPORTED_VERSION);
   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
   SSL_CTX_set_select_certificate_cb(
@@ -49,7 +54,8 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
         Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
-        filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
+        filter->onServername(
+            absl::NullSafeStringView(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)));
 
         // Return an error to stop the handshake; we have what we wanted already.
         *out_alert = SSL_AD_USER_CANCELLED;
@@ -72,23 +78,47 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_ == nullptr);
-
-  file_event_ = cb.dispatcher().createFileEvent(
-      socket.ioHandle().fd(),
-      [this](uint32_t events) {
-        if (events & Event::FileReadyType::Closed) {
-          config_->stats().connection_closed_.inc();
-          done(false);
-          return;
-        }
-
-        ASSERT(events == Event::FileReadyType::Read);
-        onRead();
-      },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
-
   cb_ = &cb;
-  return Network::FilterStatus::StopIteration;
+
+  ParseState parse_state = onRead();
+  switch (parse_state) {
+  case ParseState::Error:
+    // As per discussion in https://github.com/envoyproxy/envoy/issues/7864
+    // we don't add new enum in FilterStatus so we have to signal the caller
+    // the new condition.
+    cb.socket().close();
+    return Network::FilterStatus::StopIteration;
+  case ParseState::Done:
+    return Network::FilterStatus::Continue;
+  case ParseState::Continue:
+    // do nothing but create the event
+    file_event_ = cb.dispatcher().createFileEvent(
+        socket.ioHandle().fd(),
+        [this](uint32_t events) {
+          if (events & Event::FileReadyType::Closed) {
+            config_->stats().connection_closed_.inc();
+            done(false);
+            return;
+          }
+
+          ASSERT(events == Event::FileReadyType::Read);
+          ParseState parse_state = onRead();
+          switch (parse_state) {
+          case ParseState::Error:
+            done(false);
+            break;
+          case ParseState::Done:
+            done(true);
+            break;
+          case ParseState::Continue:
+            // do nothing but wait for the next event
+            break;
+          }
+        },
+        Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
+    return Network::FilterStatus::StopIteration;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {
@@ -122,15 +152,15 @@ void Filter::onServername(absl::string_view name) {
   clienthello_success_ = true;
 }
 
-void Filter::onRead() {
+ParseState Filter::onRead() {
   // This receive code is somewhat complicated, because it must be done as a MSG_PEEK because
   // there is no way for a listener-filter to pass payload data to the ConnectionImpl and filters
   // that get created later.
   //
-  // The file_event_ in this class gets events everytime new data is available on the socket,
+  // The file_event_ in this class gets events every time new data is available on the socket,
   // even if previous data has not been read, which is always the case due to MSG_PEEK. When
   // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
-  // socket, so that new event is immediately signalled as readable because it is new and the socket
+  // socket, so that new event is immediately signaled as readable because it is new and the socket
   // is readable, even though no new events have occurred.
   //
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
@@ -141,11 +171,10 @@ void Filter::onRead() {
   ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
   if (result.rc_ == -1 && result.errno_ == EAGAIN) {
-    return;
+    return ParseState::Continue;
   } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();
-    done(false);
-    return;
+    return ParseState::Error;
   }
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
@@ -154,8 +183,9 @@ void Filter::onRead() {
     const uint8_t* data = buf_ + read_;
     const size_t len = result.rc_ - read_;
     read_ = result.rc_;
-    parseClientHello(data, len);
+    return parseClientHello(data, len);
   }
+  return ParseState::Continue;
 }
 
 void Filter::done(bool success) {
@@ -164,7 +194,7 @@ void Filter::done(bool success) {
   cb_->continueFilterChain(success);
 }
 
-void Filter::parseClientHello(const void* data, size_t len) {
+ParseState Filter::parseClientHello(const void* data, size_t len) {
   // Ownership is passed to ssl_ in SSL_set_bio()
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
 
@@ -185,9 +215,9 @@ void Filter::parseClientHello(const void* data, size_t len) {
       // We've hit the specified size limit. This is an unreasonably large ClientHello;
       // indicate failure.
       config_->stats().client_hello_too_large_.inc();
-      done(false);
+      return ParseState::Error;
     }
-    break;
+    return ParseState::Continue;
   case SSL_ERROR_SSL:
     if (clienthello_success_) {
       config_->stats().tls_found_.inc();
@@ -196,15 +226,14 @@ void Filter::parseClientHello(const void* data, size_t len) {
       } else {
         config_->stats().alpn_not_found_.inc();
       }
-      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().Tls);
+      cb_->socket().setDetectedTransportProtocol(
+          TransportSockets::TransportProtocolNames::get().Tls);
     } else {
       config_->stats().tls_not_found_.inc();
     }
-    done(true);
-    break;
+    return ParseState::Done;
   default:
-    done(false);
-    break;
+    return ParseState::Error;
   }
 }
 

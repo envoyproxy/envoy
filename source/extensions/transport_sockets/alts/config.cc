@@ -1,11 +1,12 @@
 #include "extensions/transport_sockets/alts/config.h"
 
-#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
-#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.validate.h"
+#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
+#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/common/assert.h"
+#include "common/grpc/google_grpc_context.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -45,7 +46,7 @@ bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& pee
 }
 
 HandshakeValidator
-createHandshakeValidator(const envoy::config::transport_socket::alts::v2alpha::Alts& config) {
+createHandshakeValidator(const envoy::extensions::transport_sockets::alts::v3::Alts& config) {
   const auto& peer_service_accounts = config.peer_service_accounts();
   const std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
                                               peer_service_accounts.cend());
@@ -65,6 +66,17 @@ public:
   AltsSharedState() { grpc_alts_shared_resource_dedicated_init(); }
 
   ~AltsSharedState() override { grpc_alts_shared_resource_dedicated_shutdown(); }
+
+private:
+  // There is blanket google-grpc initialization in MainCommonBase, but that
+  // doesn't cover unit tests. However, putting blanket coverage in ProcessWide
+  // causes background threaded memory allocation in all unit tests making it
+  // hard to measure memory. Thus we also initialize grpc using our idempotent
+  // wrapper-class in classes that need it. See
+  // https://github.com/envoyproxy/envoy/issues/8282 for details.
+#ifdef ENVOY_GOOGLE_GRPC
+  Grpc::GoogleGrpcContext google_grpc_context_;
+#endif
 };
 
 SINGLETON_MANAGER_REGISTRATION(alts_shared_state);
@@ -78,7 +90,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
       SINGLETON_MANAGER_REGISTERED_NAME(alts_shared_state),
       [] { return std::make_shared<AltsSharedState>(); });
   auto config =
-      MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
+      MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::alts::v3::Alts&>(
           message, factory_ctxt.messageValidationVisitor());
   HandshakeValidator validator = createHandshakeValidator(config);
 
@@ -120,7 +132,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
 } // namespace
 
 ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::transport_socket::alts::v2alpha::Alts>();
+  return std::make_unique<envoy::extensions::transport_sockets::alts::v3::Alts>();
 }
 
 Network::TransportSocketFactoryPtr

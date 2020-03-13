@@ -34,8 +34,8 @@ to true.
   the wire individually because the statsd protocol doesn't have any way to represent a histogram
   summary. Be aware that this can be a very large volume of data.
 
-Statistics
-----------
+Event loop statistics
+---------------------
 
 The event dispatcher for the main thread has a statistics tree rooted at *server.dispatcher.*, and
 the event dispatcher for each worker thread has a statistics tree rooted at
@@ -49,3 +49,24 @@ the event dispatcher for each worker thread has a statistics tree rooted at
   poll_delay_us, Histogram, Polling delays in microseconds
 
 Note that any auxiliary threads are not included here.
+
+.. _operations_performance_watchdog:
+
+Watchdog
+--------
+
+In addition to event loop statistics, Envoy also include a configurable
+:ref:`watchdog <envoy_api_field_config.bootstrap.v2.Bootstrap.watchdog>` system that can increment
+statistics when Envoy is not responsive and optionally kill the server. The statistics are useful
+for understanding at a high level whether Envoy's event loop is not responsive either because it is
+doing too much work, blocking, or not being scheduled by the OS.
+
+The watchdog emits statistics in both the *server.* and *server.<thread_name>.* trees.
+*<thread_name>* is equal to *main_thread*, *worker_0*, *worker_1*, etc.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  watchdog_miss, Counter, Number of standard misses
+  watchdog_mega_miss, Counter, Number of mega misses

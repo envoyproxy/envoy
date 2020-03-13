@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
@@ -26,12 +25,13 @@ public:
 
   // Config::Subscription
   // We report all discovered resources in the watched file, so the resource names arguments are
-  // unused, and updateResources is a no-op (other than updating a stat).
+  // unused, and updateResourceInterest is a no-op (other than updating a stat).
   void start(const std::set<std::string>&) override;
-  void updateResources(const std::set<std::string>&) override;
+  void updateResourceInterest(const std::set<std::string>&) override;
 
 private:
   void refresh();
+  void configRejected(const EnvoyException& e, const std::string& message);
 
   bool started_{};
   const std::string path_;

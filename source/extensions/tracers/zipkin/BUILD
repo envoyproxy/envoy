@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -34,7 +35,6 @@ envoy_cc_library(
         "zipkin_tracer_impl.h",
     ],
     external_deps = [
-        "rapidjson",
         "abseil_optional",
     ],
     deps = [
@@ -57,16 +57,20 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers:well_known_names",
+        "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":zipkin_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

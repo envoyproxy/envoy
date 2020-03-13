@@ -4,8 +4,6 @@
 
 #include "gmock/gmock.h"
 
-using testing::_;
-
 namespace Envoy {
 namespace Server {
 

@@ -5,7 +5,7 @@ External Authorization
 
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
 * :ref:`Network filter v2 API reference <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`
-* This filter should be configured with the name *envoy.ext_authz*.
+* This filter should be configured with the name *envoy.filters.network.ext_authz*.
 
 The external authorization network filter calls an external authorization service to check if the
 incoming request is authorized or not. If the request is deemed unauthorized by the network filter
@@ -31,12 +31,14 @@ A sample filter configuration could be:
 .. code-block:: yaml
 
   filters:
-    - name: envoy.ext_authz
-      config:
+    - name: envoy.filters.network.ext_authz
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
         stat_prefix: ext_authz
         grpc_service:
           envoy_grpc:
             cluster_name: ext-authz
+        include_peer_certificate: true
 
   clusters:
     - name: ext-authz

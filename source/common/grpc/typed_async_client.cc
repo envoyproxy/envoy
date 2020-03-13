@@ -27,16 +27,18 @@ ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& messag
 
 RawAsyncStream* startUntyped(RawAsyncClient* client,
                              const Protobuf::MethodDescriptor& service_method,
-                             RawAsyncStreamCallbacks& callbacks) {
-  return client->startRaw(service_method.service()->full_name(), service_method.name(), callbacks);
+                             RawAsyncStreamCallbacks& callbacks,
+                             const Http::AsyncClient::StreamOptions& options) {
+  return client->startRaw(service_method.service()->full_name(), service_method.name(), callbacks,
+                          options);
 }
 
 AsyncRequest* sendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
                           const Protobuf::Message& request, RawAsyncRequestCallbacks& callbacks,
                           Tracing::Span& parent_span,
-                          const absl::optional<std::chrono::milliseconds>& timeout) {
+                          const Http::AsyncClient::RequestOptions& options) {
   return client->sendRaw(service_method.service()->full_name(), service_method.name(),
-                         Common::serializeMessage(request), callbacks, parent_span, timeout);
+                         Common::serializeMessage(request), callbacks, parent_span, options);
 }
 
 } // namespace Internal

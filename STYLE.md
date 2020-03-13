@@ -4,7 +4,8 @@
   issues are taken care of automatically. The CircleCI tests will automatically check
   the code format and fail. There are make targets that can both check the format
   (check_format) as well as fix the code format for you (fix_format). Errors in
-  .clang-tidy are enforced while other warnings are suggestions.
+  .clang-tidy are enforced while other warnings are suggestions. Note that code and
+  comment blocks designated `clang-format off` must be closed with `clang-format on`.
   To run these checks locally, see [Support Tools](support/README.md).
 * Beyond code formatting, for the most part Envoy uses the
   [Google C++ style guidelines](https://google.github.io/styleguide/cppguide.html).
@@ -43,6 +44,9 @@
   * `using BarSharedPtr = std::shared_ptr<Bar>;`
   * `using BlahConstSharedPtr = std::shared_ptr<const Blah>;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
+* `absl::optional<std::reference_wrapper<T>> is type aliased:
+  * `using FooOptRef = absl::optional<std::reference_wrapper<T>>;`
+  * `using FooOptConstRef = absl::optional<std::reference_wrapper<T>>;`
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
@@ -88,6 +92,8 @@
   [Google C++ style guide](https://google.github.io/styleguide/cppguide.html#Unnamed_Namespaces_and_Static_Variables)
    allows either, but in Envoy we prefer anonymous namespaces.
 * Braces are required for all control statements include single line if, while, etc. statements.
+* Don't use [mangled Protobuf enum
+  names](https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#enum).
 
 # Error handling
 
@@ -165,7 +171,7 @@ environment. In general, there should be no non-local network access. In additio
 
 * Paths should be constructed using:
   * The methods in [`TestEnvironment`](test/test_common/environment.h) for C++ tests.
-  * With `${TEST_TMPDIR}` (for writable temporary space) or `${TEST_RUNDIR}` for read-only access to
+  * With `${TEST_TMPDIR}` (for writable temporary space) or `${TEST_SRCDIR}` for read-only access to
     test inputs in shell tests.
   * With `{{ test_tmpdir }}`, `{{ test_rundir }}` and `{{ test_udsdir }}` respectively for JSON templates.
     `{{ test_udsdir }}` is provided for pathname based Unix Domain Sockets, which must fit within a

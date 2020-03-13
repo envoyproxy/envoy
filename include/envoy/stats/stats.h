@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/refcount_ptr.h"
 #include "envoy/stats/symbol_table.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
 
@@ -15,7 +16,6 @@ namespace Envoy {
 namespace Stats {
 
 class Allocator;
-struct Tag;
 
 /**
  * General interface for all stats objects.
@@ -42,7 +42,7 @@ public:
   /**
    * Returns a vector of configurable tags to identify this Metric.
    */
-  virtual std::vector<Tag> tags() const PURE;
+  virtual TagVector tags() const PURE;
 
   /**
    * See a more detailed description in tagExtractedStatName(), which is the
@@ -79,15 +79,6 @@ public:
 
   // Function to be called from iterateTags passing name and value as const Tag&.
   using TagIterFn = std::function<bool(const Tag&)>;
-
-  /**
-   * Iterates over all tags, calling a functor for each one. The
-   * functor can return 'true' to continue or 'false' to stop the
-   * iteration.
-   *
-   * @param fn The functor to call for each Tag.
-   */
-  virtual void iterateTags(const TagIterFn& fn) const PURE;
 
   /**
    * Indicates whether this metric has been updated since the server was started.

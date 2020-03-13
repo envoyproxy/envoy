@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_google_grpc_external_deps",
     "envoy_package",
     "envoy_select_google_grpc",
 )
@@ -33,6 +34,7 @@ envoy_cc_library(
         "//include/envoy/grpc:async_client_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -58,7 +60,6 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:stack_array",
     ],
 )
 
@@ -86,6 +87,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:hash_lib",
@@ -105,6 +107,7 @@ envoy_cc_library(
     hdrs = ["context_impl.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":stat_names_lib",
         "//include/envoy/grpc:context_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/stats:stats_interface",
@@ -122,6 +125,9 @@ envoy_cc_library(
         "grpc",
     ],
     deps = [
+        ":google_grpc_creds_lib",
+        "//include/envoy/api:api_interface",
+        "//include/envoy/registry",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -129,6 +135,17 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "stat_names_lib",
+    srcs = ["stat_names.cc"],
+    hdrs = ["stat_names.h"],
+    deps = [
+        "//include/envoy/grpc:status",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 
@@ -142,18 +159,34 @@ envoy_cc_library(
     ],
     deps = [
         ":context_lib",
+        ":google_grpc_context_lib",
         ":google_grpc_creds_lib",
         ":google_grpc_utils_lib",
+        ":stat_names_lib",
         ":typed_async_client_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/thread:thread_interface",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:thread_annotations",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "google_grpc_context_lib",
+    srcs = ["google_grpc_context.cc"],
+    hdrs = ["google_grpc_context.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:macros",
+        "//source/common/common:thread_lib",
+    ] + envoy_google_grpc_external_deps(),
 )
 
 envoy_cc_library(
@@ -166,5 +199,6 @@ envoy_cc_library(
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
         "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

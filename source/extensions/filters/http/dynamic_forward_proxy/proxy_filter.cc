@@ -1,6 +1,10 @@
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,12 +21,17 @@ using ResponseStrings = ConstSingleton<ResponseStringValues>;
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 ProxyFilterConfig::ProxyFilterConfig(
-    const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::FilterConfig& proto_config,
+    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     Upstream::ClusterManager& cluster_manager)
     : dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
       cluster_manager_(cluster_manager) {}
+
+ProxyPerRouteConfig::ProxyPerRouteConfig(
+    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config)
+    : host_rewrite_(config.host_rewrite_literal()),
+      host_rewrite_header_(Http::LowerCaseString(config.host_rewrite_header())) {}
 
 void ProxyFilter::onDestroy() {
   // Make sure we destroy any active cache load handle in case we are getting reset and deferred
@@ -31,7 +40,7 @@ void ProxyFilter::onDestroy() {
   circuit_breaker_.reset();
 }
 
-Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry;
   if (!route || !(route_entry = route->routeEntry())) {
@@ -56,8 +65,29 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
   circuit_breaker_ = std::make_unique<Upstream::ResourceAutoIncDec>(resource);
 
   uint16_t default_port = 80;
-  if (cluster_info_->transportSocketFactory().implementsSecureTransport()) {
+  if (cluster_info_->transportSocketMatcher()
+          .resolve(nullptr)
+          .factory_.implementsSecureTransport()) {
     default_port = 443;
+  }
+
+  // Check for per route filter config.
+  const auto* config = route_entry->mostSpecificPerFilterConfigTyped<ProxyPerRouteConfig>(
+      HttpFilterNames::get().DynamicForwardProxy);
+  if (config != nullptr) {
+    const auto& host_rewrite = config->hostRewrite();
+    if (!host_rewrite.empty()) {
+      headers.setHost(host_rewrite);
+    }
+
+    const auto& host_rewrite_header = config->hostRewriteHeader();
+    if (!host_rewrite_header.get().empty()) {
+      const auto* header = headers.get(host_rewrite_header);
+      if (header != nullptr) {
+        const auto& header_value = header->value().getStringView();
+        headers.setHost(header_value);
+      }
+    }
   }
 
   // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded ports.

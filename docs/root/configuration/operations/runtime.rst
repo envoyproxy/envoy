@@ -200,7 +200,7 @@ message as a `google.protobuf.Struct
 modeling a JSON object with the following rules:
 
 * Dot separators map to tree edges.
-* Scalar leaves (integer, strings, booleans) are represented with their respective JSON type.
+* Scalar leaves (integer, strings, booleans, doubles) are represented with their respective JSON type.
 * :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` is represented with via its
   `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
 
@@ -211,6 +211,10 @@ An example representation of a setting for the *health_check.min_interval* key i
   health_check:
     min_interval: 5
 
+.. note::
+
+  Integer values that are parsed from doubles are rounded down to the nearest whole number.
+
 .. _config_runtime_comments:
 
 Comments
@@ -220,6 +224,8 @@ Lines starting with ``#`` as the first character are treated as comments.
 
 Comments can be used to provide context on an existing value. Comments are also useful in an
 otherwise empty file to keep a placeholder for deployment in a time of need.
+
+.. _config_runtime_deprecation:
 
 Using runtime overrides for deprecated features
 -----------------------------------------------
@@ -234,18 +240,28 @@ increments the :ref:`deprecated_feature_use <runtime_stats>` runtime stat.
 Users are encouraged to go to :ref:`deprecated <deprecated>` to see how to
 migrate to the new code path and make sure it is suitable for their use case.
 
-In the second phase the message and filename will be added to
-:repo:`runtime_features.cc <source/common/runtime/runtime_features.cc>`
-and use of that configuration field will cause the config to be rejected by default. 
-This fail-by-default mode can be overridden in runtime configuration by setting
-envoy.deprecated_features.filename.proto:fieldname to true. For example, for a deprecated field
-``Foo.Bar.Eep`` in ``baz.proto`` set ``envoy.deprecated_features.baz.proto:Eep`` to
-``true``. Use of this override is **strongly discouraged**.
-Fatal-by-default configuration indicates that the removal of the old code paths is imminent. It is
-far better for both Envoy users and for Envoy contributors if any bugs or feature gaps with the new
-code paths are flushed out ahead of time, rather than after the code is removed!
+In the second phase the field will be tagged as disallowed_by_default
+and use of that configuration field will cause the config to be rejected by default.
+This disallowed mode can be overridden in runtime configuration by setting
+envoy.deprecated_features:full_fieldname or envoy.deprecated_features:full_enum_value
+to true. For example, for a deprecated field
+``Foo.Bar.Eep`` set ``envoy.deprecated_features:Foo.bar.Eep`` to
+``true``. There is a production example using static runtime to allow both fail-by-default fields here:
+:repo:`configs/using_deprecated_config.v2.yaml`
+Use of these override is **strongly discouraged** so please use with caution and switch to the new fields
+as soon as possible. Fatal-by-default configuration indicates that the removal of the old code paths is
+imminent. It is far better for both Envoy users and for Envoy contributors if any bugs or feature gaps
+with the new code paths are flushed out ahead of time, rather than after the code is removed!
 
 .. _runtime_stats:
+
+.. attention::
+
+   Versions of Envoy prior to 1.14.1 cannot parse runtime booleans from integer values and require
+   an explicit "true" or "false". Mistakenly placing an integer such as "0" to represent "false"
+   will lead to usage of the default value. This is especially important to keep in mind for case of
+   runtime overrides for :ref:`deprecated features<deprecated>`, as it will can potentially result
+   in unexpected Envoy behaviors.
 
 Statistics
 ----------

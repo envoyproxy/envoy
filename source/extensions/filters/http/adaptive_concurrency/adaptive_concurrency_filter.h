@@ -5,11 +5,14 @@
 #include <string>
 
 #include "envoy/common/time.h"
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+
+#include "common/common/cleanup.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
@@ -25,16 +28,18 @@ namespace AdaptiveConcurrency {
 class AdaptiveConcurrencyFilterConfig {
 public:
   AdaptiveConcurrencyFilterConfig(
-      const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
-          adaptive_concurrency,
+      const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
+          proto_config,
       Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);
 
+  bool filterEnabled() const { return adaptive_concurrency_feature_.enabled(); }
   TimeSource& timeSource() const { return time_source_; }
 
 private:
   const std::string stats_prefix_;
   TimeSource& time_source_;
+  Runtime::FeatureFlag adaptive_concurrency_feature_;
 };
 
 using AdaptiveConcurrencyFilterConfigSharedPtr =
@@ -53,16 +58,16 @@ public:
                             ConcurrencyControllerSharedPtr controller);
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
 
   // Http::StreamEncoderFilter
   void encodeComplete() override;
+  void onDestroy() override;
 
 private:
   AdaptiveConcurrencyFilterConfigSharedPtr config_;
   const ConcurrencyControllerSharedPtr controller_;
-  MonotonicTime rq_start_time_;
-  std::unique_ptr<ConcurrencyController::RequestForwardingAction> forwarding_action_;
+  std::unique_ptr<Cleanup> deferred_sample_task_;
 };
 
 } // namespace AdaptiveConcurrency

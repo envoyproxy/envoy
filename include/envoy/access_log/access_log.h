@@ -7,6 +7,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace AccessLog {
 
@@ -62,9 +64,10 @@ public:
    * Evaluate whether an access log should be written based on request and response data.
    * @return TRUE if the log should be written.
    */
-  virtual bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                        const Http::HeaderMap& response_headers,
-                        const Http::HeaderMap& response_trailers) PURE;
+  virtual bool evaluate(const StreamInfo::StreamInfo& info,
+                        const Http::RequestHeaderMap& request_headers,
+                        const Http::ResponseHeaderMap& response_headers,
+                        const Http::ResponseTrailerMap& response_trailers) PURE;
 };
 
 using FilterPtr = std::unique_ptr<Filter>;
@@ -84,8 +87,9 @@ public:
    * @param stream_info supplies additional information about the request not
    * contained in the request headers.
    */
-  virtual void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-                   const Http::HeaderMap* response_trailers,
+  virtual void log(const Http::RequestHeaderMap* request_headers,
+                   const Http::ResponseHeaderMap* response_headers,
+                   const Http::ResponseTrailerMap* response_trailers,
                    const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
@@ -107,9 +111,9 @@ public:
    * @param stream_info supplies the stream info.
    * @return std::string string containing the complete formatted access log line.
    */
-  virtual std::string format(const Http::HeaderMap& request_headers,
-                             const Http::HeaderMap& response_headers,
-                             const Http::HeaderMap& response_trailers,
+  virtual std::string format(const Http::RequestHeaderMap& request_headers,
+                             const Http::ResponseHeaderMap& response_headers,
+                             const Http::ResponseTrailerMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
@@ -131,10 +135,23 @@ public:
    * @param stream_info supplies the stream info.
    * @return std::string containing a single value extracted from the given headers/trailers/stream.
    */
-  virtual std::string format(const Http::HeaderMap& request_headers,
-                             const Http::HeaderMap& response_headers,
-                             const Http::HeaderMap& response_trailers,
+  virtual std::string format(const Http::RequestHeaderMap& request_headers,
+                             const Http::ResponseHeaderMap& response_headers,
+                             const Http::ResponseTrailerMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info) const PURE;
+  /**
+   * Extract a value from the provided headers/trailers/stream, preserving the value's type.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param response_trailers supplies the response trailers.
+   * @param stream_info supplies the stream info.
+   * @return ProtobufWkt::Value containing a single value extracted from the given
+   *         headers/trailers/stream.
+   */
+  virtual ProtobufWkt::Value formatValue(const Http::RequestHeaderMap& request_headers,
+                                         const Http::ResponseHeaderMap& response_headers,
+                                         const Http::ResponseTrailerMap& response_trailers,
+                                         const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;

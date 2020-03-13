@@ -29,6 +29,14 @@ envoy_sh_test(
 )
 
 envoy_sh_test(
+    name = "pie_test",
+    srcs = ["pie_test.sh"],
+    coverage = False,
+    data = ["//source/exe:envoy-static"],
+    tags = ["nofips"],
+)
+
+envoy_sh_test(
     name = "version_out_test",
     srcs = ["version_out_test.sh"],
     coverage = False,

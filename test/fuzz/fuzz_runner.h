@@ -6,6 +6,9 @@
 // Bring in DEFINE_PROTO_FUZZER definition as per
 // https://github.com/google/libprotobuf-mutator#integrating-with-libfuzzer.
 #include "libprotobuf_mutator/src/libfuzzer/libfuzzer_macro.h"
+// Bring in FuzzedDataProvider, see
+// https://github.com/google/fuzzing/blob/master/docs/split-inputs.md#fuzzed-data-provider
+#include "compiler_rt/fuzzer/utils/FuzzedDataProvider.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -58,6 +61,12 @@ extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv);
 
 // See https://llvm.org/docs/LibFuzzer.html#fuzz-target.
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
+
+#ifdef PERSISTENT_FUZZER
+#define PERSISTENT_FUZZ_VAR static
+#else
+#define PERSISTENT_FUZZ_VAR
+#endif
 
 #define DEFINE_TEST_ONE_INPUT_IMPL                                                                 \
   extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {                        \

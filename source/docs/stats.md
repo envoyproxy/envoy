@@ -6,16 +6,15 @@ binary program restarts. The metrics are tracked as:
  * Counters: strictly increasing 64-bit integers.
  * Gauges: 64-bit integers that can rise and fall.
  * Histograms: mapping ranges of values to frequency. The ranges are auto-adjusted as
-   data accumulates. Unliked counters and gauges, histogram data is not retained across
+   data accumulates. Unlike counters and gauges, histogram data is not retained across
    binary program restarts.
 
 In order to support restarting the Envoy binary program without losing counter and gauge
 values, they are passed from parent to child in an RPC protocol.
 They were previously held in shared memory, which imposed various restrictions.
-Unlike the shared memory implementation, the RPC passing *requires special indication
-in source/common/stats/stat_merger.cc when simple addition is not appropriate for
-combining two instances of a given stat*.
-
+Unlike the shared memory implementation, the RPC passing *requires a mode-bit specified
+when constructing gauges indicating whether it should be accumulated across hot-restarts*.
+    
 ## Performance and Thread Local Storage
 
 A key tenant of the Envoy architecture is high performance on machines with
@@ -41,8 +40,8 @@ This implementation is complicated so here is a rough overview of the threading 
    shared across all worker threads.
  * Per thread caches are checked, and if empty, they are populated from the central cache.
  * Scopes are entirely owned by the caller. The store only keeps weak pointers.
- * When a scope is destroyed, a cache flush operation is run on all threads to flush any cached
-   data owned by the destroyed scope.
+ * When a scope is destroyed, a cache flush operation is posted on all threads to flush any
+   cached data owned by the destroyed scope.
  * Scopes use a unique incrementing ID for the cache key. This ensures that if a new scope is
    created at the same address as a recently deleted scope, cache references will not accidentally
    reference the old scope which may be about to be cache flushed.
@@ -80,7 +79,8 @@ followed.
 
 Stat names are replicated in several places in various forms.
 
- * Held with the stat values, in `HeapStatData`
+ * Held with the stat values, in `CounterImpl` and `GaugeImpl`, which are defined in
+   [allocator_impl.cc](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/allocator_impl.cc)
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
@@ -90,7 +90,7 @@ Stat names are replicated in several places in various forms.
 
 There are stat maps in `ThreadLocalStore` for capturing all stats in a scope,
 and each per-thread caches. However, they don't duplicate the stat names.
-Instead, they reference the `char*` held in the `HeapStatData` itself, and thus
+Instead, they reference the `StatName` held in the `CounterImpl` or `GaugeImpl`, and thus
 are relatively cheap; effectively those maps are all pointer-to-pointer.
 
 For this to be safe, cache lookups from locally scoped strings must use `.find`
@@ -120,36 +120,116 @@ etc, must explicitly store partial stat-names their class instances, which later
 can be composed dynamically at runtime in order to fully elaborate counters,
 gauges, etc, without taking symbol-table locks, via `SymbolTable::join()`.
 
+### `StatNamePool` and `StatNameSet`
+
+These two helper classes evolved to make it easy to deploy the symbol table API
+across the codebase.
+
+`StatNamePool` provides pooled allocation for any number of
+`StatName` objects, and is intended to be held in a data structure alongside the
+`const StatName` member variables. Most names should be established during
+process initializion or in response to xDS updates.
+
+`StatNameSet` provides some associative lookups at runtime. The associations
+should be created before the set is used for requests, via
+`StatNameSet::rememberBuiltin`. This is useful in scenarios where stat-names are
+derived from data in a request, but there are limited set of known tokens, such
+as SSL ciphers or Redis commands.
+
+### Dynamic stat tokens
+
+While stats are usually composed of tokens that are known at compile-time, there
+are scenarios where the names are newly discovered from data in requests. To
+avoid taking locks in this case, tokens can be formed dynamically using
+`StatNameDynamicStorage` or `StatNameDynamicPool`. In this case we lose
+substring sharing but we avoid taking locks. Dynamically generated tokens can
+be combined with symbolized tokens from `StatNameSet` or `StatNamePool` using
+`SymbolTable::join()`.
+
+Relative to using symbolized tokens, The cost of using dynamic tokens is:
+
+ * the StatName must be allocated and populated from the string data every time
+   `StatNameDynamicPool::add()` is called or `StatNameDynamicStorage` is constructed.
+ * the resulting `StatName`s are as long as the string, rather than benefiting from
+   a symbolized representation, which is typically 4 bytes or less per token.
+
+However, the cost of using dynamic tokens is on par with the cost of not using
+a StatName system at all, only adding one re-encoding. And it is hard to quantify
+the benefit of avoiding mutex contention when there are large numbers of threads.
+
+### Symbol Table Memory Layout
+
+Below is a diagram
+[(source)](https://docs.google.com/drawings/d/1eG6CHSUFQ5zkk-j-kcFCUay2-D_ktF39Tbzql5ypUDc/edit)
+showing the memory layout for a few scenarios of constructing and joining symbolized
+`StatName` and dynamic `StatName`.
+
+![Symbol Table Memory Diagram](symtab.png)
+
 ### Current State and Strategy To Deploy Symbol Tables
 
-As of April 1, 2019, there are a fairly large number of files that directly
-lookup stats by name, e.g. via `Stats::Scope::counter(const std::string&)` in
-the request path. In most cases, this runtime lookup concatenates the scope name
-with a string literal or other request-dependent token to form the stat name, so
-it is not possible to fully memoize the stats at startup; there must be a
-runtime name lookup.
+As of September 5, 2019, the symbol table API has been integrated into the
+production code, using a temporary ["fake" symbol table
+implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h). This
+fake has enabled us to incrementally transform the codebase to pre-symbolize
+names as much as possible, avoiding contention in the hot-path.
 
-If a PR is issued that changes the underlying representation of a stat name to
-be a symbol table entry then each stat-name will need to be transformed
-whenever names are looked up, which would add CPU overhead and lock contention
-in the request-path, violating one of the principles of Envoy's [threading
-model](https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310). Before
-issuing such a PR we need to first iterate through the codebase memoizing the
-symbols that are used to form stat-names.
+There are no longer any explicit production calls to create counters
+or gauges directly from a string via `Stats::Scope::counter(const
+std::string&)`, though they are ubiquitous in tests. There is also a
+`check_format` protection against reintroducting production calls to
+`counter()`.
 
-To resolve this chicken-and-egg challenge of switching to symbol-table stat-name
-representation without suffering a temporary loss of performance, we employ a
-["fake" symbol table
-implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h).
-This implemenation uses elaborated strings as an underlying representation, but
-implements the same API as the ["real"
-implemention](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/symbol_table_impl.h).
-The underlying string representation means that there is minimal runtime
-overhead compared to the current state. But once all stat-allocation call-sites
-have been converted to use the abstract [SymbolTable
-API](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/symbol_table.h),
-the real implementation can be swapped in, the space savings realized, and the
-fake implementation deleted.
+However, there are still several ways to create hot-path contention
+looking up stats by name, and there is no bulletproof way to prevent it from
+occurring.
+ * The [stats macros](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/stats_macros.h) may be used in a data structure which is constructed in response to requests.
+ * An explicit symbol-table lookup, via `StatNamePool` or `StatNameSet` can be
+   made in the hot path.
+
+It is difficult to search for those scenarios in the source code or prevent them
+with a format-check, but we can determine whether symbol-table lookups are
+occurring during via an admin endpoint that shows 20 recent lookups by name, at
+`ENVOY_HOST:ADMIN_PORT/stats?recentlookups`. This works only when real symbol
+tables are enabled, via command-line option `--use-fake-symbol-table 0`.
+
+Once we are confident we've removed all hot-path symbol-table lookups, ideally
+through usage of real symbol tables in production, examining that endpoint, we
+can enable real symbol tables by default.
+
+### Symbol Table Class Overview
+
+Class | Superclass | Description
+-----| ---------- | ---------
+SymbolTable | | Abstract class providing an interface for symbol tables
+FakeSymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName is represented as a flat string
+SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
+SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
+StatName | | Provides an API and a view into a StatName (dynamic, symbolized, or fake). Like absl::string_view, the backing store must be separately maintained.
+StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
+StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
+StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free(). 
+StatNameDynamicStorage | StatNameStorageBase | Holds StatName storage for a dynamic (not symbolized) StatName.
+StatNamePool | | Holds backing store for any number of symbolized StatNames.
+StatNameDynamicPool | | Holds backing store for any number of dynamic StatNames.
+StatNameList | | Provides packed backing store for an ordered collection of StatNames, that are only accessed sequentially. Used for MetricImpl.
+StatNameStorageSet | | Implements a set of StatName with lookup via StatName. Used for rejected stats.
+StatNameSet | | Implements a set of StatName with lookup via string_view. Used to remember well-known names during startup, e.g. Redis commands.
+
+### Hot Restart
+
+Continuity of stat counters and gauges over hot-restart is supported. This occurs via
+a sequence of RPCs from parent to child, issued while child is in lame-duck. These
+RPCs contain a map of stat-name strings to values.
+
+One implementation complexity is that when decoding these names in the child, we
+must know which segments of the stat names were encoded dynamically. This is
+implemented by sending an auxiliary map of stat-name strings to lists of spans,
+where the spans identify dynamic segments.
+
+Dynamic segments are rare, used only by Dynamo, Mongo, IP Tagging Filter, Fault
+Filter, and `x-envoy-upstream-alt-stat-name` as of this writing. So in most
+cases this dynamic-segment map is empty.
 
 ## Tags and Tag Extraction
 
@@ -158,3 +238,32 @@ TBD
 ## Disabling statistics by substring or regex
 
 TBD
+
+## Stats Memory Tests
+
+Regardless of the underlying data structures used to implement statistics,
+memory usage will grow with the number of hosts and clusters. When a PR is
+issued that adds new per-host or per-cluster stats, this will have a
+multiplicative effect on consumed memory. This can become significant for
+deployments with O(10k) clusters or hosts.
+
+To improve visibility for this memory growth, there are [memory-usage
+integration
+tests](https://github.com/envoyproxy/envoy/blob/master/test/integration/stats_integration_test.cc).
+
+If a PR fails the tests in that file due to unexpected memory consumption, it
+gives the author and reviewer an opportunity to consider the cost/value of the
+new stats. If the test fails because the new byte-count is lower, then all
+that's needed is to lock in the improvement by updating the expected values. If
+the new per-cluster or per-host memory consumption is higher, then we must
+decide whether the value from the added stats justify the overhead for all Envoy
+deployments. In either case, we must update the golden values and add a comment
+to the table in the test indicating the memory impact of each PR.
+
+Developers trying to can iterate through changes in these tests locally with:
+
+```bash
+  bazel test -c opt --test_env=ENVOY_MEMORY_TEST_EXACT=true \
+      test/integration:stats_integration_test
+```
+

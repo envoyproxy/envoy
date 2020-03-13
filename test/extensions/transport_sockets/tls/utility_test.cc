@@ -4,6 +4,7 @@
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/extensions/transport_sockets/tls/test_data/long_validity_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
@@ -22,7 +23,7 @@ namespace {
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
+  const auto& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
@@ -30,22 +31,21 @@ TEST(UtilityTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
+  const auto& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_DNS);
   EXPECT_EQ(2, subject_alt_names.size());
 }
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithUri) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
-  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
+  const auto& subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(1, subject_alt_names.size());
 }
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithNoSAN) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
-  const std::vector<std::string>& uri_subject_alt_names =
-      Utility::getSubjectAltNames(*cert, GEN_URI);
+  const auto& uri_subject_alt_names = Utility::getSubjectAltNames(*cert, GEN_URI);
   EXPECT_EQ(0, uri_subject_alt_names.size());
 }
 
@@ -104,6 +104,27 @@ TEST(UtilityTest, TestExpirationTime) {
   const std::string formatted =
       TestUtility::formatTime(Utility::getExpirationTime(*cert), "%b %e %H:%M:%S %Y GMT");
   EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_AFTER, formatted);
+}
+
+TEST(UtilityTest, TestLongExpirationTime) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/long_validity_cert.pem"));
+  const std::string formatted =
+      TestUtility::formatTime(Utility::getExpirationTime(*cert), "%b %e %H:%M:%S %Y GMT");
+  EXPECT_EQ(TEST_LONG_VALIDITY_CERT_NOT_AFTER, formatted);
+}
+
+TEST(UtilityTest, GetLastCryptoError) {
+  // Clearing the error stack leaves us with no error to get.
+  ERR_clear_error();
+  EXPECT_FALSE(Utility::getLastCryptoError().has_value());
+
+  ERR_put_error(ERR_LIB_SSL, 0, ERR_R_MALLOC_FAILURE, __FILE__, __LINE__);
+  EXPECT_EQ(Utility::getLastCryptoError().value(),
+            "error:10000041:SSL routines:OPENSSL_internal:malloc failure");
+
+  // We consumed the last error, so back to not having an error to get.
+  EXPECT_FALSE(Utility::getLastCryptoError().has_value());
 }
 
 } // namespace

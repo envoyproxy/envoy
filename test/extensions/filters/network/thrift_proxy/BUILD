@@ -56,7 +56,7 @@ envoy_extension_cc_test_library(
         "//source/common/common:byte_order_lib",
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",
         "//test/common/buffer:utility_lib",
-        "@envoy_api//envoy/config/filter/network/thrift_proxy/v2alpha1:thrift_proxy_cc",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -211,6 +211,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:registry_lib",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -230,6 +231,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -273,6 +275,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
     ],
 )
 
@@ -290,7 +293,8 @@ envoy_extension_cc_test(
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:printers_lib",
-        "@envoy_api//envoy/config/filter/thrift/rate_limit/v2alpha1:rate_limit_cc",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -304,6 +308,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -332,6 +338,7 @@ envoy_extension_cc_test(
         ":utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -347,5 +354,7 @@ envoy_extension_cc_test(
         ":utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )

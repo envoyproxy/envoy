@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -25,10 +25,29 @@ enum class LoadBalancerType {
   ClusterProvided
 };
 
-struct SubsetSelector {
-  std::set<std::string> selector_keys_;
-  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
-      fallback_policy_;
+/**
+ * Subset selector configuration
+ */
+class SubsetSelector {
+public:
+  virtual ~SubsetSelector() = default;
+
+  /**
+   * @return keys defined for this selector
+   */
+  virtual const std::set<std::string>& selectorKeys() const PURE;
+
+  /**
+   * @return fallback policy defined for this selector, or NOT_DEFINED
+   */
+  virtual envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
+      LbSubsetSelectorFallbackPolicy
+      fallbackPolicy() const PURE;
+
+  /**
+   * @return fallback keys subset defined for this selector, or empty set
+   */
+  virtual const std::set<std::string>& fallbackKeysSubset() const PURE;
 };
 
 using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;
@@ -49,7 +68,7 @@ public:
    * @return LbSubsetFallbackPolicy the fallback policy used when
    * route metadata does not match any subset.
    */
-  virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
+  virtual envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
   fallbackPolicy() const PURE;
 
   /**

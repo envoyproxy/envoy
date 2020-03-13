@@ -1,3 +1,6 @@
+#include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.h"
+#include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
+
 #include "extensions/filters/http/dynamo/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -14,18 +17,23 @@ namespace Dynamo {
 namespace {
 
 TEST(DynamoFilterConfigTest, DynamoFilter) {
-  std::string json_string = R"EOF(
-  {
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DynamoFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  envoy::extensions::filters::http::dynamo::v3::Dynamo proto_config;
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(DynamoFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.http_dynamo_filter";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

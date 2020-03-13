@@ -1,8 +1,7 @@
 #pragma once
 
-#include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
-#include "envoy/data/tap/v2alpha/wrapper.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/network/transport_socket.h"
 
 #include "extensions/common/tap/extension_config_base.h"
@@ -26,7 +25,7 @@ public:
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
-  const Ssl::ConnectionInfo* ssl() const override;
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override;
 
 private:
   SocketTapConfigSharedPtr config_;
@@ -37,7 +36,7 @@ private:
 class TapSocketFactory : public Network::TransportSocketFactory,
                          public Common::Tap::ExtensionConfigBase {
 public:
-  TapSocketFactory(const envoy::config::transport_socket::tap::v2alpha::Tap& proto_config,
+  TapSocketFactory(const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
                    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
                    Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                    Event::Dispatcher& main_thread_dispatcher,

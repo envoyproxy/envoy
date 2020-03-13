@@ -2,13 +2,14 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/matchers.h"
 #include "envoy/common/regex.h"
-#include "envoy/type/matcher/metadata.pb.h"
-#include "envoy/type/matcher/number.pb.h"
-#include "envoy/type/matcher/string.pb.h"
-#include "envoy/type/matcher/value.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/matcher/v3/metadata.pb.h"
+#include "envoy/type/matcher/v3/number.pb.h"
+#include "envoy/type/matcher/v3/path.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/type/matcher/v3/value.pb.h"
 
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -18,6 +19,9 @@ namespace Matchers {
 
 class ValueMatcher;
 using ValueMatcherConstSharedPtr = std::shared_ptr<const ValueMatcher>;
+
+class PathMatcher;
+using PathMatcherConstSharedPtr = std::shared_ptr<const PathMatcher>;
 
 class ValueMatcher {
 public:
@@ -31,7 +35,7 @@ public:
   /**
    * Create the matcher object.
    */
-  static ValueMatcherConstSharedPtr create(const envoy::type::matcher::ValueMatcher& value);
+  static ValueMatcherConstSharedPtr create(const envoy::type::matcher::v3::ValueMatcher& value);
 };
 
 class NullMatcher : public ValueMatcher {
@@ -64,72 +68,70 @@ private:
 
 class DoubleMatcher : public ValueMatcher {
 public:
-  DoubleMatcher(const envoy::type::matcher::DoubleMatcher& matcher) : matcher_(matcher) {}
+  DoubleMatcher(const envoy::type::matcher::v3::DoubleMatcher& matcher) : matcher_(matcher) {}
 
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  const envoy::type::matcher::DoubleMatcher matcher_;
+  const envoy::type::matcher::v3::DoubleMatcher matcher_;
 };
 
 class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
-  explicit StringMatcherImpl(const envoy::type::matcher::StringMatcher& matcher);
+  explicit StringMatcherImpl(const envoy::type::matcher::v3::StringMatcher& matcher);
 
   bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
+  const envoy::type::matcher::v3::StringMatcher& matcher() const { return matcher_; }
+
 private:
-  const envoy::type::matcher::StringMatcher matcher_;
+  const envoy::type::matcher::v3::StringMatcher matcher_;
   Regex::CompiledMatcherPtr regex_;
 };
 
-class LowerCaseStringMatcher : public ValueMatcher {
-public:
-  LowerCaseStringMatcher(const envoy::type::matcher::StringMatcher& matcher)
-      : matcher_(toLowerCase(matcher)) {}
-
-  bool match(const absl::string_view value) const;
-
-  bool match(const ProtobufWkt::Value& value) const override;
-
-private:
-  envoy::type::matcher::StringMatcher
-  toLowerCase(const envoy::type::matcher::StringMatcher& matcher);
-
-  const StringMatcherImpl matcher_;
-};
-
-using LowerCaseStringMatcherPtr = std::unique_ptr<LowerCaseStringMatcher>;
-
 class ListMatcher : public ValueMatcher {
 public:
-  ListMatcher(const envoy::type::matcher::ListMatcher& matcher);
+  ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher);
 
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  const envoy::type::matcher::ListMatcher matcher_;
+  const envoy::type::matcher::v3::ListMatcher matcher_;
 
   ValueMatcherConstSharedPtr oneof_value_matcher_;
 };
 
 class MetadataMatcher {
 public:
-  MetadataMatcher(const envoy::type::matcher::MetadataMatcher& matcher);
+  MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher& matcher);
 
   /**
    * Check whether the metadata is matched to the matcher.
    * @param metadata the metadata to check.
    * @return true if it's matched otherwise false.
    */
-  bool match(const envoy::api::v2::core::Metadata& metadata) const;
+  bool match(const envoy::config::core::v3::Metadata& metadata) const;
 
 private:
-  const envoy::type::matcher::MetadataMatcher matcher_;
+  const envoy::type::matcher::v3::MetadataMatcher matcher_;
   std::vector<std::string> path_;
 
   ValueMatcherConstSharedPtr value_matcher_;
+};
+
+class PathMatcher : public StringMatcher {
+public:
+  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path) : matcher_(path.path()) {}
+  PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) : matcher_(matcher) {}
+
+  static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
+  static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
+
+  bool match(const absl::string_view path) const override;
+
+private:
+  const StringMatcherImpl matcher_;
 };
 
 } // namespace Matchers

@@ -1,13 +1,17 @@
 #pragma once
 
+#include <cstdint>
+
 namespace Envoy {
 namespace Grpc {
 
 class Status {
 public:
+  using GrpcStatus = int64_t;
+
   // If this enum is changed, then the std::unordered_map in Envoy::Grpc::Utility::nameToGrpcStatus
   // located at: //source/common/access_log/grpc/status.cc must also be changed.
-  enum GrpcStatus {
+  enum WellKnownGrpcStatus {
     // The RPC completed successfully.
     Ok = 0,
     // The RPC was canceled.
@@ -44,7 +48,7 @@ public:
     Unauthenticated = 16,
 
     // Maximum value of valid status codes.
-    MaximumValid = Unauthenticated,
+    MaximumKnown = Unauthenticated,
 
     // This is a non-GRPC error code, indicating the status code in gRPC headers
     // was invalid.

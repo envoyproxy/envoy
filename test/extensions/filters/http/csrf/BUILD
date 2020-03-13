@@ -17,10 +17,13 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.csrf",
     deps = [
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/csrf:config",
         "//source/extensions/filters/http/csrf:csrf_filter_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/extensions/filters/http/csrf/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 

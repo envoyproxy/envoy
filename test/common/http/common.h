@@ -17,11 +17,10 @@ namespace Envoy {
 class CodecClientForTest : public Http::CodecClient {
 public:
   using DestroyCb = std::function<void(CodecClient*)>;
-  CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
-                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host,
-                     Event::Dispatcher& dispatcher)
-      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host, dispatcher),
-        destroy_cb_(destroy_cb) {
+  CodecClientForTest(CodecClient::Type type, Network::ClientConnectionPtr&& connection,
+                     Http::ClientConnection* codec, DestroyCb destroy_cb,
+                     Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher)
+      : CodecClient(type, std::move(connection), host, dispatcher), destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
   ~CodecClientForTest() override {
@@ -39,8 +38,8 @@ public:
  * Mock callbacks used for conn pool testing.
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
-  void onPoolReady(Http::StreamEncoder& encoder,
-                   Upstream::HostDescriptionConstSharedPtr host) override {
+  void onPoolReady(Http::RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
+                   const StreamInfo::StreamInfo&) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();
@@ -54,7 +53,7 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
 
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
-  Http::StreamEncoder* outer_encoder_{};
+  Http::RequestEncoder* outer_encoder_{};
   Upstream::HostDescriptionConstSharedPtr host_;
 };
 
@@ -63,6 +62,7 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
  */
 class HttpTestUtility {
 public:
-  static void addDefaultHeaders(Http::HeaderMap& headers, const std::string default_method = "GET");
+  static void addDefaultHeaders(Http::RequestHeaderMap& headers,
+                                const std::string default_method = "GET");
 };
 } // namespace Envoy

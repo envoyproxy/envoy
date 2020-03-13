@@ -1,5 +1,3 @@
-#include "envoy/config/transport_socket/alts/v2alpha/alts.pb.validate.h"
-
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/manager_impl.h"
 
@@ -11,10 +9,7 @@
 #include "gtest/gtest.h"
 
 using Envoy::Server::Configuration::MockTransportSocketFactoryContext;
-using testing::_;
-using testing::Invoke;
 using testing::ReturnRef;
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {

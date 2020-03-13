@@ -3,11 +3,13 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/fault/v2/fault.pb.h"
+#include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
 #include "envoy/stats/stats.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
 #include "extensions/filters/network/mongo_proxy/proxy.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -16,13 +18,13 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::Matcher;
@@ -38,12 +40,7 @@ namespace MongoProxy {
 
 class MockDecoder : public Decoder {
 public:
-  MOCK_METHOD1(onData, void(Buffer::Instance& data));
-};
-
-class TestStatStore : public Stats::IsolatedStoreImpl {
-public:
-  MOCK_METHOD2(deliverHistogramToSinks, void(const Stats::Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, onData, (Buffer::Instance & data));
 };
 
 class TestProxyFilter : public ProxyFilter {
@@ -62,7 +59,7 @@ public:
 
 class MongoProxyFilterTest : public testing::Test {
 public:
-  MongoProxyFilterTest() { setup(); }
+  MongoProxyFilterTest() : mongo_stats_(std::make_shared<MongoStats>(store_, "test")) { setup(); }
 
   void setup() {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
@@ -82,9 +79,9 @@ public:
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
-    filter_ = std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_,
-                                                fault_config_, drain_decision_,
-                                                dispatcher_.timeSource(), emit_dynamic_metadata);
+    filter_ = std::make_unique<TestProxyFilter>(
+        "test.", store_, runtime_, access_log_, fault_config_, drain_decision_,
+        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -94,16 +91,16 @@ public:
   }
 
   void setupDelayFault(bool enable_fault) {
-    envoy::config::filter::fault::v2::FaultDelay fault;
+    envoy::extensions::filters::common::fault::v3::FaultDelay fault;
     fault.mutable_percentage()->set_numerator(50);
-    fault.mutable_percentage()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+    fault.mutable_percentage()->set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
     fault_config_.reset(new Filters::Common::Fault::FaultDelayConfig(fault));
 
     EXPECT_CALL(runtime_.snapshot_,
                 featureEnabled("mongo.fault.fixed_delay.percent",
-                               Matcher<const envoy::type::FractionalPercent&>(Percent(50))))
+                               Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {
@@ -113,7 +110,8 @@ public:
   }
 
   Buffer::OwnedImpl fake_data_;
-  NiceMock<TestStatStore> store_;
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Envoy::AccessLog::MockAccessLogFile> file_{
@@ -386,17 +384,17 @@ TEST_F(MongoProxyFilterTest, CommandStats) {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.$cmd");
     message->flags(0b1110010);
-    message->query(Bson::DocumentImpl::create()->addString("foo", "bar"));
+    message->query(Bson::DocumentImpl::create()->addString("insert", "bar"));
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);
 
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.foo.reply_num_docs"), 1));
+                          Property(&Stats::Metric::name, "test.cmd.insert.reply_num_docs"), 1));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.foo.reply_size"), 22));
+                          Property(&Stats::Metric::name, "test.cmd.insert.reply_size"), 22));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.foo.reply_time_ms"), _));
+                          Property(&Stats::Metric::name, "test.cmd.insert.reply_time_ms"), _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
@@ -407,7 +405,7 @@ TEST_F(MongoProxyFilterTest, CommandStats) {
   }));
   filter_->onWrite(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.cmd.foo.total").value());
+  EXPECT_EQ(1U, store_.counter("test.cmd.insert.total").value());
 }
 
 TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
@@ -502,6 +500,21 @@ TEST_F(MongoProxyFilterTest, MaxTime) {
   EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
 }
 
+TEST_F(MongoProxyFilterTest, MaxTimeCursor) {
+  initializeFilter();
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create()->addInt32("maxTimeMS", 500));
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
+}
+
 TEST_F(MongoProxyFilterTest, DecodeError) {
   initializeFilter();
 
@@ -571,7 +584,7 @@ TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.$cmd");
     message->flags(0b1110010);
-    message->query(Bson::DocumentImpl::create()->addString("foo", "bar"));
+    message->query(Bson::DocumentImpl::create()->addString("query", "bar"));
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);

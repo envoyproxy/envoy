@@ -1,6 +1,7 @@
 #pragma once
 
-#include "envoy/config/trace/v2/trace.pb.validate.h"
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.validate.h"
 
 #include "extensions/tracers/common/factory_base.h"
 
@@ -12,15 +13,15 @@ namespace Zipkin {
 /**
  * Config registration for the zipkin tracer. @see TracerFactory.
  */
-class ZipkinTracerFactory : public Common::FactoryBase<envoy::config::trace::v2::ZipkinConfig> {
+class ZipkinTracerFactory : public Common::FactoryBase<envoy::config::trace::v3::ZipkinConfig> {
 public:
   ZipkinTracerFactory();
 
 private:
   // FactoryBase
   Tracing::HttpTracerPtr
-  createHttpTracerTyped(const envoy::config::trace::v2::ZipkinConfig& proto_config,
-                        Server::Instance& server) override;
+  createHttpTracerTyped(const envoy::config::trace::v3::ZipkinConfig& proto_config,
+                        Server::Configuration::TracerFactoryContext& context) override;
 };
 
 } // namespace Zipkin

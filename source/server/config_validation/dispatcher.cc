@@ -17,12 +17,12 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
 }
 
 Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>&) {
+    const std::vector<Network::Address::InstanceConstSharedPtr>&, const bool) {
   return dns_resolver_;
 }
 
-Network::ListenerPtr ValidationDispatcher::createListener(Network::Socket&,
-                                                          Network::ListenerCallbacks&, bool, bool) {
+Network::ListenerPtr ValidationDispatcher::createListener(Network::SocketSharedPtr&&,
+                                                          Network::ListenerCallbacks&, bool) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 

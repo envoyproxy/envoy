@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
@@ -27,7 +26,7 @@ public:
   MockBuffer() = default;
   ~MockBuffer() override = default;
 
-  MOCK_CONST_METHOD0(length, uint64_t());
+  MOCK_METHOD(uint64_t, length, (), (const));
 };
 
 MessageMetadataSharedPtr mkMessageMetadata(uint32_t num_headers) {
@@ -312,7 +311,7 @@ TEST(HeaderTransportTest, TransformErrors) {
     EXPECT_THAT(metadata, HasFrameSize(86U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Binary));
     EXPECT_THAT(metadata, HasAppException(AppExceptionType::MissingResult,
-                                          fmt::format("Unknown transform {}", xform_id)));
+                                          absl::StrCat("Unknown transform ", xform_id)));
   }
 
   // Only the first of multiple errors is reported

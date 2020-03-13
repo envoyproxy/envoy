@@ -1,5 +1,7 @@
 #include "server/backtrace.h"
 
+#include "test/test_common/logging.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -9,7 +11,7 @@ TEST(Backward, Basic) {
   // logging a backtrace, and covers the added lines.
   BackwardsTrace tracer;
   tracer.capture();
-  tracer.logTrace();
+  EXPECT_LOG_CONTAINS("critical", "Envoy version:", tracer.logTrace());
 }
 
 TEST(Backward, InvalidUsageTest) {

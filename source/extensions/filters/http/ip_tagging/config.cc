@@ -1,6 +1,7 @@
 #include "extensions/filters/http/ip_tagging/config.h"
 
-#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.validate.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -13,7 +14,7 @@ namespace HttpFilters {
 namespace IpTagging {
 
 Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::ip_tagging::v2::IPTagging& proto_config,
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 
   IpTaggingFilterConfigSharedPtr config(
@@ -27,7 +28,8 @@ Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the ip tagging filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(IpTaggingFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(IpTaggingFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.ip_tagging"};
 
 } // namespace IpTagging
 } // namespace HttpFilters

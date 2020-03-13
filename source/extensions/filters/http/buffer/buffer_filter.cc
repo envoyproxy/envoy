@@ -1,6 +1,7 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/common/assert.h"
@@ -19,12 +20,12 @@ namespace HttpFilters {
 namespace BufferFilter {
 
 BufferFilterSettings::BufferFilterSettings(
-    const envoy::config::filter::http::buffer::v2::Buffer& proto_config)
+    const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config)
     : disabled_(false),
       max_request_bytes_(static_cast<uint64_t>(proto_config.max_request_bytes().value())) {}
 
 BufferFilterSettings::BufferFilterSettings(
-    const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config)
+    const envoy::extensions::filters::http::buffer::v3::BufferPerRoute& proto_config)
     : disabled_(proto_config.disabled()),
       max_request_bytes_(
           proto_config.has_buffer()
@@ -32,7 +33,7 @@ BufferFilterSettings::BufferFilterSettings(
               : 0) {}
 
 BufferFilterConfig::BufferFilterConfig(
-    const envoy::config::filter::http::buffer::v2::Buffer& proto_config)
+    const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config)
     : settings_(proto_config) {}
 
 BufferFilter::BufferFilter(BufferFilterConfigSharedPtr config)
@@ -50,15 +51,13 @@ void BufferFilter::initConfig() {
 
   const std::string& name = HttpFilterNames::get().Buffer;
   const auto* entry = callbacks_->route()->routeEntry();
-
-  const BufferFilterSettings* tmp = entry->perFilterConfigTyped<BufferFilterSettings>(name);
-  const BufferFilterSettings* route_local =
-      tmp ? tmp : entry->virtualHost().perFilterConfigTyped<BufferFilterSettings>(name);
+  const auto* route_local = entry->mostSpecificPerFilterConfigTyped<BufferFilterSettings>(name);
 
   settings_ = route_local ? route_local : settings_;
 }
 
-Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                      bool end_stream) {
   if (end_stream) {
     // If this is a header-only request, we don't need to do any buffering.
     return Http::FilterHeadersStatus::Continue;
@@ -79,14 +78,8 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap& headers, 
 Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   content_length_ += data.length();
   if (end_stream || settings_->disabled()) {
-    // request_headers_ is initialized iff plugin is enabled.
-    if (request_headers_ != nullptr && request_headers_->ContentLength() == nullptr) {
-      ASSERT(!settings_->disabled());
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.buffer_filter_populate_content_length")) {
-        request_headers_->insertContentLength().value(content_length_);
-      }
-    }
+    maybeAddContentLength();
+
     return Http::FilterDataStatus::Continue;
   }
 
@@ -94,12 +87,22 @@ Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance& data, bool end
   return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
-Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::RequestTrailerMap&) {
+  maybeAddContentLength();
+
   return Http::FilterTrailersStatus::Continue;
 }
 
 void BufferFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+}
+
+void BufferFilter::maybeAddContentLength() {
+  // request_headers_ is initialized iff plugin is enabled.
+  if (request_headers_ != nullptr && request_headers_->ContentLength() == nullptr) {
+    ASSERT(!settings_->disabled());
+    request_headers_->setContentLength(content_length_);
+  }
 }
 
 } // namespace BufferFilter

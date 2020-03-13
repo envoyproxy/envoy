@@ -87,6 +87,6 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:alts_cc",
+        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
     ],
 )

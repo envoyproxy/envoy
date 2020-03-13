@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "envoy/config/xds_grpc_context.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client.h"
 
 #include "common/common/backoff_strategy.h"
@@ -35,8 +35,12 @@ public:
           rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
       drain_request_timer_ = dispatcher.createTimer([this]() { callbacks_->onWriteable(); });
     }
-    backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
-                                                                  RETRY_MAX_DELAY_MS, random_);
+
+    // TODO(htuch): Make this configurable.
+    static constexpr uint32_t RetryInitialDelayMs = 500;
+    static constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
+    backoff_strategy_ =
+        std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMs, RetryMaxDelayMs, random_);
   }
 
   void establishNewStream() {
@@ -45,7 +49,7 @@ public:
       ENVOY_LOG(warn, "gRPC bidi stream for {} already exists!", service_method_.DebugString());
       return;
     }
-    stream_ = async_client_->start(service_method_, *this);
+    stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
       callbacks_->onEstablishmentFailure();
@@ -61,11 +65,11 @@ public:
   void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
 
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override {
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 
@@ -79,12 +83,13 @@ public:
     callbacks_->onDiscoveryResponse(std::move(message));
   }
 
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override {
     UNREFERENCED_PARAMETER(metadata);
   }
 
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
-    ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
     stream_ = nullptr;
     control_plane_stats_.connected_state_.set(0);
     callbacks_->onEstablishmentFailure();
@@ -127,10 +132,6 @@ private:
   }
 
   GrpcStreamCallbacks<ResponseProto>* const callbacks_;
-
-  // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_INITIAL_DELAY_MS = 500;
-  const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
 
   Grpc::AsyncClient<RequestProto, ResponseProto> async_client_;
   Grpc::AsyncStream<RequestProto> stream_{};

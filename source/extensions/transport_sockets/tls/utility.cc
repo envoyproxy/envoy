@@ -1,9 +1,9 @@
 #include "extensions/transport_sockets/tls/utility.h"
 
 #include "common/common/assert.h"
+#include "common/network/address_impl.h"
 
 #include "absl/strings/str_join.h"
-#include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,12 +91,45 @@ std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
   }
   for (const GENERAL_NAME* san : san_names.get()) {
     if (san->type == type) {
-      ASN1_STRING* str = san->d.dNSName;
-      const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
-      subject_alt_names.push_back(std::string(dns_name));
+      subject_alt_names.push_back(generalNameAsString(san));
     }
   }
   return subject_alt_names;
+}
+
+std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
+  std::string san;
+  switch (general_name->type) {
+  case GEN_DNS: {
+    ASN1_STRING* str = general_name->d.dNSName;
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    break;
+  }
+  case GEN_URI: {
+    ASN1_STRING* str = general_name->d.uniformResourceIdentifier;
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    break;
+  }
+  case GEN_IPADD: {
+    if (general_name->d.ip->length == 4) {
+      sockaddr_in sin;
+      sin.sin_port = 0;
+      sin.sin_family = AF_INET;
+      memcpy(&sin.sin_addr, general_name->d.ip->data, sizeof(sin.sin_addr));
+      Network::Address::Ipv4Instance addr(&sin);
+      san = addr.ip()->addressAsString();
+    } else if (general_name->d.ip->length == 16) {
+      sockaddr_in6 sin6;
+      sin6.sin6_port = 0;
+      sin6.sin6_family = AF_INET6;
+      memcpy(&sin6.sin6_addr, general_name->d.ip->data, sizeof(sin6.sin6_addr));
+      Network::Address::Ipv6Instance addr(sin6);
+      san = addr.ip()->addressAsString();
+    }
+    break;
+  }
+  }
+  return san;
 }
 
 std::string Utility::getIssuerFromCertificate(X509& cert) {
@@ -119,18 +152,69 @@ int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_sourc
   return 0;
 }
 
+absl::optional<std::string> Utility::getX509ExtensionValue(const X509& cert,
+                                                           absl::string_view extension_name) {
+  X509_EXTENSIONS* extensions(X509_get0_extensions(&cert));
+
+  if (extensions == nullptr) {
+    return absl::nullopt;
+  }
+
+  const size_t extension_count = sk_X509_EXTENSION_num(extensions);
+
+  for (size_t i = 0; i < extension_count; ++i) {
+    X509_EXTENSION* extension = sk_X509_EXTENSION_value(extensions, i);
+
+    ASN1_OBJECT* extension_object = X509_EXTENSION_get_object(extension);
+    const size_t size = OBJ_obj2txt(nullptr, 0, extension_object, 0);
+    std::vector<char> buffer;
+    // +1 to allow for NULL byte.
+    buffer.resize(size + 1);
+    OBJ_obj2txt(buffer.data(), buffer.size(), extension_object, 0);
+
+    if (absl::string_view(buffer.data(), size) == extension_name) {
+      ASN1_OCTET_STRING* octet_string = X509_EXTENSION_get_data(extension);
+      const unsigned char* octet_string_data = octet_string->data;
+      long xlen;
+      int tag, xclass;
+      ASN1_get_object(&octet_string_data, &xlen, &tag, &xclass, octet_string->length);
+
+      return std::string(reinterpret_cast<const char*>(octet_string_data), xlen);
+    }
+  }
+
+  return absl::nullopt;
+}
+
 SystemTime Utility::getValidFrom(const X509& cert) {
   int days, seconds;
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notBefore(&cert));
   ASSERT(rc == 1);
-  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
+  // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate valid-from date
+  // beyond 2038-01-19T03:14:08Z.
+  return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
 SystemTime Utility::getExpirationTime(const X509& cert) {
   int days, seconds;
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1_Time(), X509_get0_notAfter(&cert));
   ASSERT(rc == 1);
-  return std::chrono::system_clock::from_time_t(days * 24 * 60 * 60 + seconds);
+  // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate not-after date
+  // beyond 2038-01-19T03:14:08Z.
+  return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
+}
+
+absl::optional<std::string> Utility::getLastCryptoError() {
+  auto err = ERR_get_error();
+
+  if (err != 0) {
+    char errbuf[256];
+
+    ERR_error_string_n(err, errbuf, sizeof(errbuf));
+    return std::string(errbuf);
+  }
+
+  return absl::nullopt;
 }
 
 } // namespace Tls

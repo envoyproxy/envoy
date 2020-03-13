@@ -6,7 +6,7 @@ namespace Envoy {
 
 // Fuzz the old owned buffer implementation.
 DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
-  Envoy::BufferFuzz::bufferFuzz(input, true);
+  Envoy::BufferFuzz::bufferFuzz(input);
 }
 
 } // namespace Envoy

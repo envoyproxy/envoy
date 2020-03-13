@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/filter/network/zookeeper_proxy/v1alpha1/zookeeper_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -19,12 +20,12 @@ namespace ZooKeeperProxy {
  * Config registration for the ZooKeeper proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::zookeeper_proxy::v1alpha1::ZooKeeperProxy& proto_config,
+    const envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
 
-  const std::string stat_prefix = fmt::format("{}.zookeeper.", proto_config.stat_prefix());
+  const std::string stat_prefix = fmt::format("{}.zookeeper", proto_config.stat_prefix());
   const uint32_t max_packet_bytes =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_packet_bytes, 1024 * 1024);
 

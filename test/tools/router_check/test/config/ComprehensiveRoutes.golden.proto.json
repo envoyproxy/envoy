@@ -1,0 +1,63 @@
+{
+  "tests": [
+    {
+      "test_name": "Test 1",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/new_endpoint",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "www2",
+        "virtual_cluster_name": "other",
+        "virtual_host_name": "www2_host",
+        "path_rewrite": "/api/new_endpoint",
+        "host_rewrite": "www.lyft.com",
+        "path_redirect": ""
+      }
+    },
+    {
+      "test_name": "Test 2",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "root_www2",
+        "virtual_cluster_name": "other",
+        "virtual_host_name": "www2_host",
+        "path_rewrite": "/",
+        "host_rewrite": "www.lyft.com",
+        "path_redirect": ""
+      }
+    },
+    {
+      "test_name": "Test 3",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/foobar",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "www2",
+        "virtual_cluster_name": "other",
+        "virtual_host_name": "www2_host",
+        "path_rewrite": "/foobar",
+        "host_rewrite": "www.lyft.com",
+        "path_redirect": ""
+      }
+    },
+    {
+      "test_name": "Test 4",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/users/123",
+        "method": "PUT"
+      },
+      "validate": {
+        "virtual_cluster_name": "update_user"
+      }
+    }
+  ]
+}

@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/typed_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -97,7 +98,7 @@ using ProtocolPtr = std::unique_ptr<Protocol>;
  * Implemented by each Dubbo protocol and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedProtocolConfigFactory {
+class NamedProtocolConfigFactory : public Config::UntypedFactory {
 public:
   virtual ~NamedProtocolConfigFactory() = default;
 
@@ -108,11 +109,7 @@ public:
    */
   virtual ProtocolPtr createProtocol(SerializationType serialization_type) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of Dubbo protocol
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
+  std::string category() const override { return "envoy.dubbo_proxy.protocols"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -121,7 +118,7 @@ public:
    */
   static NamedProtocolConfigFactory& getFactory(ProtocolType type) {
     const std::string& name = ProtocolNames::get().fromType(type);
-    return Envoy::Config::Utility::getAndCheckFactory<NamedProtocolConfigFactory>(name);
+    return Envoy::Config::Utility::getAndCheckFactoryByName<NamedProtocolConfigFactory>(name);
   }
 };
 
@@ -129,13 +126,14 @@ public:
  * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
  */
 template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
+public:
   ProtocolPtr createProtocol(SerializationType serialization_type) override {
     auto protocol = std::make_unique<ProtocolImpl>();
     protocol->initSerializer(serialization_type);
     return protocol;
   }
 
-  std::string name() override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   ProtocolFactoryBase(ProtocolType type) : name_(ProtocolNames::get().fromType(type)) {}

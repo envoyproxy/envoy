@@ -16,6 +16,8 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
 
+  void initialize() override { HttpIntegrationTest::initialize(); }
+
   void bidirectionalStreaming(uint32_t bytes);
   void simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                            uint32_t response1_bytes, uint32_t response2_bytes);

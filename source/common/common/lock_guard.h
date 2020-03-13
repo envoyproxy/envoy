@@ -11,14 +11,14 @@ namespace Thread {
 /**
  * A lock guard that deals with an optional lock.
  */
-class SCOPED_LOCKABLE OptionalLockGuard {
+class ABSL_SCOPED_LOCKABLE OptionalLockGuard {
 public:
   /**
    * Establishes a scoped mutex-lock. If non-null, the mutex is locked upon construction.
    *
    * @param lock the mutex.
    */
-  OptionalLockGuard(BasicLockable* lock) EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(lock) {
+  OptionalLockGuard(BasicLockable* lock) ABSL_EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(lock) {
     if (lock_ != nullptr) {
       lock_->lock();
     }
@@ -27,7 +27,7 @@ public:
   /**
    * Destruction of the OptionalLockGuard unlocks the lock, if it is non-null.
    */
-  ~OptionalLockGuard() UNLOCK_FUNCTION() {
+  ~OptionalLockGuard() ABSL_UNLOCK_FUNCTION() {
     if (lock_ != nullptr) {
       lock_->unlock();
     }
@@ -50,7 +50,7 @@ private:
  * class lacks thread annotations, as clang currently does appear to be able to handle
  * conditional thread annotations. So the ones we'd like are commented out.
  */
-class SCOPED_LOCKABLE TryLockGuard {
+class ABSL_SCOPED_LOCKABLE TryLockGuard {
 public:
   /**
    * Establishes a scoped mutex-lock; the a mutex lock is attempted via tryLock, so
@@ -92,21 +92,21 @@ private:
  * implementation (no conditionals) and readability at call-sites. In some cases, an early
  * release is needed, in which case, a ReleasableLockGuard can be used.
  */
-class SCOPED_LOCKABLE LockGuard {
+class ABSL_SCOPED_LOCKABLE LockGuard {
 public:
   /**
    * Establishes a scoped mutex-lock; the mutex is locked upon construction.
    *
    * @param lock the mutex.
    */
-  explicit LockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(lock) {
+  explicit LockGuard(BasicLockable& lock) ABSL_EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(lock) {
     lock_.lock();
   }
 
   /**
    * Destruction of the LockGuard unlocks the lock.
    */
-  ~LockGuard() UNLOCK_FUNCTION() { lock_.unlock(); }
+  ~LockGuard() ABSL_UNLOCK_FUNCTION() { lock_.unlock(); }
 
 private:
   BasicLockable& lock_;
@@ -117,27 +117,28 @@ private:
  * BasicLockable& to allow usages to be agnostic to cross-process mutexes vs. single-process
  * mutexes.
  */
-class SCOPED_LOCKABLE ReleasableLockGuard {
+class ABSL_SCOPED_LOCKABLE ReleasableLockGuard {
 public:
   /**
    * Establishes a scoped mutex-lock; the mutex is locked upon construction.
    *
    * @param lock the mutex.
    */
-  explicit ReleasableLockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(&lock) {
+  explicit ReleasableLockGuard(BasicLockable& lock) ABSL_EXCLUSIVE_LOCK_FUNCTION(lock)
+      : lock_(&lock) {
     lock_->lock();
   }
 
   /**
    * Destruction of the LockGuard unlocks the lock, if it has not already been explicitly released.
    */
-  ~ReleasableLockGuard() UNLOCK_FUNCTION() { release(); }
+  ~ReleasableLockGuard() ABSL_UNLOCK_FUNCTION() { release(); }
 
   /**
    * Unlocks the mutex. This enables call-sites to release the mutex prior to the Lock going out of
    * scope. This is called release() for consistency with absl::ReleasableMutexLock.
    */
-  void release() UNLOCK_FUNCTION() {
+  void release() ABSL_UNLOCK_FUNCTION() {
     if (lock_ != nullptr) {
       lock_->unlock();
       lock_ = nullptr;

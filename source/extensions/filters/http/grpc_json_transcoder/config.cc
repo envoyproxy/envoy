@@ -1,10 +1,8 @@
 #include "extensions/filters/http/grpc_json_transcoder/config.h"
 
-#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.validate.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.validate.h"
 #include "envoy/registry/registry.h"
-
-#include "common/config/filter_json.h"
-#include "common/json/config_schemas.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
@@ -14,7 +12,8 @@ namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
 Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
+        proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   JsonTranscoderConfigSharedPtr filter_config =
       std::make_shared<JsonTranscoderConfig>(proto_config, context.api());
@@ -24,19 +23,11 @@ Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromPro
   };
 }
 
-Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactory(
-    const Json::Object& json_config, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
-  Config::FilterJson::translateGrpcJsonTranscoder(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
-}
-
 /**
  * Static registration for the grpc transcoding filter. @see RegisterNamedHttpFilterConfigFactory.
  */
 REGISTER_FACTORY(GrpcJsonTranscoderFilterConfig,
-                 Server::Configuration::NamedHttpFilterConfigFactory);
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.grpc_json_transcoder"};
 
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters

@@ -100,7 +100,7 @@
       }
     },
     {
-      "test_name": "Test_9",
+      "test_name": "Test_10",
       "input": {
         "authority": "api.lyft.com",
         "path": "/secondtest",
@@ -112,6 +112,22 @@
         "virtual_host_name": "api",
         "path_rewrite": "/second/test",
         "cluster_name": "www2"
+      }
+    },
+    {
+      "test_name": "Test_11",
+      "input": {
+        "authority": "redirect.lyft.com",
+        "path": "/rewrite",
+        "method": "GET",
+        "ssl": true
+      },
+      "validate": {
+        "host_rewrite": "",
+        "virtual_host_name": "",
+        "path_rewrite": "",
+        "cluster_name": "",
+        "path_redirect": "https://redirect.lyft.com/blah"
       }
     }
   ]

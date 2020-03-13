@@ -13,6 +13,18 @@ TEST(CleanupTest, ScopeExitCallback) {
   EXPECT_TRUE(callback_fired);
 }
 
+TEST(CleanupTest, Cancel) {
+  bool callback_fired = false;
+  {
+    Cleanup cleanup([&callback_fired] { callback_fired = true; });
+    EXPECT_FALSE(cleanup.cancelled());
+    cleanup.cancel();
+    EXPECT_FALSE(callback_fired);
+    EXPECT_TRUE(cleanup.cancelled());
+  }
+  EXPECT_FALSE(callback_fired);
+}
+
 TEST(RaiiListElementTest, DeleteOnDestruction) {
   std::list<int> l;
 

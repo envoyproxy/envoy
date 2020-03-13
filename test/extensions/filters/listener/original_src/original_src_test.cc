@@ -1,4 +1,5 @@
-#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
 
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
@@ -14,7 +15,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Exactly;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -31,7 +31,7 @@ public:
   }
 
   std::unique_ptr<OriginalSrcFilter> makeMarkingFilter(uint32_t mark) {
-    envoy::config::filter::listener::original_src::v2alpha1::OriginalSrc proto_config;
+    envoy::extensions::filters::listener::original_src::v3::OriginalSrc proto_config;
     proto_config.set_mark(mark);
 
     Config config(proto_config);
@@ -48,7 +48,7 @@ protected:
 
   absl::optional<Network::Socket::Option::Details>
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
-                    envoy::api::v2::core::SocketOption::SocketState state) {
+                    envoy::config::core::v3::SocketOption::SocketState state) {
     for (const auto& option : options) {
       auto details = option->getOptionDetails(callbacks_.socket_, state);
       if (details.has_value() && details->name_ == name) {
@@ -60,14 +60,14 @@ protected:
   }
 };
 
-TEST_F(OriginalSrcTest, onNewConnectionUnixSocketSkips) {
+TEST_F(OriginalSrcTest, OnNewConnectionUnixSocketSkips) {
   auto filter = makeDefaultFilter();
   setAddressToReturn("unix://domain.socket");
   EXPECT_CALL(callbacks_.socket_, addOption_(_)).Times(0);
   EXPECT_EQ(filter->onAccept(callbacks_), Network::FilterStatus::Continue);
 }
 
-TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressAddsOption) {
+TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressAddsOption) {
   auto filter = makeDefaultFilter();
 
   Network::Socket::OptionsSharedPtr options;
@@ -82,10 +82,10 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressAddsOption) {
 
   NiceMock<Network::MockConnectionSocket> socket;
   EXPECT_CALL(socket, setLocalAddress(PointeesEq(callbacks_.socket_.remote_address_)));
-  options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 }
 
-TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
+TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressUsesCorrectAddress) {
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:0");
@@ -101,7 +101,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
   EXPECT_EQ(key, expected_key);
 }
 
-TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressBleachesPort) {
+TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressBleachesPort) {
   auto filter = makeDefaultFilter();
   Network::Socket::OptionsSharedPtr options;
   setAddressToReturn("tcp://1.2.3.4:80");
@@ -115,10 +115,10 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressBleachesPort) {
 
   // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
-  options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
 }
 
-TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
+TEST_F(OriginalSrcTest, FilterAddsTransparentOption) {
   if (!ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
@@ -132,12 +132,12 @@ TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
   filter->onAccept(callbacks_);
 
   auto transparent_option = findOptionDetails(*options, ENVOY_SOCKET_IP_TRANSPARENT,
-                                              envoy::api::v2::core::SocketOption::STATE_PREBIND);
+                                              envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   EXPECT_TRUE(transparent_option.has_value());
 }
 
-TEST_F(OriginalSrcTest, filterAddsMarkOption) {
+TEST_F(OriginalSrcTest, FilterAddsMarkOption) {
   if (!ENVOY_SOCKET_SO_MARK.has_value()) {
     // The option isn't supported on this platform. Just skip the test.
     return;
@@ -151,7 +151,7 @@ TEST_F(OriginalSrcTest, filterAddsMarkOption) {
   filter->onAccept(callbacks_);
 
   auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   ASSERT_TRUE(mark_option.has_value());
   uint32_t value = 1234;
@@ -173,7 +173,7 @@ TEST_F(OriginalSrcTest, Mark0NotAdded) {
   filter->onAccept(callbacks_);
 
   auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND);
 
   ASSERT_FALSE(mark_option.has_value());
 }

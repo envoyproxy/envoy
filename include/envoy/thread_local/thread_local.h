@@ -74,6 +74,17 @@ public:
    */
   using InitializeCb = std::function<ThreadLocalObjectSharedPtr(Event::Dispatcher& dispatcher)>;
   virtual void set(InitializeCb cb) PURE;
+
+  /**
+   * UpdateCb takes the current stored data, and returns an updated/new version data.
+   * TLS will run the callback and replace the stored data with the returned value *in each thread*.
+   *
+   * NOTE: The update callback is not supposed to capture the Slot, or its owner. As the owner may
+   * be destructed in main thread before the update_cb gets called in a worker thread.
+   **/
+  using UpdateCb = std::function<ThreadLocalObjectSharedPtr(ThreadLocalObjectSharedPtr)>;
+  virtual void runOnAllThreads(const UpdateCb& update_cb) PURE;
+  virtual void runOnAllThreads(const UpdateCb& update_cb, Event::PostCb complete_cb) PURE;
 };
 
 using SlotPtr = std::unique_ptr<Slot>;

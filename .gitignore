@@ -4,12 +4,14 @@ BROWSE
 /build_*
 *.bzlc
 .cache
+.clangd
 .classpath
 .clwb/
 /ci/bazel-*
 compile_commands.json
 cscope.*
 .deps
+.devcontainer.json
 /docs/landing_source/.bundle
 /generated
 .idea/
@@ -22,7 +24,11 @@ SOURCE_VERSION
 tags
 TAGS
 /test/coverage/BUILD
-/tools/.aspell.en.pws
+/tools/spelling/.aspell.en.pws
 .vimrc
 .vs
 .vscode
+clang.bazelrc
+user.bazelrc
+CMakeLists.txt
+cmake-build-debug

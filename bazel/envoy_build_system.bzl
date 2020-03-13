@@ -6,6 +6,7 @@ load(":envoy_internal.bzl", "envoy_external_dep_path")
 load(
     ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
+    _envoy_cc_extension = "envoy_cc_extension",
     _envoy_cc_library = "envoy_cc_library",
     _envoy_cc_posix_library = "envoy_cc_posix_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
@@ -20,6 +21,8 @@ load(
 )
 load(
     ":envoy_test.bzl",
+    _envoy_benchmark_test = "envoy_benchmark_test",
+    _envoy_cc_benchmark_binary = "envoy_cc_benchmark_binary",
     _envoy_cc_fuzz_test = "envoy_cc_fuzz_test",
     _envoy_cc_mock = "envoy_cc_mock",
     _envoy_cc_test = "envoy_cc_test",
@@ -54,11 +57,6 @@ envoy_directory_genrule = rule(
     },
 )
 
-def _filter_windows_keys(cache_entries = {}):
-    # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
-    # rules_foreign_cc will figure it out for us
-    return {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
-
 # External CMake C++ library targets should be specified with this function. This defaults
 # to building the dependencies with ninja
 def envoy_cmake_external(
@@ -66,19 +64,23 @@ def envoy_cmake_external(
         cache_entries = {},
         debug_cache_entries = {},
         cmake_options = ["-GNinja"],
-        make_commands = ["ninja", "ninja install"],
+        make_commands = ["ninja -v", "ninja -v install"],
         lib_source = "",
         postfix_script = "",
         static_libraries = [],
         copy_pdb = False,
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
+        generate_crosstool_file = False,
         **kwargs):
+    cache_entries.update({"CMAKE_BUILD_TYPE": "Bazel"})
     cache_entries_debug = dict(cache_entries)
     cache_entries_debug.update(debug_cache_entries)
 
     pf = ""
     if copy_pdb:
+        # TODO: Add iterator of the first list presented of these options;
+        # static_libraries[.pdb], pdb_names, name[.pdb] files
         if pdb_name == "":
             pdb_name = name
 
@@ -96,15 +98,14 @@ def envoy_cmake_external(
     cmake_external(
         name = name,
         cache_entries = select({
-            "@envoy//bazel:windows_opt_build": _filter_windows_keys(cache_entries),
-            "@envoy//bazel:windows_x86_64": _filter_windows_keys(cache_entries_debug),
             "@envoy//bazel:opt_build": cache_entries,
             "//conditions:default": cache_entries_debug,
         }),
         cmake_options = cmake_options,
+        # TODO(lizan): Make this always true
         generate_crosstool_file = select({
             "@envoy//bazel:windows_x86_64": True,
-            "//conditions:default": False,
+            "//conditions:default": generate_crosstool_file,
         }),
         lib_source = lib_source,
         make_commands = make_commands,
@@ -173,6 +174,7 @@ envoy_cc_binary = _envoy_cc_binary
 
 # Library wrappers (from envoy_library.bzl)
 envoy_basic_cc_library = _envoy_basic_cc_library
+envoy_cc_extension = _envoy_cc_extension
 envoy_cc_library = _envoy_cc_library
 envoy_cc_posix_library = _envoy_cc_posix_library
 envoy_cc_win32_library = _envoy_cc_win32_library
@@ -185,5 +187,7 @@ envoy_cc_mock = _envoy_cc_mock
 envoy_cc_test = _envoy_cc_test
 envoy_cc_test_binary = _envoy_cc_test_binary
 envoy_cc_test_library = _envoy_cc_test_library
+envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
+envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test

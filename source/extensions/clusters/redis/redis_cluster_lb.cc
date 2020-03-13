@@ -161,26 +161,31 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   return shard->master();
 }
 
-namespace {
-bool isReadRequest(const NetworkFilters::Common::Redis::RespValue& request) {
-  if (request.type() != NetworkFilters::Common::Redis::RespType::Array) {
+bool RedisLoadBalancerContextImpl::isReadRequest(
+    const NetworkFilters::Common::Redis::RespValue& request) {
+  const NetworkFilters::Common::Redis::RespValue* command = nullptr;
+  if (request.type() == NetworkFilters::Common::Redis::RespType::Array) {
+    command = &(request.asArray()[0]);
+  } else if (request.type() == NetworkFilters::Common::Redis::RespType::CompositeArray) {
+    command = request.asCompositeArray().command();
+  }
+  if (!command) {
     return false;
   }
-  auto first = request.asArray()[0];
-  if (first.type() != NetworkFilters::Common::Redis::RespType::SimpleString &&
-      first.type() != NetworkFilters::Common::Redis::RespType::BulkString) {
+  if (command->type() != NetworkFilters::Common::Redis::RespType::SimpleString &&
+      command->type() != NetworkFilters::Common::Redis::RespType::BulkString) {
     return false;
   }
-  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(first.asString());
+  std::string to_lower_string = absl::AsciiStrToLower(command->asString());
+  return NetworkFilters::Common::Redis::SupportedCommands::isReadCommand(to_lower_string);
 }
-} // namespace
 
 RedisLoadBalancerContextImpl::RedisLoadBalancerContextImpl(
-    const std::string& key, bool enabled_hashtagging, bool use_crc16,
+    const std::string& key, bool enabled_hashtagging, bool is_redis_cluster,
     const NetworkFilters::Common::Redis::RespValue& request,
     NetworkFilters::Common::Redis::Client::ReadPolicy read_policy)
-    : hash_key_(use_crc16 ? Crc16::crc16(hashtag(key, enabled_hashtagging))
-                          : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))),
+    : hash_key_(is_redis_cluster ? Crc16::crc16(hashtag(key, true))
+                                 : MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))),
       is_read_(isReadRequest(request)), read_policy_(read_policy) {}
 
 // Inspired by the redis-cluster hashtagging algorithm

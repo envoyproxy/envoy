@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Where the runfiles are for tests.
-export TEST_RUNDIR="${TEST_SRCDIR}/${TEST_WORKSPACE}"
+# Dummy shell implementation for nooping tests.
+# TODO(lizan): remove when we have a solution for
+# https://github.com/bazelbuild/bazel/issues/3510
 
 cd $(dirname "$0")
 

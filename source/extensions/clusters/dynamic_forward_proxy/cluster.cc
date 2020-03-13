@@ -1,5 +1,9 @@
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
+
 #include "common/network/transport_socket_options_impl.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
@@ -10,12 +14,12 @@ namespace Clusters {
 namespace DynamicForwardProxy {
 
 Cluster::Cluster(
-    const envoy::api::v2::Cluster& cluster,
-    const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& config,
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Runtime::Loader& runtime,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     const LocalInfo::LocalInfo& local_info,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                                        added_via_api),
@@ -23,27 +27,41 @@ Cluster::Cluster(
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
       host_map_(std::make_shared<HostInfoMap>()) {
-  // TODO(mattklein123): Technically, we should support attaching to an already warmed DNS cache.
-  //                     This will require adding a hosts() or similar API to the cache and
-  //                     reading it during initialization.
-
   // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
   // support these parameters dynamically in the future. This is not an exhaustive list of
   // parameters that don't make sense but should be the most obvious ones that a user might set
   // in error.
-  if (!cluster.tls_context().sni().empty() || !cluster.tls_context()
-                                                   .common_tls_context()
-                                                   .validation_context()
-                                                   .verify_subject_alt_name()
-                                                   .empty()) {
+  if (!cluster.hidden_envoy_deprecated_tls_context().sni().empty() ||
+      !cluster.hidden_envoy_deprecated_tls_context()
+           .common_tls_context()
+           .validation_context()
+           .hidden_envoy_deprecated_verify_subject_alt_name()
+           .empty()) {
     throw EnvoyException(
         "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
   }
 }
 
-void Cluster::onDnsHostAddOrUpdate(
+void Cluster::startPreInit() {
+  // If we are attaching to a pre-populated cache we need to initialize our hosts.
+  auto existing_hosts = dns_cache_->hosts();
+  if (!existing_hosts.empty()) {
+    std::shared_ptr<HostInfoMap> new_host_map;
+    std::unique_ptr<Upstream::HostVector> hosts_added;
+    for (const auto& existing_host : existing_hosts) {
+      addOrUpdateWorker(existing_host.first, existing_host.second, new_host_map, hosts_added);
+    }
+    swapAndUpdateMap(new_host_map, *hosts_added, {});
+  }
+
+  onPreInitComplete();
+}
+
+void Cluster::addOrUpdateWorker(
     const std::string& host,
-    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
+    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+    std::shared_ptr<HostInfoMap>& new_host_map,
+    std::unique_ptr<Upstream::HostVector>& hosts_added) {
   // We should never get a host with no address from the cache.
   ASSERT(host_info->address() != nullptr);
 
@@ -82,25 +100,33 @@ void Cluster::onDnsHostAddOrUpdate(
 
   ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
 
-  // Create an override transport socket options that automatically provides both SNI as well as
-  // SAN verification for the resolved host if the cluster has been configured with TLS.
-  Network::TransportSocketOptionsSharedPtr transport_socket_options =
-      std::make_shared<Network::TransportSocketOptionsImpl>(
-          !host_info->isIpAddress() ? host_info->resolvedHost() : "",
-          std::vector<std::string>{host_info->resolvedHost()});
-
-  const auto new_host_map = std::make_shared<HostInfoMap>(*current_map);
+  if (new_host_map == nullptr) {
+    new_host_map = std::make_shared<HostInfoMap>(*current_map);
+  }
   const auto emplaced =
       new_host_map->try_emplace(host, host_info,
                                 std::make_shared<Upstream::LogicalHost>(
                                     info(), host, host_info->address(), dummy_locality_lb_endpoint_,
-                                    dummy_lb_endpoint_, transport_socket_options));
-  Upstream::HostVector hosts_added;
-  hosts_added.emplace_back(emplaced.first->second.logical_host_);
+                                    dummy_lb_endpoint_, nullptr));
+  if (hosts_added == nullptr) {
+    hosts_added = std::make_unique<Upstream::HostVector>();
+  }
+  hosts_added->emplace_back(emplaced.first->second.logical_host_);
+}
 
-  // Swap in the new map. This will be picked up when the per-worker LBs are recreated via
-  // the host set update.
-  swapAndUpdateMap(new_host_map, hosts_added, {});
+void Cluster::onDnsHostAddOrUpdate(
+    const std::string& host,
+    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
+  std::shared_ptr<HostInfoMap> new_host_map;
+  std::unique_ptr<Upstream::HostVector> hosts_added;
+  addOrUpdateWorker(host, host_info, new_host_map, hosts_added);
+  if (hosts_added != nullptr) {
+    ASSERT(!new_host_map->empty());
+    ASSERT(!hosts_added->empty());
+    // Swap in the new map. This will be picked up when the per-worker LBs are recreated via
+    // the host set update.
+    swapAndUpdateMap(new_host_map, *hosts_added, {});
+  }
 }
 
 void Cluster::swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
@@ -155,15 +181,29 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
-    const envoy::api::v2::Cluster& cluster,
-    const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& proto_config,
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.singletonManager(), context.dispatcher(), context.tls(), context.stats());
+      context.singletonManager(), context.dispatcher(), context.tls(), context.random(),
+      context.stats());
+  envoy::config::cluster::v3::Cluster cluster_config = cluster;
+  if (cluster_config.has_upstream_http_protocol_options()) {
+    if (!cluster_config.upstream_http_protocol_options().auto_sni() ||
+        !cluster_config.upstream_http_protocol_options().auto_san_validation()) {
+      throw EnvoyException(
+          "dynamic_forward_proxy cluster must have auto_sni and auto_san_validation true when "
+          "configured with upstream_http_protocol_options");
+    }
+  } else {
+    cluster_config.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    cluster_config.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+  }
+
   auto new_cluster = std::make_shared<Cluster>(
-      cluster, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
+      cluster_config, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
       socket_factory_context, std::move(stats_scope), context.addedViaApi());
   auto lb = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));

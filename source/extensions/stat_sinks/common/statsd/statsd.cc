@@ -5,14 +5,20 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/network/utility.h"
+#include "common/stats/symbol_table_impl.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,22 +26,15 @@ namespace StatSinks {
 namespace Common {
 namespace Statsd {
 
-Writer::Writer(Network::Address::InstanceConstSharedPtr address)
-    : io_handle_(address->socket(Network::Address::SocketType::Datagram)) {
-  ASSERT(io_handle_->fd() != -1);
+UdpStatsdSink::WriterImpl::WriterImpl(UdpStatsdSink& parent)
+    : parent_(parent),
+      io_handle_(parent_.server_address_->socket(Network::Address::SocketType::Datagram)) {}
 
-  const Api::SysCallIntResult result = address->connect(io_handle_->fd());
-  ASSERT(result.rc_ != -1);
-}
-
-Writer::~Writer() {
-  if (io_handle_->isOpen()) {
-    RELEASE_ASSERT(io_handle_->close().err_ == nullptr, "");
-  }
-}
-
-void Writer::write(const std::string& message) {
-  ::send(io_handle_->fd(), message.c_str(), message.size(), MSG_DONTWAIT);
+void UdpStatsdSink::WriterImpl::write(const std::string& message) {
+  // TODO(mattklein123): We can avoid this const_cast pattern by having a constant variant of
+  // RawSlice. This can be fixed elsewhere as well.
+  Buffer::RawSlice slice{const_cast<char*>(message.c_str()), message.size()};
+  Network::Utility::writeToSocket(*io_handle_, &slice, 1, nullptr, *parent_.server_address_);
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
@@ -44,7 +43,7 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
       prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<Writer>(this->server_address_);
+    return std::make_shared<WriterImpl>(*this);
   });
 }
 
@@ -52,28 +51,33 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   Writer& writer = tls_->getTyped<Writer>();
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      writer.write(fmt::format("{}.{}:{}|c{}", prefix_, getName(counter.counter_.get()),
-                               counter.delta_, buildTagStr(counter.counter_.get().tags())));
+      writer.write(absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_,
+                                "|c", buildTagStr(counter.counter_.get().tags())));
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(gauge.get()), gauge.get().value(),
-                               buildTagStr(gauge.get().tags())));
+      writer.write(absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(), "|g",
+                                buildTagStr(gauge.get().tags())));
     }
   }
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
-  // For statsd histograms are all timers.
-  const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, getName(histogram),
-                                        std::chrono::milliseconds(value).count(),
-                                        buildTagStr(histogram.tags())));
+  // For statsd histograms are all timers in milliseconds, Envoy histograms are however
+  // not necessarily timers in milliseconds, for Envoy histograms suffixed with their corresponding
+  // SI unit symbol this is acceptable, but for histograms without a suffix, especially those which
+  // are timers but record in units other than milliseconds, it may make sense to scale the value to
+  // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
+  // backwards compatibility).
+  const std::string message(absl::StrCat(prefix_, ".", getName(histogram), ":",
+                                         std::chrono::milliseconds(value).count(), "|ms",
+                                         buildTagStr(histogram.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
-const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
+const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {
   if (use_tag_) {
     return metric.tagExtractedName();
   } else {
@@ -81,7 +85,7 @@ const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
   }
 }
 
-const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) {
+const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) const {
   if (!use_tag_ || tags.empty()) {
     return "";
   }
@@ -91,7 +95,7 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
   for (const Stats::Tag& tag : tags) {
     tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
   }
-  return "|#" + StringUtil::join(tag_strings, ",");
+  return "|#" + absl::StrJoin(tag_strings, ",");
 }
 
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
@@ -99,8 +103,9 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                              const std::string& prefix)
     : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
-      cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
-
+      cluster_manager_(cluster_manager),
+      cx_overflow_stat_(scope.counterFromStatName(
+          Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
   Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
                                             local_info);
   cluster_info_ = cluster_manager.get(cluster_name)->info();
@@ -204,6 +209,7 @@ void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
                                                 std::chrono::milliseconds ms) {
   // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
   // also currently not possible that this interleaves with any counter/gauge flushing.
+  // See the comment at UdpStatsdSink::onHistogramComplete with respect to unit suffixes.
   ASSERT(current_slice_mem_ == nullptr);
   Buffer::OwnedImpl buffer(
       fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));
@@ -233,7 +239,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
 
   if (!connection_) {
     Upstream::Host::CreateConnectionData info =
-        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr, nullptr);
+        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr);
     if (!info.connection_) {
       buffer.drain(buffer.length());
       return;
@@ -252,7 +258,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   connection_->write(buffer, false);
 }
 
-uint64_t TcpStatsdSink::TlsSink::usedBuffer() {
+uint64_t TcpStatsdSink::TlsSink::usedBuffer() const {
   ASSERT(current_slice_mem_ != nullptr);
   return current_slice_mem_ - reinterpret_cast<char*>(current_buffer_slice_.mem_);
 }

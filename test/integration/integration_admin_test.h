@@ -1,8 +1,12 @@
 #pragma once
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+
 #include "common/json/json_loader.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -13,6 +17,22 @@ public:
   void initialize() override {
     config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
     HttpIntegrationTest::initialize();
+  }
+
+  void initialize(envoy::config::metrics::v3::StatsMatcher stats_matcher) {
+    config_helper_.addConfigModifier(
+        [stats_matcher](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher;
+        });
+    initialize();
+  }
+
+  absl::string_view request(const std::string port_key, const std::string method,
+                            const std::string endpoint, BufferingStreamDecoderPtr& response) {
+    response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
+                                                  downstreamProtocol(), version_);
+    EXPECT_TRUE(response->complete());
+    return response->headers().Status()->value().getStringView();
   }
 
   /**
@@ -26,7 +46,7 @@ public:
   /**
    * Validates that the passed in string conforms to output of stats in JSON format.
    */
-  void validateStatsJson(const std::string stats_json, const uint64_t expected_hist_count) {
+  void validateStatsJson(const std::string& stats_json, const uint64_t expected_hist_count) {
     Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(stats_json);
     EXPECT_TRUE(statsjson->hasObject("stats"));
     uint64_t histogram_count = 0;

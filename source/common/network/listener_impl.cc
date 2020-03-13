@@ -1,8 +1,8 @@
 #include "common/network/listener_impl.h"
 
-#include <sys/un.h>
-
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -29,9 +29,10 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
   const Address::InstanceConstSharedPtr& local_address =
       listener->local_address_ ? listener->local_address_
                                : listener->getLocalAddress(io_handle->fd());
+
   // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
   // for Unix domain sockets; apparently there isn't a mechanism in the kernel to get the
-  // sockaddr_un associated with the client socket when starting from the server socket.
+  // `sockaddr_un` associated with the client socket when starting from the server socket.
   // We work around this by using our own name for the socket in this case.
   // Pass the 'v6only' parameter as true if the local_address is an IPv6 address. This has no effect
   // if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote address if an
@@ -43,8 +44,7 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
                                          remote_addr_len,
                                          local_address->ip()->version() == Address::IpVersion::v6);
   listener->cb_.onAccept(
-      std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address),
-      listener->hand_off_restored_destination_connections_);
+      std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
 }
 
 void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
@@ -57,7 +57,7 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
   }
 
   if (!Network::Socket::applyOptions(socket.options(), socket,
-                                     envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
+                                     envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
     throw CreateListenerException(fmt::format("cannot set post-listen socket option on socket: {}",
                                               socket.localAddress()->asString()));
   }
@@ -65,13 +65,11 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
   evconnlistener_set_error_cb(listener_.get(), errorCallback);
 }
 
-ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-                           bool bind_to_port, bool hand_off_restored_destination_connections)
-    : BaseListenerImpl(dispatcher, socket), cb_(cb),
-      hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-      listener_(nullptr) {
+ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
+                           ListenerCallbacks& cb, bool bind_to_port)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), listener_(nullptr) {
   if (bind_to_port) {
-    setupServerSocket(dispatcher, socket);
+    setupServerSocket(dispatcher, *socket_);
   }
 }
 

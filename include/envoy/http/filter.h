@@ -168,7 +168,7 @@ public:
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
    */
-  virtual uint64_t streamId() PURE;
+  virtual uint64_t streamId() const PURE;
 
   /**
    * @return streamInfo for logging purposes. Individual filter may add specific information to be
@@ -192,6 +192,22 @@ public:
    */
   virtual const ScopeTrackedObject& scope() PURE;
 };
+
+/**
+ * RouteConfigUpdatedCallback is used to notify an OnDemandRouteUpdate filter about completion of a
+ * RouteConfig update. The filter (and the associated ActiveStream) where the original on-demand
+ * request was originated can be destroyed before a response to an on-demand update request is
+ * received and updates are propagated. To handle this:
+ *
+ * OnDemandRouteUpdate filter instance holds a RouteConfigUpdatedCallbackSharedPtr to a callback.
+ * Envoy::Router::RdsRouteConfigProviderImpl holds a weak pointer to the RouteConfigUpdatedCallback
+ * above in an Envoy::Router::UpdateOnDemandCallback struct
+ *
+ * In RdsRouteConfigProviderImpl::onConfigUpdate(), before invoking the callback, a check is made to
+ * verify if the callback is still available.
+ */
+using RouteConfigUpdatedCallback = std::function<void(bool)>;
+using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
 
 /**
  * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to restart
@@ -242,7 +258,8 @@ public:
    *
    * 4) If additional data needs to be added in the decodeTrailers() callback, this method can be
    * called in the context of the callback. All further filters will receive decodeData(..., false)
-   * followed by decodeTrailers().
+   * followed by decodeTrailers(). However if the iteration is stopped, the added data will
+   * buffered, so that the further filters will not receive decodeData() before decodeHeaders().
    *
    * It is an error to call this method in any other case.
    *
@@ -287,7 +304,7 @@ public:
    *
    * @return a reference to the newly created trailers map.
    */
-  virtual HeaderMap& addDecodedTrailers() PURE;
+  virtual RequestTrailerMap& addDecodedTrailers() PURE;
 
   /**
    * Create a locally generated response using the provided response_code and body_text parameters.
@@ -304,7 +321,7 @@ public:
    * @param details a string detailing why this local reply was sent.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
-                              std::function<void(HeaderMap& headers)> modify_headers,
+                              std::function<void(ResponseHeaderMap& headers)> modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
 
@@ -326,7 +343,7 @@ public:
    *
    * @param headers supplies the headers to be encoded.
    */
-  virtual void encode100ContinueHeaders(HeaderMapPtr&& headers) PURE;
+  virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -337,7 +354,7 @@ public:
    * @param headers supplies the headers to be encoded.
    * @param end_stream supplies whether this is a header only request/response.
    */
-  virtual void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.
@@ -350,7 +367,7 @@ public:
    * Called with trailers to be encoded. This implicitly ends the stream.
    * @param trailers supplies the trailers to encode.
    */
-  virtual void encodeTrailers(HeaderMapPtr&& trailers) PURE;
+  virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
 
   /**
    * Called with metadata to be encoded.
@@ -435,6 +452,23 @@ public:
    * @return The socket options to be applied to the upstream request.
    */
   virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
+
+  /**
+   * Schedules a request for a RouteConfiguration update from the management server.
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to the worker thread.
+   */
+  virtual void
+  requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+  /**
+   *
+   * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS
+   * route config provider is used. Scoped RDS provides are not supported at the moment, as
+   * retrieval of a route configuration in their case requires passing of http request headers
+   * as a parameter.
+   */
+  virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
 };
 
 /**
@@ -467,7 +501,7 @@ public:
    * @param end_stream supplies whether this is a header only request/response.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    */
-  virtual FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) PURE;
+  virtual FilterHeadersStatus decodeHeaders(RequestHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Called with a decoded data frame.
@@ -481,7 +515,7 @@ public:
    * Called with decoded trailers, implicitly ending the stream.
    * @param trailers supplies the decoded trailers.
    */
-  virtual FilterTrailersStatus decodeTrailers(HeaderMap& trailers) PURE;
+  virtual FilterTrailersStatus decodeTrailers(RequestTrailerMap& trailers) PURE;
 
   /**
    * Called with decoded metadata. Add new metadata to metadata_map directly. Do not call
@@ -562,7 +596,8 @@ public:
    *
    * 4) If additional data needs to be added in the encodeTrailers() callback, this method can be
    * called in the context of the callback. All further filters will receive encodeData(..., false)
-   * followed by encodeTrailers().
+   * followed by encodeTrailers(). However if the iteration is stopped, the added data will
+   * buffered, so that the further filters will not receive encodeData() before encodeHeaders().
    *
    * It is an error to call this method in any other case.
    *
@@ -607,7 +642,7 @@ public:
    *
    * @return a reference to the newly created trailers map.
    */
-  virtual HeaderMap& addEncodedTrailers() PURE;
+  virtual ResponseTrailerMap& addEncodedTrailers() PURE;
 
   /**
    * Adds new metadata to be encoded.
@@ -659,7 +694,7 @@ public:
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    *
    */
-  virtual FilterHeadersStatus encode100ContinueHeaders(HeaderMap& headers) PURE;
+  virtual FilterHeadersStatus encode100ContinueHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -667,7 +702,7 @@ public:
    * @param end_stream supplies whether this is a header only request/response.
    * @return FilterHeadersStatus determines how filter chain iteration proceeds.
    */
-  virtual FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) PURE;
+  virtual FilterHeadersStatus encodeHeaders(ResponseHeaderMap& headers, bool end_stream) PURE;
 
   /**
    * Called with data to be encoded, optionally indicating end of stream.
@@ -681,7 +716,7 @@ public:
    * Called with trailers to be encoded, implicitly ending the stream.
    * @param trailers supplies the trailers to be encoded.
    */
-  virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
+  virtual FilterTrailersStatus encodeTrailers(ResponseTrailerMap& trailers) PURE;
 
   /**
    * Called with metadata to be encoded. New metadata should be added directly to metadata_map. DO

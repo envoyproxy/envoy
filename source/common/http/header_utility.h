@@ -2,11 +2,11 @@
 
 #include <vector>
 
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/regex.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
-#include "envoy/type/range.pb.h"
+#include "envoy/type/v3/range.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -35,28 +35,44 @@ public:
   // A HeaderData specifies one of exact value or regex or range element
   // to match in a request's header, specified in the header_match_type_ member.
   // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
-  struct HeaderData {
-    HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
-    HeaderData(const Json::Object& config);
+  struct HeaderData : public HeaderMatcher {
+    HeaderData(const envoy::config::route::v3::HeaderMatcher& config);
 
     const LowerCaseString name_;
     HeaderMatchType header_match_type_;
     std::string value_;
     Regex::CompiledMatcherPtr regex_;
-    envoy::type::Int64Range range_;
+    envoy::type::v3::Int64Range range_;
     const bool invert_match_;
+
+    // HeaderMatcher
+    bool matchesHeaders(const HeaderMap& headers) const override {
+      return HeaderUtility::matchHeaders(headers, *this);
+    };
   };
 
   using HeaderDataPtr = std::unique_ptr<HeaderData>;
 
   /**
-   * Build a vector of HeaderData given input config.
+   * Build a vector of HeaderDataPtr given input config.
    */
   static std::vector<HeaderUtility::HeaderDataPtr> buildHeaderDataVector(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher>& header_matchers) {
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers) {
     std::vector<HeaderUtility::HeaderDataPtr> ret;
-    for (const auto& header_match : header_matchers) {
-      ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_match));
+    for (const auto& header_matcher : header_matchers) {
+      ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_matcher));
+    }
+    return ret;
+  }
+
+  /**
+   * Build a vector of HeaderMatcherSharedPtr given input config.
+   */
+  static std::vector<Http::HeaderMatcherSharedPtr> buildHeaderMatcherVector(
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers) {
+    std::vector<Http::HeaderMatcherSharedPtr> ret;
+    for (const auto& header_matcher : header_matchers) {
+      ret.emplace_back(std::make_shared<HeaderUtility::HeaderData>(header_matcher));
     }
     return ret;
   }
@@ -81,11 +97,30 @@ public:
   static bool headerIsValid(const absl::string_view header_value);
 
   /**
+   * Validates that the characters in the authority are valid.
+   * @return bool true if the header values are valid, false otherwise.
+   */
+  static bool authorityIsValid(const absl::string_view authority_value);
+
+  /**
    * Add headers from one HeaderMap to another
    * @param headers target where headers will be added
    * @param headers_to_add supplies the headers to be added
    */
   static void addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add);
+
+  /**
+   * @brief a helper function to determine if the headers represent an envoy internal request
+   */
+  static bool isEnvoyInternalRequest(const RequestHeaderMap& headers);
+
+  /**
+   * Determines if request headers pass Envoy validity checks.
+   * @param headers to validate
+   * @return details of the error if an error is present, otherwise absl::nullopt
+   */
+  static absl::optional<std::reference_wrapper<const absl::string_view>>
+  requestHeadersValid(const RequestHeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

@@ -20,10 +20,10 @@ public:
   MockBufferBase(std::function<void()> below_low, std::function<void()> above_high,
                  std::function<void()> above_overflow);
 
-  MOCK_METHOD1(write, Api::IoCallUint64Result(Network::IoHandle& io_handle));
-  MOCK_METHOD1(move, void(Buffer::Instance& rhs));
-  MOCK_METHOD2(move, void(Buffer::Instance& rhs, uint64_t length));
-  MOCK_METHOD1(drain, void(uint64_t size));
+  MOCK_METHOD(Api::IoCallUint64Result, write, (Network::IoHandle & io_handle));
+  MOCK_METHOD(void, move, (Buffer::Instance & rhs));
+  MOCK_METHOD(void, move, (Buffer::Instance & rhs, uint64_t length));
+  MOCK_METHOD(void, drain, (uint64_t size));
 
   void baseMove(Buffer::Instance& rhs) { BaseClass::move(rhs); }
   void baseDrain(uint64_t size) { BaseClass::drain(size); }
@@ -101,9 +101,9 @@ public:
     return Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
   }
 
-  MOCK_METHOD3(create_,
-               Buffer::Instance*(std::function<void()> below_low, std::function<void()> above_high,
-                                 std::function<void()> above_overflow));
+  MOCK_METHOD(Buffer::Instance*, create_,
+              (std::function<void()> below_low, std::function<void()> above_high,
+               std::function<void()> above_overflow));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {

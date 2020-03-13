@@ -3,19 +3,14 @@ package go_build_test
 import (
 	"testing"
 
-	_ "github.com/envoyproxy/data-plane-api/api/ads"
-	_ "github.com/envoyproxy/data-plane-api/api/als"
-	_ "github.com/envoyproxy/data-plane-api/api/bootstrap"
-	_ "github.com/envoyproxy/data-plane-api/api/cds"
-	_ "github.com/envoyproxy/data-plane-api/api/cert"
-	_ "github.com/envoyproxy/data-plane-api/api/eds"
-	_ "github.com/envoyproxy/data-plane-api/api/hds"
-	_ "github.com/envoyproxy/data-plane-api/api/lds"
-	_ "github.com/envoyproxy/data-plane-api/api/metrics_service"
-	_ "github.com/envoyproxy/data-plane-api/api/rds"
-	_ "github.com/envoyproxy/data-plane-api/api/rls"
-	_ "github.com/envoyproxy/data-plane-api/api/sds"
-	_ "github.com/envoyproxy/data-plane-api/api/trace_service"
+	_ "github.com/envoyproxy/go-control-plane/envoy/api/v2"
+	_ "github.com/envoyproxy/go-control-plane/envoy/api/v2/auth"
+	_ "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v2"
+	_ "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v2"
+	_ "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2"
+	_ "github.com/envoyproxy/go-control-plane/envoy/service/metrics/v2"
+	_ "github.com/envoyproxy/go-control-plane/envoy/service/ratelimit/v2"
+	_ "github.com/envoyproxy/go-control-plane/envoy/service/trace/v2"
 )
 
 func TestNoop(t *testing.T) {

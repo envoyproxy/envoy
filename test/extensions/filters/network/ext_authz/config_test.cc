@@ -1,4 +1,6 @@
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "extensions/filters/network/ext_authz/config.h"
@@ -19,7 +21,7 @@ namespace ExtAuthz {
 TEST(ExtAuthzFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::ext_authz::v2::ExtAuthz(), context),
+                   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz(), context),
                ProtoValidationException);
 }
 
@@ -40,13 +42,23 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(ExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.ext_authz";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace ExtAuthz

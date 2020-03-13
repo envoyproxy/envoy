@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -13,7 +14,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-Config::Config(const envoy::config::filter::network::rate_limit::v2::RateLimit& config,
+Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLimit& config,
                Stats::Scope& scope, Runtime::Loader& runtime)
     : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
       runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()) {
@@ -68,7 +69,8 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::HeaderMapPtr&&) {
+void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::ResponseHeaderMapPtr&&,
+                      Http::RequestHeaderMapPtr&&) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 

@@ -1,7 +1,0 @@
-# Windows/Envoy specific Bazel build/test options.
-
-build --define signal_trace=disabled
-build --define hot_restart=disabled
-build --define tcmalloc=disabled
-# Build GRPC without c-ares support -- otherwise it will not link
-build --define grpc_no_ares=true

@@ -14,13 +14,6 @@ namespace Common {
 template <class ConfigProto, class RouteConfigProto = ConfigProto>
 class FactoryBase : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  // Server::Configuration::NamedHttpFilterConfigFactory
-  Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
-                                            Server::Configuration::FactoryContext&) override {
-    // Only used in v1 filters.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
@@ -40,14 +33,14 @@ public:
 
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
-                                  Server::Configuration::FactoryContext& context) override {
+                                  Server::Configuration::ServerFactoryContext& context,
+                                  ProtobufMessage::ValidationVisitor& validator) override {
     return createRouteSpecificFilterConfigTyped(
-        MessageUtil::downcastAndValidate<const RouteConfigProto&>(
-            proto_config, context.messageValidationVisitor()),
-        context);
+        MessageUtil::downcastAndValidate<const RouteConfigProto&>(proto_config, validator), context,
+        validator);
   }
 
-  std::string name() override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   FactoryBase(const std::string& name) : name_(name) {}
@@ -60,7 +53,8 @@ private:
 
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
-                                       Server::Configuration::FactoryContext&) {
+                                       Server::Configuration::ServerFactoryContext&,
+                                       ProtobufMessage::ValidationVisitor&) {
     return nullptr;
   }
 

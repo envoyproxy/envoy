@@ -4,16 +4,17 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
-#include "envoy/json/json_object.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
-#include "common/json/json_loader.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"
+
+#include "absl/strings/str_join.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
@@ -71,7 +72,7 @@ uint64_t convertPercent(double percent, uint64_t max_value);
  * @param random_value supplies a numerical value to use to evaluate the event.
  * @return bool decision about whether the event should occur.
  */
-bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value);
+bool evaluateFractionalPercent(envoy::type::v3::FractionalPercent percent, uint64_t random_value);
 
 /**
  * Convert a fractional percent denominator enum into an integer.
@@ -79,10 +80,19 @@ bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t 
  * @return the converted denominator.
  */
 uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::FractionalPercent::DenominatorType& denominator);
+    const envoy::type::v3::FractionalPercent::DenominatorType& denominator);
 
 } // namespace ProtobufPercentHelper
 } // namespace Envoy
+
+// Convert an envoy::api::v2::core::Percent to a double or a default.
+// @param message supplies the proto message containing the field.
+// @param field_name supplies the field name in the message.
+// @param default_value supplies the default if the field is not present.
+#define PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(message, field_name, default_value)                  \
+  (!std::isnan((message).field_name().value())                                                     \
+       ? (message).has_##field_name() ? (message).field_name().value() : default_value             \
+       : throw EnvoyException(fmt::format("Value not in the range of 0..100 range.")))
 
 // Convert an envoy::api::v2::core::Percent to a rounded integer or a default.
 // @param message supplies the proto message containing the field.
@@ -91,7 +101,7 @@ uint64_t fractionalPercentDenominatorToInt(
 // @param default_value supplies the default if the field is not present.
 //
 // TODO(anirudhmurali): Recommended to capture and validate NaN values in PGV
-// Issue: https://github.com/lyft/protoc-gen-validate/issues/85
+// Issue: https://github.com/envoyproxy/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
   (!std::isnan((message).field_name().value())                                                     \
@@ -107,11 +117,16 @@ public:
   MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
 };
 
+class TypeUtil {
+public:
+  static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
+};
+
 class RepeatedPtrUtil {
 public:
   static std::string join(const Protobuf::RepeatedPtrField<std::string>& source,
                           const std::string& delimiter) {
-    return StringUtil::join(std::vector<std::string>(source.begin(), source.end()), delimiter);
+    return absl::StrJoin(std::vector<std::string>(source.begin(), source.end()), delimiter);
   }
 
   template <class ProtoType>
@@ -191,29 +206,21 @@ public:
 
   using FileExtensions = ConstSingleton<FileExtensionValues>;
 
-  static std::size_t hash(const Protobuf::Message& message) {
-    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
-    // message doesn't hash to different values.
-    std::string text;
-    {
-      // For memory safety, the StringOutputStream needs to be destroyed before
-      // we read the string.
-      Protobuf::io::StringOutputStream string_stream(&text);
-      Protobuf::io::CodedOutputStream coded_stream(&string_stream);
-      coded_stream.SetSerializationDeterministic(true);
-      message.SerializeToCodedStream(&coded_stream);
-    }
-    return HashUtil::xxHash64(text);
-  }
-
-  static void checkUnknownFields(const Protobuf::Message& message,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor);
+  /**
+   * A hash function uses Protobuf::TextFormat to force deterministic serialization recursively
+   * including known types in google.protobuf.Any. See
+   * https://github.com/protocolbuffers/protobuf/issues/5731 for the context.
+   * Using this function is discouraged, see discussion in
+   * https://github.com/envoyproxy/envoy/issues/8301.
+   */
+  static std::size_t hash(const Protobuf::Message& message);
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
+  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
@@ -225,8 +232,9 @@ public:
    *    in disallowed_features in runtime_features.h
    */
   static void
-  checkForDeprecation(const Protobuf::Message& message,
-                      Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
+  checkForUnexpectedFields(const Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
@@ -238,21 +246,13 @@ public:
   template <class MessageType>
   static void validate(const MessageType& message,
                        ProtobufMessage::ValidationVisitor& validation_visitor) {
-    // Log warnings or throw errors if deprecated fields are in use.
-    checkForDeprecation(message);
-    checkUnknownFields(message, validation_visitor);
+    // Log warnings or throw errors if deprecated fields or unknown fields are in use.
+    checkForUnexpectedFields(message, validation_visitor);
 
     std::string err;
     if (!Validate(message, &err)) {
-      throw ProtoValidationException(err, message);
+      throw ProtoValidationException(err, API_RECOVER_ORIGINAL(message));
     }
-  }
-
-  template <class MessageType>
-  static void loadFromFileAndValidate(const std::string& path, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-    loadFromFile(path, message, validation_visitor);
-    validate(message, validation_visitor);
   }
 
   template <class MessageType>
@@ -280,18 +280,42 @@ public:
   }
 
   /**
+   * Convert from google.protobuf.Any to a typed message. This should be used
+   * instead of the inbuilt UnpackTo as it performs validation of results.
+   *
+   * @param any_message source google.protobuf.Any message.
+   * @param message destination to unpack to.
+   *
+   * @throw EnvoyException if the message does not unpack.
+   */
+  static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
+
+  /**
    * Convert from google.protobuf.Any to a typed message.
    * @param message source google.protobuf.Any message.
-   * @param validation_visitor message validation visitor instance.
    *
    * @return MessageType the typed message inside the Any.
    */
   template <class MessageType>
   static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
     MessageType typed_message;
-    if (!message.UnpackTo(&typed_message)) {
-      throw EnvoyException("Unable to unpack " + message.DebugString());
-    }
+    unpackTo(message, typed_message);
+    return typed_message;
+  };
+
+  /**
+   * Convert and validate from google.protobuf.Any to a typed message.
+   * @param message source google.protobuf.Any message.
+   *
+   * @return MessageType the typed message inside the Any.
+   * @throw ProtoValidationException if the message does not satisfy its type constraints.
+   */
+  template <class MessageType>
+  static inline MessageType
+  anyConvertAndValidate(const ProtobufWkt::Any& message,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) {
+    MessageType typed_message = anyConvert<MessageType>(message);
+    validate(typed_message, validation_visitor);
     return typed_message;
   };
 
@@ -307,6 +331,7 @@ public:
   static void jsonConvert(const ProtobufWkt::Struct& source,
                           ProtobufMessage::ValidationVisitor& validation_visitor,
                           Protobuf::Message& dest);
+  static void jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest);
 
   /**
    * Extract YAML as string from a google.protobuf.Message.
@@ -333,15 +358,6 @@ public:
                                               bool always_print_primitive_fields = false);
 
   /**
-   * Extract JSON object from a google.protobuf.Message.
-   * @param message message of type type.googleapis.com/google.protobuf.Message.
-   * @return Json::ObjectSharedPtr of JSON object or nullptr if unable to extract.
-   */
-  static Json::ObjectSharedPtr getJsonObjectFromMessage(const Protobuf::Message& message) {
-    return Json::Factory::loadFromString(MessageUtil::getJsonStringFromMessage(message));
-  }
-
-  /**
    * Utility method to create a Struct containing the passed in key/value strings.
    *
    * @param key the key to use to set the value
@@ -350,16 +366,49 @@ public:
   static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
 
   /**
+   * Utility method to create a Struct containing the passed in key/value map.
+   *
+   * @param fields the key/value pairs to initialize the Struct proto
+   */
+  static ProtobufWkt::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
+
+  /**
    * Utility method to print a human readable string of the code passed in.
    *
    * @param code the protobuf error code
    */
   static std::string CodeEnumToString(ProtobufUtil::error::Code code);
+
+  /**
+   * Modifies a message such that all sensitive data (that is, fields annotated as
+   * `udpa.annotations.sensitive`) is redacted for display. String-typed fields annotated as
+   * `sensitive` will be replaced with the string "[redacted]", bytes-typed fields will be replaced
+   * with the bytes `5B72656461637465645D` (the ASCII / UTF-8 encoding of the string "[redacted]"),
+   * primitive-typed fields (including enums) will be cleared, and message-typed fields will be
+   * traversed recursively to redact their contents.
+   *
+   * LIMITATION: This works properly for strongly-typed messages, as well as for messages packed in
+   * a `ProtobufWkt::Any` with a `type_url` corresponding to a proto that was compiled into the
+   * Envoy binary. However it does not work for messages encoded as `ProtobufWkt::Struct`, since
+   * structs are missing the "sensitive" annotations that this function expects. Similarly, it fails
+   * for messages encoded as `ProtobufWkt::Any` with a `type_url` that isn't registered with the
+   * binary. If you're working with struct-typed messages, including those that might be hiding
+   * within strongly-typed messages, please reify them to strongly-typed messages using
+   * `MessageUtil::jsonConvert()` before calling `MessageUtil::redact()`.
+   *
+   * @param message message to redact.
+   */
+  static void redact(Protobuf::Message& message);
 };
 
 class ValueUtil {
 public:
   static std::size_t hash(const ProtobufWkt::Value& value) { return MessageUtil::hash(value); }
+
+  /**
+   * Load YAML string into ProtobufWkt::Value.
+   */
+  static ProtobufWkt::Value loadFromYaml(const std::string& yaml);
 
   /**
    * Compare two ProtobufWkt::Values for equality.
@@ -368,6 +417,50 @@ public:
    * @return true if v1 and v2 are identical
    */
   static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
+
+  /**
+   * @return wrapped ProtobufWkt::NULL_VALUE.
+   */
+  static const ProtobufWkt::Value& nullValue();
+
+  /**
+   * Wrap std::string into ProtobufWkt::Value string value.
+   * @param str string to be wrapped.
+   * @return wrapped string.
+   */
+  static ProtobufWkt::Value stringValue(const std::string& str);
+
+  /**
+   * Wrap boolean into ProtobufWkt::Value boolean value.
+   * @param str boolean to be wrapped.
+   * @return wrapped boolean.
+   */
+  static ProtobufWkt::Value boolValue(bool b);
+
+  /**
+   * Wrap ProtobufWkt::Struct into ProtobufWkt::Value struct value.
+   * @param obj struct to be wrapped.
+   * @return wrapped struct.
+   */
+  static ProtobufWkt::Value structValue(const ProtobufWkt::Struct& obj);
+
+  /**
+   * Wrap number into ProtobufWkt::Value double value.
+   * @param num number to be wrapped.
+   * @return wrapped number.
+   */
+  template <typename T> static ProtobufWkt::Value numberValue(const T num) {
+    ProtobufWkt::Value val;
+    val.set_number_value(static_cast<double>(num));
+    return val;
+  }
+
+  /**
+   * Wrap a collection of ProtobufWkt::Values into ProtobufWkt::Value list value.
+   * @param values collection of ProtobufWkt::Values to be wrapped.
+   * @return wrapped list value.
+   */
+  static ProtobufWkt::Value listValue(const std::vector<ProtobufWkt::Value>& values);
 };
 
 /**

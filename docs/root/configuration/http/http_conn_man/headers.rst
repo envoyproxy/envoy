@@ -471,7 +471,8 @@ route, virtual host, and/or global route configuration level. See the
 
 No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
-:ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>` and
+:ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`,
+:ref:`regex_rewrite <envoy_api_field_route.RouteAction.regex_rewrite>`, and
 :ref:`host_rewrite <envoy_api_field_route.RouteAction.host_rewrite>`.
 
 Headers are appended to requests/responses in the following order: weighted cluster level headers,
@@ -488,15 +489,18 @@ used to delimit variable names.
 
 Supported variable names are:
 
-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-    Remote address of the downstream connection. If the address is an IP address the output does
-    *not* include port.
+%DOWNSTREAM_REMOTE_ADDRESS%
+    Remote address of the downstream connection. If the address is an IP address it includes both
+    address and port.
 
     .. note::
 
       This may not be the physical remote address of the peer if the address has been inferred from
       :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
       <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
+    Same as **%DOWNSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
 
 %DOWNSTREAM_LOCAL_ADDRESS%
     Local address of the downstream connection. If the address is an IP address it includes both
@@ -588,6 +592,9 @@ Supported variable names are:
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
 
+%HOSTNAME%
+    The system hostname.
+
 %PROTOCOL%
     The original protocol which is already added by Envoy as a
     :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>` request header.
@@ -602,15 +609,22 @@ Supported variable names are:
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
 
+    Upstream metadata cannot be added to request headers as the upstream host has not been selected
+    when custom request headers are generated.
+
 %UPSTREAM_REMOTE_ADDRESS%
     Remote address of the upstream host. If the address is an IP address it includes both address
-    and port.
+    and port. The upstream remote address cannot be added to request headers as the upstream host
+    has not been selected when custom request headers are generated.
 
 %PER_REQUEST_STATE(reverse.dns.data.name)%
     Populates the header with values set on the stream info filterState() object. To be
     usable in custom request/response headers, these values must be of type
     Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
     identifying the organization that created the value and ending in a unique name for the data.
+
+%REQ(header-name)%
+    Populates the header with a value of the request header.
 
 %START_TIME%
     Request start time. START_TIME can be customized with specifiers as specified in

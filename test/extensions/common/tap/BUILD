@@ -16,6 +16,7 @@ envoy_cc_test_library(
     deps = [
         "//source/extensions/common/tap:tap_interface",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -25,6 +26,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/tap:admin",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -34,6 +36,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/tap:tap_matcher",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +44,9 @@ envoy_cc_test(
     name = "tap_config_base_test",
     srcs = ["tap_config_base_test.cc"],
     deps = [
+        "//source/common/buffer:buffer_lib",
         "//source/extensions/common/tap:tap_config_base",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],
 )

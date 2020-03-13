@@ -244,11 +244,6 @@ public:
   explicit DispenserFilterConfigFactory(const std::string& name) : name_(name) {}
 
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
@@ -258,10 +253,12 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
-  std::string name() override { return name_; }
+  std::string name() const override { return name_; }
 
 private:
   const std::string name_;

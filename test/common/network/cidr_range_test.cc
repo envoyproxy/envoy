@@ -1,9 +1,8 @@
-#include <sys/un.h>
-
 #include <iostream>
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/fmt.h"
 #include "common/json/json_loader.h"

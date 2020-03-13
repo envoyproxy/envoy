@@ -14,8 +14,8 @@ envoy_cc_library(
     deps = [
         ":tap_matcher",
         "//include/envoy/http:header_map_interface",
-        "@envoy_api//envoy/data/tap/v2alpha:wrapper_cc",
-        "@envoy_api//envoy/service/tap/v2alpha:common_cc",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -27,6 +27,8 @@ envoy_cc_library(
         ":tap_interface",
         ":tap_matcher",
         "//source/common/common:assert_lib",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -36,7 +38,7 @@ envoy_cc_library(
     hdrs = ["tap_matcher.h"],
     deps = [
         "//source/common/http:header_utility_lib",
-        "@envoy_api//envoy/service/tap/v2alpha:common_cc",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -49,7 +51,9 @@ envoy_cc_library(
         "//include/envoy/server:admin_interface",
         "//include/envoy/singleton:manager_interface",
         "//source/common/buffer:buffer_lib",
-        "@envoy_api//envoy/admin/v2alpha:tap_cc",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -60,6 +64,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/thread_local:thread_local_interface",
         "//source/extensions/common/tap:admin",
-        "@envoy_api//envoy/config/common/tap/v2alpha:common_cc",
+        "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/tap/v3:pkg_cc_proto",
     ],
 )

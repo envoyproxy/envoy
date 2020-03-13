@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/stats/scope.h"
@@ -17,7 +17,7 @@ public:
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
   // Config::SubscriptionFactory
-  SubscriptionPtr subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config,
+  SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
                                                absl::string_view type_url, Stats::Scope& scope,
                                                SubscriptionCallbacks& callbacks) override;
 

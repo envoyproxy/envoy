@@ -12,9 +12,9 @@ envoy_package()
 
 exports_files([
     "gen_git_sha.sh",
-    "check_format.py",
-    "header_order.py",
-    "envoy_build_fixer.py",
+    "code_format/check_format.py",
+    "code_format/header_order.py",
+    "code_format/envoy_build_fixer.py",
     "check_repositories.sh",
 ])
 
@@ -23,6 +23,15 @@ envoy_py_test_binary(
     srcs = [
         "socket_passing.py",
     ],
+)
+
+py_library(
+    name = "run_command",
+    srcs = [
+        "run_command.py",
+    ],
+    srcs_version = "PY3",
+    visibility = ["//visibility:public"],
 )
 
 envoy_cc_binary(
@@ -34,6 +43,6 @@ envoy_cc_binary(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:isolated_store_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ] + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
 )

@@ -6,6 +6,9 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <sstream>
+#include <string>
+
 #include "server/backtrace.h"
 
 namespace quic {

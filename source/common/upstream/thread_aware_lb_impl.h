@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+
 #include "common/upstream/load_balancer_impl.h"
 
 #include "absl/synchronization/mutex.h"
@@ -36,9 +38,10 @@ public:
   }
 
 protected:
-  ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
-                              Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                              const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+  ThreadAwareLoadBalancerBase(
+      const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+      Runtime::RandomGenerator& random,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
         factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
@@ -73,10 +76,10 @@ private:
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
     absl::Mutex mutex_;
-    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ GUARDED_BY(mutex_);
+    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
-    std::shared_ptr<HealthyLoad> healthy_per_priority_load_ GUARDED_BY(mutex_);
-    std::shared_ptr<DegradedLoad> degraded_per_priority_load_ GUARDED_BY(mutex_);
+    std::shared_ptr<HealthyLoad> healthy_per_priority_load_ ABSL_GUARDED_BY(mutex_);
+    std::shared_ptr<DegradedLoad> degraded_per_priority_load_ ABSL_GUARDED_BY(mutex_);
   };
 
   virtual HashingLoadBalancerSharedPtr

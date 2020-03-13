@@ -34,7 +34,8 @@ or cluster. For a plain text socket this might look like:
 
   transport_socket:
     name: envoy.transport_sockets.tap
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.transport_socket.tap.v2alpha.Tap
       common_config:
         static_config:
           match_config:
@@ -45,7 +46,7 @@ or cluster. For a plain text socket this might look like:
                 file_per_tap:
                   path_prefix: /some/tap/path
       transport_socket:
-        name: raw_buffer
+        name: envoy.transport_sockets.raw_buffer
 
 For a TLS socket, this will be:
 
@@ -53,7 +54,8 @@ For a TLS socket, this will be:
 
   transport_socket:
     name: envoy.transport_sockets.tap
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.transport_socket.tap.v2alpha.Tap
       common_config:
         static_config:
           match_config:
@@ -64,8 +66,8 @@ For a TLS socket, this will be:
                 file_per_tap:
                   path_prefix: /some/tap/path
       transport_socket:
-        name: ssl
-        config: <TLS context>
+        name: envoy.transport_sockets.tls
+        typed_config: <TLS context>
 
 where the TLS context configuration replaces any existing :ref:`downstream
 <envoy_api_msg_auth.DownstreamTlsContext>` or :ref:`upstream
@@ -111,7 +113,7 @@ analysis with tools such as `Wireshark <https://www.wireshark.org/>`_ with the
 
 .. code-block:: bash
 
-  bazel run @envoy_api//tools:tap2pcap /some/tap/path_0.pb path_0.pcap
+  bazel run @envoy_api_canonical//tools:tap2pcap /some/tap/path_0.pb path_0.pcap
   tshark -r path_0.pcap -d "tcp.port==10000,http2" -P
     1   0.000000    127.0.0.1 → 127.0.0.1    HTTP2 157 Magic, SETTINGS, WINDOW_UPDATE, HEADERS
     2   0.013713    127.0.0.1 → 127.0.0.1    HTTP2 91 SETTINGS, SETTINGS, WINDOW_UPDATE

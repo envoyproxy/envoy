@@ -42,9 +42,9 @@ protected:
   std::string hostname_{"www.fake.com"};
   quic::QuicSocketAddress server_address_;
   quic::QuicTransportVersion version_{quic::QUIC_VERSION_UNSUPPORTED};
-  quic::QuicStringPiece chlo_hash_{""};
+  quiche::QuicheStringPiece chlo_hash_{""};
   std::string server_config_{"Server Config"};
-  std::vector<std::string> expected_certs_{absl::StrCat("Fake cert from ", hostname_)};
+  std::vector<std::string> expected_certs_{"Fake cert"};
   std::string expected_signature_{absl::StrCat("Fake signature for { ", server_config_, " }")};
   EnvoyQuicFakeProofSource proof_source_;
   EnvoyQuicFakeProofVerifier proof_verifier_;
@@ -62,8 +62,8 @@ TEST_F(EnvoyQuicFakeProofSourceTest, TestGetProof) {
 TEST_F(EnvoyQuicFakeProofSourceTest, TestVerifyProof) {
   EXPECT_EQ(quic::QUIC_SUCCESS,
             proof_verifier_.VerifyProof(hostname_, /*port=*/0, server_config_, version_, chlo_hash_,
-                                        expected_certs_, "Fake timestamp", expected_signature_,
-                                        nullptr, nullptr, nullptr, nullptr));
+                                        expected_certs_, "", expected_signature_, nullptr, nullptr,
+                                        nullptr, nullptr));
   std::vector<std::string> wrong_certs{"wrong cert"};
   EXPECT_EQ(quic::QUIC_FAILURE,
             proof_verifier_.VerifyProof(hostname_, /*port=*/0, server_config_, version_, chlo_hash_,

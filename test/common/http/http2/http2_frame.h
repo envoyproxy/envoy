@@ -19,63 +19,63 @@ class Http2Frame {
 public:
   Http2Frame() = default;
 
-  using iterator = DataContainer::iterator;
-  using const_iterator = DataContainer::const_iterator;
+  using Iterator = DataContainer::iterator;
+  using ConstIterator = DataContainer::const_iterator;
 
   static constexpr size_t HeaderSize = 9;
   static const char Preamble[25];
 
   enum class Type : uint8_t {
-    DATA = 0,
-    HEADERS,
-    PRIORITY,
-    RST_STREAM,
-    SETTINGS,
-    PUSH_PROMISE,
-    PING,
-    GOAWAY,
-    WINDOW_UPDATE,
-    CONTINUATION
+    Data = 0,
+    Headers,
+    Priority,
+    RstStream,
+    Settings,
+    PushPromise,
+    Ping,
+    GoAway,
+    WindowUpdate,
+    Continuation
   };
 
   enum class SettingsFlags : uint8_t {
-    NONE = 0,
-    ACK = 1,
+    None = 0,
+    Ack = 1,
   };
 
   enum class HeadersFlags : uint8_t {
-    NONE = 0,
-    END_STREAM = 1,
-    END_HEADERS = 4,
+    None = 0,
+    EndStream = 1,
+    EndHeaders = 4,
   };
 
   enum class DataFlags : uint8_t {
-    NONE = 0,
-    END_STREAM = 1,
+    None = 0,
+    EndStream = 1,
   };
 
   // See https://tools.ietf.org/html/rfc7541#appendix-A for static header indexes
   enum class StaticHeaderIndex : uint8_t {
-    UNKNOWN,
-    METHOD_GET = 2,
-    METHOD_POST = 3,
-    PATH = 4,
-    STATUS_200 = 8,
-    STATUS_404 = 13,
-    SCHEME_HTTPS = 7,
-    HOST = 38,
+    Unknown,
+    MethodGet = 2,
+    MethodPost = 3,
+    Path = 4,
+    Status200 = 8,
+    Status404 = 13,
+    SchemeHttps = 7,
+    Host = 38,
   };
 
-  enum class ResponseStatus { UNKNOWN, _200, _404 };
+  enum class ResponseStatus { Unknown, Ok, NotFound };
 
   // Methods for creating HTTP2 frames
-  static Http2Frame makePingFrame(absl::string_view data = nullptr);
-  static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::NONE);
+  static Http2Frame makePingFrame(absl::string_view data = {});
+  static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
   static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
-                                          HeadersFlags flags = HeadersFlags::NONE);
+                                          HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeEmptyContinuationFrame(uint32_t stream_index,
-                                               HeadersFlags flags = HeadersFlags::NONE);
-  static Http2Frame makeEmptyDataFrame(uint32_t stream_index, DataFlags flags = DataFlags::NONE);
+                                               HeadersFlags flags = HeadersFlags::None);
+  static Http2Frame makeEmptyDataFrame(uint32_t stream_index, DataFlags flags = DataFlags::None);
   static Http2Frame makePriorityFrame(uint32_t stream_index, uint32_t dependent_index);
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
@@ -110,10 +110,10 @@ public:
   size_t size() const { return data_.size(); }
   // Access to the raw frame bytes
   const uint8_t* data() const { return data_.data(); }
-  iterator begin() { return data_.begin(); }
-  iterator end() { return data_.end(); }
-  const_iterator begin() const { return data_.begin(); }
-  const_iterator end() const { return data_.end(); }
+  Iterator begin() { return data_.begin(); }
+  Iterator end() { return data_.end(); }
+  ConstIterator begin() const { return data_.begin(); }
+  ConstIterator end() const { return data_.end(); }
   bool empty() const { return data_.empty(); }
 
 private:

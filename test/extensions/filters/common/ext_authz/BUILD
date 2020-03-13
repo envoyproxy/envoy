@@ -21,6 +21,8 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -30,6 +32,9 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
+        "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -39,6 +44,8 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -48,6 +55,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )
 
@@ -62,6 +70,8 @@ envoy_cc_mock(
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

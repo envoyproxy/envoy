@@ -4,9 +4,9 @@
 
 #include "common/network/connection_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -62,7 +62,7 @@ public:
   }
 
   absl::Mutex rand_lock_;
-  std::unique_ptr<TestRandomGenerator> rng_ GUARDED_BY(rand_lock_);
+  std::unique_ptr<TestRandomGenerator> rng_ ABSL_GUARDED_BY(rand_lock_);
 };
 
 // perform static registration

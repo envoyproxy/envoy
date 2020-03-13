@@ -16,13 +16,11 @@
 using testing::_;
 using testing::ContainsRegex;
 using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +35,7 @@ public:
   TestNamedSerializerConfigFactory(std::function<MockSerializer*()> f) : f_(f) {}
 
   SerializerPtr createSerializer() override { return SerializerPtr{f_()}; }
-  std::string name() override {
+  std::string name() const override {
     return SerializerNames::get().fromType(SerializationType::Hessian2);
   }
 
@@ -53,7 +51,7 @@ public:
     protocol->initSerializer(serialization_type);
     return protocol;
   }
-  std::string name() override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
+  std::string name() const override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
 
   std::function<MockProtocol*()> f_;
 };
@@ -309,7 +307,7 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_, tcpConnPoolForCluster(cluster_name_, _, _, _))
+  EXPECT_CALL(context_.cluster_manager_, tcpConnPoolForCluster(cluster_name_, _, _))
       .WillOnce(Return(nullptr));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))

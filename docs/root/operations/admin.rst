@@ -126,8 +126,51 @@ modify different aspects of the server:
   information.
 
 .. warning::
+  Configuration may include :ref:`TLS certificates <envoy_api_msg_auth.TlsCertificate>`. Before
+  dumping the configuration, Envoy will attempt to redact the ``private_key`` and ``password``
+  fields from any certificates it finds. This relies on the configuration being a strongly-typed
+  protobuf message. If your Envoy configuration uses deprecated ``config`` fields (of type
+  ``google.protobuf.Struct``), please update to the recommended ``typed_config`` fields (of type
+  ``google.protobuf.Any``) to ensure sensitive data is redacted properly.
+
+.. warning::
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
+
+.. _operations_admin_interface_config_dump_by_mask:
+
+.. http:get:: /config_dump?mask={}
+
+  Specify a subset of fields that you would like to be returned. The mask is parsed as a
+  ``ProtobufWkt::FieldMask`` and applied to each top level dump such as
+  :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>` and
+  :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`.
+  This behavior changes if both resource and mask query parameters are specified. See
+  below for details.
+
+.. _operations_admin_interface_config_dump_by_resource:
+
+.. http:get:: /config_dump?resource={}
+
+  Dump only the currently loaded configuration that matches the specified resource. The resource must
+  be a repeated field in one of the top level config dumps such as
+  :ref:`static_listeners <envoy_api_field_admin.v2alpha.ListenersConfigDump.static_listeners>` from
+  :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>` or
+  :ref:`dynamic_active_clusters <envoy_api_field_admin.v2alpha.ClustersConfigDump.dynamic_active_clusters>` from
+  :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`. If you need a non-repeated
+  field, use the mask query parameter documented above. If you want only a subset of fields from the repeated
+  resource, use both as documented below.
+
+.. _operations_admin_interface_config_dump_by_resource_and_mask:
+
+.. http:get:: /config_dump?resource={}&mask={}
+
+  When both resource and mask query parameters are specified, the mask is applied to every element
+  in the desired repeated field so that only a subset of fields are returned. The mask is parsed
+  as a ``ProtobufWkt::FieldMask``.
+
+  For example, get the names of all active dynamic clusters with
+  ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
 
 .. http:get:: /contention
 
@@ -189,7 +232,7 @@ modify different aspects of the server:
 
     Generally only used during development.
 
-.. http:post:: /memory
+.. http:get:: /memory
 
   Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
 
@@ -200,8 +243,26 @@ modify different aspects of the server:
 .. http:post:: /reset_counters
 
   Reset all counters to zero. This is useful along with :http:get:`/stats` during debugging. Note
-  that this does not drop any data sent to statsd. It just effects local output of the
+  that this does not drop any data sent to statsd. It just affects local output of the
   :http:get:`/stats` command.
+
+.. _operations_admin_interface_drain:
+
+.. http:post:: /drain_listeners
+   
+   :ref:`Drains <arch_overview_draining>` all listeners.
+
+   .. http:post:: /drain_listeners?inboundonly
+
+   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in 
+   :ref:`Listener <envoy_api_msg_Listener>` is used to determine whether a listener 
+   is inbound or outbound.
+
+.. attention::
+
+   This operation directly stops the matched listeners on workers. Once listeners in a given
+   traffic direction are stopped, listener additions and modifications in that direction
+   are not allowed.
 
 .. http:get:: /server_info
 
@@ -353,6 +414,55 @@ modify different aspects of the server:
   You can optionally pass the `usedonly` URL query argument to only get statistics that
   Envoy has updated (counters incremented at least once, gauges changed at least once,
   and histograms added to at least once)
+
+  .. http:get:: /stats/recentlookups
+
+  This endpoint helps Envoy developers debug potential contention
+  issues in the stats system. Initially, only the count of StatName
+  lookups is acumulated, not the specific names that are being looked
+  up. In order to see specific recent requests, you must enable the
+  feature by POSTing to `/stats/recentlookups/enable`. There may be
+  approximately 40-100 nanoseconds of added overhead per lookup.
+
+  When enabled, this endpoint emits a table of stat names that were
+  recently accessed as strings by Envoy. Ideally, strings should be
+  converted into StatNames, counters, gauges, and histograms by Envoy
+  code only during startup or when receiving a new configuration via
+  xDS. This is because when stats are looked up as strings they must
+  take a global symbol table lock. During startup this is acceptable,
+  but in response to user requests on high core-count machines, this
+  can cause performance issues due to mutex contention.
+
+  This admin endpoint requires Envoy to be started with option
+  `--use-fake-symbol-table 0`.
+
+  See :repo:`source/docs/stats.md` for more details.
+
+  Note also that actual mutex contention can be tracked via :http:get:`/contention`.
+
+  .. http:post:: /stats/recentlookups/enable
+
+  Turns on collection of recent lookup of stat-names, thus enabling
+  `/stats/recentlookups`.
+
+  See :repo:`source/docs/stats.md` for more details.
+
+  .. http:post:: /stats/recentlookups/disable
+
+  Turns off collection of recent lookup of stat-names, thus disabling
+  `/stats/recentlookups`. It also clears the list of lookups. However,
+  the total count, visible as stat `server.stats_recent_lookups`, is
+  not cleared, and continues to accumulate.
+
+  See :repo:`source/docs/stats.md` for more details.
+
+  .. http:post:: /stats/recentlookups/clear
+
+  Clears all outstanding lookups and counts. This clears all recent
+  lookups data as well as the count, but collection continues if
+  it is enabled.
+
+  See :repo:`source/docs/stats.md` for more details.
 
 .. _operations_admin_interface_runtime:
 

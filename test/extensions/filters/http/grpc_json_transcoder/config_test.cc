@@ -1,4 +1,5 @@
-#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.validate.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.validate.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/config.h"
 
@@ -15,10 +16,20 @@ namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(
-      GrpcJsonTranscoderFilterConfig().createFilterFactoryFromProto(
-          envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder(), "stats", context),
-      ProtoValidationException);
+  EXPECT_THROW(GrpcJsonTranscoderFilterConfig().createFilterFactoryFromProto(
+                   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder(),
+                   "stats", context),
+               ProtoValidationException);
+}
+
+// Test that the deprecated extension name still functions.
+TEST(GrpcJsonTranscoderFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.grpc_json_transcoder";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
+          deprecated_name));
 }
 
 } // namespace

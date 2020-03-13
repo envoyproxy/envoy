@@ -1,6 +1,8 @@
 #include <iostream>
 #include <unordered_map>
 
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
@@ -10,6 +12,7 @@
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -24,10 +27,10 @@ namespace Envoy {
 namespace Server {
 
 namespace {
-
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
+  buildFilterChain(const envoy::config::listener::v3::FilterChain&,
+                   FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
     return std::make_unique<Network::MockFilterChain>();
   }
@@ -81,6 +84,7 @@ public:
 
   // Dummy method
   void close() override {}
+  bool isOpen() const override { return false; }
   Network::Address::SocketType socketType() const override {
     return Network::Address::SocketType::Stream;
   }
@@ -108,47 +112,57 @@ const char YamlHeader[] = R"EOF(
     address:
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
-    - name: "envoy.listener.tls_inspector"
+    - name: "envoy.filters.listener.tls_inspector"
       config: {}
     filter_chains:
     - filter_chain_match:
         # empty
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
 const char YamlSingleServer[] = R"EOF(
     - filter_chain_match:
         server_names: "server1.example.com"
         transport_protocol: "tls"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
 const char YamlSingleDstPortTop[] = R"EOF(
     - filter_chain_match:
         destination_port: )EOF";
 const char YamlSingleDstPortBottom[] = R"EOF(
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a")EOF";
 } // namespace
 
 class FilterChainBenchmarkFixture : public benchmark::Fixture {
 public:
+  using Fixture::SetUp;
   void SetUp(const ::benchmark::State& state) override {
     int64_t input_size = state.range(0);
     std::vector<std::string> port_chains;
@@ -162,20 +176,22 @@ public:
     TestUtility::loadFromYaml(listener_yaml_config_, listener_config_);
     filter_chains_ = listener_config_.filter_chains();
   }
-  absl::Span<const envoy::api::v2::listener::FilterChain* const> filter_chains_;
+  absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
   std::string listener_yaml_config_;
-  envoy::api::v2::Listener listener_config_;
+  envoy::config::listener::v3::Listener listener_config_;
   MockFilterChainFactoryBuilder dummy_builder_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
 };
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 (::benchmark::State& state) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_);
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
+    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
   }
 }
 
@@ -187,9 +203,11 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     sockets.push_back(std::move(*MockConnectionSocket::createMockConnectionSocket(
         10000 + i, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111)));
   }
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   FilterChainManagerImpl filter_chain_manager{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_);
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context};
+
+  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, filter_chain_manager);
   for (auto _ : state) {
     for (int i = 0; i < state.range(0); i++) {
       filter_chain_manager.findFilterChain(sockets[i]);

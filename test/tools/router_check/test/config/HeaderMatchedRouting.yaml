@@ -30,7 +30,9 @@ virtual_hosts:
       prefix: /
       headers:
       - name: test_header_pattern
-        regex_match: ^user=test-\d+$
+        safe_regex_match:
+          google_re2: {}
+          regex: ^user=test-\d+$
     route:
       cluster: local_service_with_header_pattern_set_regex
   - match:

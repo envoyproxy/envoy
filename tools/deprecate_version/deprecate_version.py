@@ -22,6 +22,8 @@
 
 from __future__ import print_function
 
+import datetime
+from datetime import date
 from collections import defaultdict
 import os
 import re
@@ -117,25 +119,14 @@ def CreateIssues(access_token, runtime_and_pr):
       try:
         repo.create_issue(title, body=body, assignees=[user.login], labels=labels)
       except github.GithubException as e:
-        print(('GithubException while creating issue. This is typically because'
-               ' a user is not a member of envoyproxy org. Check that %s is in '
-               'the org.') % user.login)
-        raise
-
-
-def GetRuntimeAlreadyTrue():
-  """Returns a list of runtime flags already defaulted to true
-  """
-  runtime_already_true = []
-  runtime_features = re.compile(r'.*"(envoy.reloadable_features..*)",.*')
-  with open('source/common/runtime/runtime_features.cc', 'r') as features:
-    for line in features.readlines():
-      match = runtime_features.match(line)
-      if match and 'test_feature_true' not in match.group(1):
-        print("Found existing flag " + match.group(1))
-        runtime_already_true.append(match.group(1))
-
-  return runtime_already_true
+        try:
+          body += '\ncc @' + user.login
+          repo.create_issue(title, body=body, labels=labels)
+          print(('unable to assign issue %s to %s. Add them to the Envoy proxy org'
+                 'and assign it their way.') % (title, user.login))
+        except github.GithubException as e:
+          print('GithubException while creating issue.')
+          raise
 
 
 def GetRuntimeAndPr():
@@ -143,42 +134,55 @@ def GetRuntimeAndPr():
   """
   repo = Repo(os.getcwd())
 
-  runtime_already_true = GetRuntimeAlreadyTrue()
-
   # grep source code looking for reloadable features which are true to find the
   # PR they were added.
-  grep_output = subprocess.check_output('grep -r "envoy.reloadable_features\." source/', shell=True)
   features_to_flip = []
-  runtime_feature_regex = re.compile(r'.*(source.*cc).*"(envoy.reloadable_features\.[^"]+)".*')
-  for line in grep_output.splitlines():
-    match = runtime_feature_regex.match(str(line))
-    if match:
-      filename = (match.group(1))
-      runtime_guard = match.group(2)
-      # If this runtime guard isn't true, ignore it for this release.
-      if not runtime_guard in runtime_already_true:
-        continue
-      # For true runtime guards, walk the blame of the file they were added to,
-      # to find the pr the feature was added.
-      for commit, lines in repo.blame('HEAD', filename):
-        for line in lines:
-          if runtime_guard in line:
-            pr = (int(re.search('\(#(\d+)\)', commit.message).group(1)))
-            # Add the runtime guard and PR to the list to file issues about.
-            features_to_flip.append((runtime_guard, pr))
 
-    else:
-      print('no match in ' + str(line) + ' please address manually!')
+  runtime_features = re.compile(r'.*"(envoy.reloadable_features..*)",.*')
 
-  return features_to_flip
+  removal_date = date.today() - datetime.timedelta(days=183)
+  found_test_feature_true = False
+
+  # Walk the blame of runtime_features and look for true runtime features older than 6 months.
+  for commit, lines in repo.blame('HEAD', 'source/common/runtime/runtime_features.cc'):
+    for line in lines:
+      match = runtime_features.match(line)
+      if match:
+        runtime_guard = match.group(1)
+        if runtime_guard == 'envoy.reloadable_features.test_feature_false':
+          print("Found end sentinel\n")
+          if not found_test_feature_true:
+            # The script depends on the cc file having the true runtime block
+            # before the false runtime block.  Fail if one isn't found.
+            print('Failed to find test_feature_true.  Script needs fixing')
+            sys.exit(1)
+          return features_to_flip
+        if runtime_guard == 'envoy.reloadable_features.test_feature_true':
+          found_test_feature_true = True
+          continue
+        pr = (int(re.search('\(#(\d+)\)', commit.message).group(1)))
+        pr_date = date.fromtimestamp(commit.committed_date)
+        removable = (pr_date < removal_date)
+        # Add the runtime guard and PR to the list to file issues about.
+        print('Flag ' + runtime_guard + ' added at ' + str(pr_date) + ' ' +
+              (removable and 'and is safe to remove' or 'is not ready to remove'))
+        if removable:
+          features_to_flip.append((runtime_guard, pr))
+  print('Failed to find test_feature_false.  Script needs fixing')
+  sys.exit(1)
 
 
 if __name__ == '__main__':
   runtime_and_pr = GetRuntimeAndPr()
 
+  if not runtime_and_pr:
+    print('No code is deprecated.')
+    sys.exit(0)
+
   access_token = os.getenv('GH_ACCESS_TOKEN')
   if not access_token:
-    print('Missing GH_ACCESS_TOKEN')
+    print(
+        'Missing GH_ACCESS_TOKEN: see instructions in tools/deprecate_version/deprecate_version.py')
     sys.exit(1)
 
   CreateIssues(access_token, runtime_and_pr)

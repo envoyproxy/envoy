@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -27,12 +27,12 @@ public:
    * Returns the host that was actually resolved via DNS. If port was originally specified it will
    * be stripped from this return value.
    */
-  virtual const std::string& resolvedHost() PURE;
+  virtual const std::string& resolvedHost() const PURE;
 
   /**
    * Returns whether the original host is an IP address.
    */
-  virtual bool isIpAddress() PURE;
+  virtual bool isIpAddress() const PURE;
 
   /**
    * Indicates that the host has been used and should not be purged depending on any configured
@@ -143,6 +143,11 @@ public:
    * @return a handle that on destruction will de-register the callbacks.
    */
   virtual AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) PURE;
+
+  /**
+   * @return all hosts currently stored in the cache.
+   */
+  virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
@@ -159,8 +164,8 @@ public:
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
    */
-  virtual DnsCacheSharedPtr getCache(
-      const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config) PURE;
+  virtual DnsCacheSharedPtr
+  getCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
 };
 
 using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
@@ -170,7 +175,9 @@ using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
  */
 DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
                                          Event::Dispatcher& main_thread_dispatcher,
-                                         ThreadLocal::SlotAllocator& tls, Stats::Scope& root_scope);
+                                         ThreadLocal::SlotAllocator& tls,
+                                         Runtime::RandomGenerator& random,
+                                         Stats::Scope& root_scope);
 
 /**
  * Factory for getting a DNS cache manager.

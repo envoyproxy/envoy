@@ -6,10 +6,10 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include <arpa/inet.h>
 #include <cstring>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
@@ -88,8 +88,10 @@ bool HexDecodeToUInt32(absl::string_view data, uint32_t* out) {
 
   std::string byte_string = absl::HexStringToBytes(data_padded);
 
-  ASSERT(byte_string.size() == 4u);
-  *out = ntohl(*reinterpret_cast<const uint32_t*>(byte_string.c_str()));
+  RELEASE_ASSERT(byte_string.size() == 4u, "padded dtat is not 4 byte long.");
+  uint32_t bytes;
+  memcpy(&bytes, byte_string.data(), byte_string.length());
+  *out = ntohl(bytes);
   return true;
 }
 

@@ -1,6 +1,5 @@
 #include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
 
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
@@ -65,7 +64,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this, nullptr);
+      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(

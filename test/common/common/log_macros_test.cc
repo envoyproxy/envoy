@@ -5,6 +5,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -22,6 +23,8 @@ public:
     ENVOY_CONN_LOG(info, "fake message", connection_);
     ENVOY_STREAM_LOG(info, "fake message", stream_);
   }
+
+  void logMessageEscapeSequences() { ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test"); }
 
 private:
   NiceMock<Network::MockConnection> connection_;
@@ -87,7 +90,7 @@ TEST(Logger, logAsStatement) {
 }
 
 TEST(Logger, checkLoggerLevel) {
-  class logTestClass : public Logger::Loggable<Logger::Id::misc> {
+  class LogTestClass : public Logger::Loggable<Logger::Id::misc> {
   public:
     void setLevel(const spdlog::level::level_enum level) { ENVOY_LOGGER().set_level(level); }
     uint32_t executeAtTraceLevel() {
@@ -101,19 +104,37 @@ TEST(Logger, checkLoggerLevel) {
     }
   };
 
-  logTestClass testObj;
+  LogTestClass test_obj;
 
   // Set Loggers severity low
-  testObj.setLevel(spdlog::level::trace);
-  EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(1));
+  test_obj.setLevel(spdlog::level::trace);
+  EXPECT_THAT(test_obj.executeAtTraceLevel(), testing::Eq(1));
 
-  testObj.setLevel(spdlog::level::info);
-  EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(2));
+  test_obj.setLevel(spdlog::level::info);
+  EXPECT_THAT(test_obj.executeAtTraceLevel(), testing::Eq(2));
 }
 
 TEST(RegistryTest, LoggerWithName) {
   EXPECT_EQ(nullptr, Logger::Registry::logger("blah"));
   EXPECT_EQ("upstream", Logger::Registry::logger("upstream")->name());
+}
+
+class FormatTest : public testing::Test {
+public:
+  static void logMessageEscapeSequences() {
+    ENVOY_LOG_MISC(info, "line 1 \n line 2 \t tab \\r test");
+  }
+};
+
+TEST_F(FormatTest, OutputUnescaped) {
+  const Envoy::ExpectedLogMessages message{{"info", "line 1 \n line 2 \t tab \\r test"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(message, logMessageEscapeSequences());
+}
+
+TEST_F(FormatTest, OutputEscaped) {
+  // Note this uses a raw string literal
+  const Envoy::ExpectedLogMessages message{{"info", R"(line 1 \n line 2 \t tab \\r test)"}};
+  EXPECT_LOG_CONTAINS_ALL_OF_ESCAPED(message, logMessageEscapeSequences());
 }
 
 } // namespace Envoy

@@ -1,5 +1,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -44,7 +46,7 @@ Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool) {
 
 void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   // Clear dynamic metadata.
-  envoy::api::v2::core::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   auto& metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
@@ -72,7 +74,7 @@ DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
 void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
 
 void MySQLFilter::onNewMessage(MySQLSession::State state) {
-  if (state == MySQLSession::State::MYSQL_CHALLENGE_REQ) {
+  if (state == MySQLSession::State::ChallengeReq) {
     config_->stats_.login_attempts_.inc();
   }
 }
@@ -116,7 +118,7 @@ void MySQLFilter::onCommand(Command& command) {
   config_->stats_.queries_parsed_.inc();
 
   // Set dynamic metadata
-  envoy::api::v2::core::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   ProtobufWkt::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);

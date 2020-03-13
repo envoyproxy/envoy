@@ -1,6 +1,5 @@
 #pragma once
 
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <array>
@@ -9,6 +8,7 @@
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
 
@@ -45,7 +45,7 @@ public:
   virtual absl::uint128 address() const PURE;
 };
 
-enum class IpVersion { v4, v6 };
+enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)
 
 /**
  * Interface for a generic IP address.
@@ -139,7 +139,7 @@ public:
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    *   is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallIntResult bind(int fd) const PURE;
+  virtual Api::SysCallIntResult bind(os_fd_t fd) const PURE;
 
   /**
    * Connect a socket to this address. The socket should have been created with a call to socket()
@@ -148,7 +148,7 @@ public:
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    *   is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallIntResult connect(int fd) const PURE;
+  virtual Api::SysCallIntResult connect(os_fd_t fd) const PURE;
 
   /**
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.

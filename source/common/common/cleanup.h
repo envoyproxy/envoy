@@ -10,11 +10,19 @@ namespace Envoy {
 // RAII cleanup via functor.
 class Cleanup {
 public:
-  Cleanup(std::function<void()> f) : f_(std::move(f)) {}
+  Cleanup(std::function<void()> f) : f_(std::move(f)), cancelled_(false) {}
   ~Cleanup() { f_(); }
+
+  void cancel() {
+    cancelled_ = true;
+    f_ = []() {};
+  }
+
+  bool cancelled() { return cancelled_; }
 
 private:
   std::function<void()> f_;
+  bool cancelled_;
 };
 
 // RAII helper class to add an element to an std::list on construction and erase
@@ -31,7 +39,7 @@ public:
   }
 
   // Cancel deletion of the element on destruction. This should be called if the iterator has
-  // been invalidated, eg. if the list has been cleared or the element removed some other way.
+  // been invalidated, e.g., if the list has been cleared or the element removed some other way.
   void cancel() { cancelled_ = true; }
 
   // Delete the element now, instead of at destruction.

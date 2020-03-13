@@ -29,8 +29,9 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/tcp:conn_pool_interface",
         "//include/envoy/thread_local:thread_local_interface",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -39,7 +40,7 @@ envoy_cc_library(
     hdrs = ["health_checker.h"],
     deps = [
         ":upstream_interface",
-        "@envoy_api//envoy/data/core/v2alpha:health_check_event_cc",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -55,8 +56,10 @@ envoy_cc_library(
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/stats:primitive_stats_macros",
         "//include/envoy/stats:stats_macros",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -75,7 +78,7 @@ envoy_cc_library(
     hdrs = ["load_balancer_type.h"],
     deps = [
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
@@ -84,7 +87,7 @@ envoy_cc_library(
     hdrs = ["locality.h"],
     deps = [
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -94,7 +97,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
-        "@envoy_api//envoy/data/cluster/v2alpha:outlier_detection_event_cc",
+        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -102,6 +105,7 @@ envoy_cc_library(
     name = "retry_interface",
     hdrs = ["retry.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/upstream:types_interface",
         "//include/envoy/upstream:upstream_interface",
     ],
@@ -147,6 +151,8 @@ envoy_cc_library(
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/upstream:types_interface",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -161,6 +167,7 @@ envoy_cc_library(
         ":resource_manager_interface",
         ":upstream_interface",
         "//include/envoy/common:callback",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/config:typed_metadata_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",
@@ -168,6 +175,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
-        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

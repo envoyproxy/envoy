@@ -7,6 +7,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
+#include "common/common/logger.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -14,9 +17,12 @@ namespace Common {
 namespace Redis {
 
 /**
- * All RESP types as defined here: https://redis.io/topics/protocol
+ * All RESP types as defined here: https://redis.io/topics/protocol with the exception of
+ * CompositeArray. CompositeArray is an internal type that behaves like an Array type. Its first
+ * element is a SimpleString or BulkString and the rest of the elements are portion of another
+ * Array. This is created for performance.
  */
-enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array };
+enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array, CompositeArray };
 
 /**
  * A variant implementation of a RESP value optimized for performance. A C++11 union is used for
@@ -25,17 +31,87 @@ enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array };
 class RespValue {
 public:
   RespValue() : type_(RespType::Null) {}
-  ~RespValue() { cleanup(); }
 
-  RespValue(const RespValue& other);             // copy constructor
-  RespValue& operator=(const RespValue& other);  // copy assignment
-  bool operator==(const RespValue& other) const; // test for equality, unit tests
+  RespValue(std::shared_ptr<RespValue> base_array, const RespValue& command, const uint64_t start,
+            const uint64_t end)
+      : type_(RespType::CompositeArray) {
+    new (&composite_array_) CompositeArray(std::move(base_array), command, start, end);
+  }
+  virtual ~RespValue() { cleanup(); }
+
+  RespValue(const RespValue& other);                // copy constructor
+  RespValue(RespValue&& other) noexcept;            // move constructor
+  RespValue& operator=(const RespValue& other);     // copy assignment
+  RespValue& operator=(RespValue&& other) noexcept; // move assignment
+  bool operator==(const RespValue& other) const;    // test for equality, unit tests
   bool operator!=(const RespValue& other) const { return !(*this == other); }
 
   /**
    * Convert a RESP value to a string for debugging purposes.
    */
   std::string toString() const;
+
+  /**
+   * Holds the data for CompositeArray RespType
+   */
+  class CompositeArray {
+  public:
+    CompositeArray() = default;
+    CompositeArray(std::shared_ptr<RespValue> base_array, const RespValue& command,
+                   const uint64_t start, const uint64_t end)
+        : base_array_(std::move(base_array)), command_(&command), start_(start), end_(end) {
+      ASSERT(command.type() == RespType::BulkString || command.type() == RespType::SimpleString);
+      ASSERT(base_array_ != nullptr);
+      ASSERT(base_array_->type() == RespType::Array);
+      ASSERT(start <= end);
+      ASSERT(end < base_array_->asArray().size());
+    }
+
+    const RespValue* command() const { return command_; }
+    const std::shared_ptr<RespValue>& baseArray() const { return base_array_; }
+
+    bool operator==(const CompositeArray& other) const;
+
+    uint64_t size() const;
+
+    /**
+     * Forward const iterator for CompositeArray.
+     * @note this implementation currently supports the minimum functionality needed to support
+     *       the `for (const RespValue& value : array)` idiom.
+     */
+    struct CompositeArrayConstIterator {
+      CompositeArrayConstIterator(const RespValue* command, const std::vector<RespValue>& array,
+                                  uint64_t index, bool first)
+          : command_(command), array_(array), index_(index), first_(first) {}
+      const RespValue& operator*();
+      CompositeArrayConstIterator& operator++();
+      bool operator!=(const CompositeArrayConstIterator& rhs) const;
+      static const CompositeArrayConstIterator& empty();
+
+      const RespValue* command_;
+      const std::vector<RespValue>& array_;
+      uint64_t index_;
+      bool first_;
+    };
+
+    CompositeArrayConstIterator begin() const noexcept {
+      return (command_ && base_array_)
+                 ? CompositeArrayConstIterator{command_, base_array_->asArray(), start_, true}
+                 : CompositeArrayConstIterator::empty();
+    }
+
+    CompositeArrayConstIterator end() const noexcept {
+      return (command_ && base_array_)
+                 ? CompositeArrayConstIterator{command_, base_array_->asArray(), end_ + 1, false}
+                 : CompositeArrayConstIterator::empty();
+    }
+
+  private:
+    std::shared_ptr<RespValue> base_array_;
+    const RespValue* command_;
+    uint64_t start_;
+    uint64_t end_;
+  };
 
   /**
    * The following are getters and setters for the internal value. A RespValue starts as null,
@@ -47,6 +123,8 @@ public:
   const std::string& asString() const;
   int64_t& asInteger();
   int64_t asInteger() const;
+  CompositeArray& asCompositeArray();
+  const CompositeArray& asCompositeArray() const;
 
   /**
    * Get/set the type of the RespValue. A RespValue can only be a single type at a time. Each time
@@ -60,6 +138,7 @@ private:
     std::vector<RespValue> array_;
     std::string string_;
     int64_t integer_;
+    CompositeArray composite_array_;
   };
 
   void cleanup();
@@ -68,6 +147,8 @@ private:
 };
 
 using RespValuePtr = std::unique_ptr<RespValue>;
+using RespValueSharedPtr = std::shared_ptr<RespValue>;
+using RespValueConstSharedPtr = std::shared_ptr<const RespValue>;
 
 /**
  * Callbacks that the decoder fires.

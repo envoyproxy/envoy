@@ -6,6 +6,7 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/config/protobuf_link_hacks.h"
 #include "common/event/libevent.h"
 
 #include "test/config_test/config_test.h"
@@ -26,7 +27,7 @@ int main(int argc, char* argv[]) {
     Envoy::Event::Libevent::Global::initialize();
     Envoy::Thread::MutexBasicLockable lock;
     Envoy::Logger::Context logging_context(static_cast<spdlog::level::level_enum>(2),
-                                           Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
+                                           Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
 
     const uint32_t num_tested = Envoy::ConfigTest::run(std::string(argv[1]));
     std::cout << fmt::format("Configs tested: {}. ", num_tested);

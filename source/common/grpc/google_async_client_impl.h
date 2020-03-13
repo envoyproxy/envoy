@@ -3,6 +3,9 @@
 #include <queue>
 
 #include "envoy/api/api.h"
+#include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
@@ -12,6 +15,8 @@
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
+#include "common/grpc/google_grpc_context.h"
+#include "common/grpc/stat_names.h"
 #include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -84,6 +89,14 @@ public:
 private:
   void completionThread();
 
+  // There is blanket google-grpc initialization in MainCommonBase, but that
+  // doesn't cover unit tests. However, putting blanket coverage in ProcessWide
+  // causes background threaded memory allocation in all unit tests making it
+  // hard to measure memory. Thus we also initialize grpc using our idempotent
+  // wrapper-class in classes that need it. See
+  // https://github.com/envoyproxy/envoy/issues/8282 for details.
+  GoogleGrpcContext google_grpc_context_;
+
   // The CompletionQueue for in-flight operations. This must precede completion_thread_ to ensure it
   // is constructed before the thread runs.
   grpc::CompletionQueue cq_;
@@ -108,7 +121,7 @@ struct GoogleAsyncClientStats {
   // .streams_total
   Stats::Counter* streams_total_;
   // .streams_closed_<gRPC status code>
-  std::array<Stats::Counter*, Status::GrpcStatus::MaximumValid + 1> streams_closed_;
+  std::array<Stats::Counter*, Status::WellKnownGrpcStatus::MaximumKnown + 1> streams_closed_;
 };
 
 // Interface to allow the gRPC stub to be mocked out by tests.
@@ -157,23 +170,22 @@ class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logg
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::api::v2::core::GrpcService& config, Api::Api& api);
+                        const envoy::config::core::v3::GrpcService& config, Api::Api& api,
+                        const StatNames& stat_names);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
   AsyncRequest* sendRaw(absl::string_view service_full_name, absl::string_view method_name,
                         Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
                         Tracing::Span& parent_span,
-                        const absl::optional<std::chrono::milliseconds>& timeout) override;
+                        const Http::AsyncClient::RequestOptions& options) override;
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
-                           RawAsyncStreamCallbacks& callbacks) override;
+                           RawAsyncStreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions& options) override;
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
 private:
-  static std::shared_ptr<grpc::Channel>
-  createChannel(const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
-
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
   // This is shared with child streams, so that they can cleanup independent of
@@ -182,7 +194,7 @@ private:
   std::shared_ptr<GoogleStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
-  const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
+  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
 
@@ -198,7 +210,7 @@ class GoogleAsyncStreamImpl : public RawAsyncStream,
 public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                         absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout);
+                        const Http::AsyncClient::StreamOptions& options);
   ~GoogleAsyncStreamImpl() override;
 
   virtual void initialize(bool buffer_body_for_retry);
@@ -224,8 +236,8 @@ private:
   // Write the first PendingMessage in the write queue if non-empty.
   void writeQueued();
   // Deliver notification and update stats when the connection closes.
-  void notifyRemoteClose(Status::GrpcStatus grpc_status, Http::HeaderMapPtr trailing_metadata,
-                         const std::string& message);
+  void notifyRemoteClose(Status::GrpcStatus grpc_status,
+                         Http::ResponseTrailerMapPtr trailing_metadata, const std::string& message);
   // Schedule stream for deferred deletion.
   void deferredDelete();
   // Cleanup and schedule stream for deferred deletion if no inflight
@@ -263,7 +275,7 @@ private:
   std::string service_full_name_;
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;
-  const absl::optional<std::chrono::milliseconds>& timeout_;
+  const Http::AsyncClient::StreamOptions& options_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;
@@ -286,7 +298,7 @@ private:
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
   std::deque<std::pair<GoogleAsyncTag::Operation, bool>>
-      completed_ops_ GUARDED_BY(completed_ops_lock_);
+      completed_ops_ ABSL_GUARDED_BY(completed_ops_lock_);
   Thread::MutexBasicLockable completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;
@@ -300,7 +312,7 @@ public:
   GoogleAsyncRequestImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                          absl::string_view method_name, Buffer::InstancePtr request,
                          RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                         const absl::optional<std::chrono::milliseconds>& timeout);
+                         const Http::AsyncClient::RequestOptions& options);
 
   void initialize(bool buffer_body_for_retry) override;
 
@@ -309,10 +321,10 @@ public:
 
 private:
   // Grpc::RawAsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;
   bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   Buffer::InstancePtr request_;

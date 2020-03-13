@@ -1,5 +1,7 @@
 #include "common/config/watch_map.h"
 
+#include "envoy/service/discovery/v3/discovery.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -54,7 +56,6 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
 void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) {
   if (watches_.empty()) {
-    ENVOY_LOG(warn, "WatchMap::onConfigUpdate: there are no watches!");
     return;
   }
   SubscriptionCallbacks& name_getter = (*watches_.begin())->callbacks_;
@@ -71,28 +72,64 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
     }
   }
 
+  const bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (auto& watch : watches_) {
     const auto this_watch_updates = per_watch_updates.find(watch);
     if (this_watch_updates == per_watch_updates.end()) {
-      // This update included no resources this watch cares about - so we do an empty
-      // onConfigUpdate(), to notify the watch that its resources - if they existed before this -
-      // were dropped.
-      watch->callbacks_.onConfigUpdate({}, version_info);
+      // This update included no resources this watch cares about.
+      // 1) If there is only a single, wildcard watch (i.e. Cluster or Listener), always call
+      //    its onConfigUpdate even if just a no-op, to properly maintain state-of-the-world
+      //    semantics and the update_empty stat.
+      // 2) If this watch previously had some resources, it means this update is removing all
+      //    of this watch's resources, so the watch must be informed with an onConfigUpdate.
+      // 3) Otherwise, we can skip onConfigUpdate for this watch.
+      if (map_is_single_wildcard || !watch->state_of_the_world_empty_) {
+        watch->callbacks_.onConfigUpdate({}, version_info);
+        watch->state_of_the_world_empty_ = true;
+      }
     } else {
       watch->callbacks_.onConfigUpdate(this_watch_updates->second, version_info);
+      watch->state_of_the_world_empty_ = false;
     }
   }
 }
 
+// For responses to on-demand requests, replace the original watch for an alias
+// with one for the resource's name
+AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
+    const envoy::service::discovery::v3::Resource& resource) {
+  absl::flat_hash_set<Watch*> watches_to_update;
+  for (const auto& alias : resource.aliases()) {
+    const auto interested_watches = watch_interest_.find(alias);
+    if (interested_watches != watch_interest_.end()) {
+      for (const auto& interested_watch : interested_watches->second) {
+        watches_to_update.insert(interested_watch);
+      }
+    }
+  }
+
+  auto ret = AddedRemoved({}, {});
+  for (const auto& watch : watches_to_update) {
+    const auto& converted_watches = updateWatchInterest(watch, {resource.name()});
+    std::copy(converted_watches.added_.begin(), converted_watches.added_.end(),
+              std::inserter(ret.added_, ret.added_.end()));
+    std::copy(converted_watches.removed_.begin(), converted_watches.removed_.end(),
+              std::inserter(ret.removed_, ret.removed_.end()));
+  }
+
+  return ret;
+}
+
 void WatchMap::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
-  absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<envoy::api::v2::Resource>> per_watch_added;
+  absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>>
+      per_watch_added;
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
     for (const auto& interested_watch : interested_in_r) {
@@ -142,6 +179,7 @@ std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& ne
       newly_added_to_subscription.insert(name);
       watch_interest_[name] = {watch};
     } else {
+      // Add this watch to the already-existing set at watch_interest_[name]
       entry->second.insert(watch);
     }
   }

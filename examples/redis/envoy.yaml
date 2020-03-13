@@ -7,13 +7,15 @@ static_resources:
         port_value: 1999
     filter_chains:
     - filters:
-      - name: envoy.redis_proxy
+      - name: envoy.filters.network.redis_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: egress_redis
-          cluster: redis_cluster
           settings:
             op_timeout: 5s
+          prefix_routes:
+            catch_all_route:
+              cluster: redis_cluster
   clusters:
   - name: redis_cluster
     connect_timeout: 1s

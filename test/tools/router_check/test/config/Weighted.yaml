@@ -14,6 +14,15 @@ virtual_hosts:
               weight: 30
             - name: cluster3
               weight: 40
+  virtual_clusters:
+    - headers:
+      - name: :path
+        safe_regex_match:
+          google_re2: {}
+          regex: ^/test/\d+$
+      - name: :method
+        exact_match: GET
+      name: test_virtual_cluster
 - name: www2
   domains:
   - www2.lyft.com

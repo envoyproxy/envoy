@@ -4,9 +4,8 @@
 
 set -e
 
-# TEST_SRCDIR/TEST_WORKSPACE don't matter to config_impl_test, but they need to
-# be present because main.cc checks for their presence.
-TEST_SRCDIR=/totally TEST_WORKSPACE=/bogus $*
+# Set NORUNFILES so test/main doesn't fail when runfiles manifest is not found.
+NORUNFILES=1 $*
 
 # Verify at least one entry is actually generated
 [ -e "${GENRULE_OUTPUT_DIR}"/generated_corpus_0 ]

@@ -1,9 +1,8 @@
 #include "extensions/filters/http/lua/config.h"
 
-#include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.validate.h"
 #include "envoy/registry/registry.h"
-
-#include "common/config/filter_json.h"
 
 #include "extensions/filters/http/lua/lua_filter.h"
 
@@ -13,7 +12,7 @@ namespace HttpFilters {
 namespace Lua {
 
 Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::lua::v2::Lua& proto_config, const std::string&,
+    const envoy::extensions::filters::http::lua::v3::Lua& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
   FilterConfigConstSharedPtr filter_config(new FilterConfig{
       proto_config.inline_code(), context.threadLocal(), context.clusterManager()});
@@ -22,19 +21,10 @@ Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Http::FilterFactoryCb
-LuaFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                     const std::string& stat_prefix,
-                                     Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::lua::v2::Lua proto_config;
-  Config::FilterJson::translateLuaFilter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
-}
-
 /**
  * Static registration for the Lua filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(LuaFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(LuaFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory){"envoy.lua"};
 
 } // namespace Lua
 } // namespace HttpFilters

@@ -1,9 +1,9 @@
 #include "extensions/filters/network/client_ssl_auth/config.h"
 
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
-
-#include "common/config/filter_json.h"
 
 #include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
@@ -12,16 +12,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
 
-Network::FilterFactoryCb
-ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                                Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
-  Config::FilterJson::translateClientSslAuthFilter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, context);
-}
-
 Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,
+    const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& proto_config,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.auth_api_cluster().empty());
   ASSERT(!proto_config.stat_prefix().empty());
@@ -38,7 +30,7 @@ Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProt
  * Static registration for the client SSL auth filter. @see RegisterFactory.
  */
 REGISTER_FACTORY(ClientSslAuthConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory);
+                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.client_ssl_auth"};
 
 } // namespace ClientSslAuth
 } // namespace NetworkFilters

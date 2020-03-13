@@ -1,6 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
+#include "envoy/extensions/filters/http/health_check/v3/health_check.pb.h"
+#include "envoy/extensions/filters/http/health_check/v3/health_check.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -11,17 +12,13 @@ namespace HttpFilters {
 namespace HealthCheck {
 
 class HealthCheckFilterConfig
-    : public Common::FactoryBase<envoy::config::filter::http::health_check::v2::HealthCheck> {
+    : public Common::FactoryBase<envoy::extensions::filters::http::health_check::v3::HealthCheck> {
 public:
   HealthCheckFilterConfig() : FactoryBase(HttpFilterNames::get().HealthCheck) {}
 
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string&,
-                      Server::Configuration::FactoryContext& context) override;
-
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
+      const envoy::extensions::filters::http::health_check::v3::HealthCheck& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

@@ -51,7 +51,6 @@ public:
 
   const LowerCaseString Accept{"accept"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
-  const LowerCaseString AccessControlRequestHeaders{"access-control-request-headers"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
   const LowerCaseString AccessControlAllowHeaders{"access-control-allow-headers"};
@@ -59,6 +58,7 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Age{"age"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
@@ -97,6 +97,8 @@ public:
   const LowerCaseString EnvoyRetryGrpcOn{absl::StrCat(prefix(), "-retry-grpc-on")};
   const LowerCaseString EnvoyRetriableStatusCodes{
       absl::StrCat(prefix(), "-retriable-status-codes")};
+  const LowerCaseString EnvoyRetriableHeaderNames{
+      absl::StrCat(prefix(), "-retriable-header-names")};
   const LowerCaseString EnvoyUpstreamAltStatName{absl::StrCat(prefix(), "-upstream-alt-stat-name")};
   const LowerCaseString EnvoyUpstreamCanary{absl::StrCat(prefix(), "-upstream-canary")};
   const LowerCaseString EnvoyUpstreamHostAddress{absl::StrCat(prefix(), "-upstream-host-address")};
@@ -115,6 +117,7 @@ public:
   const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
+  const LowerCaseString Expires{"expires"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
@@ -123,13 +126,14 @@ public:
   const LowerCaseString GrpcStatus{"grpc-status"};
   const LowerCaseString GrpcTimeout{"grpc-timeout"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString GrpcStatusDetailsBin{"grpc-status-details-bin"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};
+  const LowerCaseString Http2Settings{"http2-settings"};
   const LowerCaseString KeepAlive{"keep-alive"};
-  const LowerCaseString LastModified{"last-modified"};
   const LowerCaseString Location{"location"};
   const LowerCaseString Method{":method"};
-  const LowerCaseString NoChunks{":no-chunks"};
+  const LowerCaseString NoChunks{":no-chunks"}; // Illegal pseudo-header used internally.
   const LowerCaseString Origin{"origin"};
   const LowerCaseString OtSpanContext{"x-ot-span-context"};
   const LowerCaseString Path{":path"};
@@ -153,11 +157,13 @@ public:
 
   struct {
     const std::string Close{"close"};
+    const std::string Http2Settings{"http2-settings"};
     const std::string KeepAlive{"keep-alive"};
     const std::string Upgrade{"upgrade"};
   } ConnectionValues;
 
   struct {
+    const std::string H2c{"h2c"};
     const std::string WebSocket{"websocket"};
   } UpgradeValues;
 
@@ -165,6 +171,7 @@ public:
     const std::string NoCache{"no-cache"};
     const std::string NoCacheMaxAge0{"no-cache, max-age=0"};
     const std::string NoTransform{"no-transform"};
+    const std::string Private{"private"};
   } CacheControlValues;
 
   struct {
@@ -178,6 +185,7 @@ public:
     const std::string GrpcWebText{"application/grpc-web-text"};
     const std::string GrpcWebTextProto{"application/grpc-web-text+proto"};
     const std::string Json{"application/json"};
+    const std::string Protobuf{"application/x-protobuf"};
     const std::string FormUrlEncoded{"application/x-www-form-urlencoded"};
   } ContentTypeValues;
 
@@ -204,6 +212,7 @@ public:
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
     const std::string RetriableStatusCodes{"retriable-status-codes"};
+    const std::string RetriableHeaders{"retriable-headers"};
     const std::string Reset{"reset"};
   } EnvoyRetryOnValues;
 
@@ -224,9 +233,10 @@ public:
     const std::string Delete{"DELETE"};
     const std::string Get{"GET"};
     const std::string Head{"HEAD"};
+    const std::string Options{"OPTIONS"};
+    const std::string Patch{"PATCH"};
     const std::string Post{"POST"};
     const std::string Put{"PUT"};
-    const std::string Options{"OPTIONS"};
     const std::string Trace{"TRACE"};
   } MethodValues;
 
@@ -239,6 +249,7 @@ public:
     const std::string Chunked{"chunked"};
     const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};
+    const std::string Identity{"identity"};
   } TransferEncodingValues;
 
   struct {
@@ -265,6 +276,7 @@ public:
     const std::string Http10String{"HTTP/1.0"};
     const std::string Http11String{"HTTP/1.1"};
     const std::string Http2String{"HTTP/2"};
+    const std::string Http3String{"HTTP/3"};
   } ProtocolStrings;
 
   struct {

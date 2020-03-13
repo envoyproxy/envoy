@@ -16,9 +16,9 @@ namespace Thread {
 class MutexBasicLockable : public BasicLockable {
 public:
   // BasicLockable
-  void lock() EXCLUSIVE_LOCK_FUNCTION() override { mutex_.Lock(); }
-  bool tryLock() EXCLUSIVE_TRYLOCK_FUNCTION(true) override { return mutex_.TryLock(); }
-  void unlock() UNLOCK_FUNCTION() override { mutex_.Unlock(); }
+  void lock() ABSL_EXCLUSIVE_LOCK_FUNCTION() override { mutex_.Lock(); }
+  bool tryLock() ABSL_EXCLUSIVE_TRYLOCK_FUNCTION(true) override { return mutex_.TryLock(); }
+  void unlock() ABSL_UNLOCK_FUNCTION() override { mutex_.Unlock(); }
 
 private:
   friend class CondVar;
@@ -52,7 +52,7 @@ public:
    * source/source/thread.h for an alternate implementation, which does not work
    * with thread annotation.
    */
-  void wait(MutexBasicLockable& mutex) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  void wait(MutexBasicLockable& mutex) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     condvar_.Wait(&mutex.mutex_);
   }
   template <class Rep, class Period>
@@ -60,9 +60,9 @@ public:
   /**
    * @return WaitStatus whether the condition timed out or not.
    */
-  WaitStatus
-  waitFor(MutexBasicLockable& mutex,
-          std::chrono::duration<Rep, Period> duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  WaitStatus waitFor(
+      MutexBasicLockable& mutex,
+      std::chrono::duration<Rep, Period> duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     return condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration))
                ? WaitStatus::Timeout
                : WaitStatus::NoTimeout;

@@ -19,6 +19,7 @@ envoy_cc_test_library(
     srcs = [
         "main.cc",
         "test_listener.cc",
+        "test_runner.cc",
         "test_runner.h",
     ],
     hdrs = ["test_listener.h"],
@@ -29,7 +30,6 @@ envoy_cc_test_library(
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
-        "//source/common/http/http2:codec_lib",
         "//source/exe:process_wide_lib",
         "//test/common/runtime:utility_lib",
         "//test/mocks/access_log:access_log_mocks",

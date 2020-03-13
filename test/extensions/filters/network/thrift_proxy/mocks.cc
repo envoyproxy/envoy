@@ -128,6 +128,7 @@ MockRateLimitPolicy::~MockRateLimitPolicy() = default;
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
+  ON_CALL(*this, clusterHeader()).WillByDefault(ReturnRef(cluster_header_));
 }
 MockRouteEntry::~MockRouteEntry() = default;
 

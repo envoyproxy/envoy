@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/filter/network/mysql_proxy/v1alpha1/mysql_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
+#include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -20,12 +21,12 @@ namespace MySQLProxy {
  */
 Network::FilterFactoryCb
 NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy& proto_config,
+    const envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
 
-  const std::string stat_prefix = fmt::format("mysql.{}.", proto_config.stat_prefix());
+  const std::string stat_prefix = fmt::format("mysql.{}", proto_config.stat_prefix());
 
   MySQLFilterConfigSharedPtr filter_config(
       std::make_shared<MySQLFilterConfig>(stat_prefix, context.scope()));

@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -41,20 +42,23 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
-        "//source/common/config:filter_json_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
         "//source/extensions/filters/network:well_known_names",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["mysql_config.cc"],
     hdrs = ["mysql_config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
+    status = "alpha",
     deps = [
         ":proxy_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/mysql_proxy/v1alpha1:mysql_proxy_cc",
+        "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )

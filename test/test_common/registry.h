@@ -15,6 +15,7 @@ namespace Registry {
 template <class Base> class InjectFactory {
 public:
   InjectFactory(Base& instance) : instance_(instance) {
+    EXPECT_STRNE(instance.category().c_str(), "");
     displaced_ = Registry::FactoryRegistry<Base>::replaceFactoryForTest(instance_);
   }
 
@@ -23,7 +24,8 @@ public:
       auto injected = Registry::FactoryRegistry<Base>::replaceFactoryForTest(*displaced_);
       EXPECT_EQ(injected, &instance_);
     } else {
-      Registry::FactoryRegistry<Base>::removeFactoryForTest(instance_.name());
+      Registry::FactoryRegistry<Base>::removeFactoryForTest(instance_.name(),
+                                                            instance_.configType());
     }
   }
 

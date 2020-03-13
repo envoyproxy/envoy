@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -15,15 +16,19 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
+        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/config/filter/http/dynamic_forward_proxy/v2alpha:dynamic_forward_proxy_cc",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
@@ -31,5 +36,6 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:proxy_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

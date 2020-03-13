@@ -16,7 +16,6 @@ using testing::_;
 using testing::AnyNumber;
 using testing::Combine;
 using testing::DoAll;
-using testing::Expectation;
 using testing::ExpectationSet;
 using testing::InSequence;
 using testing::Invoke;

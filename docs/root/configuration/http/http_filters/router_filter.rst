@@ -9,7 +9,7 @@ configured :ref:`route table <envoy_api_msg_RouteConfiguration>`. In addition to
 redirection, the filter also handles retry, statistics, etc.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.router.v2.Router>`
-* This filter should be configured with the name *envoy.router*.
+* This filter should be configured with the name *envoy.filters.http.router*.
 
 .. _config_http_filters_router_headers_consumed:
 
@@ -36,7 +36,9 @@ or :ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not speci
 A few notes on how Envoy does retries:
 
 * The route timeout (set via :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` or the
-  :ref:`route configuration <envoy_api_field_route.RouteAction.timeout>`) **includes** all
+  :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` in route configuration or set via 
+  `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_  by specifying 
+  :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.timeout>` in route configuration) **includes** all
   retries. Thus if the request timeout is set to 3s, and the first request attempt takes 2.7s, the
   retry (including back-off) has .3s to complete. This is by design to avoid an exponential
   retry/timeout explosion.
@@ -110,6 +112,11 @@ retriable-status-codes
   in either :ref:`the retry policy <envoy_api_field_route.RetryPolicy.retriable_status_codes>`
   or in the :ref:`config_http_filters_router_x-envoy-retriable-status-codes` header.
 
+retriable-headers
+  Envoy will attempt a retry if the upstream server response includes any headers matching in either
+  :ref:`the retry policy <envoy_api_field_route.RetryPolicy.retriable_headers>` or in the
+  :ref:`config_http_filters_router_x-envoy-retriable-header-names` header.
+
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route
 configuration <envoy_api_field_route.RouteAction.retry_policy>` or via the
@@ -158,6 +165,25 @@ Note that retry policies can also be applied at the :ref:`route level
 
 By default, Envoy will *not* perform retries unless you've configured them per above.
 
+.. _config_http_filters_router_x-envoy-retriable-header-names:
+
+x-envoy-retriable-header-names
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Setting this header informs Envoy about what response headers should be considered retriable. It is used
+in conjunction with the :ref:`retriable-headers <config_http_filters_router_x-envoy-retry-on>` retry policy.
+When the corresponding retry policy is set, the response headers provided by this list header value will be
+considered retriable in addition to the response headers enabled for retry through other retry policies.
+
+The list is a comma-separated list of header names: "X-Upstream-Retry,X-Try-Again" would cause any upstream
+responses containing either one of the specified headers to be retriable if 'retriable-headers' retry policy
+is enabled. Header names are case-insensitive.
+
+Only the names of retriable response headers can be specified via the request header. A more sophisticated
+retry policy based on the response headers can be specified by using arbitrary header matching rules
+via :ref:`retry policy configuration <envoy_api_field_route.RetryPolicy.retriable_headers>`.
+
+This header will only be honored for requests from internal clients.
+
 .. _config_http_filters_router_x-envoy-retriable-status-codes:
 
 x-envoy-retriable-status-codes
@@ -205,7 +231,9 @@ is considered. See also :ref:`config_http_filters_router_x-envoy-upstream-rq-tim
 x-envoy-upstream-rq-timeout-ms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Setting this header on egress requests will cause Envoy to override the :ref:`route configuration
+Setting this header on egress requests will cause Envoy to override the :ref:`route configuration timeout
+<envoy_api_field_route.RouteAction.timeout>` or gRPC client timeout set via `grpc-timeout header 
+<https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_  by specifying :ref:`max_grpc_timeout 
 <envoy_api_field_route.RouteAction.timeout>`. The timeout must be specified in millisecond
 units. See also :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`.
 
@@ -215,10 +243,11 @@ x-envoy-upstream-rq-per-try-timeout-ms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Setting this header on egress requests will cause Envoy to set a *per try* timeout on routed
-requests. This timeout must be <= the global route timeout (see
-:ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`) or it is ignored. This allows a
-caller to set a tight per try timeout to allow for retries while maintaining a reasonable overall
-timeout.
+requests. If a global route timeout is configured, this timeout must be less than the global route
+timeout (see :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`) or it is ignored.
+This allows a caller to set a tight per try timeout to allow for retries while maintaining a
+reasonable overall timeout. This timeout only applies before any part of the response is sent to
+the downstream, which normally happens after the upstream has sent response headers.
 
 x-envoy-hedge-on-per-try-timeout
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -316,7 +345,8 @@ responses.
 x-envoy-original-path
 ^^^^^^^^^^^^^^^^^^^^^
 
-If the route utilizes :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`,
+If the route utilizes :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`
+or :ref:`regex_rewrite <envoy_api_field_route.RouteAction.regex_rewrite>`,
 Envoy will put the original path header in this header. This can be useful for logging and
 debugging.
 
@@ -347,7 +377,7 @@ owning HTTP connection manager.
   :widths: 1, 1, 2
 
   no_route, Counter, Total requests that had no route and resulted in a 404
-  no_cluster, Counter, Total requests in which the target cluster did not exist and resulted in a 404
+  no_cluster, Counter, Total requests in which the target cluster did not exist and which by default result in a 503
   rq_redirect, Counter, Total requests that resulted in a redirect response
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests

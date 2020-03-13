@@ -8,8 +8,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/callback.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -24,6 +26,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -77,12 +80,15 @@ public:
   /**
    * @return host specific counters.
    */
-  virtual std::vector<Stats::CounterSharedPtr> counters() const PURE;
+  virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
+  counters() const PURE;
 
   /**
    * Create a connection for this host.
    * @param dispatcher supplies the owning dispatcher.
    * @param options supplies the socket options that will be set on the new connection.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
    * @return the connection data which includes the raw network connection as well as the *real*
    *         host that backs it. The reason why a 2nd host is returned is that some hosts are
    *         logical and wrap multiple real network destinations. In this case, a different host
@@ -97,15 +103,19 @@ public:
   /**
    * Create a health check connection for this host.
    * @param dispatcher supplies the owning dispatcher.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
    * @return the connection data.
    */
-  virtual CreateConnectionData
-  createHealthCheckConnection(Event::Dispatcher& dispatcher) const PURE;
+  virtual CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
    * @return host specific gauges.
    */
-  virtual std::vector<Stats::GaugeSharedPtr> gauges() const PURE;
+  virtual std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
+  gauges() const PURE;
 
   /**
    * Atomically clear a health flag for a host. Flags are specified in HealthFlags.
@@ -210,7 +220,7 @@ using ExcludedHostVectorConstSharedPtr = std::shared_ptr<const ExcludedHostVecto
 
 using HostListPtr = std::unique_ptr<HostVector>;
 using LocalityWeightsMap =
-    std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
+    std::unordered_map<envoy::config::core::v3::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
 using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
 
 /**
@@ -583,8 +593,8 @@ public:
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   GAUGE(version, NeverImport)                                                                      \
-  HISTOGRAM(upstream_cx_connect_ms)                                                                \
-  HISTOGRAM(upstream_cx_length_ms)
+  HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
+  HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
@@ -610,6 +620,13 @@ public:
   REMAINING_GAUGE(remaining_rq, Accumulate)
 
 /**
+ * All stats around timeout budgets. Not used by default.
+ */
+#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(HISTOGRAM)                                                \
+  HISTOGRAM(upstream_rq_timeout_budget_percent_used, Unspecified)                                  \
+  HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
+
+/**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 struct ClusterStats {
@@ -628,6 +645,13 @@ struct ClusterLoadReportStats {
  */
 struct ClusterCircuitBreakersStats {
   ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * Struct definition for cluster timeout budget stats. @see stats_macros.h
+ */
+struct ClusterTimeoutBudgetStats {
+  ALL_CLUSTER_TIMEOUT_BUDGET_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -690,6 +714,12 @@ public:
   virtual uint64_t features() const PURE;
 
   /**
+   * @return const Http::Http1Settings& for HTTP/1.1 connections created on behalf of this cluster.
+   *         @see Http::Http1Settings.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
+
+  /**
    * @return const Http::Http2Settings& for HTTP/2 connections created on behalf of this cluster.
    *         @see Http::Http2Settings.
    */
@@ -711,7 +741,7 @@ public:
    * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
    *         load balancers for this cluster.
    */
-  virtual const envoy::api::v2::Cluster::CommonLbConfig& lbConfig() const PURE;
+  virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
   /**
    * @return the type of load balancing that the cluster should use.
@@ -721,24 +751,24 @@ public:
   /**
    * @return the service discovery type to use for resolving the cluster.
    */
-  virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
+  virtual envoy::config::cluster::v3::Cluster::DiscoveryType type() const PURE;
 
   /**
    * @return the type of cluster, only used for custom discovery types.
    */
-  virtual const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&
   clusterType() const PURE;
 
   /**
    * @return configuration for least request load balancing, only used if LB type is least request.
    */
-  virtual const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
   lbLeastRequestConfig() const PURE;
 
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
-  virtual const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const PURE;
 
   /**
@@ -746,7 +776,7 @@ public:
    *         for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.
    */
-  virtual const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
   lbOriginalDstConfig() const PURE;
 
   /**
@@ -765,6 +795,12 @@ public:
   virtual uint64_t maxRequestsPerConnection() const PURE;
 
   /**
+   * @return uint32_t the maximum number of response headers. The default value is 100. Results in a
+   * reset if the number of headers exceeds this value.
+   */
+  virtual uint32_t maxResponseHeadersCount() const PURE;
+
+  /**
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
@@ -776,10 +812,10 @@ public:
   virtual ResourceManager& resourceManager(ResourcePriority priority) const PURE;
 
   /**
-   * @return Network::TransportSocketFactory& the factory of transport socket to use when
-   *         communicating with the cluster.
+   * @return TransportSocketMatcher& the transport socket matcher associated
+   * factory.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.
@@ -798,6 +834,11 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
+   * @return absl::optional<ClusterTimeoutBudgetStats>& stats on timeout budgets for this cluster.
+   */
+  virtual const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const PURE;
+
+  /**
    * Returns an optional source address for upstream connections to bind to.
    *
    * @return a source address to bind to or nullptr if no bind need occur.
@@ -812,7 +853,7 @@ public:
   /**
    * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
    */
-  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
 
   /**
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
@@ -847,6 +888,18 @@ public:
    * Create network filters on a new upstream connection.
    */
   virtual void createNetworkFilterChain(Network::Connection& connection) const PURE;
+
+  /**
+   * Calculate upstream protocol based on features.
+   */
+  virtual Http::Protocol
+  upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
+
+  /**
+   * @return http protocol options for upstream connection
+   */
+  virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const PURE;
 
 protected:
   /**

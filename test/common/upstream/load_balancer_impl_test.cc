@@ -4,6 +4,8 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/config/cluster/v3/cluster.pb.h"
+
 #include "common/network/utility.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -27,7 +29,7 @@ namespace {
 class LoadBalancerTestBase : public testing::TestWithParam<bool> {
 protected:
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
-  // all the load balancers have equivalent functonality for failover host sets.
+  // all the load balancers have equivalent functionality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
@@ -42,15 +44,15 @@ protected:
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
-  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config_;
 };
 
 class TestLb : public LoadBalancerBase {
 public:
   TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random,
-         const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::isInPanic;
@@ -84,7 +86,6 @@ public:
     }
 
     for (; i < (num_healthy_hosts + num_degraded_hosts + num_excluded_hosts); ++i) {
-      host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
       host_set.excluded_hosts_.push_back(host_set.hosts_[i]);
     }
     host_set.runCallbacks({}, {});
@@ -113,7 +114,7 @@ public:
     return aggregatePrioritySetsValues<bool>(lb_, &TestLb::isInPanic);
   }
 
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   TestLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
 
@@ -128,10 +129,18 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
                                        Upstream::DegradedLoad({0, 0, 0})};
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
-  // With both the primary and failover hosts unhealthy, we should select an
-  // unhealthy primary host.
-  EXPECT_EQ(100, lb_.percentageLoad(0));
-  EXPECT_EQ(0, lb_.percentageLoad(1));
+  // Primary and failover are in panic mode. Load distribution is based
+  // on the number of hosts regardless of their health.
+  EXPECT_EQ(50, lb_.percentageLoad(0));
+  EXPECT_EQ(50, lb_.percentageLoad(1));
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
+
+  // Modify number of hosts in failover, but leave them in the unhealthy state
+  // primary and secondary are in panic mode, so load distribution is
+  // based on number of host regardless of their health.
+  updateHostSet(failover_host_set_, 2, 0);
+  EXPECT_EQ(34, lb_.percentageLoad(0));
+  EXPECT_EQ(66, lb_.percentageLoad(1));
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Update the priority set with a new priority level P=2 and ensure the host
@@ -300,12 +309,27 @@ TEST_P(LoadBalancerBaseTest, GentleFailover) {
   ASSERT_THAT(getPanic(), ElementsAre(false, false));
 
   // Health P=0 == 100*1.4 == 35 P=1 == 35
-  // Since 4 hosts are excluded and are unhealthy, P=0 should be considered fully unavailable.
-  // Total health = 35% is less than 100%. Panic should trigger.
+  // Total health = 35% is less than 100%.
+  // All priorities are in panic mode (situation called TotalPanic)
+  // Load is distributed based on number of hosts regardless of their health status.
+  // P=0 and P=1 have 4 hosts each so each priority will receive 50% of the traffic.
   updateHostSet(host_set_, 4 /* num_hosts */, 0 /* num_healthy_hosts */, 0 /* num_degraded_hosts */,
                 4 /* num_excluded_hosts */);
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
-  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 100));
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true));
+
+  // Make sure that in TotalPanic mode (all levels are in Panic),
+  // load distribution depends only on number of hosts.
+  // excluded_hosts should not be taken into account.
+  // P=0 has 4 hosts with 1 excluded, P=1 has 6 hosts with 2 excluded.
+  // P=0 should receive 4/(4+6)=40% of traffic
+  // P=1 should receive 6/(4+6)=60% of traffic
+  updateHostSet(host_set_, 4 /* num_hosts */, 0 /* num_healthy_hosts */, 0 /* num_degraded_hosts */,
+                1 /* num_excluded_hosts */);
+  updateHostSet(failover_host_set_, 6 /* num_hosts */, 1 /* num_healthy_hosts */,
+                0 /* num_degraded_hosts */, 2 /* num_excluded_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(40, 60));
   ASSERT_THAT(getPanic(), ElementsAre(true, true));
 }
 
@@ -380,11 +404,13 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
 
   // Levels P=0 and P=1 are totally down. P=2 is 40*1.4=56%% healthy.
   // 100% of the traffic should go to P=2. All levels P=0, P=1 and P=2 should
-  // be in panic mode even though P=0 and P=1 do not receive any load.
+  // be in panic mode.
+  // Since all levels are in panic mode load distribution is based
+  // on number of hosts in each level.
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
-  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
 
@@ -400,21 +426,34 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
 
-  // All levels are completely down. 100% of traffic should go to P=0
-  // and P=0 should be in panic mode
+  // All levels are completely down - situation called TotalPanic.
+  // Load is distributed based on the number
+  // of hosts in the priority in relation to the total number of hosts.
+  // Here the total number of hosts is 10.
+  // priority 0 will receive 5/10: 50% of the traffic
+  // priority 1 will receive 3/10: 30% of the traffic
+  // priority 2 will receive 2/10: 20% of the traffic
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
-  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
-  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
-  ASSERT_THAT(getLoadPercentage(), ElementsAre(100, _, _));
+  updateHostSet(failover_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 2 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 30, 20));
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
-  ASSERT_THAT(getPanic(), ElementsAre(true, _, _));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
 
-  // Rounding errors should be picked up by the first healthy priority.
+  // Rounding errors should be picked up by the first priority.
+  // All priorities are in panic mode - situation called TotalPanic.
+  // Load is distributed based on the number
+  // of hosts in the priority in relation to the total number of hosts.
+  // Total number of hosts is 5+6+3=14.
+  // priority 0 should receive 5/14=37% of traffic
+  // priority 1 should receive 6/14=42% of traffic
+  // priority 2 should receive 3/14=21% of traffic
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
-  updateHostSet(failover_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
-  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
-  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 67, 33));
+  updateHostSet(failover_host_set_, 6 /* num_hosts */, 2 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 3 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(37, 42, 21));
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
 
   // Load should spill over into degraded.
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
@@ -427,6 +466,9 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
 
   // Rounding errors should be picked up by the first priority with degraded hosts when
   // there are no healthy priorities.
+  // Disable panic threshold to prevent total panic from kicking in.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(0));
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
                 2 /* num_degraded_hosts */);
@@ -434,6 +476,43 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
                 1 /* num_degraded_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 67, 33));
+
+  // Simulate Total Panic mode. There is no healthy hosts, but there are
+  // degraded hosts. Because there is Total Panic, load is distributed
+  // based just on number of hosts in priorities regardless of its health.
+  // Rounding errors should be picked up by the first priority.
+  // Enable back panic threshold.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillRepeatedly(Return(50));
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                2 /* num_degraded_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                1 /* num_degraded_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+
+  // Rounding error should be allocated to the first non-empty priority
+  // In this test P=0 is not empty.
+  updateHostSet(host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
+
+  // Rounding error should be allocated to the first non-empty priority
+  // In this test P=0 is empty and P=1 is not empty.
+  updateHostSet(host_set_, 0 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 6 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 67, 33));
+  // In this test P=1 is not empty.
+  updateHostSet(host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
 }
 
 TEST_P(LoadBalancerBaseTest, BoundaryConditions) {
@@ -516,6 +595,39 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Update the priority set with a new priority level P=2 and ensure the host
+  // is chosen
+  MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
+  tertiary_host_set_.hosts_ = *hosts;
+  tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
+  HostVector add_hosts;
+  add_hosts.push_back(tertiary_host_set_.hosts_[0]);
+  tertiary_host_set_.runCallbacks(add_hosts, {});
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Now add a healthy host in P=0 and make sure it is immediately selected.
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks(add_hosts, {});
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+
+  // Remove the healthy host and ensure we fail back over to tertiary_host_set_
+  host_set_.healthy_hosts_ = {};
+  host_set_.runCallbacks({}, {});
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Test that extending the priority set with an existing LB causes the correct updates when the
+// cluster is configured to disable on panic.
+TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
+  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+
+  init(false);
+  // With both the primary and failover hosts unhealthy, we should select no host.
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
@@ -827,6 +939,32 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
+}
+
+// Test that no hosts are selected when fail_traffic_on_panic is enabled.
+TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+
+  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+
+  init(false);
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+
+  // Take the threshold back above the panic threshold.
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+  hostSet().runCallbacks({}, {});
+
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+
+  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
 
 // Ensure if the panic threshold is 0%, panic mode is disabled.
@@ -1177,6 +1315,41 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
+TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPanic) {
+  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
+  HostVectorSharedPtr upstream_hosts(new HostVector(
+      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
+  HostVectorSharedPtr local_hosts(new HostVector({}, {}));
+
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality = makeHostsPerLocality(
+      {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}});
+  HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{}, {}});
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
+      .WillOnce(Return(50))
+      .WillOnce(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+      .WillOnce(Return(1));
+
+  hostSet().healthy_hosts_ = *upstream_hosts;
+  hostSet().hosts_ = *upstream_hosts;
+  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
+  init(true);
+  updateHosts(local_hosts, local_hosts_per_locality);
+
+  // Local cluster is not OK, we'll do regular routing (and select no host, since we're in global
+  // panic).
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
+  EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
+}
+
 // Validate that if we have healthy host lists >= 2, but there is no local
 // locality included, that we skip zone aware routing and fallback.
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
@@ -1284,7 +1457,7 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
 
   // Creating various load balancer objects with different choice configs.
-  envoy::api::v2::Cluster::LeastRequestLbConfig lr_lb_config;
+  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
                                 random_,       common_config_, lr_lb_config};
@@ -1388,30 +1561,51 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
 
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  RandomLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_config_};
+  void init() {
+    lb_.reset(
+        new RandomLoadBalancer(priority_set_, nullptr, stats_, runtime_, random_, common_config_));
+  }
+  std::shared_ptr<LoadBalancer> lb_;
 };
 
-TEST_P(RandomLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
+TEST_P(RandomLoadBalancerTest, NoHosts) {
+  init();
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+}
 
 TEST_P(RandomLoadBalancerTest, Normal) {
+  init();
+
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
+
+TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
+  common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+  init();
+
+  hostSet().healthy_hosts_ = {};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
 
 TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
-  auto subset_info =
-      LoadBalancerSubsetInfoImpl(envoy::api::v2::Cluster::LbSubsetConfig::default_instance());
+  auto subset_info = LoadBalancerSubsetInfoImpl(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance());
 
   EXPECT_FALSE(subset_info.isEnabled());
-  EXPECT_TRUE(subset_info.fallbackPolicy() == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK);
+  EXPECT_TRUE(subset_info.fallbackPolicy() ==
+              envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 0);
   EXPECT_EQ(subset_info.subsetSelectors().size(), 0);
 }
@@ -1420,33 +1614,126 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   auto subset_value = ProtobufWkt::Value();
   subset_value.set_string_value("the value");
 
-  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
-  subset_config.set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  subset_config.set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   subset_config.mutable_default_subset()->mutable_fields()->insert({"key", subset_value});
   auto subset_selector1 = subset_config.mutable_subset_selectors()->Add();
   subset_selector1->add_keys("selector_key1");
   auto subset_selector2 = subset_config.mutable_subset_selectors()->Add();
   subset_selector2->add_keys("selector_key2");
   subset_selector2->set_fallback_policy(
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 
   auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
 
   EXPECT_TRUE(subset_info.isEnabled());
   EXPECT_TRUE(subset_info.fallbackPolicy() ==
-              envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
+              envoy::config::cluster::v3::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 1);
   EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
             std::string("the value"));
   EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->selector_keys_,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
             std::set<std::string>({"selector_key1"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallback_policy_,
-            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->selector_keys_,
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackPolicy(),
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selectorKeys(),
             std::set<std::string>({"selector_key2"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallback_policy_,
-            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackPolicy(),
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetFallbackValid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector1 = subset_config.mutable_subset_selectors()->Add();
+  selector1->add_keys("key1");
+  selector1->add_keys("key2");
+  selector1->add_keys("key3");
+  selector1->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector1->add_fallback_keys_subset("key1");
+  selector1->add_fallback_keys_subset("key3");
+
+  auto selector2 = subset_config.mutable_subset_selectors()->Add();
+  selector2->add_keys("key1");
+  selector2->add_keys("key3");
+  selector2->add_keys("key4");
+  selector2->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector2->add_fallback_keys_subset("key4");
+
+  auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
+
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackPolicy(),
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
+            std::set<std::string>({"key1", "key2", "key3"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackKeysSubset(),
+            std::set<std::string>({"key1", "key3"}));
+
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackPolicy(),
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->selectorKeys(),
+            std::set<std::string>({"key1", "key3", "key4"}));
+  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackKeysSubset(),
+            std::set<std::string>({"key4"}));
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetForOtherPolicyInvalid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+  selector->add_fallback_keys_subset("key1");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetNotASubsetInvalid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector->add_fallback_keys_subset("key3");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset must be a subset of selector keys");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEmptyInvalid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset cannot be empty");
+}
+
+TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEqualKeysInvalid) {
+  auto subset_config = envoy::config::cluster::v3::Cluster::LbSubsetConfig::default_instance();
+  auto selector = subset_config.mutable_subset_selectors()->Add();
+
+  selector->add_keys("key1");
+  selector->add_keys("key2");
+  selector->set_fallback_policy(
+      envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  selector->add_fallback_keys_subset("key2");
+  selector->add_fallback_keys_subset("key1");
+
+  EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
+                            "fallback_keys_subset cannot be equal to keys");
 }
 
 } // namespace

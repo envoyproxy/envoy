@@ -5,6 +5,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/redis/redis_command_stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,9 +30,9 @@ public:
 /**
  * Outbound request callbacks.
  */
-class PoolCallbacks {
+class ClientCallbacks {
 public:
-  virtual ~PoolCallbacks() = default;
+  virtual ~ClientCallbacks() = default;
 
   /**
    * Called when a pipelined response is received.
@@ -47,21 +48,26 @@ public:
   /**
    * Called when a MOVED or ASK redirection error is received, and the request must be retried.
    * @param value supplies the MOVED error response
+   * @param host_address supplies the redirection host address and port
+   * @param ask_redirection indicates if this is a ASK redirection
    * @return bool true if the request is successfully redirected, false otherwise
    */
-  virtual bool onRedirection(const Common::Redis::RespValue& value) PURE;
+  virtual bool onRedirection(RespValuePtr&& value, const std::string& host_address,
+                             bool ask_redirection) PURE;
 };
 
 /**
  * DoNothingPoolCallbacks is used for internally generated commands whose response is
  * transparently filtered, and redirection never occurs (e.g., "asking", "auth", etc.).
  */
-class DoNothingPoolCallbacks : public PoolCallbacks {
+class DoNothingPoolCallbacks : public ClientCallbacks {
 public:
-  // PoolCallbacks
+  // ClientCallbacks
   void onResponse(Common::Redis::RespValuePtr&&) override {}
   void onFailure() override {}
-  bool onRedirection(const Common::Redis::RespValue&) override { return false; }
+  bool onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {
+    return false;
+  }
 };
 
 /**
@@ -94,7 +100,13 @@ public:
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.
    */
-  virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
+  virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
+
+  /**
+   * Initialize the connection. Issue the auth command and readonly command as needed.
+   * @param auth password for upstream host.
+   */
+  virtual void initialize(const std::string& auth_password) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -164,6 +176,11 @@ public:
   virtual uint32_t maxUpstreamUnknownConnections() const PURE;
 
   /**
+   * @return when enabled, upstream cluster per-command statistics will be recorded.
+   */
+  virtual bool enableCommandStats() const PURE;
+
+  /**
    * @return the read policy the proxy should use.
    */
   virtual ReadPolicy readPolicy() const PURE;
@@ -181,10 +198,15 @@ public:
    * @param host supplies the upstream host.
    * @param dispatcher supplies the owning thread's dispatcher.
    * @param config supplies the connection pool configuration.
+   * @param redis_command_stats supplies the redis command stats.
+   * @param scope supplies the stats scope.
+   * @param auth password for upstream host.
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const Config& config) PURE;
+                           const Config& config,
+                           const RedisCommandStatsSharedPtr& redis_command_stats,
+                           Stats::Scope& scope, const std::string& auth_password) PURE;
 };
 
 } // namespace Client

@@ -1,7 +1,5 @@
 #include "common/grpc/common.h"
 
-#include <arpa/inet.h>
-
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -10,23 +8,24 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
-#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Grpc {
 
-bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
+bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   // Content type is gRPC if it is exactly "application/grpc" or starts with
   // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
@@ -38,7 +37,7 @@ bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
                   .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
-bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
+bool Common::isGrpcResponseHeader(const Http::ResponseHeaderMap& headers, bool end_stream) {
   if (end_stream) {
     // Trailers-only response, only grpc-status is required.
     return headers.GrpcStatus() != nullptr;
@@ -49,23 +48,73 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   return hasGrpcContentType(headers);
 }
 
-absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
+absl::optional<Status::GrpcStatus>
+Common::getGrpcStatus(const Http::ResponseHeaderOrTrailerMap& trailers, bool allow_user_defined) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
-
   uint64_t grpc_status_code;
+
   if (!grpc_status_header || grpc_status_header->value().empty()) {
-    return {};
+    return absl::nullopt;
   }
   if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
-      grpc_status_code > Status::GrpcStatus::MaximumValid) {
-    return {Status::GrpcStatus::InvalidCode};
+      (grpc_status_code > Status::WellKnownGrpcStatus::MaximumKnown && !allow_user_defined)) {
+    return {Status::WellKnownGrpcStatus::InvalidCode};
   }
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};
 }
 
-std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
+absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTrailerMap& trailers,
+                                                         const Http::ResponseHeaderMap& headers,
+                                                         const StreamInfo::StreamInfo& info,
+                                                         bool allow_user_defined) {
+  // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
+  // request. When it is returned, it will be in the response trailers. With that said, Envoy will
+  // treat a trailers-only response as a headers-only response, so we have to check the following
+  // in order:
+  //   1. trailers gRPC status, if it exists.
+  //   2. headers gRPC status, if it exists.
+  //   3. Inferred from info HTTP status, if it exists.
+  const std::array<absl::optional<Grpc::Status::GrpcStatus>, 3> optional_statuses = {{
+      {Grpc::Common::getGrpcStatus(trailers, allow_user_defined)},
+      {Grpc::Common::getGrpcStatus(headers, allow_user_defined)},
+      {info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
+                                 Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
+                           : absl::nullopt},
+  }};
+
+  for (const auto& optional_status : optional_statuses) {
+    if (optional_status.has_value()) {
+      return optional_status;
+    }
+  }
+
+  return absl::nullopt;
+}
+
+std::string Common::getGrpcMessage(const Http::ResponseHeaderOrTrailerMap& trailers) {
   const auto entry = trailers.GrpcMessage();
   return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
+}
+
+absl::optional<google::rpc::Status>
+Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
+  const Http::HeaderEntry* details_header = trailers.get(Http::Headers::get().GrpcStatusDetailsBin);
+  if (!details_header) {
+    return absl::nullopt;
+  }
+
+  // Some implementations use non-padded base64 encoding for grpc-status-details-bin.
+  auto decoded_value = Base64::decodeWithoutPadding(details_header->value().getStringView());
+  if (decoded_value.empty()) {
+    return absl::nullopt;
+  }
+
+  google::rpc::Status status;
+  if (!status.ParseFromString(decoded_value)) {
+    return absl::nullopt;
+  }
+
+  return {std::move(status)};
 }
 
 Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {
@@ -107,9 +156,9 @@ Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
   return body;
 }
 
-std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_headers) {
+std::chrono::milliseconds Common::getGrpcTimeout(const Http::RequestHeaderMap& request_headers) {
   std::chrono::milliseconds timeout(0);
-  Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
+  const Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   if (header_grpc_timeout_entry) {
     uint64_t grpc_timeout;
     // TODO(dnoe): Migrate to pure string_view (#6580)
@@ -149,7 +198,8 @@ std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_header
   return timeout;
 }
 
-void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value) {
+void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout,
+                           Http::RequestHeaderMap& headers) {
   uint64_t time = timeout.count();
   static const char units[] = "mSMH";
   const char* unit = units; // start with milliseconds
@@ -166,35 +216,29 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::Heade
       unit++;
     }
   }
-  value.setInteger(time);
-  value.append(unit, 1);
+  headers.setGrpcTimeout(absl::StrCat(time, absl::string_view(unit, 1)));
 }
 
-Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
-                                        const std::string& service_full_name,
-                                        const std::string& method_name,
-                                        const absl::optional<std::chrono::milliseconds>& timeout) {
-  Http::MessagePtr message(new Http::RequestMessageImpl());
-  message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  message->headers().insertPath().value().append("/", 1);
-  message->headers().insertPath().value().append(service_full_name.c_str(),
-                                                 service_full_name.size());
-  message->headers().insertPath().value().append("/", 1);
-  message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
-  message->headers().insertHost().value(upstream_cluster);
+Http::RequestMessagePtr
+Common::prepareHeaders(const std::string& upstream_cluster, const std::string& service_full_name,
+                       const std::string& method_name,
+                       const absl::optional<std::chrono::milliseconds>& timeout) {
+  Http::RequestMessagePtr message(new Http::RequestMessageImpl());
+  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+  message->headers().setPath(absl::StrCat("/", service_full_name, "/", method_name));
+  message->headers().setHost(upstream_cluster);
   // According to https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md TE should appear
   // before Timeout and ContentType.
-  message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
+  message->headers().setReferenceTE(Http::Headers::get().TEValues.Trailers);
   if (timeout) {
-    toGrpcTimeout(timeout.value(), message->headers().insertGrpcTimeout().value());
+    toGrpcTimeout(timeout.value(), message->headers());
   }
-  message->headers().insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Grpc);
+  message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 
   return message;
 }
 
-void Common::checkForHeaderOnlyError(Http::Message& http_response) {
+void Common::checkForHeaderOnlyError(Http::ResponseMessage& http_response) {
   // First check for grpc-status in headers. If it is here, we have an error.
   absl::optional<Status::GrpcStatus> grpc_status_code =
       Common::getGrpcStatus(http_response.headers());
@@ -202,14 +246,14 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
     return;
   }
 
-  if (grpc_status_code.value() == Status::GrpcStatus::InvalidCode) {
+  if (grpc_status_code.value() == Status::WellKnownGrpcStatus::InvalidCode) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
   }
 
   throw Exception(grpc_status_code.value(), Common::getGrpcMessage(http_response.headers()));
 }
 
-void Common::validateResponse(Http::Message& http_response) {
+void Common::validateResponse(Http::ResponseMessage& http_response) {
   if (Http::Utility::getResponseStatus(http_response.headers()) != enumToInt(Http::Code::OK)) {
     throw Exception(absl::optional<uint64_t>(), "non-200 response code");
   }

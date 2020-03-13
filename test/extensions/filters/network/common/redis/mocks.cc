@@ -50,8 +50,8 @@ MockClient::~MockClient() = default;
 MockPoolRequest::MockPoolRequest() = default;
 MockPoolRequest::~MockPoolRequest() = default;
 
-MockPoolCallbacks::MockPoolCallbacks() = default;
-MockPoolCallbacks::~MockPoolCallbacks() = default;
+MockClientCallbacks::MockClientCallbacks() = default;
+MockClientCallbacks::~MockClientCallbacks() = default;
 
 } // namespace Client
 

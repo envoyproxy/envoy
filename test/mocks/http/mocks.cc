@@ -8,13 +8,8 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::MakeMatcher;
-using testing::Matcher;
-using testing::MatcherInterface;
-using testing::MatchResultListener;
 using testing::Return;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Http {
@@ -29,7 +24,7 @@ MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
 
 MockServerConnection::MockServerConnection() {
-  ON_CALL(*this, protocol()).WillByDefault(Return(protocol_));
+  ON_CALL(*this, protocol()).WillByDefault(Invoke([this]() { return protocol_; }));
 }
 
 MockServerConnection::~MockServerConnection() = default;
@@ -68,22 +63,25 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, sendLocalReply(_, _, _, _, _))
       .WillByDefault(Invoke([this](Code code, absl::string_view body,
-                                   std::function<void(HeaderMap & headers)> modify_headers,
+                                   std::function<void(ResponseHeaderMap & headers)> modify_headers,
                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                    absl::string_view details) {
         sendLocalReply_(code, body, modify_headers, grpc_status, details);
       }));
+  ON_CALL(*this, routeConfig())
+      .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
 
 void MockStreamDecoderFilterCallbacks::sendLocalReply_(
-    Code code, absl::string_view body, std::function<void(HeaderMap& headers)> modify_headers,
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   details_ = std::string(details);
   Utility::sendLocalReply(
       is_grpc_request_,
-      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+      [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
         if (modify_headers != nullptr) {
           modify_headers(*headers);
         }

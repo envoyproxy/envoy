@@ -18,6 +18,6 @@ envoy_cc_test(
         "//source/extensions/grpc_credentials/aws_iam:config",
         "//test/common/grpc:grpc_client_integration_test_harness_lib",
         "//test/integration:integration_lib",
-        "@envoy_api//envoy/config/grpc_credential/v2alpha:aws_iam_cc",
+        "@envoy_api//envoy/config/grpc_credential/v2alpha:pkg_cc_proto",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )

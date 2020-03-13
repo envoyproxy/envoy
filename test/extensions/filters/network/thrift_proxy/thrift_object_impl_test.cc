@@ -10,14 +10,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::AnyNumber;
 using testing::Expectation;
 using testing::ExpectationSet;
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
 using testing::Values;
 
 namespace Envoy {

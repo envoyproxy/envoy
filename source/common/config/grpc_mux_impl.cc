@@ -2,7 +2,11 @@
 
 #include <unordered_set>
 
+#include "envoy/service/discovery/v3/discovery.pb.h"
+
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
+#include "common/memory/utils.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -11,21 +15,14 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
+                         envoy::config::core::v3::ApiVersion transport_api_version,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      first_stream_request_(true) {
+      first_stream_request_(true), transport_api_version_(transport_api_version) {
   Config::Utility::checkLocalInfo("ads", local_info);
-}
-
-GrpcMuxImpl::~GrpcMuxImpl() {
-  for (const auto& api_state : api_state_) {
-    for (auto watch : api_state.second.watches_) {
-      watch->clear();
-    }
-  }
 }
 
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
@@ -60,6 +57,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   if (skip_subsequent_node_ && !first_stream_request_) {
     request.clear_node();
   }
+  VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
   grpc_stream_.sendMessage(request);
   first_stream_request_ = false;
@@ -70,12 +68,11 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 }
 
-GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
-                                       const std::set<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
-  auto watch =
-      std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
-  ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
+GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
+                                      const std::set<std::string>& resources,
+                                      SubscriptionCallbacks& callbacks) {
+  auto watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, type_url, *this);
+  ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
 
   // Lazily kick off the requests based on first subscription. This has the
   // convenient side-effect that we order messages on the channel based on
@@ -127,7 +124,7 @@ bool GrpcMuxImpl::paused(const std::string& type_url) const {
 }
 
 void GrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
+    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {
@@ -161,11 +158,12 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // We have to walk all watches (and need an efficient map as a result) to
     // ensure we deliver empty config updates when a resource is dropped.
     std::unordered_map<std::string, ProtobufWkt::Any> resources;
-    GrpcMuxCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
+    SubscriptionCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
     for (const auto& resource : message->resources()) {
       if (type_url != resource.type_url()) {
-        throw EnvoyException(fmt::format("{} does not match {} type URL in DiscoveryResponse {}",
-                                         resource.type_url(), type_url, message->DebugString()));
+        throw EnvoyException(
+            fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
+                        resource.type_url(), type_url, message->DebugString()));
       }
       const std::string resource_name = callbacks.resourceName(resource);
       resources.emplace(resource_name, resource);
@@ -194,14 +192,15 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
     // would do that tracking here.
     api_state_[type_url].request_.set_version_info(message->version_info());
+    Memory::Utils::tryShrinkHeap();
   } catch (const EnvoyException& e) {
     for (auto watch : api_state_[type_url].watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
     ::google::rpc::Status* error_detail = api_state_[type_url].request_.mutable_error_detail();
-    error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
-    error_detail->set_message(e.what());
+    error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+    error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
   queueDiscoveryRequest(type_url);
@@ -232,10 +231,7 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
 
 void GrpcMuxImpl::clearRequestQueue() {
   grpc_stream_.maybeUpdateQueueSizeStat(0);
-  // TODO(fredlas) when we have C++17: request_queue_ = {};
-  while (!request_queue_.empty()) {
-    request_queue_.pop();
-  }
+  request_queue_ = {};
 }
 
 void GrpcMuxImpl::drainRequests() {

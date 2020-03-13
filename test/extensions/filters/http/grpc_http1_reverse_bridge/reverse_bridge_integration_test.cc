@@ -29,8 +29,9 @@ public:
 
     const std::string filter =
         R"EOF(
-name: envoy.filters.http.grpc_http1_reverse_bridge
-config:
+name: grpc_http1_reverse_bridge
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfig
   content_type: application/x-protobuf
   withhold_grpc_frames: true
             )EOF";
@@ -55,11 +56,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
 TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestHeaderMapImpl request_headers({{":scheme", "http"},
-                                           {":method", "POST"},
-                                           {":authority", "foo"},
-                                           {":path", "/testing.ExampleService/Print"},
-                                           {"content-type", "application/grpc"}});
+  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
+                                                  {":method", "POST"},
+                                                  {":authority", "foo"},
+                                                  {":path", "/testing.ExampleService/Print"},
+                                                  {"content-type", "application/grpc"}});
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder.first;
   IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
@@ -81,16 +82,16 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
               HeaderValueOf(Http::Headers::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
-  Http::TestHeaderMapImpl response_headers;
-  response_headers.insertStatus().value(200);
-  response_headers.insertContentType().value(std::string("application/x-protobuf"));
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-protobuf");
   upstream_request_->encodeHeaders(response_headers, false);
 
   Buffer::OwnedImpl response_data{"defgh"};
   upstream_request_->encodeData(response_data, false);
 
-  Http::TestHeaderMapImpl response_trailers;
-  response_trailers.insertGrpcStatus().value(std::string("0"));
+  Http::TestResponseTrailerMapImpl response_trailers;
+  response_trailers.setGrpcStatus(std::string("0"));
   upstream_request_->encodeTrailers(response_trailers);
 
   response->waitForEndStream();
@@ -109,6 +110,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
       std::equal(response->body().begin(), response->body().begin() + 4, expected_prefix.begin()));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());

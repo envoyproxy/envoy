@@ -2,7 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "common/config/filter_json.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
+
 #include "common/http/message_impl.h"
 #include "common/network/address_impl.h"
 
@@ -25,9 +26,7 @@ using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
-using testing::ReturnNew;
 using testing::ReturnRef;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
@@ -50,7 +49,7 @@ ip_white_list:
 test: a
   )EOF";
 
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
+  envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
   EXPECT_THROW(TestUtility::loadFromYaml(yaml, proto_config), EnvoyException);
 }
 
@@ -58,7 +57,8 @@ class ClientSslAuthFilterTest : public testing::Test {
 protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
-        api_(Api::createApiForTest(stats_store_)) {}
+        api_(Api::createApiForTest(stats_store_)),
+        ssl_(std::make_shared<Ssl::MockConnectionInfo>()) {}
   ~ClientSslAuthFilterTest() override { tls_.shutdownThread(); }
 
   void setup() {
@@ -72,7 +72,7 @@ ip_white_list:
   prefix_len: 64
     )EOF";
 
-    envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
+    envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
     EXPECT_CALL(cm_, get(Eq("vpn")));
     setupRequest();
@@ -96,7 +96,7 @@ ip_white_list:
     EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
         .WillOnce(
-            Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+            Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               callbacks_ = &callbacks;
               return &request_;
@@ -112,10 +112,10 @@ ip_white_list:
   std::unique_ptr<ClientSslAuthFilter> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
-  Ssl::MockConnectionInfo ssl_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Api::ApiPtr api_;
+  std::shared_ptr<Ssl::MockConnectionInfo> ssl_;
 };
 
 TEST_F(ClientSslAuthFilterTest, NoCluster) {
@@ -124,7 +124,7 @@ auth_api_cluster: bad_cluster
 stat_prefix: bad_cluster
   )EOF";
 
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
+  envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
   TestUtility::loadFromYaml(yaml, proto_config);
   EXPECT_CALL(cm_, get(Eq("bad_cluster"))).WillOnce(Return(nullptr));
   EXPECT_THROW(
@@ -156,11 +156,11 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Create a new filter for an SSL connection, with no backing auth data yet.
   createAuthFilter();
-  ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(&ssl_));
+  ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_));
   filter_callbacks_.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1");
   std::string expected_sha_1("digest");
-  EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
+  EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_1));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
@@ -168,8 +168,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
 
   // Respond.
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  Http::MessagePtr message(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  Http::ResponseMessagePtr message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(
       api_->fileSystem().fileReadToEnd(TestEnvironment::runfilesPath(
           "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json")));
@@ -184,7 +184,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   filter_callbacks_.connection_.remote_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1");
   std::string expected_sha_2("1b7d42ef0025ad89c1c911d6c10d7e86a4cb7c5863b2980abcbad1895f8b5314");
-  EXPECT_CALL(ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_2));
+  EXPECT_CALL(*ssl_, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha_2));
   EXPECT_EQ(Network::FilterStatus::StopIteration, instance_->onNewConnection());
   EXPECT_CALL(filter_callbacks_, continueReading());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::Connected);
@@ -226,7 +226,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Error response.
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   message = std::make_unique<Http::ResponseMessageImpl>(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}});
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}});
   callbacks_->onSuccess(std::move(message));
 
   // Interval timer fires.
@@ -236,7 +236,7 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Parsing error
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   message = std::make_unique<Http::ResponseMessageImpl>(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}});
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
   message->body() = std::make_unique<Buffer::OwnedImpl>("bad_json");
   callbacks_->onSuccess(std::move(message));
 
@@ -252,10 +252,11 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+            callbacks.onSuccess(
+                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
             return nullptr;
           }));
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));

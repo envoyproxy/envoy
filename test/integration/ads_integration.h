@@ -3,63 +3,78 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
+// TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
+//               work restores it here.
 namespace Envoy {
-static const std::string& AdsIntegrationConfig() {
-  CONSTRUCT_ON_FIRST_USE(std::string, R"EOF(
+static std::string AdsIntegrationConfig(const std::string& api_type) {
+  // Note: do not use CONSTRUCT_ON_FIRST_USE here!
+  return fmt::format(R"EOF(
 dynamic_resources:
-  lds_config: {ads: {}}
-  cds_config: {ads: {}}
+  lds_config:
+    ads: {{}}
+  cds_config:
+    ads: {{}}
   ads_config:
-    api_type: GRPC
-    set_node_on_first_message_only: true
+    api_type: {}
+    set_node_on_first_message_only: false
 static_resources:
   clusters:
     name: dummy_cluster
-    connect_timeout: { seconds: 5 }
+    connect_timeout:
+      seconds: 5
     type: STATIC
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
+    http2_protocol_options: {{}}
 admin:
   access_log_path: /dev/null
   address:
     socket_address:
       address: 127.0.0.1
       port_value: 0
-)EOF");
+)EOF",
+                     api_type);
 }
 
-class AdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
+class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
   AdsIntegrationTest();
 
   void TearDown() override;
 
-  envoy::api::v2::Cluster buildCluster(const std::string& name);
+  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
 
-  envoy::api::v2::Cluster buildRedisCluster(const std::string& name);
+  envoy::config::cluster::v3::Cluster buildRedisCluster(const std::string& name);
 
-  envoy::api::v2::ClusterLoadAssignment buildClusterLoadAssignment(const std::string& name);
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name);
 
-  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config,
-                                         const std::string& stat_prefix = "ads_test");
+  envoy::config::listener::v3::Listener buildListener(const std::string& name,
+                                                      const std::string& route_config,
+                                                      const std::string& stat_prefix = "ads_test");
 
-  envoy::api::v2::Listener buildRedisListener(const std::string& name, const std::string& cluster);
+  envoy::config::listener::v3::Listener buildRedisListener(const std::string& name,
+                                                           const std::string& cluster);
 
-  envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
-                                                      const std::string& cluster);
+  envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
+                                                                const std::string& cluster);
 
   void makeSingleRequest();
 
@@ -68,9 +83,9 @@ public:
 
   void testBasicFlow();
 
-  envoy::admin::v2alpha::ClustersConfigDump getClustersConfigDump();
-  envoy::admin::v2alpha::ListenersConfigDump getListenersConfigDump();
-  envoy::admin::v2alpha::RoutesConfigDump getRoutesConfigDump();
+  envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
+  envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
+  envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
 };
 
 } // namespace Envoy

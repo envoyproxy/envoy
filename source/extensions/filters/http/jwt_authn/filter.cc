@@ -1,5 +1,6 @@
 #include "extensions/filters/http/jwt_authn/filter.h"
 
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -12,6 +13,18 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+
+namespace {
+
+bool isCorsPreflightRequest(const Http::RequestHeaderMap& headers) {
+  return headers.Method() &&
+         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Options &&
+         headers.Origin() && !headers.Origin()->value().empty() &&
+         headers.AccessControlRequestMethod() &&
+         !headers.AccessControlRequestMethod()->value().empty();
+}
+
+} // namespace
 
 struct RcDetailsValues {
   // The jwt_authn filter rejected the request
@@ -29,18 +42,28 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
 
   state_ = Calling;
   stopped_ = false;
+
+  if (config_->bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
+    // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
+    // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
+    ENVOY_LOG(debug, "CORS preflight request bypassed regardless of JWT requirements");
+    stats_.cors_preflight_bypassed_.inc();
+    onComplete(Status::Ok);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   // Verify the JWT token, onComplete() will be called when completed.
   const auto* verifier =
-      config_->findVerifier(headers, decoder_callbacks_->streamInfo().filterState());
+      config_->findVerifier(headers, *decoder_callbacks_->streamInfo().filterState());
   if (!verifier) {
     onComplete(Status::Ok);
   } else {
-    context_ = Verifier::createContext(headers, this);
+    context_ = Verifier::createContext(headers, decoder_callbacks_->activeSpan(), this);
     verifier->verify(context_);
   }
 
@@ -89,7 +112,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
   if (state_ == Calling) {
     return Http::FilterTrailersStatus::StopIteration;

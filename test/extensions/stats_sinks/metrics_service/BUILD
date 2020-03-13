@@ -12,6 +12,17 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.stat_sinks.metrics_service",
+    deps = [
+        "//include/envoy/registry",
+        "//source/extensions/stat_sinks/metrics_service:config",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "metrics_service_test",
     srcs = ["grpc_metrics_service_impl_test.cc"],
     extension_name = "envoy.stat_sinks.metrics_service",
@@ -26,6 +37,7 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -42,6 +54,8 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
     ],
 )

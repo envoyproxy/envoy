@@ -2,23 +2,25 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":router_lib",
         "//include/envoy/registry",
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
-        "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:router_cc",
+        "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
     ],
 )
 
@@ -39,7 +41,6 @@ envoy_cc_library(
         ":router_interface",
         "//include/envoy/router:router_ratelimit_interface",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
-        "@envoy_api//envoy/api/v2/route:route_cc",
     ],
 )
 
@@ -66,7 +67,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:thrift_object_interface",
         "//source/extensions/filters/network/thrift_proxy:transport_interface",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
-        "@envoy_api//envoy/config/filter/network/thrift_proxy/v2alpha1:thrift_proxy_cc",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -79,5 +80,6 @@ envoy_cc_library(
         ":router_ratelimit_interface",
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

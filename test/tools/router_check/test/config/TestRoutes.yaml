@@ -13,6 +13,16 @@ virtual_hosts:
           cluster: www2
           prefix_rewrite: /api/new_endpoint
       - match:
+          prefix: /ping
+        direct_response:
+          status: 200
+          body:
+            inline_string: "Success!"
+        response_headers_to_add:
+          - header:
+              key: "content-type"
+              value: "text/plain"
+      - match:
           path: /
         route:
           cluster: root_www2
@@ -20,7 +30,6 @@ virtual_hosts:
           prefix: /
         route:
           cluster: www2
-
   - name: www2_staging
     domains:
       - www-staging.lyft.net
@@ -104,26 +113,61 @@ virtual_hosts:
           timeout:
             seconds: 30
     virtual_clusters:
-      - pattern: ^/rides$
-        method: POST
+      - headers:
+          - name: :path
+            safe_regex_match:
+              google_re2: {}
+              regex: ^/rides$
+          - name: :method
+            exact_match: POST
         name: ride_request
-      - pattern: ^/rides/\d+$
-        method: PUT
+      - headers:
+          - name: :path
+            safe_regex_match:
+              google_re2: {}
+              regex: ^/rides/\d+$
+          - name: :method
+            exact_match: PUT
         name: update_ride
-      - pattern: ^/users/\d+/chargeaccounts$
-        method: POST
+      - headers:
+          - name: :path
+            safe_regex_match:
+              google_re2: {}
+              regex: ^/users/\d+/chargeaccounts$
+          - name: :method
+            exact_match: POST
         name: cc_add
-      - pattern: ^/users/\d+/chargeaccounts/(?!validate)\w+$
-        method: PUT
+      - headers:
+          - name: :path
+            safe_regex_match:
+              google_re2: {}
+              regex: ^/users/\d+/chargeaccounts/[^validate]\w+$
+          - name: :method
+            exact_match: PUT
         name: cc_add
-      - pattern: ^/users$
-        method: POST
+      - headers:
+          - name: :path
+            safe_regex_match:
+              google_re2: {}
+              regex: ^/users$
+          - name: :method
+            exact_match: POST
         name: create_user_login
-      - pattern: ^/users/\d+$
-        method: PUT
+      - headers:
+          - name: :path
+            safe_regex_match:
+              google_re2: {}
+              regex: ^/users/\d+$
+          - name: :method
+            exact_match: PUT
         name: update_user
-      - pattern: ^/users/\d+/location$
-        method: POST
+      - headers:
+          - name: :path
+            safe_regex_match:
+              google_re2: {}
+              regex: ^/users/\d+/location$
+          - name: :method
+            exact_match: POST
         name: ulu
 internal_only_headers:
   - x-lyft-user-id

@@ -52,16 +52,16 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
-  FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+  Network::DnsResolverSharedPtr
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                    const bool use_tcp_for_dns_lookups) override;
+  FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
-  Network::ListenerPtr createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
-                                      bool bind_to_port,
-                                      bool hand_off_restored_destination_connections) override;
-  Network::ListenerPtr createUdpListener(Network::Socket& socket,
-                                         Network::UdpListenerCallbacks& cb) override;
+  Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
+                                      Network::ListenerCallbacks& cb, bool bind_to_port) override;
+  Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
+                                            Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
@@ -74,6 +74,8 @@ public:
     current_object_ = object;
     return return_object;
   }
+  MonotonicTime approximateMonotonicTime() const override;
+  void updateApproximateMonotonicTime() override;
 
   // FatalErrorInterface
   void onFatalError() const override {
@@ -110,9 +112,10 @@ private:
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
   Thread::MutexBasicLockable post_lock_;
-  std::list<std::function<void()>> post_callbacks_ GUARDED_BY(post_lock_);
+  std::list<std::function<void()>> post_callbacks_ ABSL_GUARDED_BY(post_lock_);
   const ScopeTrackedObject* current_object_{};
   bool deferred_deleting_{};
+  MonotonicTime approximate_monotonic_time_;
 };
 
 } // namespace Event

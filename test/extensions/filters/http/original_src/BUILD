@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -18,7 +17,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.original_src",
     deps = [
         "//source/extensions/filters/http/original_src:config_lib",
-        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
+        "@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto",
     ],
 )
 
@@ -31,7 +30,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/original_src:config_lib",
         "//source/extensions/filters/http/original_src:original_src_lib",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
+        "@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto",
     ],
 )
 
@@ -48,6 +47,7 @@ envoy_extension_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto",
     ],
 )

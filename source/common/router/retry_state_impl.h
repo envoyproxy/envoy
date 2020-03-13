@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
+#include "common/http/header_utility.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -23,7 +24,8 @@ namespace Router {
  */
 class RetryStateImpl : public RetryState {
 public:
-  static RetryStatePtr create(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
+  static RetryStatePtr create(const RetryPolicy& route_policy,
+                              Http::RequestHeaderMap& request_headers,
                               const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                               Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                               Upstream::ResourcePriority priority);
@@ -49,11 +51,11 @@ public:
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
-  RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
+  RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                  DoRetryCallback callback) override;
   // Returns true if the retry policy would retry the passed headers. Does not
   // take into account circuit breaking or remaining tries.
-  bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers) override;
+  bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) override;
   RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
                                DoRetryCallback callback) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
@@ -84,7 +86,7 @@ public:
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
 
 private:
-  RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
+  RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                  Upstream::ResourcePriority priority);
@@ -99,7 +101,7 @@ private:
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   uint32_t retry_on_{};
-  uint32_t retries_remaining_{1};
+  uint32_t retries_remaining_{};
   DoRetryCallback callback_;
   Event::TimerPtr retry_timer_;
   Upstream::ResourcePriority priority_;
@@ -108,6 +110,7 @@ private:
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
+  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
 };
 
 } // namespace Router

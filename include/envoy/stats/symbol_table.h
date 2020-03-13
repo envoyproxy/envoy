@@ -22,6 +22,9 @@ class StatName;
 using StatNameVec = std::vector<StatName>;
 
 class StatNameList;
+class StatNameSet;
+
+using StatNameSetPtr = std::unique_ptr<StatNameSet>;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
@@ -70,7 +73,7 @@ public:
   virtual std::string toString(const StatName& stat_name) const PURE;
 
   /**
-   * Deterines whether one StatName lexically precedes another. Note that
+   * Determines whether one StatName lexically precedes another. Note that
    * the lexical order may not exactly match the lexical order of the
    * elaborated strings. For example, stat-name of "-.-" would lexically
    * sort after "---" but when encoded as a StatName would come lexically
@@ -117,8 +120,7 @@ public:
    * @param num_names The number of names.
    * @param symbol_table The symbol table in which to encode the names.
    */
-  virtual void populateList(const absl::string_view* names, uint32_t num_names,
-                            StatNameList& list) PURE;
+  virtual void populateList(const StatName* names, uint32_t num_names, StatNameList& list) PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;
@@ -143,10 +145,46 @@ public:
   virtual void callWithStringView(StatName stat_name,
                                   const std::function<void(absl::string_view)>& fn) const PURE;
 
+  using RecentLookupsFn = std::function<void(absl::string_view, uint64_t)>;
+
+  /**
+   * Calls the provided function with the name of the most recently looked-up
+   * symbols, including lookups on any StatNameSets, and with a count of
+   * the recent lookups on that symbol.
+   *
+   * @param iter the function to call for every recent item.
+   */
+  virtual uint64_t getRecentLookups(const RecentLookupsFn& iter) const PURE;
+
+  /**
+   * Clears the recent-lookups structures.
+   */
+  virtual void clearRecentLookups() PURE;
+
+  /**
+   * Sets the recent-lookup capacity.
+   */
+  virtual void setRecentLookupCapacity(uint64_t capacity) PURE;
+
+  /**
+   * @return The configured recent-lookup tracking capacity.
+   */
+  virtual uint64_t recentLookupCapacity() const PURE;
+
+  /**
+   * Creates a StatNameSet.
+   *
+   * @param name the name of the set.
+   * @return the set.
+   */
+  virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
+
 private:
   friend struct HeapStatData;
+  friend class StatNameDynamicStorage;
   friend class StatNameStorage;
   friend class StatNameList;
+  friend class StatNameSet;
 
   // The following methods are private, but are called by friend classes
   // StatNameStorage and StatNameList, which must be friendly with SymbolTable
@@ -183,6 +221,8 @@ private:
    *
    */
   virtual StoragePtr encode(absl::string_view name) PURE;
+
+  virtual StoragePtr makeDynamicStorage(absl::string_view name) PURE;
 };
 
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;

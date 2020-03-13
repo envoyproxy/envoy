@@ -17,6 +17,7 @@
 #include "common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -91,14 +92,14 @@ ssize_t InstanceImplPosix::fileSize(const std::string& path) {
 
 std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    throw EnvoyException(fmt::format("Invalid path: {}", path));
+    throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
 
   std::ios::sync_with_stdio(false);
 
   std::ifstream file(path);
   if (file.fail()) {
-    throw EnvoyException(fmt::format("unable to read file: {}", path));
+    throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
 
   std::stringstream file_string;
@@ -107,9 +108,22 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
+PathSplitResult InstanceImplPosix::splitPathFromFilename(absl::string_view path) {
+  size_t last_slash = path.rfind('/');
+  if (last_slash == std::string::npos) {
+    throw EnvoyException(fmt::format("invalid file path {}", path));
+  }
+  absl::string_view name = path.substr(last_slash + 1);
+  // truncate all trailing slashes, except root slash
+  if (last_slash == 0) {
+    ++last_slash;
+  }
+  return {path.substr(0, last_slash), name};
+}
+
 bool InstanceImplPosix::illegalPath(const std::string& path) {
   // Special case, allow /dev/fd/* access here so that config can be passed in a
-  // file descriptor from an execing bootstrap script. The reason we do this
+  // file descriptor from a bootstrap script via exec. The reason we do this
   // _before_ canonicalizing the path is that different unix flavors implement
   // /dev/fd/* differently, for example on linux they are symlinks to /dev/pts/*
   // which are symlinks to /proc/self/fds/. On BSD (and darwin) they are not
@@ -140,7 +154,6 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
 }
 
 Api::SysCallStringResult InstanceImplPosix::canonicalPath(const std::string& path) {
-  // TODO(htuch): When we are using C++17, switch to std::filesystem::canonical.
   char* resolved_path = ::realpath(path.c_str(), nullptr);
   if (resolved_path == nullptr) {
     return {std::string(), errno};

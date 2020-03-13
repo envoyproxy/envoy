@@ -7,13 +7,14 @@ set -e
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" || "$1" == "bazel.compile_time_options" ]]; then
+        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
   build_setup_args="-nofetch"
 fi
 
+SRCDIR="${PWD}"
 . "$(dirname "$0")"/setup_cache.sh
 . "$(dirname "$0")"/build_setup.sh $build_setup_args
-cd "${ENVOY_SRCDIR}"
+cd "${SRCDIR}"
 
 echo "building using ${NUM_CPUS} CPUs"
 
@@ -41,8 +42,9 @@ function bazel_with_collection() {
 
 function cp_binary_for_outside_access() {
   DELIVERY_LOCATION="$1"
+  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
   cp -f \
-    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
+    bazel-bin/"${ENVOY_BIN}" \
     "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
 }
 
@@ -53,6 +55,9 @@ function cp_binary_for_image_build() {
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_"$1"
   mkdir -p "${ENVOY_SRCDIR}"/build_"$1"_stripped
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_"$1"_stripped/envoy
+
+  # Copy for azp which doesn't preserve permissions, creating a tar archive
+  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${ENVOY_SRCDIR}" build_"$1" build_"$1"_stripped
 }
 
 function bazel_binary_build() {
@@ -71,10 +76,10 @@ function bazel_binary_build() {
   fi
 
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" //source/exe:envoy-static ${CONFIG_ARGS}
+  bazel build ${BAZEL_BUILD_OPTIONS} -c "${COMPILE_TYPE}" "${ENVOY_BUILD_TARGET}" ${CONFIG_ARGS}
   collect_build_profile "${BINARY_TYPE}"_build
 
-  # Copy the envoy-static binary somewhere that we can access outside of the
+  # Copy the built envoy binary somewhere that we can access outside of the
   # container.
   cp_binary_for_outside_access envoy
 
@@ -142,14 +147,16 @@ elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   setup_clang_toolchain
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan --build_tests_only"
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan ${TEST_TARGETS}
-  echo "Building and testing envoy-filter-example tests..."
-  pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
-    //:echo2_integration_test //:envoy_binary_test
-  popd
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
+  if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
+    echo "Building and testing envoy-filter-example tests..."
+    pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+    bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${ENVOY_FILTER_EXAMPLE_TESTS}
+    popd
+  fi
   # Also validate that integration test traffic tapping (useful when debugging etc.)
   # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
@@ -157,8 +164,9 @@ elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
   TAP_TMP=/tmp/tap/
   rm -rf "${TAP_TMP}"
   mkdir -p "${TAP_TMP}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-asan \
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} \
     --strategy=TestRunner=local --test_env=TAP_PATH="${TAP_TMP}/tap" \
+    --test_env=PATH="/usr/sbin:${PATH}" \
     //test/extensions/transport_sockets/tls/integration:ssl_integration_test
   # Verify that some pb_text files have been created. We can't check for pcap,
   # since tcpdump is not available in general due to CircleCI lack of support
@@ -169,12 +177,22 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests ${TEST_TARGETS}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan ${TEST_TARGETS}
-  echo "Building and testing envoy-filter-example tests..."
-  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan \
-    //:echo2_integration_test //:envoy_binary_test
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan --build_tests_only ${TEST_TARGETS}
+  if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
+    echo "Building and testing envoy-filter-example tests..."
+    pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+    bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan ${ENVOY_FILTER_EXAMPLE_TESTS}
+    popd
+  fi
   exit 0
+elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
+  ENVOY_STDLIB=libc++
+  setup_clang_toolchain
+  # rbe-toolchain-msan must comes as first to win library link order.
+  BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-msan ${BAZEL_BUILD_OPTIONS} -c dbg --build_tests_only"
+  echo "bazel MSAN debug build with tests"
+  echo "Building and testing envoy tests ${TEST_TARGETS}"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
 elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
@@ -199,26 +217,40 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
     --define path_normalization_by_default=true \
     --define deprecated_features=disabled \
   "
-  setup_clang_libcxx_toolchain
+  ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
+  setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel with different compiletime options build with tests..."
+
+  if [[ "${TEST_TARGETS}" == "//test/..." ]]; then
+    cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+    TEST_TARGETS="@envoy//test/..."
+  fi
   # Building all the dependencies from scratch to link them against libc++.
   echo "Building..."
-  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg //source/exe:envoy-static --build_tag_filters=-nofips
+  bazel build ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   echo "Building and testing ${TEST_TARGETS}"
   bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c dbg ${TEST_TARGETS} --test_tag_filters=-nofips --build_tests_only
 
   # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
   # these tests under "-c opt" to save time in CI.
-  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt //test/common/common:assert_test //test/server:server_test
+  bazel test ${BAZEL_BUILD_OPTIONS} ${COMPILE_TIME_OPTIONS} -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
+
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
+  echo "Validating API structure..."
+  ./tools/api/validate_structure.py
   echo "Building API..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
+  bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api_canonical//envoy/...
   echo "Testing API..."
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
-    @envoy_api//tools:tap2pcap_test
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
+    @envoy_api_canonical//tools:tap2pcap_test
+  echo "Testing API boosting (unit tests)..."
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_dev//clang_tools/api_booster/...
+  echo "Testing API boosting (golden C++ tests)..."
+  # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
+  LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config BAZEL_BUILD_OPTIONS="--config=clang" python3.8 ./tools/api_boost/api_boost_test.py
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_clang_toolchain
@@ -234,7 +266,7 @@ elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
-  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh 
+  NUM_CPUS=$NUM_CPUS ci/run_clang_tidy.sh
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
@@ -245,7 +277,7 @@ elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
   echo "bazel Coverity Scan build"
   echo "Building..."
   /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel build --action_env=LD_PRELOAD ${BAZEL_BUILD_OPTIONS} \
-    -c opt //source/exe:envoy-static
+    -c opt "${ENVOY_BUILD_TARGET}"
   # tar up the coverity results
   tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
   # Copy the Coverity results somewhere that we can access outside of the container.
@@ -260,17 +292,33 @@ elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
   echo "Building envoy fuzzers and executing 100 fuzz iterations..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} --test_arg="-runs=10"
   exit 0
+elif [[ "$CI_TARGET" == "bazel.fuzzit" ]]; then
+  setup_clang_toolchain
+  FUZZ_TEST_TARGETS="$(bazel query "attr('tags','fuzzer',${TEST_TARGETS})")"
+  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS}"
+  echo "Building fuzzers and run under Fuzzit"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} --config=asan-fuzzer ${FUZZ_TEST_TARGETS} \
+    --test_env=FUZZIT_API_KEY --test_env=ENVOY_BUILD_IMAGE --test_timeout=1200 --run_under=//bazel:fuzzit_wrapper
+  exit 0
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
+  # proto_format.sh needs to build protobuf.
+  setup_clang_toolchain
+  echo "protoxform_test..."
+  ./tools/protoxform/protoxform_test.sh
   echo "fix_format..."
-  ./tools/check_format.py fix
-  ./tools/format_python_tools.sh fix
+  ./tools/code_format/check_format.py fix
+  ./tools/code_format/format_python_tools.sh fix
+  ./tools/proto_format/proto_format.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
+  # proto_format.sh needs to build protobuf.
+  setup_clang_toolchain
   echo "check_format_test..."
-  ./tools/check_format_test_helper.py --log=WARN
+  ./tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
-  ./tools/check_format.py check
-  ./tools/format_python_tools.sh check
+  ./tools/code_format/check_format.py check
+  ./tools/code_format/format_python_tools.sh check
+  ./tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   echo "check_repositories..."
@@ -278,19 +326,19 @@ elif [[ "$CI_TARGET" == "check_repositories" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling" ]]; then
   echo "check_spelling..."
-  ./tools/check_spelling.sh check
+  ./tools/spelling/check_spelling.sh check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling" ]];then
   echo "fix_spell..."
-  ./tools/check_spelling.sh fix
+  ./tools/spelling/check_spelling.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
   echo "check_spelling_pedantic..."
-  ./tools/check_spelling_pedantic.py check
+  ./tools/spelling/check_spelling_pedantic.py --mark check
   exit 0
 elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
   echo "fix_spelling_pedantic..."
-  ./tools/check_spelling_pedantic.py fix
+  ./tools/spelling/check_spelling_pedantic.py fix
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."

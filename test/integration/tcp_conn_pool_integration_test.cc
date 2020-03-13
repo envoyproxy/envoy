@@ -1,6 +1,5 @@
 #include <list>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "test/integration/integration.h"
@@ -26,7 +25,7 @@ public:
     UNREFERENCED_PARAMETER(end_stream);
 
     Tcp::ConnectionPool::Instance* pool = cluster_manager_.tcpConnPoolForCluster(
-        "cluster_0", Upstream::ResourcePriority::Default, nullptr, nullptr);
+        "cluster_0", Upstream::ResourcePriority::Default, nullptr);
     ASSERT(pool != nullptr);
 
     requests_.emplace_back(*this, data);
@@ -87,14 +86,6 @@ class TestFilterConfigFactory : public Server::Configuration::NamedNetworkFilter
 public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
-  createFilterFactory(const Json::Object&,
-                      Server::Configuration::FactoryContext& context) override {
-    return [&context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestFilter>(context.clusterManager()));
-    };
-  }
-
-  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext& context) override {
     return [&context](Network::FilterManager& filter_manager) -> void {
@@ -103,10 +94,12 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
   bool isTerminalFilter() override { return true; }
 };
 

@@ -19,6 +19,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/stats:stats_lib",
         "//test/common/http:common_lib",
@@ -51,6 +52,25 @@ envoy_cc_test(
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http2:conn_pool_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/common/http:common_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "conn_pool_legacy_test",
+    srcs = ["conn_pool_legacy_test.cc"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/common/http/http2:conn_pool_legacy_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
@@ -116,6 +136,7 @@ envoy_cc_test(
         "//source/common/http/http2:metadata_decoder_lib",
         "//source/common/http/http2:metadata_encoder_lib",
         "//source/common/runtime:runtime_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )

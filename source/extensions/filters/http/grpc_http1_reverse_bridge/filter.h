@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -21,14 +22,20 @@ public:
       : upstream_content_type_(std::move(upstream_content_type)),
         withhold_grpc_frames_(withhold_grpc_frames) {}
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& buffer, bool end_stream) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
 private:
+  // Prepend the grpc frame into the buffer
+  void buildGrpcFrameHeader(Buffer::Instance& buffer);
+
   const std::string upstream_content_type_;
   const bool withhold_grpc_frames_;
 
@@ -40,6 +47,19 @@ private:
   // buffer we instead maintain our own.
   Buffer::OwnedImpl buffer_{};
 };
+
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(
+      const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute&
+          config)
+      : disabled_(config.disabled()) {}
+  bool disabled() const { return disabled_; }
+
+private:
+  bool disabled_;
+};
+
 } // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
 } // namespace Extensions

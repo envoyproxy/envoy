@@ -8,6 +8,8 @@ namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+static constexpr uint64_t MaxSendmsgSize = 4096;
+
 void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
   memset(address, 0, sizeof(*address));
   address->sun_family = AF_UNIX;
@@ -16,8 +18,8 @@ void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
 sockaddr_un HotRestartingBase::createDomainSocketAddress(uint64_t id, const std::string& role) {
   // Right now we only allow a maximum of 3 concurrent envoy processes to be running. When the third
   // starts up it will kill the oldest parent.
-  const uint64_t MAX_CONCURRENT_PROCESSES = 3;
-  id = id % MAX_CONCURRENT_PROCESSES;
+  static constexpr uint64_t MaxConcurrentProcesses = 3;
+  id = id % MaxConcurrentProcesses;
 
   // This creates an anonymous domain socket name (where the first byte of the name of \0).
   sockaddr_un address;
@@ -122,8 +124,8 @@ void HotRestartingBase::getPassedFdIfPresent(HotRestartMessage* out, msghdr* mes
   }
 }
 
-// While in use, recv_buf_ is always >= MaxSendmsgSize. In between messages, it is kept empty, to be
-// grown back to MaxSendmsgSize at the start of the next message.
+// While in use, recv_buf_ is always >= MaxSendmsgSize. In between messages, it is kept empty,
+// to be grown back to MaxSendmsgSize at the start of the next message.
 void HotRestartingBase::initRecvBufIfNewMessage() {
   if (recv_buf_.empty()) {
     ASSERT(cur_msg_recvd_bytes_ == 0);

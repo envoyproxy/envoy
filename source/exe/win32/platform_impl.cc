@@ -4,10 +4,6 @@
 
 #include "exe/platform_impl.h"
 
-// clang-format off
-#include <winsock2.h>
-// clang-format on
-
 namespace Envoy {
 
 PlatformImpl::PlatformImpl()
@@ -19,8 +15,6 @@ PlatformImpl::PlatformImpl()
   RELEASE_ASSERT(rc == 0, "WSAStartup failed with error");
 }
 
-~PlatformImpl() { ::WSACleanup(); }
-
-}; // namespace Envoy
+PlatformImpl::~PlatformImpl() { ::WSACleanup(); }
 
 } // namespace Envoy

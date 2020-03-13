@@ -17,10 +17,28 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "api_listener_test",
+    srcs = ["api_listener_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/server:api_listener_lib",
+        "//source/server:listener_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
     tags = ["backtrace"],
-    deps = ["//source/server:backtrace_lib"],
+    deps = [
+        "//source/server:backtrace_lib",
+        "//test/test_common:logging_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -43,6 +61,9 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -52,12 +73,16 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:connection_balancer_lib",
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -67,6 +92,7 @@ envoy_cc_test(
     deps = [
         "//source/server:drain_manager_lib",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -89,6 +115,8 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
+        "//source/server:hot_restarting_child",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
     ],
 )
@@ -115,15 +143,22 @@ envoy_cc_test(
     name = "options_impl_test",
     srcs = ["options_impl_test.cc"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/buffer:config",
         "//source/server:options_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/buffer/v3:pkg_cc_proto",
     ],
 )
 
@@ -140,6 +175,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 
@@ -157,15 +193,38 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:lds_cc",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "listener_manager_impl_test_lib",
+    hdrs = ["listener_manager_impl_test.h"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
+    deps = [
+        "//source/common/init:manager_lib",
+        "//source/server:api_listener_lib",
+        "//source/server:listener_lib",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
+        ":listener_manager_impl_test_lib",
         ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -182,14 +241,28 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:active_raw_udp_listener_config",
-        "//source/server:listener_manager_lib",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+# Stand-alone quic test because of FIPS.
+envoy_cc_test(
+    name = "listener_manager_impl_quic_only_test",
+    srcs = ["listener_manager_impl_quic_only_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        ":listener_manager_impl_test_lib",
+        ":utility_lib",
+        "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
+        "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -206,14 +279,13 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
-        "//source/extensions/filters/listener/original_dst:config",
-        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:api_listener_lib",
         "//source/server:filter_chain_manager_lib",
-        "//source/server:listener_manager_lib",
+        "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -221,6 +293,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -241,6 +314,11 @@ envoy_cc_fuzz_test(
 )
 
 filegroup(
+    name = "server_test_data",
+    srcs = glob(["test_data/server/**"]),
+)
+
+filegroup(
     name = "runtime_test_data",
     srcs = glob(["test_data/runtime/**"]),
 )
@@ -254,24 +332,9 @@ envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
-        ":cluster_dupe_bootstrap.yaml",
-        ":cluster_health_check_bootstrap.yaml",
-        ":empty_bootstrap.yaml",
-        ":invalid_bootstrap.yaml",
-        ":invalid_layered_runtime_duplicate_name.yaml",
-        ":invalid_layered_runtime_missing_name.yaml",
-        ":invalid_layered_runtime_no_layer_specifier.yaml",
-        ":invalid_legacy_runtime_bootstrap.yaml",
-        ":invalid_runtime_bootstrap.yaml",
-        ":node_bootstrap.yaml",
-        ":node_bootstrap_no_admin_port.yaml",
-        ":node_bootstrap_with_admin_socket_options.yaml",
-        ":node_bootstrap_without_access_log.yaml",
-        ":runtime_bootstrap.yaml",
         ":runtime_test_data",
+        ":server_test_data",
         ":static_validation_test_data",
-        ":stats_sink_bootstrap.yaml",
-        ":zipkin_tracing.yaml",
     ],
     deps = [
         "//source/common/common:version_lib",
@@ -287,11 +350,14 @@ envoy_cc_test(
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/tracers/zipkin:config",
         "//source/server:server_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -313,7 +379,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:lds_cc",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -339,9 +405,11 @@ envoy_cc_test_binary(
         "googletest",
     ],
     deps = [
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "//source/server:filter_chain_manager_lib",
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
     ],

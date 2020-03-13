@@ -74,8 +74,9 @@ If a vulnerability does not affect any point release but only master, additional
 
 * If the issue is detected and a fix is available within 5 days of the introduction of the
   vulnerability, the fix will be publicly reviewed and landed on master. A courtesy e-mail will be
-  sent to envoy-users@googlegroups.com, envoy-dev@googlegroups.com and
-  cncf-envoy-distributors-announce@lists.cncf.io if the severity is medium or greater.
+  sent to envoy-users@googlegroups.com, envoy-dev@googlegroups.com,
+  envoy-security-announce@googlegroups.com and cncf-envoy-distributors-announce@lists.cncf.io if 
+  the severity is medium or greater.
 * If the vulnerability has been in existence for more than 5 days, we will activate the security
   release process for any medium or higher vulnerabilities. Low severity vulnerabilities will still
   be merged onto master as soon as a fix is available.
@@ -86,29 +87,11 @@ detect issues during their execution on ClusterFuzz. A soak period of 5 days pro
 guarantee, since we will invoke the security release process for medium or higher severity issues
 for these older bugs.
 
-### Confidentiality, integrity and availability
+### Threat model
 
-We consider vulnerabilities leading to the compromise of data confidentiality or integrity to be our
-highest priority concerns. Availability, in particular in areas relating to DoS and resource
-exhaustion, is also a serious security concern for Envoy operators, in particular those utilizing
-Envoy in edge deployments.
-
-The Envoy availability stance around CPU and memory DoS, as well as Query-of-Death (QoD), is still
-evolving. We will continue to iterate and fix well known resource issues in the open, e.g. overload
-manager and watermark improvements. We will activate the security process for disclosures that
-appear to present a risk profile that is significantly greater than the current Envoy availability
-hardening status quo. Examples of disclosures that would elicit this response:
-* QoD; where a single query from a client can bring down an Envoy server.
-* Highly asymmetric resource exhaustion attacks, where very little traffic can cause resource
-  exhaustion, e.g. that delivered by a single client.
-
-Note that we do not currently consider the default settings for Envoy to be safe from an availability
-perspective. It is necessary for operators to explicitly configure watermarks, the overload manager,
-circuit breakers and other resource related features in Envoy to provide a robust availability
-story. We will not act on any security disclosure that relates to a lack of safe defaults. Over
-time, we will work towards improved safe-by-default configuration, but due to backwards
-compatibility and performance concerns, this will require following the breaking change deprecation
-policy.
+See https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model.
+Vulnerabilities are evaluated against this threat model when deciding whether to activate the Envoy
+security release process.
 
 ### Fix Team Organization
 
@@ -149,7 +132,8 @@ or mitigation so that a realistic timeline can be communicated to users.
 
 **Disclosure of Forthcoming Fix to Users** (Completed within 1-7 days of Disclosure)
 
-- The Fix Lead will email [envoy-announce@googlegroups.com](https://groups.google.com/forum/#!forum/envoy-announce)
+- The Fix Lead will email [envoy-security-announce@googlegroups.com](https://groups.google.com/forum/#!forum/envoy-security-announce)
+  (CC [envoy-announce@googlegroups.com](https://groups.google.com/forum/#!forum/envoy-announce))
   informing users that a security vulnerability has been disclosed and that a fix will be made
   available at YYYY-MM-DD HH:MM UTC in the future via this list. This time is the Release Date.
 - The Fix Lead will include any mitigating steps users can take until a fix is available.
@@ -203,8 +187,8 @@ These steps should be completed 1-3 days after the Release Date. The retrospecti
 ## Private Distributors List
 
 This list is intended to be used primarily to provide actionable information to
-multiple distribution vendors at once. This list is not intended for
-individuals to find out about security issues.
+multiple distribution vendors as well as a *limited* set of high impact end users at once. *This
+list is not intended in the general case for end users to find out about security issues*.
 
 ### Embargo Policy
 
@@ -212,7 +196,7 @@ The information members receive on cncf-envoy-distributors-announce must not be 
 even hinted at anywhere beyond the need-to-know within your specific team except with the list's
 explicit approval. This holds true until the public disclosure date/time that was agreed upon by the
 list. Members of the list and others may not use the information for anything other than getting the
-issue fixed for your respective distribution's users.
+issue fixed for your respective users.
 
 Before any information from the list is shared with respective members of your team required to fix
 said issue, they must agree to the same terms and only find out information on a need-to-know basis.
@@ -264,7 +248,7 @@ could be in the form of the following:
 ### Membership Criteria
 
 To be eligible for the cncf-envoy-distributors-announce mailing list, your
-distribution should:
+use of Envoy should:
 
 1. Be either:
    1. An actively maintained distribution of Envoy components. An example is
@@ -279,11 +263,36 @@ distribution should:
       marketing copy, etc.) that it is built on top of Envoy. E.g.,
       "SuperAwesomeCloudProvider's Envoy as a Service (EaaS)". An infrastructure
       service that uses Envoy for a product but does not publicly say they are
-      using Envoy does not qualify. This is essentially IaaS or PaaS, if you use
-      Envoy to support a SaaS, e.g. "SuperAwesomeCatVideoService", this does not
-      qualify.
-2. Have a user or customer base not limited to your own organization. We will use the size
-   of the user or customer base as part of the criteria to determine
+      using Envoy does not *generally* qualify (see option 3 that follows). This is essentially IaaS
+      or PaaS. If you use Envoy to support a SaaS, e.g. "SuperAwesomeCatVideoService", this does not
+      *generally* qualify.
+
+   OR
+
+   3. An end user of Envoy that satisfies the following requirements:
+       1. Is "well known" to the Envoy community. Being "well known" is fully subjective and
+          determined by the Envoy maintainers and security team. Becoming "well known" would
+          generally be achieved by activities such as: PR contributions, either code or
+          documentation; helping other end users on Slack, GitHub, and the mailing lists; speaking
+          about use of Envoy at conferences; writing about use of Envoy in blog posts; sponsoring
+          Envoy conferences, meetups, and other activities; etc. This is a more strict variant of
+          item 5 below.
+       2. Is of sufficient size, scale, and impact to make your inclusion on the list
+          worthwhile. The definition of size, scale, and impact is fully subjective and
+          determined by the Envoy maintainers and security team. The definition will not be
+          discussed further in this document.
+       3. You *must* smoke test and then widely deploy security patches promptly and report back
+          success or failure ASAP. Furthermore, the Envoy maintainers may occasionally ask you to
+          smoke test especially risky public PRs before they are merged. Not performing these tasks
+          in a reasonably prompt timeframe will result in removal from the list. This is a more
+          strict variant of item 7 below.
+       4. In order to balance inclusion in the list versus a greater chance of accidental
+          disclosure, end users added to the list via this option will be limited to a total of
+          **10** slots. Periodic review (see below) may allow new slots to open, so please continue
+          to apply if it seems your organization would otherwise qualify. The security team also
+          reserves the right to change this limit in the future.
+2. Have a user or customer base not limited to your own organization (except for option 3 above).
+   We will use the size of the user or customer base as part of the criteria to determine
    eligibility.
 3. Have a publicly verifiable track record up to present day of fixing security
    issues.
@@ -304,7 +313,7 @@ distribution should:
     e-mail updates. This e-mail address will be [shared with the Envoy community](#Members).
 
 Note that Envoy maintainers are members of the Envoy security team. [Members of the Envoy security
-team](OWNERS.md#envoy-security-team) and the organizations that they represents are implicitly
+team](OWNERS.md#envoy-security-team) and the organizations that they represent are implicitly
 included in the private distributor list. These organizations do not need to meet the above list of
 criteria with the exception of the acceptance of the embargo policy.
 
@@ -324,10 +333,19 @@ Subject: Seven-Corp Membership to cncf-envoy-distributors-announce
 Below are each criterion and why I think we, Seven-Corp, qualify.
 
 > 1. Be an actively maintained distribution of Envoy components OR offer Envoy as a publicly
-     available service in which the product clearly states that it is built on top of Envoy.
+     available service in which the product clearly states that it is built on top of Envoy OR
+     be a well known end user of sufficient size, scale, and impact to make your
+     inclusion worthwhile.
 
 We distribute the "Seven" distribution of Envoy [link]. We have been doing
 this since 1999 before proxies were even cool.
+
+OR
+
+We use Envoy for our #1 rated cat video service and have 40 billion MAU, proxying 40 trillion^2 RPS
+through Envoy at the edge. Secure cat videos are our top priority. We also contribute a lot to the Envoy
+community by implementing features, not making Matt ask for documentation or tests, and writing blog
+posts about efficient Envoy cat video serving.
 
 > 2. Have a user or customer base not limited to your own organization. Please specify an
 >    approximate size of your user or customer base, including the number of
@@ -379,21 +397,31 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
       individuals come and go. A good example is envoy-security@seven.com, a bad example is
       acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
       e-mail updates. This e-mail address will be shared with the Envoy community.
+
+envoy-security@seven.com
 ```
+
+### Review of membership criteria
+
+In all cases, members of the distribution list will be reviewed on a yearly basis by the maintainers
+and security team to ensure they still qualify for inclusion on the list.
 
 ### Members
 
-| E-mail                                                | Organization  |
-|-------------------------------------------------------|:-------------:|
-| envoy-security-team@aspenmesh.io                      | Aspen Mesh    |
-| aws-app-mesh-security@amazon.com                      | AWS           |
-| security@cilium.io                                    | Cilium        |
-| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry |
-| secalert@datawire.io                                  | Datawire      |
-| google-internal-envoy-security@google.com             | Google        |
-| argoprod@us.ibm.com                                   | IBM           |
-| istio-security-vulnerability-reports@googlegroups.com | Istio         |
-| secalert@redhat.com                                   | Red Hat       |
-| envoy-security@solo.io                                | solo.io       |
-| envoy-security@tetrate.io                             | Tetrate       |
-| security@vmware.com                                   | VMware        |
+| E-mail                                                | Organization  | End User | Last Review |
+|-------------------------------------------------------|:-------------:|:--------:|:-----------:|
+| envoy-security-team@aspenmesh.io                      | Aspen Mesh    | No       | 12/19       |
+| aws-app-mesh-security@amazon.com                      | AWS           | No       | 12/19       |
+| security@cilium.io                                    | Cilium        | No       | 12/19       |
+| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry | No       | 12/19       |
+| secalert@datawire.io                                  | Datawire      | No       | 12/19       |
+| google-internal-envoy-security@google.com             | Google        | No       | 12/19       |
+| argoprod@us.ibm.com                                   | IBM           | No       | 12/19       |
+| istio-security-vulnerability-reports@googlegroups.com | Istio         | No       | 12/19       |
+| secalert@redhat.com                                   | Red Hat       | No       | 12/19       |
+| envoy-security@solo.io                                | solo.io       | No       | 12/19       |
+| envoy-security@tetrate.io                             | Tetrate       | No       | 12/19       |
+| security@vmware.com                                   | VMware        | No       | 12/19       |
+| envoy-security@pinterest.com                          | Pinterest     | Yes      | 12/19       |
+| envoy-security@dropbox.com                            | Dropbox       | Yes      | 01/20       |
+| envoy-security-predisclosure@stripe.com               | Stripe        | Yes      | 01/20       |

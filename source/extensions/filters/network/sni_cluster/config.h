@@ -15,14 +15,11 @@ namespace SniCluster {
 class SniClusterNetworkFilterConfigFactory
     : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override;
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() override { return NetworkFilterNames::get().SniCluster; }
+  std::string name() const override { return NetworkFilterNames::get().SniCluster; }
 };
 
 } // namespace SniCluster

@@ -1,6 +1,7 @@
 #include "common/ssl/tls_certificate_config_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/common/empty_string.h"
@@ -13,7 +14,7 @@ namespace Ssl {
 static const std::string INLINE_STRING = "<inline>";
 
 TlsCertificateConfigImpl::TlsCertificateConfigImpl(
-    const envoy::api::v2::auth::TlsCertificate& config,
+    const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
     Server::Configuration::TransportSocketFactoryContext* factory_context, Api::Api& api)
     : certificate_chain_(Config::DataSource::read(config.certificate_chain(), true, api)),
       certificate_chain_path_(

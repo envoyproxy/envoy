@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package test.extensions.filters.http;
+
+import "test/fuzz/common.proto";
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+
+message FilterFuzzTestCase {
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpFilter config = 1;
+
+  test.fuzz.HttpData data = 2;
+}

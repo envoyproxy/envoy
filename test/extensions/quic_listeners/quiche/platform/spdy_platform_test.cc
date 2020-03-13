@@ -6,15 +6,12 @@
 #include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
-#include "quiche/spdy/platform/api/spdy_arraysize.h"
 #include "quiche/spdy/platform/api/spdy_bug_tracker.h"
 #include "quiche/spdy/platform/api/spdy_containers.h"
 #include "quiche/spdy/platform/api/spdy_endianness_util.h"
 #include "quiche/spdy/platform/api/spdy_estimate_memory_usage.h"
 #include "quiche/spdy/platform/api/spdy_flags.h"
 #include "quiche/spdy/platform/api/spdy_logging.h"
-#include "quiche/spdy/platform/api/spdy_ptr_util.h"
-#include "quiche/spdy/platform/api/spdy_string_piece.h"
 #include "quiche/spdy/platform/api/spdy_test_helpers.h"
 
 // Basic tests to validate functioning of the QUICHE spdy platform
@@ -28,11 +25,6 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 namespace {
-
-TEST(SpdyPlatformTest, SpdyArraysize) {
-  int array[] = {0, 1, 2, 3, 4};
-  EXPECT_EQ(5, SPDY_ARRAYSIZE(array));
-}
 
 TEST(SpdyPlatformTest, SpdyBugTracker) {
   EXPECT_DEBUG_DEATH(SPDY_BUG << "Here is a bug,", " bug");
@@ -87,25 +79,9 @@ TEST(SpdyPlatformTest, SpdyLog) {
   SPDY_DVLOG_IF(4, false) << "DVLOG_IF(4, false)";
 }
 
-TEST(SpdyPlatformTest, SpdyMakeUnique) {
-  auto p = spdy::SpdyMakeUnique<int>(4);
-  EXPECT_EQ(4, *p);
-}
-
-TEST(SpdyPlatformTest, SpdyWrapUnique) {
-  auto p = spdy::SpdyWrapUnique(new int(6));
-  EXPECT_EQ(6, *p);
-}
-
 TEST(SpdyPlatformTest, SpdyString) {
   std::string s = "foo";
   EXPECT_EQ('o', s[1]);
-}
-
-TEST(SpdyPlatformTest, SpdyStringPiece) {
-  std::string s = "bar";
-  spdy::SpdyStringPiece sp(s);
-  EXPECT_EQ('b', sp[0]);
 }
 
 TEST(SpdyPlatformTest, SpdyTestHelpers) {

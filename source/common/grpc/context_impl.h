@@ -7,6 +7,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/hash.h"
+#include "common/grpc/stat_names.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "absl/types/optional.h"
@@ -30,6 +31,10 @@ public:
                   const RequestNames& request_names, bool success) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
                   bool success) override;
+  void chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
+                                const RequestNames& request_names, uint64_t amount) override;
+  void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
+                                 const RequestNames& request_names, uint64_t amount) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.
@@ -45,6 +50,8 @@ public:
     return protocol == Context::Protocol::Grpc ? grpc_ : grpc_web_;
   }
 
+  StatNames& statNames() override { return stat_names_; }
+
 private:
   // Makes a stat name from a string, if we don't already have one for it.
   // This always takes a lock on mutex_, and if we haven't seen the name
@@ -56,14 +63,18 @@ private:
 
   Stats::SymbolTable& symbol_table_;
   mutable Thread::MutexBasicLockable mutex_;
-  Stats::StatNamePool stat_name_pool_ GUARDED_BY(mutex_);
-  StringMap<Stats::StatName> stat_name_map_ GUARDED_BY(mutex_);
+  Stats::StatNamePool stat_name_pool_ ABSL_GUARDED_BY(mutex_);
+  StringMap<Stats::StatName> stat_name_map_ ABSL_GUARDED_BY(mutex_);
   const Stats::StatName grpc_;
   const Stats::StatName grpc_web_;
   const Stats::StatName success_;
   const Stats::StatName failure_;
   const Stats::StatName total_;
   const Stats::StatName zero_;
+  const Stats::StatName request_message_count_;
+  const Stats::StatName response_message_count_;
+
+  StatNames stat_names_;
 };
 
 } // namespace Grpc

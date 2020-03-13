@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
@@ -35,8 +34,10 @@ envoy_cc_test(
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/api:api_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -84,6 +85,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -107,6 +109,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -133,6 +136,8 @@ envoy_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -159,6 +164,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -178,6 +184,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -198,6 +205,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -211,6 +219,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -225,6 +234,7 @@ envoy_cc_test_library(
         "//test/mocks/network:network_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -234,6 +244,7 @@ envoy_cc_test(
     deps = [
         ":socket_option_test",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -249,6 +260,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -259,6 +271,7 @@ envoy_cc_test(
         ":socket_option_test",
         "//source/common/network:addr_family_aware_socket_option_lib",
         "//source/common/network:address_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -270,12 +283,12 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_binary(
+envoy_cc_test_binary(
     name = "lc_trie_speed_test",
-    testonly = 1,
     srcs = ["lc_trie_speed_test.cc"],
     external_deps = [
         "benchmark",
@@ -291,5 +304,14 @@ envoy_cc_test(
     srcs = ["io_socket_handle_impl_test.cc"],
     deps = [
         "//source/common/network:address_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "transport_socket_options_impl_test",
+    srcs = ["transport_socket_options_impl_test.cc"],
+    deps = [
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/stream_info:filter_state_lib",
     ],
 )

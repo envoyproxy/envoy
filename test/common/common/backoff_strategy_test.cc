@@ -56,4 +56,14 @@ TEST(BackOffStrategyTest, JitteredBackOffWithMaxIntervalReset) {
   jittered_back_off.reset();
   EXPECT_EQ(4, jittered_back_off.nextBackOffMs()); // Should start from start
 }
+
+TEST(BackOffStrategyTest, FixedBackOffBasicReset) {
+  FixedBackOffStrategy fixed_back_off(30);
+  EXPECT_EQ(30, fixed_back_off.nextBackOffMs());
+  EXPECT_EQ(30, fixed_back_off.nextBackOffMs());
+
+  fixed_back_off.reset();
+  EXPECT_EQ(30, fixed_back_off.nextBackOffMs());
+}
+
 } // namespace Envoy

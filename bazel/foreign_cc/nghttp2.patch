@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index e70d2d49..f9c5340e 100644
+index 35c77d1d..47bd63f5 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -273,7 +273,11 @@ check_type_size("ssize_t" SIZEOF_SSIZE_T)
@@ -8,22 +8,10 @@ index e70d2d49..f9c5340e 100644
    # Set it to "int" to match the behavior of AC_TYPE_SSIZE_T (autotools).
 -  set(ssize_t int)
 +  if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
-+    set(ssize_t int64_t)
++    set(ssize_t ptrdiff_t)
 +  else()
 +    set(ssize_t int)
 +  endif()
  endif()
  # AC_TYPE_UINT8_T
  # AC_TYPE_UINT16_T
-diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
-index 17e422b2..a10f82a5 100644
---- a/lib/CMakeLists.txt
-+++ b/lib/CMakeLists.txt
-@@ -56,6 +56,7 @@ if(HAVE_CUNIT OR ENABLE_STATIC_LIB)
-     COMPILE_FLAGS "${WARNCFLAGS}"
-     VERSION ${LT_VERSION} SOVERSION ${LT_SOVERSION}
-     ARCHIVE_OUTPUT_NAME nghttp2
-+    ARCHIVE_OUTPUT_NAME nghttp2_static
-   )
-   target_compile_definitions(nghttp2_static PUBLIC "-DNGHTTP2_STATICLIB")
-   if(ENABLE_STATIC_LIB)

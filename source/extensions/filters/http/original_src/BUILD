@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -14,9 +15,7 @@ envoy_cc_library(
     name = "config_lib",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    deps = [
-        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
-    ],
+    deps = ["@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto"],
 )
 
 envoy_cc_library(
@@ -32,16 +31,18 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",  # The extension build system requires a library named config
     srcs = ["original_src_config_factory.cc"],
     hdrs = ["original_src_config_factory.h"],
+    security_posture = "robust_to_untrusted_downstream",
+    status = "alpha",
     deps = [
         ":config_lib",
         ":original_src_lib",
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:original_src_cc",
+        "@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto",
     ],
 )

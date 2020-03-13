@@ -46,7 +46,8 @@ envoy_cc_test_library(
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/stream_info:filter_state_lib",
-        "//test/test_common:test_time_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -56,5 +57,13 @@ envoy_cc_test(
     deps = [
         "//source/common/stream_info:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "uint32_accessor_impl_test",
+    srcs = ["uint32_accessor_impl_test.cc"],
+    deps = [
+        "//source/common/stream_info:uint32_accessor_lib",
     ],
 )

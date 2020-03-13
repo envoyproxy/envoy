@@ -1,0 +1,55 @@
+# 1. Fix linking with unbundled toolchain on macOS.
+# 2. Increase VSZ limit to 4TiB (allows us to start up to 370 VMs).
+# 3. Fix MSAN linking.
+--- wee8/build/toolchain/gcc_toolchain.gni
++++ wee8/build/toolchain/gcc_toolchain.gni
+@@ -355,6 +355,8 @@ template("gcc_toolchain") {
+         # AIX does not support either -D (deterministic output) or response
+         # files.
+         command = "$ar -X64 {{arflags}} -r -c -s {{output}} {{inputs}}"
++      } else if (current_os == "mac") {
++        command = "\"$ar\" {{arflags}} -r -c -s {{output}} {{inputs}}"
+       } else {
+         rspfile = "{{output}}.rsp"
+         rspfile_content = "{{inputs}}"
+@@ -546,7 +548,7 @@ template("gcc_toolchain") {
+
+       start_group_flag = ""
+       end_group_flag = ""
+-      if (current_os != "aix") {
++      if (current_os != "aix" && current_os != "mac") {
+         # the "--start-group .. --end-group" feature isn't available on the aix ld.
+         start_group_flag = "-Wl,--start-group"
+         end_group_flag = "-Wl,--end-group "
+--- wee8/src/wasm/wasm-memory.cc
++++ wee8/src/wasm/wasm-memory.cc
+@@ -142,7 +142,7 @@ void* TryAllocateBackingStore(WasmMemoryTracker* memory_tracker, Heap* heap,
+ // address space limits needs to be smaller.
+ constexpr size_t kAddressSpaceLimit = 0x8000000000L;  // 512 GiB
+ #elif V8_TARGET_ARCH_64_BIT
+-constexpr size_t kAddressSpaceLimit = 0x10100000000L;  // 1 TiB + 4 GiB
++constexpr size_t kAddressSpaceLimit = 0x40100000000L;  // 4 TiB + 4 GiB
+ #else
+ constexpr size_t kAddressSpaceLimit = 0xC0000000;  // 3 GiB
+ #endif
+--- wee8/build/config/sanitizers/sanitizers.gni
++++ wee8/build/config/sanitizers/sanitizers.gni
+@@ -145,7 +145,7 @@ if (current_toolchain != default_toolchain) {
+ # standard system libraries. We have instrumented system libraries for msan,
+ # which requires them to prevent false positives.
+ # TODO(thakis): Maybe remove this variable.
+-use_prebuilt_instrumented_libraries = is_msan
++use_prebuilt_instrumented_libraries = false
+
+ # Whether we are doing a fuzzer build. Normally this should be checked instead
+ # of checking "use_libfuzzer || use_afl" because often developers forget to
+@@ -185,8 +185,7 @@ assert(!using_sanitizer || is_clang,
+ assert(!is_cfi || is_clang,
+        "is_cfi requires setting is_clang = true in 'gn args'")
+
+-prebuilt_instrumented_libraries_available =
+-    is_msan && (msan_track_origins == 0 || msan_track_origins == 2)
++prebuilt_instrumented_libraries_available = false
+
+ if (use_libfuzzer && is_linux) {
+   if (is_asan) {

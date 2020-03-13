@@ -1,7 +1,9 @@
 #pragma once
 
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/logical_host.h"
@@ -17,12 +19,12 @@ namespace DynamicForwardProxy {
 class Cluster : public Upstream::BaseDynamicClusterImpl,
                 public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
 public:
-  Cluster(const envoy::api::v2::Cluster& cluster,
-          const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& config,
+  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+          const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
           Runtime::Loader& runtime,
           Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
           const LocalInfo::LocalInfo& local_info,
-          Server::Configuration::TransportSocketFactoryContext& factory_context,
+          Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
           Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
@@ -31,10 +33,7 @@ public:
   }
 
   // Upstream::ClusterImplBase
-  void startPreInit() override {
-    // Nothing to do during initialization.
-    onPreInitComplete();
-  }
+  void startPreInit() override;
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
   void onDnsHostAddOrUpdate(
@@ -92,6 +91,11 @@ private:
     return host_map_;
   }
 
+  void
+  addOrUpdateWorker(const std::string& host,
+                    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+                    std::shared_ptr<HostInfoMap>& new_host_map,
+                    std::unique_ptr<Upstream::HostVector>& hosts_added);
   void swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
                         const Upstream::HostVector& hosts_added,
                         const Upstream::HostVector& hosts_removed);
@@ -100,8 +104,8 @@ private:
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   const Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
       update_callbacks_handle_;
-  const envoy::api::v2::endpoint::LocalityLbEndpoints dummy_locality_lb_endpoint_;
-  const envoy::api::v2::endpoint::LbEndpoint dummy_lb_endpoint_;
+  const envoy::config::endpoint::v3::LocalityLbEndpoints dummy_locality_lb_endpoint_;
+  const envoy::config::endpoint::v3::LbEndpoint dummy_lb_endpoint_;
   const LocalInfo::LocalInfo& local_info_;
 
   absl::Mutex host_map_lock_;
@@ -112,7 +116,7 @@ private:
 };
 
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                           envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig> {
+                           envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig> {
 public:
   ClusterFactory()
       : ConfigurableClusterFactoryBase(
@@ -121,10 +125,10 @@ public:
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      const envoy::api::v2::Cluster& cluster,
-      const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& proto_config,
+      const envoy::config::cluster::v3::Cluster& cluster,
+      const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;
 };
 

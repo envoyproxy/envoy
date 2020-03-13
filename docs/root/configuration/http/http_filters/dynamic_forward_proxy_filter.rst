@@ -19,11 +19,11 @@ as well as the :ref:`dynamic forward proxy cluster
 must be configured together and point to the same DNS cache parameters for Envoy to operate as an
 HTTP dynamic forward proxy.
 
-.. note::
-
-  The HTTP connection manager :ref:`allow_absolute_url
-  <envoy_api_field_core.Http1ProtocolOptions.allow_absolute_url>` parameter has been set to true
-  to allow Envoy to proxy absolute HTTP URLs.
+This filter supports :ref:`host rewrite <envoy_api_msg_config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig>`
+via the :ref:`virtual host's per_filter_config <envoy_api_field_route.VirtualHost.per_filter_config>` or the
+:ref:`route's per_filter_config <envoy_api_field_route.Route.per_filter_config>`. This can be used to rewrite
+the host header with the provided value before DNS lookup, thus allowing to route traffic to the rewritten
+host when forwarding. See the example below within the configured routes.
 
 .. note::
 
@@ -51,12 +51,10 @@ HTTP dynamic forward proxy.
           port_value: 10000
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
-            http_protocol_options:
-              allow_absolute_url: true
             route_config:
               name: local_route
               virtual_hosts:
@@ -64,16 +62,24 @@ HTTP dynamic forward proxy.
                 domains: ["*"]
                 routes:
                 - match:
+                    prefix: "/force-host-rewrite"
+                  route:
+                    cluster: dynamic_forward_proxy_cluster
+                  per_filter_config:
+                    envoy.filters.http.dynamic_forward_proxy:
+                      host_rewrite: www.example.org
+                - match:
                     prefix: "/"
                   route:
                     cluster: dynamic_forward_proxy_cluster
             http_filters:
             - name: envoy.filters.http.dynamic_forward_proxy
-              config:
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig
                 dns_cache_config:
                   name: dynamic_forward_proxy_cache_config
                   dns_lookup_family: V4_ONLY
-            - name: envoy.router
+            - name: envoy.filters.http.router
     clusters:
     - name: dynamic_forward_proxy_cluster
       connect_timeout: 1s
@@ -85,10 +91,13 @@ HTTP dynamic forward proxy.
           dns_cache_config:
             name: dynamic_forward_proxy_cache_config
             dns_lookup_family: V4_ONLY
-      tls_context:
-        common_tls_context:
-          validation_context:
-            trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+          common_tls_context:
+            validation_context:
+              trusted_ca: {filename: /etc/ssl/certs/ca-certificates.crt}
 
 Statistics
 ----------

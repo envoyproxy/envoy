@@ -1,0 +1,29 @@
+broker.id=0
+listeners=PLAINTEXT://127.0.0.1:{{ data['kafka_real_port'] }}
+advertised.listeners=PLAINTEXT://127.0.0.1:{{ data['kafka_envoy_port'] }}
+
+num.network.threads=3
+num.io.threads=8
+socket.send.buffer.bytes=102400
+socket.receive.buffer.bytes=102400
+socket.request.max.bytes=104857600
+
+log.dirs={{ data['data_dir'] }}
+num.partitions=1
+num.recovery.threads.per.data.dir=1
+
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
+
+log.retention.hours=168
+log.segment.bytes=1073741824
+log.retention.check.interval.ms=300000
+
+zookeeper.connect=127.0.0.1:{{ data['zk_port'] }}
+zookeeper.connection.timeout.ms=6000
+
+group.initial.rebalance.delay.ms=0
+
+# The number of __consumer_offsets partitions is reduced to make logs a bit more readable.
+offsets.topic.num.partitions=5

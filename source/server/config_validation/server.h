@@ -2,6 +2,9 @@
 
 #include <iostream>
 
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
@@ -34,7 +37,8 @@ namespace Server {
  * validateConfig() takes over from main() for a config-validation run of Envoy. It returns true if
  * the config is valid, false if invalid.
  */
-bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+bool validateConfig(const Options& options,
+                    const Network::Address::InstanceConstSharedPtr& local_address,
                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                     Filesystem::Instance& file_system);
 
@@ -50,14 +54,14 @@ bool validateConfig(const Options& options, Network::Address::InstanceConstShare
  * If we finish initialization, and reach the point where an ordinary Envoy run would begin serving
  * requests, the validation is considered successful.
  */
-class ValidationInstance : Logger::Loggable<Logger::Id::main>,
-                           public Instance,
-                           public ListenerComponentFactory,
-                           public ServerLifecycleNotifier,
-                           public WorkerFactory {
+class ValidationInstance final : Logger::Loggable<Logger::Id::main>,
+                                 public Instance,
+                                 public ListenerComponentFactory,
+                                 public ServerLifecycleNotifier,
+                                 public WorkerFactory {
 public:
   ValidationInstance(const Options& options, Event::TimeSystem& time_system,
-                     Network::Address::InstanceConstSharedPtr local_address,
+                     const Network::Address::InstanceConstSharedPtr& local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
                      ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
                      Filesystem::Instance& file_system);
@@ -69,7 +73,7 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
-    return dispatcher().createDnsResolver({});
+    return dispatcher().createDnsResolver({}, false);
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -94,56 +98,63 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  ProcessContext& processContext() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ProcessContextOptRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
-
+  void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+    return server_contexts_;
+  }
+  void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
+    http_context_.setDefaultTracingConfig(tracing_config);
+  }
 
   // Server::ListenerComponentFactory
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+  LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {
     return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), initManager(), stats(),
                                         listenerManager(),
                                         messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-      Configuration::FactoryContext& context) override {
-    return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters, context);
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
+    return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+        filters, filter_chain_factory_context);
   }
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                               Network::Address::SocketType,
                                               const Network::Socket::OptionsSharedPtr&,
-                                              bool) override {
+                                              const ListenSocketCreationParams&) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
   }
-  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType) override {
+  DrainManagerPtr createDrainManager(envoy::config::listener::v3::Listener::DrainType) override {
     return nullptr;
   }
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(OverloadManager&) override {
+  WorkerPtr createWorker(OverloadManager&, const std::string&) override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;
@@ -158,7 +169,8 @@ public:
   }
 
 private:
-  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options,
+                  const Network::Address::InstanceConstSharedPtr& local_address,
                   ComponentFactory& component_factory);
 
   // init_manager_ must come before any member that participates in initialization, and destructed
@@ -193,6 +205,7 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
+  ServerFactoryContextImpl server_contexts_;
 };
 
 } // namespace Server

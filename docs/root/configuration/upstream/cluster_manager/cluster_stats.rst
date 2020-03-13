@@ -74,7 +74,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
   upstream_rq_retry_success, Counter, Total request retry successes
-  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking
+  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the retry budget
   upstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from upstream
   upstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from upstream
   upstream_flow_control_backed_up_total, Counter, Total number of times the upstream connection backed up and paused reads from downstream
@@ -141,6 +141,10 @@ statistics will be rooted at *cluster.<name>.outlier_detection.* and contain the
   ejections_detected_consecutive_local_origin_failure, Counter, Number of detected consecutive local origin failure ejections (even if unenforced)
   ejections_enforced_local_origin_success_rate, Counter, Number of enforced success rate outlier ejections for locally originated failures
   ejections_detected_local_origin_success_rate, Counter, Number of detected success rate outlier ejections for locally originated failures (even if unenforced)
+  ejections_enforced_failure_percentage, Counter, Number of enforced failure percentage outlier ejections. Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
+  ejections_detected_failure_percentage, Counter, Number of detected failure percentage outlier ejections (even if unenforced). Exact meaning of this counter depends on :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` config item. Refer to :ref:`Outlier Detection documentation<arch_overview_outlier_detection>` for details.
+  ejections_enforced_failure_percentage_local_origin, Counter, Number of enforced failure percentage outlier ejections for locally originated failures
+  ejections_detected_failure_percentage_local_origin, Counter, Number of detected failure percentage outlier ejections for locally originated failures (even if unenforced)
   ejections_total, Counter, Deprecated. Number of ejections due to any outlier type (even if unenforced)
   ejections_consecutive_5xx, Counter, Deprecated. Number of consecutive 5xx ejections (even if unenforced)
 
@@ -164,6 +168,21 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
   remaining_pending, Gauge, Number of remaining pending requests until the circuit breaker opens
   remaining_rq, Gauge, Number of remaining requests until the circuit breaker opens
   remaining_retries, Gauge, Number of remaining retries until the circuit breaker opens
+
+.. _config_cluster_manager_cluster_stats_timeout_budgets:
+
+Timeout budget statistics
+-------------------------
+
+If :ref:`timeout budget statistic tracking <envoy_api_field_Cluster.track_timeout_budgets>` is
+turned on, statistics will be added to *cluster.<name>* and contain the following:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   upstream_rq_timeout_budget_percent_used, Histogram, What percentage of the global timeout was used waiting for a response
+   upstream_rq_timeout_budget_per_try_percent_used, Histogram, What percentage of the per try timeout was used waiting for a response
 
 .. _config_cluster_manager_cluster_stats_dynamic_http:
 

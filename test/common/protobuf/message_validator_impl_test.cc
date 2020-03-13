@@ -45,7 +45,8 @@ TEST(WarningValidationVisitorImpl, UnknownField) {
 // The strict validation visitor throws on unknown fields.
 TEST(StrictValidationVisitorImpl, UnknownField) {
   StrictValidationVisitorImpl strict_validation_visitor;
-  EXPECT_THROW_WITH_MESSAGE(strict_validation_visitor.onUnknownField("foo"), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(strict_validation_visitor.onUnknownField("foo"),
+                            UnknownProtoFieldException,
                             "Protobuf message (foo) has unknown fields");
 }
 

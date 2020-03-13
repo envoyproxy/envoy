@@ -2,7 +2,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -26,7 +27,6 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnRef;
 using testing::WithArgs;
 
@@ -48,7 +48,7 @@ public:
     }
     )EOF";
 
-    envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
+    envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
     TestUtility::loadFromJson(json, proto_config);
     config_.reset(new Config(proto_config, stats_store_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
@@ -92,12 +92,13 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   }
   )EOF";
 
-  envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
+  envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config{};
   TestUtility::loadFromJson(json_string, proto_config);
 
-  EXPECT_THROW(TestUtility::downcastAndValidate<
-                   const envoy::config::filter::network::ext_authz::v2::ExtAuthz&>(proto_config),
-               ProtoValidationException);
+  EXPECT_THROW(
+      TestUtility::downcastAndValidate<
+          const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz&>(proto_config),
+      ProtoValidationException);
 }
 
 TEST_F(ExtAuthzFilterTest, OKWithOnData) {

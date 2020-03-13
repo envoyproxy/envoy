@@ -2,12 +2,24 @@
 
 set -e
 
+readonly DEFAULT_VALIDITY_DAYS=${DEFAULT_VALIDITY_DAYS:-730}
+readonly HERE=$(cd $(dirname $0) && pwd)
+
+cd $HERE
+trap cleanup EXIT
+
+cleanup() {
+  rm *csr
+  rm *srl
+  rm crl_*
+}
+
 # $1=<CA name> $2=[issuer name]
 generate_ca() {
   if [[ "$2" != "" ]]; then local EXTRA_ARGS="-CA $2_cert.pem -CAkey $2_key.pem -CAcreateserial"; fi
   openssl genrsa -out $1_key.pem 2048
   openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256
-  openssl x509 -req -days 730 -in $1_cert.csr -signkey $1_key.pem -out $1_cert.pem \
+  openssl x509 -req -days ${DEFAULT_VALIDITY_DAYS} -in $1_cert.csr -signkey $1_key.pem -out $1_cert.pem \
     -extensions v3_ca -extfile $1_cert.cfg $EXTRA_ARGS
 }
 
@@ -36,7 +48,7 @@ generate_info_header() {
 
 # $1=<certificate name> $2=<CA name> $3=[days]
 generate_x509_cert() {
-  if [[ "$3" != "" ]]; then local DAYS=$3; else local DAYS="730"; fi
+  if [[ "$3" != "" ]]; then local DAYS=$3; else local DAYS="${DEFAULT_VALIDITY_DAYS}"; fi
   if [[ -f $1_password.txt ]]; then local EXTRA_ARGS="-passin file:$1_password.txt"; fi
   openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -batch -sha256 $EXTRA_ARGS
   openssl x509 -req -days $DAYS -in $1_cert.csr -sha256 -CA $2_cert.pem -CAkey \
@@ -44,15 +56,28 @@ generate_x509_cert() {
   generate_info_header $1
 }
 
+# $1=<certificate name> $2=<CA name> $3=[days]
+#
+# Generate a certificate without a subject CN. For this to work, the config
+# must have an empty [req_distinguished_name] section.
+generate_x509_cert_nosubject() {
+  if [[ "$3" != "" ]]; then local DAYS=$3; else local DAYS="${DEFAULT_VALIDITY_DAYS}"; fi
+  openssl req -new -key $1_key.pem -out $1_cert.csr -config $1_cert.cfg -subj / -batch -sha256
+  openssl x509 -req -days $DAYS -in $1_cert.csr -sha256 -CA $2_cert.pem -CAkey \
+    $2_key.pem -CAcreateserial -out $1_cert.pem -extensions v3_ca -extfile $1_cert.cfg
+  generate_info_header $1
+}
+
 # $1=<certificate name> $2=[certificate file name]
 generate_selfsigned_x509_cert() {
   if [[ "$2" != "" ]]; then local OUTPUT_PREFIX=$2; else local OUTPUT_PREFIX=$1; fi
-  openssl req -new -x509 -days 730 -key $1_key.pem -out ${OUTPUT_PREFIX}_cert.pem -config $1_cert.cfg -batch -sha256
+  openssl req -new -x509 -days ${DEFAULT_VALIDITY_DAYS} -key $1_key.pem -out ${OUTPUT_PREFIX}_cert.pem -config $1_cert.cfg -batch -sha256
   generate_info_header $OUTPUT_PREFIX
 }
 
 # Generate ca_cert.pem.
 generate_ca ca
+generate_x509_cert ca ca
 
 # Generate intermediate_ca_cert.pem.
 generate_ca intermediate_ca ca
@@ -143,6 +168,12 @@ generate_ecdsa_key selfsigned_ecdsa_p384 secp384r1
 generate_selfsigned_x509_cert selfsigned_ecdsa_p384
 rm -f selfsigned_ecdsa_p384_cert.cfg
 
+# Generate long_validity_cert.pem as a self-signed, with expiry that exceeds 32bit time_t.
+cp -f selfsigned_cert.cfg long_validity_cert.cfg
+generate_rsa_key long_validity
+generate_x509_cert long_validity ca 18250
+rm -f long_validity_cert.cfg
+
 # Generate expired_cert.pem as a self-signed, expired cert (will fail on macOS 10.13+ because of negative days value).
 cp -f selfsigned_cert.cfg expired_cert.cfg
 generate_rsa_key expired
@@ -169,6 +200,6 @@ openssl rand 80 > ticket_key_a
 openssl rand 80 > ticket_key_b
 openssl rand 79 > ticket_key_wrong_len
 
-rm *csr
-rm *srl
-rm crl_*
+# Generate a certificate with no subject CN and no altnames.
+generate_rsa_key no_subject
+generate_x509_cert_nosubject no_subject ca

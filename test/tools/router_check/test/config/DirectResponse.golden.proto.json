@@ -1,0 +1,14 @@
+{
+    "tests":  [
+      {
+        "test_name": "Direct Response",
+        "input": {
+          "authority": "lyft.com",
+          "path": "/ping",
+          "method": "GET"
+        },
+        "validate": {"path_redirect": "http://lyft.com/ping"}
+      }
+    ]
+  }
+  

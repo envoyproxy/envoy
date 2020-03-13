@@ -1,3 +1,5 @@
+#include "envoy/service/metrics/v3/metrics_service.pb.h"
+
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include "test/mocks/common.h"
@@ -12,7 +14,6 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +25,7 @@ class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
   using MockMetricsStream = Grpc::MockAsyncStream;
   using MetricsServiceCallbacks =
-      Grpc::AsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>;
+      Grpc::AsyncStreamCallbacks<envoy::service::metrics::v3::StreamMetricsResponse>;
 
   GrpcMetricsStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
@@ -35,9 +36,10 @@ public:
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*async_client_, startRaw(_, _, _))
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
         .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
-                                                     Grpc::RawAsyncStreamCallbacks& callbacks) {
+                                                     Grpc::RawAsyncStreamCallbacks& callbacks,
+                                                     const Http::AsyncClient::StreamOptions&) {
           *callbacks_to_set = dynamic_cast<MetricsServiceCallbacks*>(&callbacks);
           return &stream;
         }));
@@ -59,39 +61,40 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
   EXPECT_CALL(stream1, sendMessageRaw_(_, false));
-  envoy::service::metrics::v2::StreamMetricsMessage message_metrics1;
+  envoy::service::metrics::v3::StreamMetricsMessage message_metrics1;
   streamer_->send(message_metrics1);
   // Verify that sending an empty response message doesn't do anything bad.
   callbacks1->onReceiveMessage(
-      std::make_unique<envoy::service::metrics::v2::StreamMetricsResponse>());
+      std::make_unique<envoy::service::metrics::v3::StreamMetricsResponse>());
 }
 
 // Test that stream failure is handled correctly.
 TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
   InSequence s;
 
-  EXPECT_CALL(*async_client_, startRaw(_, _, _))
-      .WillOnce(Invoke(
-          [](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+      .WillOnce(
+          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));
   EXPECT_CALL(local_info_, node());
-  envoy::service::metrics::v2::StreamMetricsMessage message_metrics1;
+  envoy::service::metrics::v3::StreamMetricsMessage message_metrics1;
   streamer_->send(message_metrics1);
 }
 
 class MockGrpcMetricsStreamer : public GrpcMetricsStreamer {
 public:
   // GrpcMetricsStreamer
-  MOCK_METHOD1(send, void(envoy::service::metrics::v2::StreamMetricsMessage& message));
+  MOCK_METHOD(void, send, (envoy::service::metrics::v3::StreamMetricsMessage & message));
 };
 
 class TestGrpcMetricsStreamer : public GrpcMetricsStreamer {
 public:
   int metric_count;
   // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override {
+  void send(envoy::service::metrics::v3::StreamMetricsMessage& message) override {
     metric_count = message.envoy_metrics_size();
   }
 };

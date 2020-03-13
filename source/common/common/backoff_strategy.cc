@@ -21,4 +21,10 @@ uint64_t JitteredBackOffStrategy::nextBackOffMs() {
 
 void JitteredBackOffStrategy::reset() { current_retry_ = 1; }
 
+FixedBackOffStrategy::FixedBackOffStrategy(uint64_t interval_ms) : interval_ms_(interval_ms) {
+  ASSERT(interval_ms_ > 0);
+}
+
+uint64_t FixedBackOffStrategy::nextBackOffMs() { return interval_ms_; }
+
 } // namespace Envoy

@@ -1,0 +1,22 @@
+# Windows/Envoy specific Bazel build/test options.
+
+build --define signal_trace=disabled
+build --define hot_restart=disabled
+build --define tcmalloc=disabled
+build --workspace_status_command="bash bazel/get_workspace_status"
+
+# Required to work around quiche build defect
+# Unguarded gcc pragmas are not recognized by MSVC
+build --copt="/wd4068"
+
+# Should not be required after upstream fix, see issue;
+# https://github.com/bazelbuild/rules_foreign_cc/issues/301
+build --copt="-DCARES_STATICLIB"
+build --copt="-DNGHTTP2_STATICLIB"
+build --copt="-DCURL_STATICLIB"
+
+build --experimental_enable_runfiles
+build --features=compiler_param_file
+build --features=fully_static_link
+build --features=static_link_msvcrt
+build --dynamic_mode=off

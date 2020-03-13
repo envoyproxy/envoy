@@ -7,7 +7,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Matcher;
 using testing::Return;
 
 namespace RedisCmdSplitter = Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitter;
@@ -53,14 +52,20 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.redis_proxy
-        config:
+        name: redis
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
           prefix_routes:
             catch_all_route:
               cluster: cluster_0
           settings:
             op_timeout: 5s
+)EOF";
+
+// This is a configuration with command stats enabled.
+const std::string CONFIG_WITH_COMMAND_STATS = CONFIG + R"EOF(
+            enable_command_stats: true
 )EOF";
 
 // This is a configuration with moved/ask redirection support enabled.
@@ -142,8 +147,9 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.redis_proxy
-        config:
+        name: redis
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
@@ -199,8 +205,10 @@ static_resources:
   clusters:
     - name: cluster_0
       type: STATIC
-      extension_protocol_options:
-        envoy.redis_proxy: { auth_password: { inline_string: cluster_0_password }}
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          auth_password: { inline_string: cluster_0_password }
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -214,8 +222,10 @@ static_resources:
     - name: cluster_1
       type: STATIC
       lb_policy: RANDOM
-      extension_protocol_options:
-        envoy.redis_proxy: { auth_password: { inline_string: cluster_1_password }}
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          auth_password: { inline_string: cluster_1_password }
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -227,8 +237,10 @@ static_resources:
                     port_value: 1
     - name: cluster_2
       type: STATIC
-      extension_protocol_options:
-        envoy.redis_proxy: { auth_password: { inline_string: cluster_2_password }}
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions
+          auth_password: { inline_string: cluster_2_password }
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2
@@ -247,8 +259,9 @@ static_resources:
         port_value: 0
     filter_chains:
       filters:
-        name: envoy.redis_proxy
-        config:
+        name: redis
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.redis_proxy.v2.RedisProxy
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
@@ -370,7 +383,6 @@ public:
                                      const std::string& auth_password = "");
 
 protected:
-  Runtime::MockRandomGenerator* mock_rng_{};
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
   Runtime::MockLoader* runtime_{};
@@ -422,6 +434,12 @@ public:
   RedisProxyWithMirrorsIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_MIRROR, 6) {}
 };
 
+class RedisProxyWithCommandStatsIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithCommandStatsIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_COMMAND_STATS, 2) {}
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -450,17 +468,15 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithCommandStatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
   setDeterministic();
   config_helper_.renameListener("redis_proxy");
   BaseIntegrationTest::initialize();
-
-  mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&test_server_->server().random());
-  // Abort now if we cannot downcast the server's random number generator pointer.
-  ASSERT_TRUE(mock_rng_ != nullptr);
-  // Ensure that fake_upstreams_[0] is the load balancer's host of choice by default.
-  ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
 }
 
 void RedisProxyIntegrationTest::roundtripToUpstreamStep(
@@ -489,7 +505,6 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     expect_auth_command = (!auth_password.empty());
     EXPECT_TRUE(upstream->waitForRawConnection(fake_upstream_connection));
   }
-
   if (expect_auth_command) {
     std::string auth_command = makeBulkStringArray({"auth", auth_password});
     EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
@@ -596,6 +611,35 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
 TEST_P(RedisProxyIntegrationTest, SimpleRequestAndResponse) {
   initialize();
   simpleRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
+  initialize();
+  std::string request = makeBulkStringArray({"mget", "foo"});
+  std::string upstream_response = "$3\r\nbar\r\n";
+  std::string downstream_response =
+      "*1\r\n" + upstream_response; // Downstream response is array of length 1
+
+  // Make MGET request from downstream
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->clearData();
+  redis_client->write(request);
+
+  // Make GET request to upstream (MGET is turned into GETs for upstream)
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_password = "";
+  std::string upstream_request = makeBulkStringArray({"get", "foo"});
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_password);
+
+  // Downstream response for MGET
+  redis_client->waitForData(downstream_response);
+  EXPECT_EQ(downstream_response, redis_client->data());
+
+  // Cleanup
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
 }
 
 // This test sends an invalid Redis command from a fake
@@ -994,8 +1038,7 @@ TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
   initialize();
 
   std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
-  // When random_value is < 50, the percentage:* will be mirrored
-  ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
+  // When random_value is < 50, the percentage:* will be mirrored, random() default is 0
   const std::string& request = makeBulkStringArray({"get", "percentage:toto"});
   const std::string& response = "$3\r\nbar\r\n";
   // roundtrip to cluster_0 (catch_all route)

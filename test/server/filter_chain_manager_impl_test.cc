@@ -1,10 +1,11 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -21,7 +22,6 @@
 #include "server/filter_chain_manager_impl.h"
 #include "server/listener_manager_impl.h"
 
-#include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/network/mocks.h"
@@ -37,21 +37,17 @@
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Throw;
 
 namespace Envoy {
 namespace Server {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
+  buildFilterChain(const envoy::config::listener::v3::FilterChain&,
+                   FilterChainFactoryContextCreator&) const override {
     // Won't dereference but requires not nullptr.
     return std::make_unique<Network::MockFilterChain>();
   }
@@ -99,36 +95,40 @@ public:
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 
-  void addSingleFilterChainHelper(const envoy::api::v2::listener::FilterChain& filter_chain) {
+  void addSingleFilterChainHelper(const envoy::config::listener::v3::FilterChain& filter_chain) {
     filter_chain_manager_.addFilterChain(
-        std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain},
-        filter_chain_factory_builder_);
+        std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
+        filter_chain_factory_builder_, filter_chain_manager_);
   }
 
-  // Intermedia states.
+  // Intermediate states.
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::vector<std::shared_ptr<Network::MockConnectionSocket>> sockets_;
 
-  // Reuseable template.
+  // Reusable template.
   const std::string filter_chain_yaml = R"EOF(
       filter_chain_match:
         destination_port: 10000
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
-  envoy::api::v2::listener::FilterChain filter_chain_template_;
+  envoy::config::listener::v3::FilterChain filter_chain_template_;
   MockFilterChainFactoryBuilder filter_chain_factory_builder_;
+  NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
 
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_};
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
@@ -141,5 +141,18 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
 }
+
+// The current implementation generates independent contexts for the same filter chain
+TEST_F(FilterChainManagerImplTest, FilterChainContextsAreUnique) {
+  std::set<Configuration::FilterChainFactoryContext*> contexts;
+  {
+    for (int i = 0; i < 2; i++) {
+      contexts.insert(
+          &filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_template_));
+    }
+  }
+  EXPECT_EQ(contexts.size(), 2);
+}
+
 } // namespace Server
 } // namespace Envoy

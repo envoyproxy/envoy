@@ -137,6 +137,12 @@ public:
    * @return whether a time_point contains a valid, not default constructed time.
    */
   static bool timePointValid(MonotonicTime time_point);
+
+  /**
+   * @param time_source time keeping source.
+   * @return uint64_t the number of milliseconds since the epoch.
+   */
+  static uint64_t nowToMilliseconds(TimeSource& time_source);
 };
 
 /**
@@ -144,6 +150,35 @@ public:
  */
 class StringUtil {
 public:
+  /**
+   * Callable struct that returns the result of string comparison ignoring case.
+   * @param lhs supplies the first string view.
+   * @param rhs supplies the second string view.
+   * @return true if strings are semantically the same and false otherwise.
+   */
+  struct CaseInsensitiveCompare {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    bool operator()(absl::string_view lhs, absl::string_view rhs) const;
+  };
+
+  /**
+   * Callable struct that returns the hash representation of a case-insensitive string_view input.
+   * @param key supplies the string view.
+   * @return uint64_t hash representation of the supplied string view.
+   */
+  struct CaseInsensitiveHash {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    uint64_t operator()(absl::string_view key) const;
+  };
+
+  /**
+   * Definition of unordered set of case-insensitive std::string.
+   */
+  using CaseUnorderedSet =
+      absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
+
   static const char WhitespaceChars[];
 
   /**
@@ -193,6 +228,15 @@ public:
   static absl::string_view trim(absl::string_view source);
 
   /**
+   * Removes any specific trailing characters from the end of a string_view.
+   *
+   * @param source the string_view.
+   * @param ch the character to strip from the end of the string_view.
+   * @return a view of the string with the end characters removed.
+   */
+  static absl::string_view removeTrailingCharacters(absl::string_view source, char ch);
+
+  /**
    * Look up for an exactly token in a delimiter-separated string view.
    * @param source supplies the delimiter-separated string view.
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
@@ -228,20 +272,6 @@ public:
    */
   static bool caseFindToken(absl::string_view source, absl::string_view delimiters,
                             absl::string_view key_token, bool trim_whitespace = true);
-
-  /**
-   * Compare one string view with another string view ignoring case sensitivity.
-   * @param lhs supplies the first string view.
-   * @param rhs supplies the second string view.
-   * @return true if strings are semantically the same and false otherwise.
-   *
-   * E.g.,
-   *
-   * caseCompare("hello", "hello")   . true
-   * caseCompare("hello", "HELLO")   . true
-   * caseCompare("hello", "HellO")   . true
-   */
-  static bool caseCompare(absl::string_view lhs, absl::string_view rhs);
 
   /**
    * Crop characters from a string view starting at the first character of the matched
@@ -282,17 +312,23 @@ public:
                                                    bool keep_empty_string = false);
 
   /**
+   * Remove tokens from a delimiter-separated string view. The tokens are trimmed before
+   * they are compared ignoring case with the elements of 'tokens_to_remove'. The output is
+   * built from the trimmed tokens preserving case.
+   * @param source supplies the delimiter-separated string view.
+   * @param multi-delimiters supplies chars used to split the delimiter-separated string view.
+   * @param tokens_to_remove supplies a set of tokens which should not appear in the result.
+   * @param joiner contains a string used between tokens in the result.
+   * @return string of the remaining joined tokens.
+   */
+  static std::string removeTokens(absl::string_view source, absl::string_view delimiters,
+                                  const CaseUnorderedSet& tokens_to_remove,
+                                  absl::string_view joiner);
+
+  /**
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
-
-  /**
-   * Join elements of a vector into a string delimited by delimiter.
-   * @param source supplies the strings to join.
-   * @param delimiter supplies the delimiter to join them together.
-   * @return string combining elements of `source` with `delimiter` in between each element.
-   */
-  static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
 
   /**
    * Version of substr() that operates on a start and end index instead of a start index and a
@@ -324,42 +360,6 @@ public:
    * @return std::string s converted to upper case.
    */
   static std::string toUpper(absl::string_view s);
-
-  /**
-   * Convert a string to lower case.
-   * @param s string.
-   * @return std::string s converted to lower case.
-   */
-  static std::string toLower(absl::string_view s);
-
-  /**
-   * Callable struct that returns the result of string comparison ignoring case.
-   * @param lhs supplies the first string view.
-   * @param rhs supplies the second string view.
-   * @return true if strings are semantically the same and false otherwise.
-   */
-  struct CaseInsensitiveCompare {
-    // Enable heterogeneous lookup (https://abseil.io/tips/144)
-    using is_transparent = void;
-    bool operator()(absl::string_view lhs, absl::string_view rhs) const;
-  };
-
-  /**
-   * Callable struct that returns the hash representation of a case-insensitive string_view input.
-   * @param key supplies the string view.
-   * @return uint64_t hash representation of the supplied string view.
-   */
-  struct CaseInsensitiveHash {
-    // Enable heterogeneous lookup (https://abseil.io/tips/144)
-    using is_transparent = void;
-    uint64_t operator()(absl::string_view key) const;
-  };
-
-  /**
-   * Definition of unordered set of case-insensitive std::string.
-   */
-  using CaseUnorderedSet =
-      absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
 
   /**
    * Removes all the character indices from str contained in the interval-set.
@@ -487,13 +487,6 @@ private:
 };
 
 /**
- * Hashing functor for use with unordered_map and unordered_set with string_view as a key.
- */
-struct StringViewHash {
-  std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
-};
-
-/**
  * Hashing functor for use with enum class types.
  * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
  * specializations.
@@ -512,9 +505,9 @@ class WelfordStandardDeviation {
 public:
   /**
    * Accumulates a new value into the standard deviation.
-   * @param newValue the new value
+   * @param new_value the new value
    */
-  void update(double newValue);
+  void update(double new_value);
 
   /**
    * @return double the computed mean value.

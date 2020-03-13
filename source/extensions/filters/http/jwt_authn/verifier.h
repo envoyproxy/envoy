@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 
 namespace Envoy {
@@ -53,6 +55,13 @@ public:
     virtual Http::HeaderMap& headers() const PURE;
 
     /**
+     * Returns the active span wrapped in this context.
+     *
+     * @return the active span.
+     */
+    virtual Tracing::Span& parentSpan() const PURE;
+
+    /**
      * Returns the request callback wrapped in this context.
      *
      * @returns the request callback.
@@ -72,13 +81,14 @@ public:
 
   // Factory method for creating verifiers.
   static VerifierConstPtr create(
-      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement& requirement,
-      const Protobuf::Map<
-          std::string, ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>& providers,
-      const AuthFactory& factory, const Extractor& extractor_for_allow_fail);
+      const envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement& requirement,
+      const Protobuf::Map<std::string,
+                          envoy::extensions::filters::http::jwt_authn::v3::JwtProvider>& providers,
+      const AuthFactory& factory);
 
   // Factory method for creating verifier contexts.
-  static ContextSharedPtr createContext(Http::HeaderMap& headers, Callbacks* callback);
+  static ContextSharedPtr createContext(Http::RequestHeaderMap& headers, Tracing::Span& parent_span,
+                                        Callbacks* callback);
 };
 
 using ContextSharedPtr = std::shared_ptr<Verifier::Context>;

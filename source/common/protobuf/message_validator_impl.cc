@@ -34,7 +34,8 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
-  throw EnvoyException(absl::StrCat("Protobuf message (", description, ") has unknown fields"));
+  throw UnknownProtoFieldException(
+      absl::StrCat("Protobuf message (", description, ") has unknown fields"));
 }
 
 ValidationVisitor& getNullValidationVisitor() {
