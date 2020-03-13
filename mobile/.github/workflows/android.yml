@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: ./ci/mac_ci_setup.sh
+      - run: ./envoy/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
         run: bazel build --fat_apk_cpu=x86 //:android_dist
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: ./ci/mac_ci_setup.sh
+      - run: ./envoy/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - uses: actions/download-artifact@v1
         with:
@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: ./ci/mac_ci_setup.sh
+      - run: ./envoy/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - uses: actions/download-artifact@v1
         with:
