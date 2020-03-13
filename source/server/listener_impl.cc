@@ -298,7 +298,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           [](const auto& filter) {
             return filter.name() ==
                        Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector ||
-                   filter.name() == "envoy.listeners.tls_inspector";
+                   filter.name() == "envoy.listener.tls_inspector";
           });
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
@@ -335,7 +335,6 @@ Event::Dispatcher& ListenerImpl::dispatcher() { return parent_.server_.dispatche
 Network::DrainDecision& ListenerImpl::drainDecision() { return *this; }
 Grpc::Context& ListenerImpl::grpcContext() { return parent_.server_.grpcContext(); }
 bool ListenerImpl::healthCheckFailed() { return parent_.server_.healthCheckFailed(); }
-Tracing::HttpTracer& ListenerImpl::httpTracer() { return httpContext().tracer(); }
 Http::Context& ListenerImpl::httpContext() { return parent_.server_.httpContext(); }
 
 const LocalInfo::LocalInfo& ListenerImpl::localInfo() const { return parent_.server_.localInfo(); }

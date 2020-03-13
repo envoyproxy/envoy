@@ -248,6 +248,29 @@ def envoy_cc_test_binary(
         **kargs
     )
 
+# Envoy benchmark binaries should be specified with this function.
+def envoy_cc_benchmark_binary(
+        name,
+        deps = [],
+        **kargs):
+    envoy_cc_test_binary(
+        name,
+        deps = deps + ["//test/benchmark:main"],
+        **kargs
+    )
+
+# Tests to validate that Envoy benchmarks run successfully should be specified with this function.
+def envoy_benchmark_test(
+        name,
+        benchmark_binary,
+        data = []):
+    native.sh_test(
+        name = name,
+        srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
+        data = [":" + benchmark_binary] + data,
+        args = ["%s/%s" % (native.package_name(), benchmark_binary)],
+    )
+
 # Envoy Python test binaries should be specified with this function.
 def envoy_py_test_binary(
         name,
