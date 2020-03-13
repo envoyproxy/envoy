@@ -317,11 +317,10 @@ TEST(UtilityTest, TranslateAnyToFactoryConfig) {
     return ProtobufTypes::MessagePtr{new ProtobufWkt::Duration()};
   }));
 
-  const auto& config =
-      dynamic_cast<const ProtobufWkt::Duration&>(*Utility::translateAnyToFactoryConfig(
-          typed_config, ProtobufMessage::getStrictValidationVisitor(), factory));
+  auto config = Utility::translateAnyToFactoryConfig(
+      typed_config, ProtobufMessage::getStrictValidationVisitor(), factory);
 
-  EXPECT_EQ(config.seconds(), 42);
+  EXPECT_THAT(*config, ProtoEq(source_duration));
 }
 
 void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const Protobuf::Message& inner) {
