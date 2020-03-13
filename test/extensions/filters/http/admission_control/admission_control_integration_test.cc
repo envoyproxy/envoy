@@ -89,9 +89,9 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a >98%
-  // throttling rate.
-  EXPECT_GE(throttle_count / request_count, 0.98);
+  // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
+  // throttling rate. Allowing an error of 1%.
+  EXPECT_LE(abs(throttle_count / request_count - 0.98), 0.01);
 
   // We now wait for the history to become stale.
   waitFor(std::chrono::seconds(10));
