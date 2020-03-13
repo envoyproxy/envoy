@@ -43,6 +43,12 @@ public:
                         const std::vector<FakeHttpConnection::Type>& upstream_protocols = {
                             FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2});
 
+  // Return valid ipv4 tests if machine supports ipv4 and runtime argument selects ipv4, otherwise
+  // return empty.
+  static std::vector<HttpProtocolTestParams>
+  getIpv4OnlyProtocolTestParams(const std::vector<Http::CodecClient::Type>& downstream_protocols,
+                                const std::vector<FakeHttpConnection::Type>& upstream_protocols);
+
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
   static std::string

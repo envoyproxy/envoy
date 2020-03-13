@@ -114,10 +114,31 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
 }
 
-// TODO(lambdai): skip the tests in ipv6 env since filter chain matches varies at ipv4 dst address.
+// Sample test making sure our config framework informs on listener failure.
+TEST_P(LdsIntegrationTest, FailConfigLoad) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    filter_chain->mutable_filters(0)->clear_typed_config();
+    filter_chain->mutable_filters(0)->set_name("grewgragra");
+  });
+  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
+                             "Didn't find a registered implementation for name: 'grewgragra'");
+}
+
+using LdsIpv4OnlyIntegrationTest = HttpProtocolIntegrationTest;
+
+// The LDS code path supports both ipv4 and ipv6. We run the tests only on ipv4 supported platform
+// because ipv4 stack natually provides multiple loopback ip addresses.
+INSTANTIATE_TEST_SUITE_P(
+    LdsInplaceUpdate, LdsIpv4OnlyIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getIpv4OnlyProtocolTestParams(
+        {Http::CodecClient::Type::HTTP1}, {FakeHttpConnection::Type::HTTP1})),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 // This test case confirms a new listener config with additional filter chains doesn't impact the
 // existing filter chain and connection.
-TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
+TEST_P(LdsIpv4OnlyIntegrationTest, ReloadConfigAddingFilterChain) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -178,7 +199,7 @@ TEST_P(LdsIntegrationTest, ReloadConfigAddingFilterChain) {
 
 // Test that a new listener config with one fewer filter chain will drain the connections on that
 // filter chain.
-TEST_P(LdsIntegrationTest, ReloadConfigDeletingFilterChain) {
+TEST_P(LdsIpv4OnlyIntegrationTest, ReloadConfigDeletingFilterChain) {
   autonomous_upstream_ = true;
 
   config_helper_.addConfigModifier(
@@ -247,22 +268,6 @@ TEST_P(LdsIntegrationTest, ReloadConfigDeletingFilterChain) {
 
   conn1->close();
   conn2->close();
-}
-
-// Confirm that a new listener config with updated filter chain will drain the connection on the
-// existing filter chain, and new connections will see the updated filter chain.
-TEST_P(LdsIntegrationTest, ReloadConfigUpdatingFilterChain) {}
-
-// Sample test making sure our config framework informs on listener failure.
-TEST_P(LdsIntegrationTest, FailConfigLoad) {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    auto* filter_chain = listener->mutable_filter_chains(0);
-    filter_chain->mutable_filters(0)->clear_typed_config();
-    filter_chain->mutable_filters(0)->set_name("grewgragra");
-  });
-  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
-                             "Didn't find a registered implementation for name: 'grewgragra'");
 }
 
 } // namespace
