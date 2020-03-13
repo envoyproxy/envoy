@@ -585,7 +585,7 @@ void RtdsSubscription::start() {
   // instantiated in the server instance.
   const auto resource_name = getResourceName(config_source_.resource_api_version());
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), store_, *this);
+      config_source_, Grpc::Common::typeUrl(resource_name), store_, *this);
   subscription_->start({resource_name_});
 }
 

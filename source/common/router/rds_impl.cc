@@ -85,7 +85,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
   const auto resource_name = getResourceName(rds.config_source().resource_api_version());
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          rds.config_source(), Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
+          rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this);
   local_init_manager_.add(local_init_target_);
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator_);

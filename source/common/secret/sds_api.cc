@@ -86,7 +86,7 @@ void SdsApi::validateUpdateSize(int num_resources) {
 void SdsApi::initialize() {
   const auto resource_name = getResourceName(sds_config_.resource_api_version());
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), stats_, *this);
+      sds_config_, Grpc::Common::typeUrl(resource_name), stats_, *this);
   subscription_->start({sds_config_name_});
 }
 
