@@ -6,4 +6,3 @@ UDP listener filters
   :maxdepth: 2
 
   */v2alpha/*
-  */v3/*
