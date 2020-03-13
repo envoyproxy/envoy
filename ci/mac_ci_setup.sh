@@ -35,16 +35,10 @@ if [ -n "$CIRCLECI" ]; then
     mv ~/.gitconfig ~/.gitconfig_save
 fi
 
-# Required as bazel is installed in the latest macos vm image, we have to unlink it to
-# link the bazel command to bazelisk
-bazel_path=`which bazel`
-if is_installed "bazelbuild/tap/bazel" && ! brew unlink bazelbuild/tap/bazel; then
-    echo "Failed to unlink bazelbuild/tap/bazel"
+# Required as bazel and a foreign bazelisk are installed in the latest macos vm image, we have
+# to unlink/overwrite them to install bazelisk
+brew install --force bazelbuild/tap/bazelisk
+if ! brew link --overwrite bazelbuild/tap/bazelisk; then
+    echo "Failed to install and link bazelbuild/tap/bazelisk"
     exit 1
 fi
-bazelisk_path=`which bazel`
-if [ -z "$bazelisk_path" ]; then
-    echo "bazelisk not installed"
-    exit 1
-fi
-ln -s $bazelisk_path $bazel_path
