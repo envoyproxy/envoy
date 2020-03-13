@@ -51,5 +51,6 @@ The following statistics are generated for all subscriptions.
  update_success, Counter, Total API fetches completed successfully
  update_failure, Counter, Total API fetches that failed because of network errors
  update_rejected, Counter, Total API fetches that failed because of schema/validation errors
+ update_time, Gauge, Timestamp of the last successful API fetch attempt as milliseconds since the epoch. Refreshed even after a trivial configuration reload that contained no configuration changes.
  version, Gauge, Hash of the contents from the last successful API fetch
  control_plane.connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server

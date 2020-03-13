@@ -19,11 +19,11 @@ TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
       .Times(0);
   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
-  EXPECT_TRUE(statsAre(1, 0, 0, 1, 0, 0));
+  EXPECT_TRUE(statsAre(1, 0, 0, 1, 0, 0, 0));
   timerTick();
-  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, 7148434200721666028));
+  EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, TEST_TIME_MILLIS, 7148434200721666028));
 }
 
 // Validate that the client can recover from bad JSON responses.
@@ -38,28 +38,48 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
   http_callbacks_->onSuccess(std::move(message));
-  EXPECT_TRUE(statsAre(1, 0, 1, 0, 0, 0));
+  EXPECT_TRUE(statsAre(1, 0, 1, 0, 0, 0, 0));
   request_in_progress_ = false;
   timerTick();
-  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, 0));
+  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, 0, 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(3, 1, 1, 0, 0, 7148434200721666028));
+  EXPECT_TRUE(statsAre(3, 1, 1, 0, 0, TEST_TIME_MILLIS, 7148434200721666028));
 }
 
 TEST_F(HttpSubscriptionImplTest, ConfigNotModified) {
   startSubscription({"cluster0", "cluster1"});
 
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0));
   timerTick();
-  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0));
+  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0));
 
   // accept and modify.
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, true, "200");
-  EXPECT_TRUE(statsAre(3, 1, 0, 0, 0, 7148434200721666028));
+  EXPECT_TRUE(statsAre(3, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028));
 
   // accept and does not modify.
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true, false, "304");
-  EXPECT_TRUE(statsAre(4, 1, 0, 0, 0, 7148434200721666028));
+  EXPECT_TRUE(statsAre(4, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028));
+}
+
+TEST_F(HttpSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
+  startSubscription({"cluster0", "cluster1"});
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0));
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", false);
+  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, 0, 0));
+}
+
+TEST_F(HttpSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
+  startSubscription({"cluster0", "cluster1"});
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0));
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028));
+
+  // Advance the simulated time and verify that a trivial update (no change) also changes the update
+  // time.
+  simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS + 1)));
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+  EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028));
 }
 
 } // namespace
