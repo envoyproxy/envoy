@@ -117,9 +117,8 @@ AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigShare
                                                const std::string& stats_prefix)
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
 
-Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&,
-                                                                bool end_stream) {
-  if (!end_stream || !config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
+Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+  if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -130,24 +129,20 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  deferred_record_failure_ = std::make_unique<Cleanup>([this]() {
-    std::cout << "@tallen failure recorded\n";
-    config_->getController().recordFailure();
-  });
+  deferred_record_failure_ =
+      std::make_unique<Cleanup>([this]() { config_->getController().recordFailure(); });
 
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                                                bool end_stream) {
-  if (end_stream) {
-    if (config_->response_evaluator()->isSuccess(headers)) {
-      config_->getController().recordSuccess();
-      ASSERT(deferred_record_failure_);
-      deferred_record_failure_->cancel();
-    } else {
-      deferred_record_failure_.reset();
-    }
+                                                                bool) {
+  if (config_->response_evaluator()->isSuccess(headers)) {
+    config_->getController().recordSuccess();
+    ASSERT(deferred_record_failure_);
+    deferred_record_failure_->cancel();
+  } else {
+    deferred_record_failure_.reset();
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -168,20 +163,15 @@ ThreadLocalControllerImpl::ThreadLocalControllerImpl(TimeSource& time_source,
     : time_source_(time_source), sampling_window_(sampling_window) {}
 
 void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {
-  const MonotonicTime now = time_source_.monotonicTime();
-
   // Purge stale samples.
-  while (!historical_data_.empty() && (now - historical_data_.front().first) >= sampling_window_) {
-    global_data_.successes -= historical_data_.front().second.successes;
-    global_data_.requests -= historical_data_.front().second.requests;
-    historical_data_.pop_front();
+  while (!historical_data_.empty() && ageOfOldestSample() >= sampling_window_) {
+    removeOldestSample();
   }
 
   // It's possible we purged stale samples from the history and are left with nothing, so it's
   // necessary to add an empty entry. We will also need to roll over into a new entry in the
   // historical data if we've exceeded the time specified by the granularity.
-  if (historical_data_.empty() ||
-      (now - historical_data_.back().first) >= defaultHistoryGranularity) {
+  if (historical_data_.empty() || ageOfNewestSample() >= defaultHistoryGranularity) {
     historical_data_.emplace_back(time_source_.monotonicTime(), RequestData());
   }
 }

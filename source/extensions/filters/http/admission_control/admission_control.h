@@ -85,6 +85,30 @@ private:
   // Potentially remove any stale samples and record sample aggregates to the historical data.
   void maybeUpdateHistoricalData();
 
+  // Returns the age of the oldest sample in the historical data.
+  std::chrono::microseconds ageOfOldestSample() const {
+    ASSERT(!historical_data_.empty());
+    using namespace std::chrono;
+    return duration_cast<microseconds>(time_source_.monotonicTime() -
+                                       historical_data_.front().first);
+  }
+
+  // Returns the age of the newest sample in the historical data.
+  std::chrono::microseconds ageOfNewestSample() const {
+    ASSERT(!historical_data_.empty());
+    using namespace std::chrono;
+    return duration_cast<microseconds>(time_source_.monotonicTime() -
+                                       historical_data_.back().first);
+  }
+
+  // Removes the oldest sample in the historical data and reconciles the global data.
+  void removeOldestSample() {
+    ASSERT(!historical_data_.empty());
+    global_data_.successes -= historical_data_.front().second.successes;
+    global_data_.requests -= historical_data_.front().second.requests;
+    historical_data_.pop_front();
+  }
+
   TimeSource& time_source_;
   std::deque<std::pair<MonotonicTime, RequestData>> historical_data_;
 

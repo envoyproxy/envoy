@@ -46,6 +46,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "admission_control_integration_test",
+    srcs = ["admission_control_integration_test.cc"],
+    extension_name = "envoy.filters.http.admission_control",
+    deps = [
+        "//source/extensions/filters/http/admission_control:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "admission_controller_test",
     srcs = ["controller_test.cc"],
     extension_name = "envoy.filters.http.admission_control",
