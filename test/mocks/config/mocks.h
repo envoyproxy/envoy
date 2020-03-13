@@ -122,7 +122,7 @@ public:
 
 class MockTypedFactory : public TypedFactory {
 public:
-  ~MockTypedFactory() = default;
+  ~MockTypedFactory() override;
 
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
   MOCK_METHOD(std::string, configType, ());

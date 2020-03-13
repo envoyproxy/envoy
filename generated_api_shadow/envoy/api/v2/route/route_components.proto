@@ -151,11 +151,11 @@ message VirtualHost {
   RetryPolicy retry_policy = 16;
 
   // [#not-implemented-hide:]
-  // Implementation specific configuration which depends on the implementation being instantiated.
-  // See the supported retry policy implementations for further documentation. Note that setting a
-  // route level entry will take precedence over this config and it'll be treated
-  // independently (e.g.: values are not inherited). :ref:`Retry policy <envoy_api_field_route.VirtualHost.retry_policy>`
-  // should not be set if this field is used.
+  // Specifies the configuration for retry policy extension. See the supported retry policy
+  // implementations for further documentation. Note that setting a route level entry will take
+  // precedence over this config and it'll be treated independently (e.g.: values are not inherited).
+  // :ref:`Retry policy <envoy_api_field_route.VirtualHost.retry_policy>` should not be set if this
+  // field is used.
   google.protobuf.Any retry_policy_extension = 19;
 
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
@@ -887,10 +887,10 @@ message RouteAction {
   RetryPolicy retry_policy = 9;
 
   // [#not-implemented-hide:]
-  // Implementation specific configuration which depends on the implementation being instantiated.
-  // See the supported retry policy implementations for further documentation. Note that if this is
-  // set, it'll take precedence over the virtual host level retry policy entirely (e.g.: policies
-  // are not merged, most internal one becomes the enforced policy). :ref:`Retry policy <envoy_api_field_route.VirtualHost.retry_policy>`
+  // Specifies the configuration for retry policy extension. See the supported retry policy
+  // implementations for further documentation. Note that if this is set, it'll take precedence over
+  // the virtual host level retry policy entirely (e.g.: policies are not merged, most internal one
+  // becomes the enforced policy). :ref:`Retry policy <envoy_api_field_route.VirtualHost.retry_policy>`
   // should not be set if this field is used.
   google.protobuf.Any retry_policy_extension = 33;
 
