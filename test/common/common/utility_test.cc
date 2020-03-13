@@ -353,6 +353,36 @@ TEST(StringUtil, StringViewSplit) {
     EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
                 ContainerEq(StringUtil::splitToken("hello world", " ", true)));
   }
+  {
+    auto tokens = StringUtil::splitToken(" one , two , three ", ",", true, true);
+    EXPECT_EQ(3, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "two") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", true, true);
+    EXPECT_EQ(4, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", false, true);
+    EXPECT_EQ(3, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", false);
+    EXPECT_EQ(4, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " one ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "  ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five ") != tokens.end());
+  }
 }
 
 TEST(StringUtil, StringViewRemoveTokens) {

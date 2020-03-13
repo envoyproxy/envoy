@@ -1088,6 +1088,56 @@ TEST_F(RouterRetryStateImplTest, BudgetRuntimeSetOnly) {
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
 }
 
+TEST_F(RouterRetryStateImplTest, ParseRetryOn) {
+  // RETRY_ON_5XX             0x1
+  // RETRY_ON_GATEWAY_ERROR   0x2
+  // RETRY_ON_CONNECT_FAILURE 0x4
+  std::string config = "5xx,gateway-error,connect-failure";
+  auto result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, 7);
+  EXPECT_TRUE(result.second);
+
+  config = "xxx,gateway-error,connect-failure";
+  result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, 6);
+  EXPECT_FALSE(result.second);
+
+  config = " 5xx,gateway-error ,  connect-failure   ";
+  result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, 7);
+  EXPECT_TRUE(result.second);
+
+  config = " 5 xx,gateway-error ,  connect-failure   ";
+  result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, 6);
+  EXPECT_FALSE(result.second);
+}
+
+TEST_F(RouterRetryStateImplTest, ParseRetryGrpcOn) {
+  // RETRY_ON_GRPC_CANCELLED             0x20
+  // RETRY_ON_GRPC_DEADLINE_EXCEEDED     0x40
+  // RETRY_ON_GRPC_RESOURCE_EXHAUSTED    0x80
+  std::string config = "cancelled,deadline-exceeded,resource-exhausted";
+  auto result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 224);
+  EXPECT_TRUE(result.second);
+
+  config = "cancelled,deadline-exceeded,resource-exhaust";
+  result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 96);
+  EXPECT_FALSE(result.second);
+
+  config = "   cancelled,deadline-exceeded   ,   resource-exhausted   ";
+  result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 224);
+  EXPECT_TRUE(result.second);
+
+  config = "   cancelled,deadline-exceeded   ,   resource- exhausted   ";
+  result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 96);
+  EXPECT_FALSE(result.second);
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

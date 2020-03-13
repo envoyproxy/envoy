@@ -153,7 +153,7 @@ void RetryStateImpl::enableBackoffTimer() {
 std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config) {
   uint32_t ret = 0;
   bool all_fields_valid = true;
-  for (const auto retry_on : StringUtil::splitToken(config, ",")) {
+  for (const auto retry_on : StringUtil::splitToken(config, ",", false, true)) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnValues._5xx) {
       ret |= RetryPolicy::RETRY_ON_5XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.GatewayError) {
@@ -181,7 +181,7 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
 std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header) {
   uint32_t ret = 0;
   bool all_fields_valid = true;
-  for (const auto retry_on : StringUtil::splitToken(retry_grpc_on_header, ",")) {
+  for (const auto retry_on : StringUtil::splitToken(retry_grpc_on_header, ",", false, true)) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Cancelled) {
       ret |= RetryPolicy::RETRY_ON_GRPC_CANCELLED;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.DeadlineExceeded) {

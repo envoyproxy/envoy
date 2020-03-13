@@ -328,18 +328,29 @@ absl::string_view StringUtil::cropLeft(absl::string_view source, absl::string_vi
 
 std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
                                                       absl::string_view delimiters,
-                                                      bool keep_empty_string) {
+                                                      bool keep_empty_string,
+                                                      bool trim_whitespace) {
+  std::vector<absl::string_view> result;
   if (keep_empty_string) {
-    return absl::StrSplit(source, absl::ByAnyChar(delimiters));
+    result = absl::StrSplit(source, absl::ByAnyChar(delimiters));
+  } else {
+    if (trim_whitespace) {
+      result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipWhitespace());
+    } else {
+      result = absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
+    }
   }
-  return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
+
+  if (trim_whitespace) {
+    for_each(result.begin(), result.end(), [](auto& v) { v = trim(v); });
+  }
+  return result;
 }
 
 std::string StringUtil::removeTokens(absl::string_view source, absl::string_view delimiters,
                                      const CaseUnorderedSet& tokens_to_remove,
                                      absl::string_view joiner) {
-  auto values = Envoy::StringUtil::splitToken(source, delimiters);
-  std::for_each(values.begin(), values.end(), [](auto& v) { v = StringUtil::trim(v); });
+  auto values = Envoy::StringUtil::splitToken(source, delimiters, false, true);
   auto end = std::remove_if(values.begin(), values.end(),
                             [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
   return absl::StrJoin(values.begin(), end, joiner);
