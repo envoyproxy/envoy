@@ -155,11 +155,11 @@ public:
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
-  Server::Configuration::NamedHttpFilterConfigFactory&
+  void
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
                 int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
-                bool& is_terminal);
+                const char* filter_chain_type, bool last_filter_in_current_config);
 
   /**
    * Determines what tracing provider to use for a given
