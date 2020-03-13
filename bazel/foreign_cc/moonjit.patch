@@ -1,0 +1,90 @@
+diff --git a/src/Makefile b/src/Makefile
+index f56465d..3f4f2fa 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -27,7 +27,7 @@ NODOTABIVER= 51
+ DEFAULT_CC = gcc
+ #
+ # LuaJIT builds as a native 32 or 64 bit binary by default.
+-CC= $(DEFAULT_CC)
++CC ?= $(DEFAULT_CC)
+ #
+ # Use this if you want to force a 32 bit build on a 64 bit multilib OS.
+ #CC= $(DEFAULT_CC) -m32
+@@ -71,10 +71,10 @@ CCWARN= -Wall
+ # as dynamic mode.
+ #
+ # Mixed mode creates a static + dynamic library and a statically linked luajit.
+-BUILDMODE= mixed
++#BUILDMODE= mixed
+ #
+ # Static mode creates a static library and a statically linked luajit.
+-#BUILDMODE= static
++BUILDMODE= static
+ #
+ # Dynamic mode creates a dynamic library and a dynamically linked luajit.
+ # Note: this executable will only run when the library is installed!
+@@ -99,7 +99,7 @@ XCFLAGS=
+ # enabled by default. Some other features that *might* break some existing
+ # code (e.g. __pairs or os.execute() return values) can be enabled here.
+ # Note: this does not provide full compatibility with Lua 5.2 at this time.
+-#XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
++XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
+ #
+ # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
+ #XCFLAGS+= -DLUAJIT_DISABLE_JIT
+@@ -587,7 +587,7 @@ endif
+
+ Q= @
+ E= @echo
+-#Q=
++Q=
+ #E= @:
+
+ ##############################################################################
+EOF
+diff --git a/build.py b/build.py
+new file mode 100755
+index 0000000..9c71271
+--- /dev/null
++++ b/build.py
+@@ -0,0 +1,39 @@
++#!/usr/bin/env python
++
++import argparse
++import os
++import shutil
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--prefix")
++    args = parser.parse_args()
++    src_dir = os.path.dirname(os.path.realpath(__file__))
++    shutil.copytree(src_dir, os.path.basename(src_dir))
++    os.chdir(os.path.basename(src_dir))
++
++    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.6"
++    os.environ["DEFAULT_CC"] = os.environ.get("CC", "")
++    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
++    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "") + " -fno-function-sections -fno-data-sections"
++    os.environ["CFLAGS"] = ""
++    # LuaJIT compile process build a tool `buildvm` and use it, building `buildvm` with ASAN
++    # will cause LSAN detect its leak and fail the build, set exitcode to 0 to make LSAN doesn't
++    # fail on it.
++    os.environ["LSAN_OPTIONS"] = "exitcode=0"
++
++    if "ENVOY_MSAN" in os.environ:
++      os.environ["HOST_CFLAGS"] = "-fno-sanitize=memory"
++      os.environ["HOST_LDFLAGS"] = "-fno-sanitize=memory"
++
++    # Blacklist LuaJIT from ASAN for now.
++    # TODO(htuch): Remove this when https://github.com/envoyproxy/envoy/issues/6084 is resolved.
++    if "ENVOY_CONFIG_ASAN" in os.environ:
++      os.environ["TARGET_CFLAGS"] += " -fsanitize-blacklist=%s/com_github_moonjit_moonjit/clang-asan-blacklist.txt" % os.environ["PWD"]
++      with open("clang-asan-blacklist.txt", "w") as f:
++        f.write("fun:*\n")
++
++    os.system('make V=1 PREFIX="{}" install'.format(args.prefix))
++
++main()
++

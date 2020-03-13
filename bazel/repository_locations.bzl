@@ -120,6 +120,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "LuaJIT-2.1.0-beta3",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/v2.1.0-beta3.tar.gz"],
     ),
+    com_github_moonjit_moonjit = dict(
+        sha256 = "83deb2c880488dfe7dd8ebf09e3b1e7613ef4b8420de53de6f712f01aabca2b6",
+        strip_prefix = "moonjit-2.2.0",
+        urls = ["https://github.com/moonjit/moonjit/archive/2.2.0.tar.gz"],
+    ),
     com_github_nghttp2_nghttp2 = dict(
         sha256 = "eb9d9046495a49dd40c7ef5d6c9907b51e5a6b320ea6e2add11eb8b52c982c47",
         strip_prefix = "nghttp2-1.40.0",

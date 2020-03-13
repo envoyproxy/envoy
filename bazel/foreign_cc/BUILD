@@ -44,6 +44,25 @@ configure_make(
     }),
     lib_source = "@com_github_luajit_luajit//:all",
     make_commands = [],
+    out_include_dir = "include/luajit-2.1",
+    static_libraries = [
+        "libluajit-5.1.a",
+    ],
+)
+
+configure_make(
+    name = "moonjit",
+    configure_command = "build.py",
+    configure_env_vars = select({
+        # This shouldn't be needed! See
+        # https://github.com/envoyproxy/envoy/issues/6084
+        # TODO(htuch): Remove when #6084 is fixed
+        "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//conditions:default": {},
+    }),
+    lib_source = "@com_github_moonjit_moonjit//:all",
+    make_commands = [],
+    out_include_dir = "include/moonjit-2.2",
     static_libraries = [
         "libluajit-5.1.a",
     ],
