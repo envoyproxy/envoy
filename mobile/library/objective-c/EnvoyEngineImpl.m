@@ -40,7 +40,8 @@ static void ios_on_exit() {
 }
 
 - (int)runWithConfigYAML:(NSString *)configYAML logLevel:(NSString *)logLevel {
-  [self startObservingLifecycleNotifications];
+  // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748
+  // gets fixed. [self startObservingLifecycleNotifications];
 
   // Envoy exceptions will only be caught here when compiled for 64-bit arches.
   // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Exceptions/Articles/Exceptions64Bit.html
