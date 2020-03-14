@@ -144,8 +144,9 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
 
-    auto lf_config = createListenerFilterConfig_(proto_config);
-    ret.push_back(factory.createListenerFilterFactoryFromProto(*message, lf_config, context));
+    auto listener_filter_config = createListenerFilterConfig_(proto_config);
+    ret.push_back(
+        factory.createListenerFilterFactoryFromProto(*message, listener_filter_config, context));
   }
   return ret;
 }

@@ -838,6 +838,44 @@ TEST_F(ConnectionHandlerTest, UdpListenerNoFilterThrowsException) {
   }
 }
 
+// Listener Filter matchers works.
+TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
+  Network::ListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(local_address_));
+  handler_->addListener(*test_listener);
+
+  auto first_listener_filter_config = std::make_shared<Network::MockListenerFilterConfig>();
+  auto last_listener_filter_config = std::make_shared<Network::MockListenerFilterConfig>();
+  auto match_nothing = std::make_shared<Network::MockListenerFilterMatcher>();
+  auto* disabled_listener_filter = new Network::MockListenerFilter();
+  auto* enabled_filter = new Network::MockListenerFilter();
+  EXPECT_CALL(factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        manager.addAcceptFilter(first_listener_filter_config,
+                                Network::ListenerFilterPtr{disabled_listener_filter});
+        manager.addAcceptFilter(last_listener_filter_config,
+                                Network::ListenerFilterPtr{enabled_filter});
+        return true;
+      }));
+  EXPECT_CALL(*first_listener_filter_config, matcher()).WillOnce(Return(match_nothing));
+  EXPECT_CALL(*last_listener_filter_config, matcher()).WillOnce(Return(nullptr));
+
+  // The disable matcher match everything, making the listener filter never called.
+  EXPECT_CALL(*match_nothing, matches(_)).WillOnce(Return(true));
+  EXPECT_CALL(*disabled_listener_filter, onAccept(_)).Times(0);
+
+  // The non macher acts as if always enabled.
+  EXPECT_CALL(*enabled_filter, onAccept(_)).WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(*disabled_listener_filter, destroy_());
+  EXPECT_CALL(*enabled_filter, destroy_());
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  listener_callbacks->onAccept(std::make_unique<NiceMock<Network::MockConnectionSocket>>());
+  EXPECT_CALL(*listener, onDestroy());
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

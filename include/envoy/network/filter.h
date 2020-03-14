@@ -322,7 +322,7 @@ public:
    * first is called first).
    * @param filter supplies the filter being added.
    */
-  virtual void addAcceptFilter(Network::ListenerFilterConfigSharedPtr lf_config,
+  virtual void addAcceptFilter(Network::ListenerFilterConfigSharedPtr listener_filter_config,
                                ListenerFilterPtr&& filter) PURE;
 };
 

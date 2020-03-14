@@ -165,9 +165,9 @@ public:
   MockListenerFilterManager();
   ~MockListenerFilterManager() override;
 
-  void addAcceptFilter(Network::ListenerFilterConfigSharedPtr lf_config,
+  void addAcceptFilter(Network::ListenerFilterConfigSharedPtr listener_filter_config,
                        ListenerFilterPtr&& filter) override {
-    addAcceptFilter_(lf_config, filter);
+    addAcceptFilter_(listener_filter_config, filter);
   }
 
   MOCK_METHOD(void, addAcceptFilter_,
@@ -473,6 +473,13 @@ public:
   ~MockListenerFilterConfig() override;
 
   MOCK_METHOD(ListenerFilterMatcherSharedPtr, matcher, (), (const));
+};
+
+class MockListenerFilterMatcher : public ListenerFilterMatcher {
+public:
+  MockListenerFilterMatcher();
+  ~MockListenerFilterMatcher() override;
+  MOCK_METHOD(bool, matches, (Network::ListenerFilterCallbacks & cb), (const));
 };
 } // namespace Network
 } // namespace Envoy

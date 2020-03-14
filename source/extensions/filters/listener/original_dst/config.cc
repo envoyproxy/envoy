@@ -19,12 +19,11 @@ namespace OriginalDst {
 class OriginalDstConfigFactory : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Network::ListenerFilterFactoryCb
-  createListenerFilterFactoryFromProto(const Protobuf::Message&,
-                                       Network::ListenerFilterConfigSharedPtr lf_config,
-                                       Server::Configuration::ListenerFactoryContext&) override {
-    return [lf_config](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(lf_config, std::make_unique<OriginalDstFilter>());
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message&, Network::ListenerFilterConfigSharedPtr listener_filter_config,
+      Server::Configuration::ListenerFactoryContext&) override {
+    return [listener_filter_config](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(listener_filter_config, std::make_unique<OriginalDstFilter>());
     };
   }
 

@@ -199,5 +199,8 @@ MockListenerFilterConfig::MockListenerFilterConfig() {
 }
 MockListenerFilterConfig::~MockListenerFilterConfig() = default;
 
+MockListenerFilterMatcher::MockListenerFilterMatcher() = default;
+MockListenerFilterMatcher::~MockListenerFilterMatcher() = default;
+
 } // namespace Network
 } // namespace Envoy

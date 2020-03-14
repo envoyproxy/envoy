@@ -252,10 +252,10 @@ public:
    * @param context supplies the filter's context.
    * @return Network::ListenerFilterFactoryCb the factory creation function.
    */
-  virtual Network::ListenerFilterFactoryCb
-  createListenerFilterFactoryFromProto(const Protobuf::Message& config,
-                                       Network::ListenerFilterConfigSharedPtr lf_config,
-                                       ListenerFactoryContext& context) PURE;
+  virtual Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& config,
+      Network::ListenerFilterConfigSharedPtr listener_filter_config,
+      ListenerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.filters.listener"; }
 };

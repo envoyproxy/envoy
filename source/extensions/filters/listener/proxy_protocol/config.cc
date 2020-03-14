@@ -18,12 +18,13 @@ class ProxyProtocolConfigFactory : public Server::Configuration::NamedListenerFi
 public:
   // NamedListenerFilterConfigFactory
   Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
-      const Protobuf::Message&, Network::ListenerFilterConfigSharedPtr lf_config,
+      const Protobuf::Message&, Network::ListenerFilterConfigSharedPtr listener_filter_config,
       Server::Configuration::ListenerFactoryContext& context) override {
     ConfigSharedPtr config(new Config(context.scope()));
-    return [lf_config, config](Network::ListenerFilterManager& filter_manager) -> void {
-      filter_manager.addAcceptFilter(lf_config, std::make_unique<Filter>(config));
-    };
+    return
+        [listener_filter_config, config](Network::ListenerFilterManager& filter_manager) -> void {
+          filter_manager.addAcceptFilter(listener_filter_config, std::make_unique<Filter>(config));
+        };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
