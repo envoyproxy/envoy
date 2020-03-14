@@ -276,14 +276,12 @@ public:
 TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
   init(std::make_unique<SymbolTableImpl>());
 
-  /*
   for (uint32_t i = 1; i < 256; ++i) {
     char ch = static_cast<char>(i);
     absl::string_view one_char(&ch, 1);
-    EXPECT_EQ(1, dynamicEncodeDecodeTest(absl::StrCat("D:", one_char)));
-    EXPECT_EQ(1, dynamicEncodeDecodeTest(one_char));
+    EXPECT_EQ(1, dynamicEncodeDecodeTest(absl::StrCat("D:", one_char))) << "dynamic=" << one_char;
+    EXPECT_EQ(0, dynamicEncodeDecodeTest(one_char)) << "symbolic=" << one_char;
   }
-  */
   EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
   EXPECT_EQ(1, dynamicEncodeDecodeTest("D:dynamic"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.world"));
