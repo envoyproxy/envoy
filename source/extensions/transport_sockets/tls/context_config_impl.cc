@@ -138,24 +138,11 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
     }
   }
   case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-      SessionTicketKeysTypeCase::kDisableSessionTickets:
-  case envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
       SessionTicketKeysTypeCase::SESSION_TICKET_KEYS_TYPE_NOT_SET:
     return nullptr;
   default:
     throw EnvoyException(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
                                      config.session_ticket_keys_type_case()));
-  }
-}
-
-bool getSessionTicketsDisabled(
-    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& config) {
-  if (config.session_ticket_keys_type_case() ==
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext::
-          SessionTicketKeysTypeCase::kDisableSessionTickets) {
-    return config.disable_session_tickets();
-  } else {
-    return false;
   }
 }
 
@@ -387,7 +374,13 @@ ServerContextConfigImpl::ServerContextConfigImpl(
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
-      disable_session_tickets_(getSessionTicketsDisabled(config)) {
+      disable_session_tickets_(config.disable_session_tickets()) {
+
+  if (disable_session_tickets_ && session_ticket_keys_provider_ != nullptr) {
+    throw EnvoyException(
+        fmt::format("TLS session tickets have been disabled, but either session_ticket_keys or "
+                    "session_ticket_keys_sds_secret_config has been set"));
+  }
 
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
