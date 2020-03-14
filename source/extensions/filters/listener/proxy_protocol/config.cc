@@ -19,7 +19,6 @@ public:
   // NamedListenerFilterConfigFactory
   Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
       const Protobuf::Message&, Network::ListenerFilterConfigSharedPtr lf_config,
-
       Server::Configuration::ListenerFactoryContext& context) override {
     ConfigSharedPtr config(new Config(context.scope()));
     return [lf_config, config](Network::ListenerFilterManager& filter_manager) -> void {

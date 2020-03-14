@@ -275,16 +275,26 @@ public:
  * Listener Filter
  */
 
+//
+class ListenerFilterMatcher {
+public:
+  virtual ~ListenerFilterMatcher() = default;
+  virtual bool matches(Network::ListenerFilterCallbacks& cb) const PURE;
+};
+using ListenerFilterMatcherPtr = std::unique_ptr<ListenerFilterMatcher>;
+using ListenerFilterMatcherSharedPtr = std::shared_ptr<ListenerFilterMatcher>;
+
 /**
  *  A mapping from a general listener filter message without `typed_config`.
  **/
 class ListenerFilterConfig {
 public:
   virtual ~ListenerFilterConfig() = default;
-  virtual bool disabledPredicate() PURE;
+  virtual ListenerFilterMatcherSharedPtr matcher() const PURE;
 };
 
 using ListenerFilterConfigSharedPtr = std::shared_ptr<ListenerFilterConfig>;
+
 class ListenerFilter {
 public:
   virtual ~ListenerFilter() = default;

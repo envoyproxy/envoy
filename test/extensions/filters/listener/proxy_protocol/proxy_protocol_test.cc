@@ -55,6 +55,7 @@ public:
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
+        listener_filter_config_(std::make_shared<NiceMock<Network::MockListenerFilterConfig>>()),
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
     EXPECT_CALL(socket_factory_, socketType())
@@ -105,6 +106,7 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
+              listener_filter_config_,
               std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           maybeExitDispatcher();
           return true;
@@ -173,6 +175,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
+  std::shared_ptr<NiceMock<Network::MockListenerFilterConfig>> listener_filter_config_;
   Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
@@ -909,6 +912,7 @@ public:
       : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
                                                            nullptr, true)),
+        listener_filter_config_(std::make_shared<Network::MockListenerFilterConfig>()),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_->localAddress()->ip()->port())),
@@ -927,9 +931,11 @@ public:
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
+              listener_filter_config_,
               std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           return true;
         }));
+    EXPECT_CALL(*listener_filter_config_, matcher).Times(1);
   }
 
   // Network::ListenerConfig
@@ -1005,6 +1011,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   Network::MockListenSocketFactory socket_factory_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
+  std::shared_ptr<Network::MockListenerFilterConfig> listener_filter_config_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
   Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;

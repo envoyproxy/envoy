@@ -363,7 +363,9 @@ envoy_cc_library(
         "//source/common/config:version_converter_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
+        "//source/common/network:filter_matcher_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/network:listener_filter_config_impl",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
@@ -561,18 +563,5 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:filter_config_interface",
         "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "filter_matcher",
-    srcs = [
-        "filter_matcher.cc",
-    ],
-    hdrs = ["filter_matcher.h"],
-    deps = [
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

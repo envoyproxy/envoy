@@ -194,5 +194,10 @@ MockUdpListenerFilterManager::~MockUdpListenerFilterManager() = default;
 MockConnectionBalancer::MockConnectionBalancer() = default;
 MockConnectionBalancer::~MockConnectionBalancer() = default;
 
+MockListenerFilterConfig::MockListenerFilterConfig() {
+  ON_CALL(*this, matcher()).WillByDefault(Return(nullptr));
+}
+MockListenerFilterConfig::~MockListenerFilterConfig() = default;
+
 } // namespace Network
 } // namespace Envoy
