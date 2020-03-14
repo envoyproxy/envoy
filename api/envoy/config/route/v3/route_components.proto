@@ -1164,6 +1164,10 @@ message DirectResponseAction {
   //   :ref:`envoy_api_msg_config.route.v3.Route`, :ref:`envoy_api_msg_config.route.v3.RouteConfiguration` or
   //   :ref:`envoy_api_msg_config.route.v3.VirtualHost`.
   core.v3.DataSource body = 2;
+
+  // Specifies the response flag to record after sending the response.
+  // If the value is set, it must be a valid %RESPONSE_FLAGS% from access log.
+  string response_flag = 3;
 }
 
 message Decorator {

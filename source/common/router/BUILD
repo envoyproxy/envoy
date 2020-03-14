@@ -77,6 +77,7 @@ envoy_cc_library(
     hdrs = ["config_utility.h"],
     deps = [
         "//include/envoy/http:codes_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -84,6 +85,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stream_info:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",

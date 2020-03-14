@@ -438,6 +438,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
             response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
+          const auto rf = direct_response->responseFlag();
+          if (absl::nullopt != rf) {
+            callbacks_->streamInfo().setResponseFlag(rf.value());
+          }
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     callbacks_->streamInfo().setRouteName(direct_response->routeName());

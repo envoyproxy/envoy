@@ -66,6 +66,12 @@ public:
   virtual Http::Code responseCode() const PURE;
 
   /**
+   * Returns the response flag to record.
+   * @return absl::optional<StreamInfo::ResponseFlag> the response flag.
+   */
+  virtual const absl::optional<StreamInfo::ResponseFlag> responseFlag() const PURE;
+
+  /**
    * Returns the redirect path based on the request headers.
    * @param headers supplies the request headers.
    * @return std::string the redirect URL if this DirectResponseEntry is a redirect,
