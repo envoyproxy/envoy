@@ -20,7 +20,7 @@ void Coroutine::start(int function_ref, int num_args, const std::function<void()
 
   state_ = State::Yielded;
   lua_rawgeti(coroutine_state_.get(), LUA_REGISTRYINDEX, function_ref);
-  ASSERT(lua_isfunction(coroutine_state_.get(), -1));
+  ASSERT(lua_isfunction(coroutine_state_.get(), -1) == 1);
 
   // The function needs to come before the arguments but the arguments are already on the stack,
   // so we need to move it into position.
@@ -69,11 +69,15 @@ int ThreadLocalState::getGlobalRef(uint64_t slot) {
   return tls.global_slots_[slot];
 }
 
-uint64_t ThreadLocalState::registerGlobal(const std::string& global) {
-  tls_slot_->runOnAllThreads([this, global]() {
+uint64_t ThreadLocalState::registerGlobal(const std::string& global,
+                                          const InitializerList& initializers) {
+  tls_slot_->runOnAllThreads([this, global, initializers]() {
     LuaThreadLocal& tls = tls_slot_->getTyped<LuaThreadLocal>();
     lua_getglobal(tls.state_.get(), global.c_str());
     if (lua_isfunction(tls.state_.get(), -1)) {
+      for (const auto& initialize : initializers) {
+        initialize(tls.state_.get());
+      }
       tls.global_slots_.push_back(luaL_ref(tls.state_.get(), LUA_REGISTRYINDEX));
     } else {
       ENVOY_LOG(debug, "definition for '{}' not found in script", global);

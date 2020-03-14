@@ -552,12 +552,26 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
 
-  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
+  const Filters::Common::Lua::InitializerList initializers(
+    // EnvoyTimestampResolution "enum".
+    {
+      [](lua_State* state) {
+          lua_newtable(state);
+          {
+            LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
+            LUA_ENUM(state, NANOSECOND, Timestamp::Resolution::Nanosecond);
+          }
+          lua_setglobal(state, "EnvoyTimestampResolution");
+      },
+      // Add more initializers here.
+    });
+
+  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request", initializers);
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
   }
 
-  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
+  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response", initializers);
   if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
   }
