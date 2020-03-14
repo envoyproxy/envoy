@@ -18,6 +18,11 @@
 #include <mswsock.h>
 #include <ws2tcpip.h>
 
+// This is introduced in Windows SDK 10.0.17063.0 which is required
+// to build Envoy on Windows (we will reevaluate whether earlier builds
+// of Windows can be detected and PipeInstance marked unsupported at runtime.)
+#include <afunix.h>
+
 // <windows.h> defines some frequently used symbols, so we need to undef these
 // interfering symbols.
 #undef DELETE

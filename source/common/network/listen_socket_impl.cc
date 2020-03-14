@@ -19,7 +19,7 @@ namespace Network {
 
 void ListenSocketImpl::doBind() {
   const Api::SysCallIntResult result = local_address_->bind(io_handle_->fd());
-  if (result.rc_ == -1) {
+  if (SOCKET_FAILURE(result.rc_)) {
     close();
     throw SocketBindException(
         fmt::format("cannot bind '{}': {}", local_address_->asString(), strerror(result.errno_)),

@@ -78,6 +78,7 @@ def _envoy_linkopts():
 
 def _envoy_stamped_deps():
     return select({
+        "@envoy//bazel:windows_x86_64": [],
         "@envoy//bazel:apple": [
             "@envoy//bazel:raw_build_id.ldscript",
         ],
