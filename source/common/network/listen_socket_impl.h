@@ -83,7 +83,7 @@ public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
       : ListenSocketImpl(address->socket(T::type), address) {
-    RELEASE_ASSERT(io_handle_->fd() != -1, "");
+    RELEASE_ASSERT(SOCKET_VALID(io_handle_->fd()), "");
 
     setPrebindSocketOptions();
 

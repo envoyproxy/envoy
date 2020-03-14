@@ -5,6 +5,8 @@ load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
 
 envoy_package()
 
+# autotools packages are unusable on Windows as-is
+# TODO: Consider our own gperftools.BUILD file as we do with many other packages
 configure_make(
     name = "gperftools_build",
     configure_options = [
@@ -22,16 +24,20 @@ configure_make(
         "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
         "//conditions:default": ["libtcmalloc_and_profiler.a"],
     }),
+    tags = ["skip_on_windows"],
 )
 
 # Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
 cc_library(
     name = "gperftools",
+    tags = ["skip_on_windows"],
     deps = [
         "gperftools_build",
     ],
 )
 
+# autotools packages are unusable on Windows as-is
+# TODO: Consider our own luajit.BUILD file as we do with many other packages
 configure_make(
     name = "luajit",
     configure_command = "build.py",
@@ -48,6 +54,7 @@ configure_make(
     static_libraries = [
         "libluajit-5.1.a",
     ],
+    tags = ["skip_on_windows"],
 )
 
 configure_make(
@@ -66,6 +73,7 @@ configure_make(
     static_libraries = [
         "libluajit-5.1.a",
     ],
+    tags = ["skip_on_windows"],
 )
 
 envoy_cmake_external(
