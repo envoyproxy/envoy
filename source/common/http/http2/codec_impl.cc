@@ -907,7 +907,18 @@ void ConnectionImpl::sendPendingFrames() {
 
 void ConnectionImpl::sendSettings(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options, bool disable_push) {
-  std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals> settings;
+  absl::InlinedVector<nghttp2_settings_entry, 10> settings;
+  auto insertParameter = [&settings](const nghttp2_settings_entry& entry) mutable -> bool {
+    const auto it = std::find_if(settings.cbegin(), settings.cend(),
+                                 [&entry](const nghttp2_settings_entry& existing) {
+                                   return entry.settings_id == existing.settings_id;
+                                 });
+    if (it != settings.end()) {
+      return false;
+    }
+    settings.push_back(entry);
+    return true;
+  };
 
   // Universally disable receiving push promise frames as we don't currently support
   // them. nghttp2 will fail the connection if the other side still sends them.
@@ -915,69 +926,47 @@ void ConnectionImpl::sendSettings(
   // NOTE: This is a special case with respect to custom parameter overrides in that server push is
   // not supported and therefore not end user configurable.
   if (disable_push) {
-    settings.insert({static_cast<int32_t>(NGHTTP2_SETTINGS_ENABLE_PUSH), disable_push ? 0U : 1U});
+    settings.push_back(
+        {static_cast<int32_t>(NGHTTP2_SETTINGS_ENABLE_PUSH), disable_push ? 0U : 1U});
   }
 
   for (const auto it : http2_options.custom_settings_parameters()) {
+    // Validate that named parameters (with the exception of `allow_connect`) are not being
+    // overridden by custom parameters.
+    ASSERT((absl::c_none_of<std::array<uint16_t, 4>>(
+        {NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, NGHTTP2_SETTINGS_ENABLE_PUSH,
+         NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE},
+        [it](const uint16_t& entry) { return entry == it.identifier().value(); })));
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
-    if (it.identifier().value() == NGHTTP2_SETTINGS_ENABLE_PUSH && it.value().value() == 1) {
-      // For simplicity, warn when server push is configured enabled on either client or server
-      // connections. It _is_ actually enabled on downstream connections although Envoy itself will
-      // never send push_promise frames, but the nuance could be confusing to end users.
-      ENVOY_CONN_LOG(
-          warn,
-          "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.",
-          connection_);
-      continue;
-    }
-    auto result =
-        settings.insert({static_cast<int32_t>(it.identifier().value()), it.value().value()});
-    if (!result.second) {
-      ENVOY_CONN_LOG(debug, "duplicate user defined settings parameter with id {:#x}, value {}",
+
+    const bool result =
+        insertParameter({static_cast<int32_t>(it.identifier().value()), it.value().value()});
+    if (!result) {
+      ENVOY_CONN_LOG(debug, "duplicate custom settings parameter with id {:#x}, value {}",
                      connection_, it.identifier().value(), it.value().value());
       continue;
     }
-    ENVOY_CONN_LOG(debug, "adding user defined settings parameter with id {:#x} to {}", connection_,
+    ENVOY_CONN_LOG(debug, "adding custom settings parameter with id {:#x} to {}", connection_,
                    it.identifier().value(), it.value().value());
   }
 
-  struct SettingsDescriptor {
-    nghttp2_settings_entry entry;
-    uint32_t default_value;
-  };
-  auto descriptors = std::vector<SettingsDescriptor>{
-      {{/*nghttp2_settings_entry.settings_id=*/NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL,
-        /*nghttp2_settings_entry.value=*/http2_options.allow_connect()},
-       /*default_value=*/0},
+  // Insert named parameters.
+  settings.insert(
+      settings.end(),
       {{NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_options.hpack_table_size().value()},
-       NGHTTP2_DEFAULT_HEADER_TABLE_SIZE},
-      {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
-       NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS},
-      {{NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()},
-       NGHTTP2_INITIAL_WINDOW_SIZE}};
-  for (const auto& descriptor : descriptors) {
-    if (descriptor.entry.value != descriptor.default_value) {
-      auto result = settings.insert(descriptor.entry);
-      // Config validation should ensure a collision with user defined parameters is not possible.
-      // There is one exception, `allow_connect`, which requires a breaking API change to enable
-      // presence checks during validation.
-      if (!result.second) {
-        ASSERT(descriptor.entry.settings_id == NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL);
-        ENVOY_CONN_LOG(debug,
-                       "overriding named settings parameter with id {:#x}, value {} due to "
-                       "collision with user defined parameter",
-                       connection_, descriptor.entry.settings_id, descriptor.entry.value);
-        continue;
-      }
-      ENVOY_CONN_LOG(debug, "adding named settings parameter with id {:#x} to {}", connection_,
-                     descriptor.entry.settings_id, descriptor.entry.value);
-    }
+       {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
+       {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()}});
+  const bool result =
+      insertParameter({NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()});
+  if (!result) {
+    ENVOY_CONN_LOG(warn,
+                   "the named allow_connect SETTINGS parameter is being overriden by a custom "
+                   "parameter with value {}",
+                   connection_, http2_options.allow_connect());
   }
 
   if (!settings.empty()) {
-    std::vector<nghttp2_settings_entry> iv;
-    std::copy(settings.begin(), settings.end(), std::back_inserter(iv));
-    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &settings[0], settings.size());
     ASSERT(rc == 0);
   } else {
     // nghttp2_submit_settings need to be called at least once
@@ -996,7 +985,7 @@ void ConnectionImpl::sendSettings(
                                               NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
     ASSERT(rc == 0);
   }
-} // namespace Http2
+}
 
 ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_new(&callbacks_);

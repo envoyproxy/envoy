@@ -118,10 +118,13 @@ message Http2ProtocolOptions {
   // See `RFC7540, sec. 6.5.1 <https://tools.ietf.org/html/rfc7540#section-6.5.1>`_ for details.
   message SettingsParameter {
     // The 16 bit parameter identifier.
-    google.protobuf.UInt32Value identifier = 1 [(validate.rules).uint32 = {lte: 65536 gte: 1}];
+    google.protobuf.UInt32Value identifier = 1 [
+      (validate.rules).uint32 = {lte: 65536 gte: 1},
+      (validate.rules).message = {required: true}
+    ];
 
     // The 32 bit parameter value.
-    google.protobuf.UInt32Value value = 2;
+    google.protobuf.UInt32Value value = 2 [(validate.rules).message = {required: true}];
   }
 
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_

@@ -1113,18 +1113,19 @@ MATCHER_P(HasValue, m, "") {
   return ExplainMatchResult(m, value, result_listener);
 };
 
-class Http2CustomSettingsTest : public ::testing::TestWithParam<
-                                    ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool>>,
-                                public Http2CodecImplTestFixture {
+class Http2CustomSettingsTestBase : public Http2CodecImplTestFixture {
 public:
   struct SettingsParameter {
     uint16_t identifier;
     uint32_t value;
   };
 
-  Http2CustomSettingsTest()
-      : Http2CodecImplTestFixture(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam())),
-        validate_client_(::testing::get<2>(GetParam())) {}
+  Http2CustomSettingsTestBase(Http2SettingsTuple client_settings,
+                              Http2SettingsTuple server_settings, bool validate_client)
+      : Http2CodecImplTestFixture(client_settings, server_settings),
+        validate_client_(validate_client) {}
+
+  virtual ~Http2CustomSettingsTestBase() = default;
 
   // Sets the custom settings parameters specified by |parameters| in the |options| proto.
   void setHttp2CustomSettingsParameters(envoy::config::core::v3::Http2ProtocolOptions& options,
@@ -1161,13 +1162,22 @@ protected:
   bool validate_client_{false};
 };
 
+class Http2CustomSettingsTest
+    : public Http2CustomSettingsTestBase,
+      public ::testing::TestWithParam<
+          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool>> {
+public:
+  Http2CustomSettingsTest()
+      : Http2CustomSettingsTestBase(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
+                                    ::testing::get<2>(GetParam())) {}
+};
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CustomSettingsTest,
                          ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
                                             HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool()));
 
 // Validates that custom parameters (those which are not explicitly named in the
-// envoy::config::core::v3::Http2ProtocolOptions proto) are properly sent and processed by client
-// and server connections.
+// envoy::config::core::v3::Http2ProtocolOptions proto) are properly sent and processed by
+// client and server connections.
 TEST_P(Http2CustomSettingsTest, UserDefinedSettings) {
   std::vector<SettingsParameter> custom_parameters{{0x10, 10}, {0x11, 20}};
   setHttp2CustomSettingsParameters(getCustomOptions(), custom_parameters);
@@ -1197,23 +1207,20 @@ TEST_P(Http2CustomSettingsTest, UserDefinedSettings) {
         getSettingsProvider().getRemoteSettingsParameterValue(NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE),
         HasValue(initial_stream_window_size));
   }
-  // Validate that custom parameters are received by the endpoint (client or server) under test.
+  // Validate that custom parameters are received by the endpoint (client or server) under
+  // test.
   for (const auto& parameter : custom_parameters) {
     EXPECT_THAT(getSettingsProvider().getRemoteSettingsParameterValue(parameter.identifier),
                 HasValue(parameter.value));
   }
 }
 
-// Validates that custom settings parameters override named parameter values (both when these are
-// defaulted or explicitly set).
-TEST_P(Http2CustomSettingsTest, UserDefinedSettingsParametersOverrideNamedParameters) {
-  // These settings override named parameters which are defaulted when not specified via
-  // configuration.
+// Validates that the only custom settings parameter allowed to override a named parameter is
+// 'allow_connect' (id = 0x8).
+TEST_P(Http2CustomSettingsTest, UserDefinedSettingsParametersAllowConnectOverrideOnly) {
+  // The named allow_connect value defaults to 0.
   std::vector<SettingsParameter> named_parameter_overrides{
-      {NGHTTP2_SETTINGS_HEADER_TABLE_SIZE,
-       CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE - 1},
-      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS,
-       CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS - 1}};
+      {NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, 1}};
   setHttp2CustomSettingsParameters(getCustomOptions(), named_parameter_overrides);
   initialize();
   TestRequestHeaderMapImpl request_headers;
@@ -1226,22 +1233,32 @@ TEST_P(Http2CustomSettingsTest, UserDefinedSettingsParametersOverrideNamedParame
   }
 }
 
-// Validates that server push can not be overridden via custom settings parameters.
-TEST_P(Http2CustomSettingsTest, NeverAllowServerPushEnablementOnClientConnection) {
-  // Server push is always disabled only on the downstream (client) connections.
-  if (!validate_client_) {
-    return;
-  }
-  std::vector<SettingsParameter> custom_parameters{{0x2, 1}};
-  setHttp2CustomSettingsParameters(getCustomOptions(), custom_parameters);
-  initialize();
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
-  request_encoder_->encodeHeaders(request_headers, false);
-  // nghttp2 will not send the ENABLE_PUSH parameter to the peer when it is set to 0.
-  EXPECT_EQ(getSettingsProvider().getRemoteSettingsParameterValue(NGHTTP2_SETTINGS_ENABLE_PUSH),
-            absl::nullopt);
+class Http2CustomSettingsDeathTest
+    : public Http2CustomSettingsTestBase,
+      public ::testing::TestWithParam<
+          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, uint16_t>> {
+
+public:
+  Http2CustomSettingsDeathTest()
+      : Http2CustomSettingsTestBase(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
+                                    ::testing::get<2>(GetParam())),
+        custom_parameter_identifier_(::testing::get<3>(GetParam())) {}
+
+protected:
+  uint16_t custom_parameter_identifier_{0};
+};
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CustomSettingsDeathTest,
+                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
+                                            ::testing::Values(0x1, 0x2, 0x3, 0x4)));
+
+// Validates that overriding named parameters with custom parameters will trigger an ASSERT().
+// NOTE: `allow_connect` is the only exception since presence can not be checked without a breaking
+// API change.
+TEST_P(Http2CustomSettingsDeathTest, DisallowNamedParameterOverrides) {
+  std::vector<SettingsParameter> custom_parameters{{custom_parameter_identifier_, 1}};
+  setHttp2CustomSettingsParameters(client_http2_options_, custom_parameters);
+  EXPECT_DEBUG_DEATH(initialize(), "");
 }
 
 // Tests request headers whose size is larger than the default limit of 60K.
@@ -1447,7 +1464,8 @@ TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
   EXPECT_EQ(nghttp2_session_get_hd_deflate_dynamic_table_size(client_->session()),
             nghttp2_session_get_hd_inflate_dynamic_table_size(server_->session()));
 
-  // Verify that headers are compressed only when both client and server advertise table size > 0:
+  // Verify that headers are compressed only when both client and server advertise table size
+  // > 0:
   if (client_http2_options_.hpack_table_size().value() &&
       server_http2_options_.hpack_table_size().value()) {
     EXPECT_NE(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_->session()));
@@ -1541,7 +1559,8 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   for (int i = 0; i < kMaxOutboundControlFrames / 2; ++i) {
     EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
   }
-  // The number of outbound frames should be half of max so the connection should not be terminated.
+  // The number of outbound frames should be half of max so the connection should not be
+  // terminated.
   EXPECT_NO_THROW(client_->sendPendingFrames());
 
   // 1 more ping frame should overflow the outbound frame limit.
