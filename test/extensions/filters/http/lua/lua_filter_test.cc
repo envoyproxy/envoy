@@ -1904,7 +1904,7 @@ TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-TEST_F(LuaHttpFilterTest, Timestamp_DefaultsToMills_WhenNoFormatSet) {
+TEST_F(LuaHttpFilterTest, Timestamp_DefaultsToMilliseconds_WhenNoFormatSet) {
   const std::string SCRIPT{R"EOF(
       function envoy_on_request(request_handle)
         request_handle:logTrace(request_handle:timestamp())
