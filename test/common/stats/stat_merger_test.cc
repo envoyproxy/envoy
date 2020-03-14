@@ -307,7 +307,9 @@ TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
 
   for (uint32_t i = 1; i < 256; ++i) {
     char ch = static_cast<char>(i);
-    EXPECT_EQ(0, dynamicEncodeDecodeTest(absl::StrCat("D:", absl::string_view(&ch, 1))));
+    absl::string_view one_char(&ch, 1);
+    EXPECT_EQ(0, dynamicEncodeDecodeTest(absl::StrCat("D:", one_char))) << "dynamic=" << one_char;
+    EXPECT_EQ(0, dynamicEncodeDecodeTest(one_char)) << "symbolic=" << one_char;
   }
   EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:dynamic"));

@@ -17,13 +17,11 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
   StatNamePool symbolic_pool(symbol_table);
   std::vector<StatName> stat_names;
 
-  std::string no_nulls;
-  for (uint32_t i = 0; i < data.size(); ++i) {
-    char ch = data[i];
-    no_nulls += (ch == '\0') ? 'A' : ch;
-  }
-  data = no_nulls;
-
+  // This local string is write-only; it's used to help when debugging
+  // a crash. If a crash is found, you can print the unit_test_encoding
+  // in the debugger and then add that as a test-case in stat_merger_text.cc,
+  // in StatMergerDynamicTest.DynamicsWithFakeSymbolTable and
+  // StatMergerDynamicTest.DynamicsWithRealSymbolTable.
   std::string unit_test_encoding;
 
   for (uint32_t index = 0; index < data.size();) {
