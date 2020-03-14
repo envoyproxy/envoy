@@ -207,6 +207,19 @@ public:
   void setRecentLookupCapacity(uint64_t capacity) override;
   uint64_t recentLookupCapacity() const override;
 
+  /**
+   * Identifies the dynamic components of a stat_name into an array of integer
+   * pairs, indicating the begin/end of spans of tokens in the stat-name that
+   * are created from StatNameDynamicStore or StatNameDynamicPool.
+   *
+   * This can be used to reconstruct the same exact StatNames in
+   * StatMerger::mergeStats(), to enable stat continuity across hot-restart.
+   *
+   * @param stat_name the input stat name.
+   * @return the array pair indicating the bounds.
+   */
+  DynamicSpans getDynamicSpans(StatName stat_name) const override;
+
 private:
   friend class StatName;
   friend class StatNameTest;

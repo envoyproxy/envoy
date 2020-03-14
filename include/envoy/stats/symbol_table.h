@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/pure.h"
@@ -25,6 +26,9 @@ class StatNameList;
 class StatNameSet;
 
 using StatNameSetPtr = std::unique_ptr<StatNameSet>;
+
+using DynamicSpan = std::pair<uint32_t, uint32_t>;
+using DynamicSpans = std::vector<DynamicSpan>;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
@@ -178,6 +182,8 @@ public:
    * @return the set.
    */
   virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
+
+  virtual DynamicSpans getDynamicSpans(StatName stat_name) const PURE;
 
 private:
   friend struct HeapStatData;
