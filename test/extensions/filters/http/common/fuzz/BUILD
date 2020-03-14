@@ -38,5 +38,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
     ] + envoy_all_extensions(),
 )

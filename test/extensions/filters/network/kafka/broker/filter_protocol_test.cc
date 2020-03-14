@@ -45,7 +45,7 @@ protected:
   }
 };
 
-TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleUnknownRequestAndResponseWithoutBreaking) {
+TEST_F(KafkaBrokerFilterProtocolTest, ShouldHandleUnknownRequestAndResponseWithoutBreaking) {
   // given
   const int16_t unknown_api_key = std::numeric_limits<int16_t>::max();
 
@@ -70,7 +70,7 @@ TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleUnknownRequestAndResponseWitho
   ASSERT_EQ(scope_.counter("kafka.prefix.response.unknown").value(), 1);
 }
 
-TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleBrokenRequestPayload) {
+TEST_F(KafkaBrokerFilterProtocolTest, ShouldHandleBrokenRequestPayload) {
   // given
 
   // Encode broken request into buffer.
@@ -89,7 +89,7 @@ TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleBrokenRequestPayload) {
   ASSERT_EQ(testee_.getRequestDecoderForTest()->getCurrentParserForTest(), nullptr);
 }
 
-TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleBrokenResponsePayload) {
+TEST_F(KafkaBrokerFilterProtocolTest, ShouldHandleBrokenResponsePayload) {
   // given
 
   const int32_t correlation_id = 42;
@@ -110,7 +110,7 @@ TEST_F(KafkaBrokerFilterProtocolTest, shouldHandleBrokenResponsePayload) {
   ASSERT_EQ(testee_.getResponseDecoderForTest()->getCurrentParserForTest(), nullptr);
 }
 
-TEST_F(KafkaBrokerFilterProtocolTest, shouldAbortOnUnregisteredResponse) {
+TEST_F(KafkaBrokerFilterProtocolTest, ShouldAbortOnUnregisteredResponse) {
   // given
   const ResponseMetadata response_metadata = {0, 0, 0};
   const ProduceResponse response_data = {{}};
@@ -124,7 +124,7 @@ TEST_F(KafkaBrokerFilterProtocolTest, shouldAbortOnUnregisteredResponse) {
   ASSERT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
-TEST_F(KafkaBrokerFilterProtocolTest, shouldProcessMessages) {
+TEST_F(KafkaBrokerFilterProtocolTest, ShouldProcessMessages) {
   // given
   // For every request/response type & version, put a corresponding request into the buffer.
   for (const AbstractRequestSharedPtr& message : MessageUtilities::makeAllRequests()) {

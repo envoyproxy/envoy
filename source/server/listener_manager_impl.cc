@@ -201,10 +201,6 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   // For each listener config we share a single socket among all threaded listeners.
   // First we try to get the socket from our parent if applicable.
   if (address->type() == Network::Address::Type::Pipe) {
-// No such thing as AF_UNIX on Windows
-#ifdef WIN32
-    throw EnvoyException("network type pipe not supported on Windows");
-#else
     if (socket_type != Network::Address::SocketType::Stream) {
       // This could be implemented in the future, since Unix domain sockets
       // support SOCK_DGRAM, but there would need to be a way to specify it in
@@ -220,7 +216,6 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
-#endif
   }
 
   const std::string scheme = (socket_type == Network::Address::SocketType::Stream)
@@ -406,11 +401,9 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
-  ListenerImplPtr new_listener(
-      new ListenerImpl(config, version_info, *this, name, added_via_api, workers_started_, hash,
-                       added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
-                                     : server_.messageValidationContext().staticValidationVisitor(),
-                       server_.options().concurrency()));
+  ListenerImplPtr new_listener(new ListenerImpl(config, version_info, *this, name, added_via_api,
+                                                workers_started_, hash,
+                                                server_.options().concurrency()));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This

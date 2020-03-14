@@ -155,6 +155,14 @@ TEST(QueryMessageInfoTest, MaxTime) {
     QueryMessageInfo info(q);
     EXPECT_EQ(1212, info.max_time());
   }
+
+  {
+    QueryMessageImpl q(0, 0);
+    q.fullCollectionName("db.foo");
+    q.query(Bson::DocumentImpl::create()->addInt64("maxTimeMS", 2400));
+    QueryMessageInfo info(q);
+    EXPECT_EQ(2400, info.max_time());
+  }
 }
 
 TEST(QueryMessageInfoTest, Command) {

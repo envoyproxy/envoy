@@ -138,7 +138,7 @@ message FilterChainMatch {
   // Suggested values include:
   //
   // * ``raw_buffer`` - default, used when no transport protocol is detected,
-  // * ``tls`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  // * ``tls`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
   //   when TLS protocol is detected.
   string transport_protocol = 9;
 
@@ -148,9 +148,9 @@ message FilterChainMatch {
   //
   // Suggested values include:
   //
-  // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector
+  // * ``http/1.1`` - set by :ref:`envoy.filters.listener.tls_inspector
   //   <config_listener_filters_tls_inspector>`,
-  // * ``h2`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  // * ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
   //
   // .. attention::
   //

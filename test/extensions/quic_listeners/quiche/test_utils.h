@@ -37,8 +37,9 @@ public:
   MOCK_METHOD(bool, ShouldCreateOutgoingBidirectionalStream, ());
   MOCK_METHOD(bool, ShouldCreateOutgoingUnidirectionalStream, ());
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
-              (quic::QuicStream * stream, quic::QuicStreamId id, size_t write_length,
-               quic::QuicStreamOffset offset, quic::StreamSendingState state));
+              (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
+               quic::StreamSendingState state, quic::TransmissionType type,
+               quiche::QuicheOptional<quic::EncryptionLevel> level));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -79,8 +80,9 @@ public:
   MOCK_METHOD(bool, ShouldCreateOutgoingBidirectionalStream, ());
   MOCK_METHOD(bool, ShouldCreateOutgoingUnidirectionalStream, ());
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
-              (quic::QuicStream * stream, quic::QuicStreamId id, size_t write_length,
-               quic::QuicStreamOffset offset, quic::StreamSendingState state));
+              (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
+               quic::StreamSendingState state, quic::TransmissionType type,
+               quiche::QuicheOptional<quic::EncryptionLevel> level));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};

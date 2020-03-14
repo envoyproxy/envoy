@@ -1,6 +1,7 @@
 #include "extensions/filters/common/fault/fault_config.h"
 
 #include "envoy/extensions/filters/common/fault/v3/fault.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -9,6 +10,40 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Fault {
+
+FaultAbortConfig::FaultAbortConfig(
+    const envoy::extensions::filters::http::fault::v3::FaultAbort& abort_config)
+    : percentage_(abort_config.percentage()) {
+  switch (abort_config.error_type_case()) {
+  case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHttpStatus:
+    provider_ = std::make_unique<FixedAbortProvider>(abort_config.http_status());
+    break;
+  case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::kHeaderAbort:
+    provider_ = std::make_unique<HeaderAbortProvider>();
+    break;
+  case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+absl::optional<Http::Code>
+FaultAbortConfig::HeaderAbortProvider::statusCode(const Http::HeaderEntry* header) const {
+  absl::optional<Http::Code> ret;
+  if (header == nullptr) {
+    return ret;
+  }
+
+  uint64_t code;
+  if (!absl::SimpleAtoi(header->value().getStringView(), &code)) {
+    return ret;
+  }
+
+  if (code >= 200 && code < 600) {
+    ret = static_cast<Http::Code>(code);
+  }
+
+  return ret;
+}
 
 FaultDelayConfig::FaultDelayConfig(
     const envoy::extensions::filters::common::fault::v3::FaultDelay& delay_config)

@@ -217,9 +217,10 @@ void InstanceImpl::flushStatsInternal() {
 
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
-InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
-    envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                       const Options& options,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
@@ -242,7 +243,6 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     bootstrap.MergeFrom(config_proto);
   }
   MessageUtil::validate(bootstrap, validation_visitor);
-  return BootstrapVersion::V2;
 }
 
 void InstanceImpl::initialize(const Options& options,
@@ -391,14 +391,14 @@ void InstanceImpl::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
-      messageValidationContext(), *api_, http_context_, access_log_manager_, *singleton_manager_);
+      messageValidationContext(), *api_, http_context_, grpc_context_, access_log_manager_,
+      *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
   // is constructed as part of the InstanceImpl and then populated once
   // cluster_manager_factory_ is available.
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
-  http_context_.setTracer(config_.httpTracer());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -413,7 +413,7 @@ void InstanceImpl::initialize(const Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, time_source_, *api_);
+        *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
         stats_store_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
