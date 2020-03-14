@@ -20,9 +20,5 @@ public:
 private:
   std::vector<ListenerFilterMatcherPtr> matchers_;
 };
-
-ListenerFilterMatcherPtr ListenerFilterMatcherbuildListenerFilterMatcher(
-    const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& match_config);
-
 } // namespace Network
 } // namespace Envoy

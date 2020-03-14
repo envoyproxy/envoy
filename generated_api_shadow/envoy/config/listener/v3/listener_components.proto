@@ -213,7 +213,6 @@ message FilterChain {
   string name = 7;
 }
 
-// [#not-implemented-hide:]
 // Listener filter chain match configuration. This is a recursive structure which allows complex
 // nested match configurations to be built using various logical operators.
 // [#next-free-field: 6]
@@ -270,7 +269,6 @@ message ListenerFilter {
     google.protobuf.Any typed_config = 3;
   }
 
-  // [#not-implemented-hide:]
   // Decide when to disable this listener filter on incoming traffic.
   // Example:
   // 0. always enable filter

@@ -4,18 +4,30 @@
 
 namespace Envoy {
 namespace Network {
+
+// Introduced to save number of memory allocation at build phase memory usage match phase.
+// Work with OwnedListenerFilterMatcher.
+// The first phase is constructor, requiring only 1 slots.
+// The second phase is complete() which reserves contiguously slots.
 class TwoPhaseMatcher : public ListenerFilterMatcher {
 public:
   virtual void
   complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) PURE;
 };
-struct TrueMatcher : public TwoPhaseMatcher {
+
+namespace {
+// Forward declare: Used by each concrete TwoPhaseMatcher
+std::unique_ptr<TwoPhaseMatcher> createFromMessage(
+    const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& match_config,
+    std::vector<ListenerFilterMatcherPtr>& matchers);
+} // namespace
+struct TrueMatcher final : public TwoPhaseMatcher {
   bool matches(ListenerFilterCallbacks&) const override { return true; }
   void complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate&) override {
     // Nothing to do
   }
 };
-struct NotMatcher : public TwoPhaseMatcher {
+struct NotMatcher final : public TwoPhaseMatcher {
 public:
   explicit NotMatcher(std::vector<ListenerFilterMatcherPtr>& matchers) : matchers_(matchers) {}
   bool matches(ListenerFilterCallbacks& cb) const override {
@@ -23,7 +35,7 @@ public:
   }
   void
   complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
-    std::unique_ptr<TwoPhaseMatcher> sub;
+    std::unique_ptr<TwoPhaseMatcher> sub = createFromMessage(self.not_match(), matchers_);
     sub_matcher_offset_ = matchers_.size();
     auto ptr = sub.get();
     matchers_.emplace_back(std::move(sub));
@@ -35,10 +47,12 @@ private:
   uint sub_matcher_offset_{0};
 };
 
-struct AndMatcher : public TwoPhaseMatcher {
+struct AndMatcher final : public TwoPhaseMatcher {
   AndMatcher(std::vector<ListenerFilterMatcherPtr>& matchers) : matchers_(matchers) {}
   bool matches(ListenerFilterCallbacks& cb) const override {
-    for (uint i = sub_matcher_offset_; i < sub_matcher_offset_; i++) {
+    auto end = sub_matcher_offset_ + sub_matcher_len_;
+
+    for (uint i = sub_matcher_offset_; i < end; i++) {
       if (!matchers_[i]->matches(cb)) {
         return false;
       }
@@ -47,11 +61,10 @@ struct AndMatcher : public TwoPhaseMatcher {
   }
   void
   complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
-    std::unique_ptr<TwoPhaseMatcher> sub;
     sub_matcher_offset_ = matchers_.size();
     sub_matcher_len_ = self.and_match().rules_size();
-    for (uint i = 0; i < sub_matcher_len_; i++) {
-      matchers_.emplace_back(std::move(sub));
+    for (const auto& sub : self.and_match().rules()) {
+      matchers_.emplace_back(createFromMessage(sub, matchers_));
     }
     TwoPhaseMatcher* matcher{nullptr};
     for (uint i = 0; i < sub_matcher_len_; i++) {
@@ -66,10 +79,11 @@ private:
   uint sub_matcher_len_{0};
 };
 
-struct OrMatcher : public TwoPhaseMatcher {
+struct OrMatcher final : public TwoPhaseMatcher {
   OrMatcher(std::vector<ListenerFilterMatcherPtr>& matchers) : matchers_(matchers) {}
   bool matches(ListenerFilterCallbacks& cb) const override {
-    for (uint i = sub_matcher_offset_; i < sub_matcher_offset_; i++) {
+    auto end = sub_matcher_offset_ + sub_matcher_len_;
+    for (uint i = sub_matcher_offset_; i < end; i++) {
       if (matchers_[i]->matches(cb)) {
         return true;
       }
@@ -78,16 +92,15 @@ struct OrMatcher : public TwoPhaseMatcher {
   }
   void
   complete(const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& self) override {
-    std::unique_ptr<TwoPhaseMatcher> sub;
     sub_matcher_offset_ = matchers_.size();
-    sub_matcher_len_ = self.and_match().rules_size();
-    for (uint i = 0; i < sub_matcher_len_; i++) {
-      matchers_.emplace_back(std::move(sub));
+    sub_matcher_len_ = self.or_match().rules_size();
+    for (const auto& sub : self.or_match().rules()) {
+      matchers_.emplace_back(createFromMessage(sub, matchers_));
     }
     TwoPhaseMatcher* matcher{nullptr};
     for (uint i = 0; i < sub_matcher_len_; i++) {
       matcher = static_cast<TwoPhaseMatcher*>(matchers_[i + sub_matcher_offset_].get());
-      matcher->complete(self.and_match().rules(i));
+      matcher->complete(self.or_match().rules(i));
     }
   }
 
@@ -97,12 +110,11 @@ private:
   uint sub_matcher_len_{0};
 };
 
-struct DstPortMatcher : public TwoPhaseMatcher {
+struct DstPortMatcher final : public TwoPhaseMatcher {
 public:
   DstPortMatcher() = default;
   bool matches(ListenerFilterCallbacks& cb) const override {
     const auto& address = cb.socket().localAddress();
-
     // Match on destination port (only for IP addresses).
     if (address->type() == Address::Type::Ip) {
       const auto port = address->ip()->port();
@@ -123,47 +135,39 @@ private:
   uint32_t start_;
   uint32_t end_;
 };
-
-OwnedListenerFilterMatcher::OwnedListenerFilterMatcher(
-    const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& match_config) {
-  matchers_.push_back(nullptr);
+namespace {
+std::unique_ptr<TwoPhaseMatcher> createFromMessage(
+    const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& match_config,
+    std::vector<ListenerFilterMatcherPtr>& matchers) {
   switch (match_config.rule_case()) {
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kAnyMatch:
-    matchers_[0] = std::make_unique<TrueMatcher>();
-    break;
+    return std::make_unique<TrueMatcher>();
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kNotMatch: {
-    auto not_matcher = std::make_unique<NotMatcher>(matchers_);
-    auto not_ptr = not_matcher.get();
-    matchers_[0] = std::move(not_matcher);
-    not_ptr->complete(match_config);
-    break;
+    return std::make_unique<NotMatcher>(matchers);
   }
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kAndMatch: {
-    auto and_matcher = std::make_unique<AndMatcher>(matchers_);
-    auto and_ptr = and_matcher.get();
-    matchers_[0] = std::move(and_matcher);
-    and_ptr->complete(match_config);
-    break;
+    return std::make_unique<AndMatcher>(matchers);
   }
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::kOrMatch: {
-    auto or_matcher = std::make_unique<OrMatcher>(matchers_);
-    auto or_ptr = or_matcher.get();
-    matchers_[0] = std::move(or_matcher);
-    or_ptr->complete(match_config);
-    break;
+    return std::make_unique<OrMatcher>(matchers);
   }
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::
       kDestinationPortRange: {
-    auto dst_port_matcher = std::make_unique<DstPortMatcher>();
-    auto dst_port_ptr = dst_port_matcher.get();
-    matchers_[0] = std::move(dst_port_matcher);
-    dst_port_ptr->complete(match_config);
-    break;
+    return std::make_unique<DstPortMatcher>();
   }
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::RULE_NOT_SET: {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
   }
+}
+} // namespace
+
+OwnedListenerFilterMatcher::OwnedListenerFilterMatcher(
+    const envoy::config::listener::v3::ListenerFilterChainMatchPredicate& match_config) {
+  auto uptr = createFromMessage(match_config, matchers_);
+  auto& ref = *uptr;
+  matchers_.push_back(std::move(uptr));
+  ref.complete(match_config);
 }
 
 } // namespace Network
