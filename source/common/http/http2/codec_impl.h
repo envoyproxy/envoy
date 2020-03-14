@@ -73,18 +73,6 @@ public:
                                           HeaderString& cookies);
 };
 
-struct SettingsEntryHash {
-  size_t operator()(const nghttp2_settings_entry& entry) const {
-    return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
-  }
-};
-
-struct SettingsEntryEquals {
-  bool operator()(const nghttp2_settings_entry& lhs, const nghttp2_settings_entry& rhs) const {
-    return lhs.settings_id == rhs.settings_id;
-  }
-};
-
 /**
  * Base class for HTTP/2 client and server codecs.
  */
@@ -350,7 +338,7 @@ protected:
                     bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
   // NOTE: This is only used for tests.
-  virtual void onSettings(const nghttp2_settings&) {}
+  virtual void onSettingsForTest(const nghttp2_settings&) {}
 
   static Http2Callbacks http2_callbacks_;
 

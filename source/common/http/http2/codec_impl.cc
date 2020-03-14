@@ -551,7 +551,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
-    onSettings(frame->settings);
+    onSettingsForTest(frame->settings);
   }
 
   StreamImpl* stream = getStream(frame->hd.stream_id);

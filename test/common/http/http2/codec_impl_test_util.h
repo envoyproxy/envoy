@@ -10,6 +10,18 @@ namespace Http2 {
 
 class TestCodecSettingsProvider {
 public:
+  struct SettingsEntryHash {
+    size_t operator()(const nghttp2_settings_entry& entry) const {
+      return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
+    }
+  };
+
+  struct SettingsEntryEquals {
+    bool operator()(const nghttp2_settings_entry& lhs, const nghttp2_settings_entry& rhs) const {
+      return lhs.settings_id == rhs.settings_id;
+    }
+  };
+
   // Returns the value of the SETTINGS parameter keyed by |identifier| sent by the remote endpoint.
   absl::optional<uint32_t> getRemoteSettingsParameterValue(int32_t identifier) const {
     const auto it = settings_.find({identifier, 0});
@@ -45,8 +57,8 @@ public:
   using ServerConnectionImpl::getStream;
 
 protected:
-  // Overrides ServerConnectionImpl::onSettings().
-  void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  // Overrides ServerConnectionImpl::onSettingsForTest().
+  void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
 };
 
 class TestClientConnectionImpl : public ClientConnectionImpl, public TestCodecSettingsProvider {
@@ -62,8 +74,8 @@ public:
   using ConnectionImpl::sendPendingFrames;
 
 protected:
-  // Overrides ClientConnectionImpl::onSettings().
-  void onSettings(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  // Overrides ClientConnectionImpl::onSettingsForTest().
+  void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
 };
 
 } // namespace Http2
