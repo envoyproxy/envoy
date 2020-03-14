@@ -117,6 +117,36 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
   return {};
 }
 
+absl::optional<std::vector<StreamInfo::ResponseFlag>>
+ConfigUtility::parseDirectResponseFlag(const envoy::config::route::v3::Route& route) {
+  if (!route.has_direct_response()) {
+    return {};
+  }
+
+  if (route.direct_response().response_flag().flags_size() <= 0) {
+    return {};
+  }
+
+  std::vector<StreamInfo::ResponseFlag> response_flags;
+  for (int i = 0; i < route.direct_response().response_flag().flags_size(); i++) {
+    const auto flag = route.direct_response().response_flag().flags(i);
+    if (flag.empty()) {
+      continue;
+    }
+    absl::optional<StreamInfo::ResponseFlag> response_flag =
+        StreamInfo::ResponseFlagUtils::toResponseFlag(flag);
+    if (absl::nullopt == response_flag) {
+      throw EnvoyException(absl::StrCat("Unknown response flag ", flag));
+    }
+    response_flags.push_back(response_flag.value());
+  }
+
+  if (response_flags.empty()) {
+    return {};
+  }
+  return response_flags;
+}
+
 std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
                                                    Api::Api& api) {
   static const ssize_t MaxBodySize = 4096;

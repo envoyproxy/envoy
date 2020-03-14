@@ -4537,6 +4537,7 @@ TEST_F(RouterTest, Redirect) {
   EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::MovedPermanently));
+  EXPECT_CALL(direct_response, responseFlag()).WillRepeatedly(Return(absl::nullopt));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
@@ -4560,6 +4561,7 @@ TEST_F(RouterTest, RedirectFound) {
   EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Found));
+  EXPECT_CALL(direct_response, responseFlag()).WillRepeatedly(Return(absl::nullopt));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
@@ -4581,6 +4583,7 @@ TEST_F(RouterTest, DirectResponse) {
   std::string route_name("route-test-name");
   EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
+  EXPECT_CALL(direct_response, responseFlag()).WillRepeatedly(Return(absl::nullopt));
   EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
   absl::string_view route_name_view(route_name);
@@ -4596,6 +4599,31 @@ TEST_F(RouterTest, DirectResponse) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+  EXPECT_FALSE(callbacks_.stream_info_.hasAnyResponseFlag());
+}
+
+TEST_F(RouterTest, DirectResponseWithResponseFlag) {
+  NiceMock<MockDirectResponseEntry> direct_response;
+  std::string route_name("route-test-name");
+  std::vector<StreamInfo::ResponseFlag> response_flags;
+  response_flags.push_back(StreamInfo::ResponseFlag::NoRouteFound);
+  EXPECT_CALL(direct_response, routeName()).WillOnce(ReturnRef(route_name));
+  EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
+  EXPECT_CALL(direct_response, responseFlag()).WillRepeatedly(Return(response_flags));
+  EXPECT_CALL(direct_response, responseBody()).WillRepeatedly(ReturnRef(EMPTY_STRING));
+  EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
+  absl::string_view route_name_view(route_name);
+  EXPECT_CALL(callbacks_.stream_info_, setRouteName(route_name_view));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(span_, injectContext(_)).Times(0);
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+  EXPECT_TRUE(callbacks_.stream_info_.hasResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
 }
 
 TEST_F(RouterTest, DirectResponseWithBody) {

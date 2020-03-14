@@ -9,6 +9,7 @@ api_proto_package(
         "//envoy/annotations:pkg",
         "//envoy/api/v2:pkg",
         "//envoy/api/v2/route:pkg",
+        "//envoy/config/common/accesslog/v3:pkg",
         "//envoy/config/core/v3:pkg",
         "//envoy/type/matcher/v3:pkg",
         "//envoy/type/tracing/v3:pkg",

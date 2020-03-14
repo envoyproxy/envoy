@@ -85,6 +85,9 @@ public:
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
+  const absl::optional<std::vector<StreamInfo::ResponseFlag>> responseFlag() const override {
+    return absl::nullopt;
+  }
   const std::string& responseBody() const override { return EMPTY_STRING; }
   const std::string& routeName() const override { return route_name_; }
 
@@ -482,6 +485,9 @@ public:
                                        absl::string_view new_port) const;
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
+  const absl::optional<std::vector<StreamInfo::ResponseFlag>> responseFlag() const override {
+    return direct_response_flag_;
+  }
   const std::string& responseBody() const override { return direct_response_body_; }
 
   // Router::Route
@@ -743,6 +749,7 @@ private:
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
   const absl::optional<Http::Code> direct_response_code_;
+  const absl::optional<std::vector<StreamInfo::ResponseFlag>> direct_response_flag_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;

@@ -53,6 +53,8 @@ public:
   MOCK_METHOD(void, rewritePathHeader,
               (Http::RequestHeaderMap & headers, bool insert_envoy_original_path), (const));
   MOCK_METHOD(Http::Code, responseCode, (), (const));
+  MOCK_METHOD(const absl::optional<std::vector<StreamInfo::ResponseFlag>>, responseFlag, (),
+              (const));
   MOCK_METHOD(const std::string&, responseBody, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
 };

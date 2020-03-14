@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package envoy.config.common.accesslog.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.common.accesslog.v3";
+option java_outer_classname = "CommonProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Common accesslog configuration]
+
+// Common configuration for all accesslog filter.
+// Filters requests that received responses with an Envoy response flag set.
+// A list of the response flags can be found
+// in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
+message ResponseFlagFilter {
+  // Only responses with the any of the flags listed in this field will be logged.
+  // This field is optional. If it is not specified, then any response flag will pass
+  // the filter check.
+  repeated string flags = 1 [(validate.rules).repeated = {
+    items {
+      string {
+        in: "LH"
+        in: "UH"
+        in: "UT"
+        in: "LR"
+        in: "UR"
+        in: "UF"
+        in: "UC"
+        in: "UO"
+        in: "NR"
+        in: "DI"
+        in: "FI"
+        in: "RL"
+        in: "UAEX"
+        in: "RLSE"
+        in: "DC"
+        in: "URX"
+        in: "SI"
+        in: "IH"
+        in: "DPE"
+      }
+    }
+  }];
+}
