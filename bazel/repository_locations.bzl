@@ -120,6 +120,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "LuaJIT-2.1.0-beta3",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/v2.1.0-beta3.tar.gz"],
     ),
+    com_github_moonjit_moonjit = dict(
+        sha256 = "83deb2c880488dfe7dd8ebf09e3b1e7613ef4b8420de53de6f712f01aabca2b6",
+        strip_prefix = "moonjit-2.2.0",
+        urls = ["https://github.com/moonjit/moonjit/archive/2.2.0.tar.gz"],
+    ),
     com_github_nghttp2_nghttp2 = dict(
         sha256 = "eb9d9046495a49dd40c7ef5d6c9907b51e5a6b320ea6e2add11eb8b52c982c47",
         strip_prefix = "nghttp2-1.40.0",
@@ -131,9 +136,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.1.tar.gz"],
     ),
     com_lightstep_tracer_cpp = dict(
-        sha256 = "defbf471facfebde6523ca1177529b63784893662d4ef2c60db074be8aef0634",
-        strip_prefix = "lightstep-tracer-cpp-0.8.0",
-        urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
+        sha256 = "1ed7faaad1deabddb83791b2b7f2ec79d25b47009994c1a8bb6da85244c60e4f",
+        strip_prefix = "lightstep-tracer-cpp-665d8388aafbbbb44994f4fa12b3b65b9dcea613",
+        # 2019-03-11
+        urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/665d8388aafbbbb44994f4fa12b3b65b9dcea613.tar.gz"],
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
         sha256 = "6dc1088ab7f788b6c849fbaa6300517c8fdf88991a70b778be79c284c36857bf",
@@ -270,9 +276,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-8.0.426.12.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/38cc1ee6a89a4d0b52cf2a611bdc09312bcd2c5c.tar.gz
-        sha256 = "aadef7fd47d35d2a690e0238bf61cb2394a9a290023233f0a4736772a738d437",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/38cc1ee6a89a4d0b52cf2a611bdc09312bcd2c5c.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4f6ba16cf16505f12dc8d2f23cfc6e13c1aa5806.tar.gz
+        sha256 = "2990ca4434a6fc1b63560b1aa000f5765c174ad906642e123a92498f1ad6c03d",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/4f6ba16cf16505f12dc8d2f23cfc6e13c1aa5806.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "326ec397b55e39f48bd5380ccded1af5b04653ee96e769cd4d694f9a3bacef50",
