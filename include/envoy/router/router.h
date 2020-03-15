@@ -361,6 +361,11 @@ public:
    *         present.
    */
   virtual const envoy::type::v3::FractionalPercent& defaultValue() const PURE;
+
+  /**
+   * @return true if the trace span should be sampled.
+   */
+  virtual bool traceSampled() const PURE;
 };
 
 using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;

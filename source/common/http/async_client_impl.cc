@@ -248,9 +248,11 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
   }
+  child_span_->setSampled(options.sampled_);
 }
 
 void AsyncRequestImpl::initialize() {
+  child_span_->injectContext(request_->headers());
   sendHeaders(request_->headers(), !request_->body());
   if (request_->body()) {
     // It's possible this will be a no-op due to a local response synchronously generated in

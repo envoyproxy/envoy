@@ -190,16 +190,19 @@ public:
 class TestShadowPolicy : public ShadowPolicy {
 public:
   TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
-                   envoy::type::v3::FractionalPercent default_value = {})
-      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value) {}
+                   envoy::type::v3::FractionalPercent default_value = {}, bool trace_sampled = true)
+      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value),
+        trace_sampled_(trace_sampled) {}
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
+  bool traceSampled() const override { return trace_sampled_; }
 
   std::string cluster_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
+  bool trace_sampled_;
 };
 
 class MockShadowWriter : public ShadowWriter {
@@ -209,13 +212,13 @@ public:
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-              std::chrono::milliseconds timeout) override {
-    shadow_(cluster, request, timeout);
+              const Http::AsyncClient::RequestOptions& options) override {
+    shadow_(cluster, request, options);
   }
 
   MOCK_METHOD(void, shadow_,
               (const std::string& cluster, Http::RequestMessagePtr& request,
-               std::chrono::milliseconds timeout));
+               const Http::AsyncClient::RequestOptions& options));
 };
 
 class TestVirtualCluster : public VirtualCluster {
