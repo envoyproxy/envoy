@@ -242,8 +242,8 @@ HeaderParserPtr HeaderParser::configure(
   for (const auto& header_value : headers_to_add) {
     HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
 
-    header_parser->headers_to_add_.emplace_back(
-        Http::LowerCaseString(header_value.key()), std::move(header_formatter));
+    header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
+                                                std::move(header_formatter));
   }
 
   return header_parser;
