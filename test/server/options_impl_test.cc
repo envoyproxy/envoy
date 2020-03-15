@@ -80,7 +80,7 @@ TEST_F(OptionsImplTest, All) {
       "--file-flush-interval-msec 9000 "
       "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
-      "--reject-unknown-dynamic-fields --use-fake-symbol-table 0");
+      "--reject-unknown-dynamic-fields --use-fake-symbol-table 0 --log-stacktrace-to-stderr 1");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -102,6 +102,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
   EXPECT_FALSE(options->fakeSymbolTableEnabled());
+  EXPECT_TRUE(options->logStacktraceToStderr());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -133,6 +134,7 @@ TEST_F(OptionsImplTest, SetAll) {
   bool signal_handling_enabled = options->signalHandlingEnabled();
   bool cpuset_threads_enabled = options->cpusetThreadsEnabled();
   bool fake_symbol_table_enabled = options->fakeSymbolTableEnabled();
+  bool log_stacktrace_to_stderr = options->logStacktraceToStderr();
 
   options->setBaseId(109876);
   options->setConcurrency(42);
@@ -160,6 +162,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setAllowUnkownFields(true);
   options->setRejectUnknownFieldsDynamic(true);
   options->setFakeSymbolTableEnabled(!options->fakeSymbolTableEnabled());
+  options->setLogStacktraceToStderr(!options->logStacktraceToStderr());
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
@@ -187,6 +190,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
   EXPECT_EQ(!fake_symbol_table_enabled, options->fakeSymbolTableEnabled());
+  EXPECT_EQ(!log_stacktrace_to_stderr, options->logStacktraceToStderr());
 
   // Validate that CommandLineOptions is constructed correctly.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -255,7 +259,8 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 4. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
   // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
   // 6. hot restart version - print the hot restart version and exit.
-  EXPECT_EQ(options->count() - 6, command_line_options->GetDescriptor()->field_count());
+  // 7. log-stacktrace-to-stderr
+  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, OptionsFromArgv) {

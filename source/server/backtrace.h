@@ -9,12 +9,6 @@
 #include "absl/debugging/symbolize.h"
 
 namespace Envoy {
-#define BACKTRACE_LOG()                                                                            \
-  do {                                                                                             \
-    BackwardsTrace t;                                                                              \
-    t.capture();                                                                                   \
-    t.logTrace();                                                                                  \
-  } while (0)
 
 /**
  * Use absl::Stacktrace and absl::Symbolize to log resolved symbols

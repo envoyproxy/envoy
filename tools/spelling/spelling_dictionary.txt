@@ -968,6 +968,7 @@ src
 ssize
 stackdriver
 stacktrace
+stacktraces
 startup
 stateful
 statsd

@@ -132,6 +132,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                               "Use fake symbol table implementation", false, true,
                                               "bool", cmd);
 
+  TCLAP::ValueArg<bool> log_stacktrace_to_stderr(
+      "", "log-stacktrace-to-stderr",
+      "Log crash-dump directly to stderr rather than via the logging system", false, false, "bool",
+      cmd);
+
   TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
                                                   "Comma-separated list of extensions to disable",
                                                   false, "", "string", cmd);
@@ -157,6 +162,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   hot_restart_disabled_ = disable_hot_restart.getValue();
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
   fake_symbol_table_enabled_ = use_fake_symbol_table.getValue();
+  log_stacktrace_to_stderr_ = log_stacktrace_to_stderr.getValue();
   cpuset_threads_ = cpuset_threads.getValue();
 
   if (log_level.isSet()) {

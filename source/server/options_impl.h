@@ -95,6 +95,9 @@ public:
   void setFakeSymbolTableEnabled(bool fake_symbol_table_enabled) {
     fake_symbol_table_enabled_ = fake_symbol_table_enabled;
   }
+  void setLogStacktraceToStderr(bool log_stacktrace_to_stderr) {
+    log_stacktrace_to_stderr_ = log_stacktrace_to_stderr;
+  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
@@ -132,6 +135,7 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   bool fakeSymbolTableEnabled() const override { return fake_symbol_table_enabled_; }
+  bool logStacktraceToStderr() const override { return log_stacktrace_to_stderr_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
@@ -180,6 +184,7 @@ private:
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
   bool fake_symbol_table_enabled_;
+  bool log_stacktrace_to_stderr_;
   std::vector<std::string> disabled_extensions_;
   uint32_t count_;
 };
