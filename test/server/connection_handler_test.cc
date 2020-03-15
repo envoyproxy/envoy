@@ -788,7 +788,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
         return true;
       }));
   EXPECT_CALL(*first_listener_filter_config, matcher()).WillOnce(Return(nullptr));
-  // matcher() is invoked at build phase. It is called despites the onAccept on last listener filter
+  // matcher() is invoked at build phase. It is called despite the onAccept on last listener filter
   // is not invoked.
   EXPECT_CALL(*last_listener_filter_config, matcher()).WillOnce(Return(nullptr));
 
@@ -867,7 +867,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterWorks) {
   EXPECT_CALL(*match_nothing, matches(_)).WillOnce(Return(true));
   EXPECT_CALL(*disabled_listener_filter, onAccept(_)).Times(0);
 
-  // The non macher acts as if always enabled.
+  // The non matcher acts as if always enabled.
   EXPECT_CALL(*enabled_filter, onAccept(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(*disabled_listener_filter, destroy_());
   EXPECT_CALL(*enabled_filter, destroy_());

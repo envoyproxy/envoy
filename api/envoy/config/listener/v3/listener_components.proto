@@ -266,15 +266,13 @@ message ListenerFilter {
   }
 
   // Decide when to disable this listener filter on incoming traffic.
-  // Example:
-  // 0. always enable filter
-  //    don't set `filter_disabled`
-  // 1. disable when the destination port is 3306
-  //    rule.destination_port_range = Int32Range {start = 3306, end = 3307}
-  // 2. disable when the destination port is 3306 or 15000
-  //    rule.or_match = MatchSet.rules [
-  //       rule.destination_port_range = Int32Range {start = 3306, end = 3307},
-  //       rule.destination_port_range = Int32Range {start = 15000, end = 15001},
-  //    ]
+  //
+  // Examples:
+  //
+  // * clear the field if filter is always enabled
+  // * disable when the destination port is 3306
+  //   ``rule.destination_port_range = Int32Range {start = 3306, end = 3307}``
+  // * disable when the destination port is 3306 or 15000
+  //   See :ref:`ListenerFilterChainMatchPredicate <envoy_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
   ListenerFilterChainMatchPredicate filter_disabled = 4;
 }
