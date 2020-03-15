@@ -5622,6 +5622,22 @@ TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
                             expected_message);
 }
 
+TEST_F(ConfigUtilityTest, ParseResponseFlag) {
+  envoy::config::route::v3::Route route;
+  EXPECT_EQ(absl::nullopt, ConfigUtility::parseDirectResponseFlag(route));
+
+  route.mutable_direct_response()->set_response_flag("");
+  EXPECT_EQ(absl::nullopt, ConfigUtility::parseDirectResponseFlag(route));
+
+  route.mutable_direct_response()->set_response_flag("NR");
+  EXPECT_EQ(StreamInfo::ResponseFlagUtils::toResponseFlag("NR"),
+            ConfigUtility::parseDirectResponseFlag(route));
+
+  route.mutable_direct_response()->set_response_flag("BAD_FLAG");
+  EXPECT_THROW_WITH_MESSAGE(ConfigUtility::parseDirectResponseFlag(route), EnvoyException,
+                            "Unknown response flag BAD_FLAG");
+}
+
 TEST_F(RouteConfigurationV2, RedirectCode) {
   const std::string yaml = R"EOF(
 name: foo
