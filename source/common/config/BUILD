@@ -342,6 +342,7 @@ envoy_cc_library(
         ":api_type_oracle_lib",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:visitor_lib",
         "//source/common/protobuf:well_known_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

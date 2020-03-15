@@ -3599,7 +3599,8 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 TEST_F(RouterTest, Shadow) {
   ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("foo", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
-  policy = std::make_unique<TestShadowPolicy>("fizz", "buzz");
+  policy = std::make_unique<TestShadowPolicy>("fizz", "buzz", envoy::type::v3::FractionalPercent(),
+                                              false);
   callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
@@ -3630,17 +3631,21 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_CALL(callbacks_, decodingBuffer())
       .Times(AtLeast(2))
       .WillRepeatedly(Return(body_data.get()));
-  EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
+  EXPECT_CALL(*shadow_writer_, shadow_("foo", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
-                          std::chrono::milliseconds) -> void {
+                          const Http::AsyncClient::RequestOptions& options) -> void {
         EXPECT_NE(nullptr, request->body());
         EXPECT_NE(nullptr, request->trailers());
+        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
+        EXPECT_TRUE(options.sampled_);
       }));
-  EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, std::chrono::milliseconds(10)))
+  EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
-                          std::chrono::milliseconds) -> void {
+                          const Http::AsyncClient::RequestOptions& options) -> void {
         EXPECT_NE(nullptr, request->body());
         EXPECT_NE(nullptr, request->trailers());
+        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
+        EXPECT_FALSE(options.sampled_);
       }));
   router_.decodeTrailers(trailers);
 
