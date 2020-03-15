@@ -765,7 +765,8 @@ message RouteAction {
   //
   //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
   //   requests to */prefix/etc* will be stripped to */etc*.
-  string prefix_rewrite = 5;
+  string prefix_rewrite = 5
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // Indicates that during forwarding, portions of the path that match the
   // pattern should be rewritten, even allowing the substitution of capture
@@ -800,7 +801,8 @@ message RouteAction {
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
-    string host_rewrite_literal = 6;
+    string host_rewrite_literal = 6
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
@@ -817,7 +819,8 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
-    string host_rewrite_header = 29;
+    string host_rewrite_header = 29
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -1122,14 +1125,16 @@ message RedirectAction {
   }
 
   // The host portion of the URL will be swapped with this value.
-  string host_redirect = 1;
+  string host_redirect = 1
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // The port value of the URL will be swapped with this value.
   uint32 port_redirect = 8;
 
   oneof path_rewrite_specifier {
     // The path portion of the URL will be swapped with this value.
-    string path_redirect = 2;
+    string path_redirect = 2
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during redirection, the matched prefix (or path)
     // should be swapped with this value. This option allows redirect URLs be dynamically created
@@ -1139,7 +1144,8 @@ message RedirectAction {
     //
     //   Pay attention to the use of trailing slashes as mentioned in
     //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_config.route.v3.RouteAction.prefix_rewrite>`.
-    string prefix_rewrite = 5;
+    string prefix_rewrite = 5
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // The HTTP status code to use in the redirect response. The default response
