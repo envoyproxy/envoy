@@ -1,0 +1,27 @@
+## Image with pre-built Jaeger tracer extension.
+## See https://github.com/yskopets/envoy-jaeger-tracer
+FROM yskopets/envoy-jaeger-tracer:0.4.2-1.13.0-0 AS jaeger-tracer
+
+## Image with pre-built Envoy binary.
+FROM envoyproxy/envoy-dev:latest
+
+# Notice that Jaeger tracer extension is linked against 'libc++' dynamically.
+# Because of this, we have to install 'libc++' and 'libc++abi' libraries.
+RUN apt-get update        \
+ && apt-get -q install -y \
+      libc++1             \
+      libc++abi1          \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=jaeger-tracer /libjaegertracing_plugin.so /usr/local/lib/envoy/libjaegertracing_plugin.so
+
+# Setup user application.
+RUN apt-get update        \
+ && apt-get -q install -y \
+      python3             \
+      python3-pip         \
+ && rm -rf /var/lib/apt/lists/*
+RUN pip3 install -q Flask==0.11.1 requests==2.18.4
+
+# Notice that the actual entry point file will be mounted in on start-up.
+ENTRYPOINT /usr/local/bin/start_service.sh

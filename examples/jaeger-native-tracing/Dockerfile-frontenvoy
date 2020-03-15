@@ -1,0 +1,18 @@
+## Image with pre-built Jaeger tracer extension.
+## See https://github.com/yskopets/envoy-jaeger-tracer
+FROM yskopets/envoy-jaeger-tracer:0.4.2-1.13.0-0 AS jaeger-tracer
+
+## Image with pre-built Envoy binary.
+FROM envoyproxy/envoy-dev:latest
+
+# Notice that Jaeger tracer extension is linked against 'libc++' dynamically.
+# Because of this, we have to install 'libc++' and 'libc++abi' libraries.
+RUN apt-get update        \
+ && apt-get -q install -y \
+      libc++1             \
+      libc++abi1          \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=jaeger-tracer /libjaegertracing_plugin.so /usr/local/lib/envoy/libjaegertracing_plugin.so
+
+CMD /usr/local/bin/envoy -c /etc/front-envoy.yaml --service-cluster front-proxy

@@ -11,6 +11,7 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           generate_request_id: true
+          tracing: {}
           codec_type: auto
           stat_prefix: ingress_http
           route_config:
@@ -50,13 +51,15 @@ tracing:
     name: envoy.tracers.dynamic_ot
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.DynamicOtConfig
-      library: /usr/local/lib/libjaegertracing_plugin.so
+      library: /usr/local/lib/envoy/libjaegertracing_plugin.so
       config:
         service_name: front-proxy
         sampler:
           type: const
           param: 1
         reporter:
+          # NOTE: It is not recommended to use a remote host for UDP connections.
+          # We do it here only to simplify example set-up.
           localAgentHostPort: jaeger:6831
         headers:
           jaegerDebugHeader: jaeger-debug-id
