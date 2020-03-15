@@ -124,8 +124,6 @@ private:
   static MatcherSharedPtr
   toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& matcher,
                      bool enable_case_sensitive_string_matcher);
-  static Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>
-  toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers);
 
   const bool enable_case_sensitive_string_matcher_;
   const MatcherSharedPtr request_header_matchers_;

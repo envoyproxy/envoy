@@ -132,7 +132,7 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
-          toHeadersAdd(config.http_service().authorization_request().headers_to_add()))) {}
+          config.http_service().authorization_request().headers_to_add(), false)) {}
 
 MatcherSharedPtr
 ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -188,19 +188,6 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
                                  const bool disable_lowercase_string_matcher) {
   return std::make_unique<HeaderKeyMatcher>(
       createStringMatchers(list, disable_lowercase_string_matcher));
-}
-
-Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> ClientConfig::toHeadersAdd(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers) {
-  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_value_options;
-  headers_value_options.Reserve(headers.size());
-  for (const auto& header : headers) {
-    envoy::config::core::v3::HeaderValueOption option;
-    option.mutable_header()->MergeFrom(header);
-    option.mutable_append()->set_value(false);
-    headers_value_options.Add()->CopyFrom(option);
-  }
-  return headers_value_options;
 }
 
 RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,

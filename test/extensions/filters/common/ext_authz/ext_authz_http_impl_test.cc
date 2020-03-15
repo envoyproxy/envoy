@@ -305,6 +305,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   client_->onSuccess(std::move(check_response));
 }
 
+using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string>;
+
 // Verify client response headers when authorization_headers_to_add is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
@@ -322,10 +324,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   EXPECT_CALL(*child_span, injectContext(_));
   // Expect that header1 will be added and header2 correctly overwritten. Due to this behavior, the
   // append property of header value option should always be false.
-  const std::pair<const Http::LowerCaseString, const std::string> header1{"x-authz-header1",
-                                                                          "value"};
-  const std::pair<const Http::LowerCaseString, const std::string> header2{"x-authz-header2",
-                                                                          "value"};
+  const HeaderValuePair header1{"x-authz-header1", "value"};
+  const HeaderValuePair header2{"x-authz-header2", "value"};
   EXPECT_CALL(async_client_,
               send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2)), _, _));
   client_->check(request_callbacks_, request, active_span_, stream_info_);
@@ -366,13 +366,12 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
   EXPECT_CALL(*child_span, injectContext(_));
 
-  const std::pair<const Http::LowerCaseString, const std::string> headers_to_add{"x-authz-header1",
-                                                                                 "123"};
-  EXPECT_CALL(async_client_, send_(AllOf(ContainsPairAsHeader(headers_to_add)), _, _));
+  const HeaderValuePair expected_header{"x-authz-header1", "123"};
+  EXPECT_CALL(async_client_, send_(ContainsPairAsHeader(expected_header), _, _));
 
   Http::RequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")),
-                          headers_to_add.second);
+                          expected_header.second);
 
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(stream_info, getRequestHeaders()).WillOnce(Return(&request_headers));
