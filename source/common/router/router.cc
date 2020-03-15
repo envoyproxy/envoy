@@ -750,8 +750,12 @@ void Filter::maybeDoShadowing() {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*downstream_trailers_));
     }
 
-    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request),
-                                  timeout_.global_timeout_);
+    auto options = Http::AsyncClient::RequestOptions()
+                       .setTimeout(timeout_.global_timeout_)
+                       .setParentSpan(callbacks_->activeSpan())
+                       .setChildSpanName("mirror")
+                       .setSampled(shadow_policy.traceSampled());
+    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request), options);
   }
 }
 
