@@ -686,6 +686,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
 }
 
 void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
+  ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
   connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
   connection_manager_.doEndStream(*this);
 }

@@ -1504,6 +1504,8 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeout) {
   auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
   test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
   response->waitForReset();
