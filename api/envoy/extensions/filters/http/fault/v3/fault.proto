@@ -24,6 +24,14 @@ message FaultAbort {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.FaultAbort";
 
+  // Fault aborts are controlled via an HTTP header (if applicable). See the
+  // :ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // more information.
+  message HeaderAbort {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.fault.v2.FaultAbort.HeaderAbort";
+  }
+
   reserved 1;
 
   oneof error_type {
@@ -31,6 +39,9 @@ message FaultAbort {
 
     // HTTP status code to use to abort the HTTP request.
     uint32 http_status = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+
+    // Fault aborts are controlled via an HTTP header (if applicable).
+    HeaderAbort header_abort = 4;
   }
 
   // The percentage of requests/operations/connections that will be aborted with the error code

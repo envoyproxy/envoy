@@ -103,7 +103,7 @@ public:
       : api_(Api::createApiForTest(time_system_)), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_t099, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_draft_27, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -171,7 +171,7 @@ public:
           return request_decoder;
         }));
     quic::QuicStreamId stream_id =
-        quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
+        quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 4u : 5u;
     return envoy_quic_session_.GetOrCreateStream(stream_id);
   }
 
@@ -223,7 +223,7 @@ TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));
   quic::QuicStreamId stream_id =
-      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
+      quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 4u : 5u;
   auto stream =
       reinterpret_cast<quic::QuicSpdyStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
   // Receive a GET request on created stream.
@@ -252,7 +252,7 @@ TEST_P(EnvoyQuicServerSessionTest, InvalidIncomingStreamId) {
   Http::MockStreamCallbacks stream_callbacks;
   // IETF stream 5 and G-Quic stream 2 are server initiated.
   quic::QuicStreamId stream_id =
-      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 5u : 2u;
+      quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 5u : 2u;
   std::string data("aaaa");
   quic::QuicStreamFrame stream_frame(stream_id, false, 0, data);
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0);
@@ -269,7 +269,7 @@ TEST_P(EnvoyQuicServerSessionTest, NoNewStreamForInvalidIncomingStream) {
   Http::MockStreamCallbacks stream_callbacks;
   // IETF stream 5 and G-Quic stream 2 are server initiated.
   quic::QuicStreamId stream_id =
-      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 5u : 2u;
+      quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 5u : 2u;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0);
   EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_INVALID_STREAM_ID,
                                                            "Data for nonexistent stream"));
@@ -287,7 +287,7 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
   quic::QuicRstStreamFrame rst1(/*control_frame_id=*/1u, stream1->id(),
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::RemoteReset, _));
-  if (quic_version_[0].transport_version < quic::QUIC_VERSION_99) {
+  if (quic_version_[0].transport_version < quic::QUIC_VERSION_IETF_DRAFT_27) {
     EXPECT_CALL(*quic_connection_, SendControlFrame(_))
         .WillOnce(Invoke([stream_id = stream1->id()](const quic::QuicFrame& frame) {
           EXPECT_EQ(stream_id, frame.rst_stream_frame->stream_id);
@@ -696,9 +696,7 @@ TEST_P(EnvoyQuicServerSessionTest, ShutdownNotice) {
 
 TEST_P(EnvoyQuicServerSessionTest, GoAway) {
   installReadFilter();
-  if (quic_version_[0].transport_version < quic::QUIC_VERSION_99) {
-    EXPECT_CALL(*quic_connection_, SendControlFrame(_));
-  }
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   http_connection_->goAway();
 }
 
@@ -804,7 +802,7 @@ TEST_P(EnvoyQuicServerSessionTest, SendBufferWatermark) {
         return request_decoder;
       }));
   quic::QuicStreamId stream_id =
-      quic_version_[0].transport_version == quic::QUIC_VERSION_99 ? 4u : 5u;
+      quic_version_[0].transport_version == quic::QUIC_VERSION_IETF_DRAFT_27 ? 4u : 5u;
   auto stream1 =
       dynamic_cast<EnvoyQuicServerStream*>(envoy_quic_session_.GetOrCreateStream(stream_id));
 

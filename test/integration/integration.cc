@@ -209,6 +209,9 @@ void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
 }
 
 void IntegrationTcpClient::waitForHalfClose() {
+  if (payload_reader_->readLastByte()) {
+    return;
+  }
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(payload_reader_->readLastByte());
 }

@@ -93,6 +93,7 @@ def envoy_cc_fuzz_test(
         srcs = tar_src,
         testonly = 1,
     )
+    fuzz_copts = ["-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION"]
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
@@ -105,7 +106,7 @@ def envoy_cc_fuzz_test(
     )
     native.cc_test(
         name = name,
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = _envoy_test_linkopts(),
         linkstatic = 1,
         args = ["$(locations %s)" % corpus_name],
@@ -129,7 +130,7 @@ def envoy_cc_fuzz_test(
     # provide a path to FuzzingEngine.
     native.cc_binary(
         name = name + "_driverless",
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-lFuzzingEngine"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
@@ -139,7 +140,7 @@ def envoy_cc_fuzz_test(
 
     native.cc_test(
         name = name + "_with_libfuzzer",
-        copts = envoy_copts("@envoy", test = True),
+        copts = fuzz_copts + envoy_copts("@envoy", test = True),
         linkopts = ["-fsanitize=fuzzer"] + _envoy_test_linkopts(),
         linkstatic = 1,
         testonly = 1,
@@ -246,6 +247,29 @@ def envoy_cc_test_binary(
         linkopts = _envoy_test_linkopts(),
         tags = tags + ["compilation_db_dep"],
         **kargs
+    )
+
+# Envoy benchmark binaries should be specified with this function.
+def envoy_cc_benchmark_binary(
+        name,
+        deps = [],
+        **kargs):
+    envoy_cc_test_binary(
+        name,
+        deps = deps + ["//test/benchmark:main"],
+        **kargs
+    )
+
+# Tests to validate that Envoy benchmarks run successfully should be specified with this function.
+def envoy_benchmark_test(
+        name,
+        benchmark_binary,
+        data = []):
+    native.sh_test(
+        name = name,
+        srcs = ["//bazel:test_for_benchmark_wrapper.sh"],
+        data = [":" + benchmark_binary] + data,
+        args = ["%s/%s" % (native.package_name(), benchmark_binary)],
     )
 
 # Envoy Python test binaries should be specified with this function.
