@@ -95,6 +95,7 @@ extern bool main_common_hack;
 // Exercise the codepath to instantiate MainCommon and destruct it, without hot restart.
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabled) {
   addArg("--disable-hot-restart");
+  addArg("--log-stacktrace-to-stderr");
   main_common_hack = true;
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
   main_common_hack = false;

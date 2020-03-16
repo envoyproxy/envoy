@@ -132,10 +132,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                               "Use fake symbol table implementation", false, true,
                                               "bool", cmd);
 
-  TCLAP::ValueArg<bool> log_stacktrace_to_stderr(
+  TCLAP::SwitchArg log_stacktrace_to_stderr(
       "", "log-stacktrace-to-stderr",
-      "Log crash-dump directly to stderr rather than via the logging system", false, false, "bool",
-      cmd);
+      "Log crash-dump directly to stderr rather than via the logging system", cmd, false);
 
   TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
                                                   "Comma-separated list of extensions to disable",
