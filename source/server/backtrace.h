@@ -48,6 +48,7 @@ public:
    * @param log_to_stderr Whether to log to stderr or the logging system.
    */
   static void setLogToStderr(bool log_to_stderr);
+  static bool logToStderr() { return log_to_stderr_; }
 
   /**
    * Capture a stack trace.
