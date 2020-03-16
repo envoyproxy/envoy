@@ -9,6 +9,7 @@
 #include "extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,9 +61,10 @@ SerializerPtr SpanBuffer::makeSerializer(
 }
 
 std::string JsonV1Serializer::serialize(const std::vector<Span>& zipkin_spans) {
-  const std::string serialized_elements =
-      absl::StrJoin(zipkin_spans, ",", [](std::string* element, Span zipkin_span) {
-        absl::StrAppend(element, zipkin_span.toJson());
+  Util::Replacements replacements;
+  const std::string serialized_elements = absl::StrJoin(
+      zipkin_spans, ",", [&replacements](std::string* element, const Span& zipkin_span) {
+        absl::StrAppend(element, zipkin_span.toJson(replacements));
       });
   return absl::StrCat("[", serialized_elements, "]");
 }
@@ -71,20 +73,23 @@ JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
     : shared_span_context_{shared_span_context} {}
 
 std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
-  const std::string serialized_elements =
-      absl::StrJoin(zipkin_spans, ",", [this](std::string* out, const Span& zipkin_span) {
+  Util::Replacements replacements;
+  const std::string serialized_elements = absl::StrJoin(
+      zipkin_spans, ",", [this, &replacements](std::string* out, const Span& zipkin_span) {
         absl::StrAppend(
-            out, absl::StrJoin(toListOfSpans(zipkin_span), ",",
-                               [](std::string* element, const ProtobufWkt::Struct& span) {
-                                 absl::StrAppend(element, MessageUtil::getJsonStringFromMessage(
-                                                              span, false, true));
-                               }));
+            out,
+            absl::StrJoin(toListOfSpans(zipkin_span, replacements), ",",
+                          [replacements](std::string* element, const ProtobufWkt::Struct& span) {
+                            const std::string json =
+                                MessageUtil::getJsonStringFromMessage(span, false, true);
+                            absl::StrAppend(element, absl::StrReplaceAll(json, replacements));
+                          }));
       });
   return absl::StrCat("[", serialized_elements, "]");
 }
 
 const std::vector<ProtobufWkt::Struct>
-JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
+JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& replacements) const {
   std::vector<ProtobufWkt::Struct> spans;
   spans.reserve(zipkin_span.annotations().size());
   for (const auto& annotation : zipkin_span.annotations()) {
@@ -103,7 +108,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
     }
 
     if (annotation.isSetEndpoint()) {
-      (*fields)[SPAN_TIMESTAMP] = ValueUtil::numberValue(annotation.timestamp());
+      (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(annotation.timestamp(), replacements);
       (*fields)[SPAN_LOCAL_ENDPOINT] =
           ValueUtil::structValue(toProtoEndpoint(annotation.endpoint()));
     }

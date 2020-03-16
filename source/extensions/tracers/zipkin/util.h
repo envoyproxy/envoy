@@ -6,6 +6,7 @@
 #include "envoy/common/time.h"
 
 #include "common/common/byte_order.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,6 +44,18 @@ public:
     auto bytes = toEndianness<ByteOrder::BigEndian>(value);
     return std::string(reinterpret_cast<const char*>(&bytes), sizeof(Type));
   }
+
+  using Replacements = std::vector<std::pair<const std::string, const std::string>>;
+
+  /**
+   * Returns a wrapped uint64_t value as a string. In addition to that, it also pushes back a
+   * replacement to the given replacements vector.
+   *
+   * @param value unt64_t number that will be represented in string.
+   * @param replacements a container to hold the required replacements when serializing this value.
+   * @return ProtobufWkt::Value wrapped uint64_t as a string.
+   */
+  static ProtobufWkt::Value uint64Value(uint64_t value, Replacements& replacements);
 };
 
 } // namespace Zipkin

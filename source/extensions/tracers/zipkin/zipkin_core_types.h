@@ -14,6 +14,7 @@
 #include "extensions/tracers/zipkin/util.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -37,15 +38,16 @@ public:
    * All classes defining Zipkin abstractions need to implement this method to convert
    * the corresponding abstraction to a ProtobufWkt::Struct.
    */
-  virtual const ProtobufWkt::Struct toStruct() const PURE;
+  virtual const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const PURE;
 
   /**
    * Serializes the a type as a Zipkin-compliant JSON representation as a string.
    *
    * @return a stringified JSON.
    */
-  const std::string toJson() const {
-    return MessageUtil::getJsonStringFromMessage(toStruct(), false, true);
+  const std::string toJson(Util::Replacements& replacements) const {
+    return absl::StrReplaceAll(
+        MessageUtil::getJsonStringFromMessage(toStruct(replacements), false, true), replacements);
   };
 };
 
@@ -104,7 +106,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct() const override;
+  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string service_name_;
@@ -196,7 +198,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct() const override;
+  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   uint64_t timestamp_{0};
@@ -294,7 +296,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct() const override;
+  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string key_;
@@ -550,7 +552,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct() const override;
+  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
   /**
    * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked
