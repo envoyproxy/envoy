@@ -2401,6 +2401,34 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
   EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, NotInvokeStreamDeletionConfiguredZero) {
+  max_stream_duration_ = std::chrono::milliseconds(0);
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_).Times(0);
+    conn_manager_->newStream(response_encoder_);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false); // kick off request
+}
+
+TEST_F(HttpConnectionManagerImplTest, StreamDeletionConfigiredValidly) {
+  max_stream_duration_ = std::chrono::milliseconds(10);
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Event::MockTimer* duration_timer = setUpTimer();
+
+    EXPECT_CALL(*duration_timer, enableTimer(max_stream_duration_.value(), _));
+    conn_manager_->newStream(response_encoder_);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false); // kick off request
+}
+
 TEST_F(HttpConnectionManagerImplTest, StreamAliveDurationExpired) {
   max_stream_duration_ = std::chrono::milliseconds(10);
   setup(false, "");
@@ -2416,6 +2444,8 @@ TEST_F(HttpConnectionManagerImplTest, StreamAliveDurationExpired) {
 
   EXPECT_CALL(*duration_timer, disableTimer());
   duration_timer->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_max_duration_reached_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());
 }
 
@@ -2435,6 +2465,7 @@ TEST_F(HttpConnectionManagerImplTest, NotInvokeDeferredStreamDeletion) {
   EXPECT_CALL(*duration_timer, disableTimer());
   conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_max_duration_reached_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());
 }
 

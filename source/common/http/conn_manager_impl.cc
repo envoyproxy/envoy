@@ -606,7 +606,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     request_timer_->enableTimer(request_timeout_ms_, this);
   }
 
-  if (connection_manager_.config_.maxStreamDuration()) {
+  const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
+  if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
     max_stream_duration_timer_ =
         connection_manager.read_callbacks_->connection().dispatcher().createTimer(
             [this]() -> void { onStreamMaxDurationReached(); });
