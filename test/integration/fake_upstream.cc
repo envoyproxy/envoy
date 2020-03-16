@@ -129,6 +129,11 @@ void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vect
       [this, &metadata_map_vector]() -> void { encoder_.encodeMetadata(metadata_map_vector); });
 }
 
+void FakeStream::readDisable(bool disable) {
+  parent_.connection().dispatcher().post(
+      [this, disable]() -> void { encoder_.getStream().readDisable(disable); });
+}
+
 void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;

@@ -23,7 +23,7 @@ option (udpa.annotations.file_migrate).move_to_package =
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message TcpProxy {
   // [#not-implemented-hide:] Deprecated.
   // TCP Proxy filter configuration using V1 format.
@@ -108,6 +108,14 @@ message TcpProxy {
     repeated ClusterWeight clusters = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
+  // Configuration for tunneling TCP over other transports or application layers.
+  // Currently, only HTTP/2 is supported. When other options exist, HTTP/2 will
+  // remain the default.
+  message TunnelingConfig {
+    // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
+    string hostname = 1 [(validate.rules).string = {min_bytes: 1}];
+  }
+
   // The prefix to use when emitting :ref:`statistics
   // <config_network_filters_tcp_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -165,4 +173,10 @@ message TcpProxy {
   // load balancing algorithms will select a host randomly. Currently the number of hash policies is
   // limited to 1.
   repeated type.HashPolicy hash_policy = 11 [(validate.rules).repeated = {max_items: 1}];
+
+  // [#not-implemented-hide:] feature in progress
+  // If set, this configures tunneling, e.g. configuration options to tunnel multiple TCP
+  // payloads over a shared HTTP/2 tunnel. If this message is absent, the payload
+  // will be proxied upstream as per usual.
+  TunnelingConfig tunneling_config = 12;
 }
