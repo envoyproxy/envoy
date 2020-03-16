@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.direct_response.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.direct_response.v3";
@@ -16,6 +18,6 @@ message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.direct_response.v2.Config";
 
-  // Response data as bytes.
-  bytes response = 1;
+  // Response data as a data source.
+  config.core.v3.DataSource response = 1;
 }
