@@ -25,7 +25,7 @@ private:
   const HttpTracerSharedPtr null_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
 
   // HttpTracers indexed by the hash of their configuration.
-  absl::flat_hash_map<std::size_t, HttpTracerSharedPtr> http_tracers_;
+  absl::flat_hash_map<std::size_t, std::weak_ptr<HttpTracer>> http_tracers_;
 };
 
 } // namespace Tracing

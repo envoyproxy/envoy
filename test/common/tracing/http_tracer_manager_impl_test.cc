@@ -3,11 +3,13 @@
 #include "common/tracing/http_tracer_manager_impl.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::NotNull;
 using testing::WhenDynamicCastTo;
@@ -120,6 +122,64 @@ TEST_F(HttpTracerManagerImplTest, ShouldFailIfProviderSpecificConfigIsNotValid) 
   string_value: "value"
 }
 )");
+}
+
+class HttpTracerManagerImplCacheTest : public testing::Test {
+public:
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  HttpTracerManagerImpl http_tracer_manager_{std::make_unique<TracerFactoryContextImpl>(
+      server_factory_context_, ProtobufMessage::getStrictValidationVisitor())};
+
+  NiceMock<Server::Configuration::MockTracerFactory> tracer_factory_{"envoy.tracers.mock"};
+
+private:
+  Registry::InjectFactory<Server::Configuration::TracerFactory> registered_tracer_factory_{
+      tracer_factory_};
+};
+
+TEST_F(HttpTracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
+  envoy::config::trace::v3::Tracing_Http tracing_config;
+  tracing_config.set_name("envoy.tracers.mock");
+
+  HttpTracer* expected_tracer = new NiceMock<MockHttpTracer>();
+
+  // Expect HttpTracerManager to create a new HttpTracer.
+  EXPECT_CALL(tracer_factory_, createHttpTracer(_, _))
+      .WillOnce(InvokeWithoutArgs(
+          [expected_tracer] { return std::shared_ptr<HttpTracer>(expected_tracer); }));
+
+  auto actual_tracer_one = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config);
+
+  EXPECT_EQ(actual_tracer_one.get(), expected_tracer);
+
+  // Expect HttpTracerManager to re-use cached value.
+  auto actual_tracer_two = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config);
+
+  EXPECT_EQ(actual_tracer_two.get(), expected_tracer);
+
+  // Expect HttpTracerManager to use weak references under the hood and release HttpTracer as soon
+  // as it's no longer in use.
+  std::weak_ptr<HttpTracer> weak_pointer{actual_tracer_one};
+
+  actual_tracer_one.reset();
+  // Expect one strong reference still to be left.
+  EXPECT_NE(weak_pointer.lock(), nullptr);
+
+  actual_tracer_two.reset();
+  // Expect no more strong references to be left.
+  EXPECT_EQ(weak_pointer.lock(), nullptr);
+
+  HttpTracer* expected_another_tracer = new NiceMock<MockHttpTracer>();
+
+  // Expect HttpTracerManager to create a new HttpTracer once again.
+  EXPECT_CALL(tracer_factory_, createHttpTracer(_, _))
+      .WillOnce(InvokeWithoutArgs([expected_another_tracer] {
+        return std::shared_ptr<HttpTracer>(expected_another_tracer);
+      }));
+
+  auto actual_tracer_three = http_tracer_manager_.getOrCreateHttpTracer(&tracing_config);
+
+  EXPECT_EQ(actual_tracer_three.get(), expected_another_tracer);
 }
 
 } // namespace

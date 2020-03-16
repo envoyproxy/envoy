@@ -18,11 +18,14 @@ HttpTracerManagerImpl::getOrCreateHttpTracer(const envoy::config::trace::v3::Tra
   const auto cache_key = MessageUtil::hash(*config);
   const auto it = http_tracers_.find(cache_key);
   if (it != http_tracers_.end()) {
-    return it->second;
+    auto http_tracer = it->second.lock();
+    if (http_tracer) { // HttpTracer might have been released since it's a weak reference
+      return http_tracer;
+    }
   }
 
-  // Initialize tracing driver.
-  ENVOY_LOG(info, "instantiating tracing driver: {}", config->name());
+  // Initialize a new tracer.
+  ENVOY_LOG(info, "instantiating a new tracer: {}", config->name());
 
   // Now see if there is a factory that will accept the config.
   auto& factory =
@@ -31,10 +34,7 @@ HttpTracerManagerImpl::getOrCreateHttpTracer(const envoy::config::trace::v3::Tra
       *config, factory_context_->messageValidationVisitor(), factory);
 
   HttpTracerSharedPtr http_tracer = factory.createHttpTracer(*message, *factory_context_);
-  // TODO(yskopets): In the initial implementation HttpTracers are never removed from the cache.
-  // Once HttpTracer implementations have been revised to support removal and cleanup,
-  // this cache must be reworked to release HttpTracers as soon as they are no longer in use.
-  http_tracers_.emplace(cache_key, http_tracer);
+  http_tracers_.insert_or_assign(cache_key, http_tracer); // cache a weak reference
   return http_tracer;
 }
 
