@@ -60,11 +60,12 @@ On the other end, the response of the Lambda function must conform to the follow
         "isBase64Encoded": true|false
     }
 
-- The ``statusCode`` field is used as the HTTP response code.
-- The ``headers`` are used as the HTTP response headers. If multiple headers share the same name, their values are
-  coalesced into a single comma-separated value. Unlike the request headers, cookies are not part of the response
-  headers because the ``Set-Cookie`` header cannot contain more than one value per the `RFC`_.
-- The ``cookies`` are used as ``Set-Cookie`` response headers.
+- The ``statusCode`` field is used as the HTTP response code. If this key is missing, Envoy returns a ``200
+  OK``.
+- The ``headers`` are used as the HTTP response headers.
+- The ``cookies`` are used as ``Set-Cookie`` response headers. Unlike the request headers, cookies are _not_ part of the
+  response headers because the ``Set-Cookie`` header cannot contain more than one value per the `RFC`_. Therefore, Each
+  key/value pair in this JSON array will translate to a single ``Set-Cookie`` header.
 - The ``body`` is base64-decoded if it is marked as base64-encoded and sent as the body of the HTTP response.
 
 .. _RFC: https://tools.ietf.org/html/rfc6265#section-4.1

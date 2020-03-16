@@ -67,10 +67,9 @@ bool isTargetClusterLambdaGateway(Upstream::ClusterInfo const& cluster_info) {
 
 bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
   // If transfer-encoding is anything other than 'identity' (i.e. chunked, compress, deflate or
-  // gzip) then we want to base64-encode it regardless of the content-type value.
-  if (headers.TransferEncoding()) {
-    std::string encoding{headers.TransferEncoding()->value().getStringView()};
-    if (Http::LowerCaseString(encoding).get() != "identity") {
+  // gzip) then we want to base64-encode the response body regardless of the content-type value.
+  if (auto encoding_header = headers.TransferEncoding()) {
+    if (!absl::EqualsIgnoreCase(encoding_header->value().getStringView(), "identity")) {
       return false;
     }
   }
@@ -127,7 +126,8 @@ std::string Filter::resolveSettings() {
       arn_.swap(route_arn);
       payload_passthrough_ = route_settings->payloadPassthrough();
     } else {
-      ENVOY_LOG(warn, "Found route specific configuration but failed to parse Lambda ARN {}.",
+      // TODO(marcomagdy): add stats for this error
+      ENVOY_LOG(debug, "Found route specific configuration but failed to parse Lambda ARN {}.",
                 route_settings->arn());
       return "Invalid AWS Lambda ARN";
     }
@@ -200,15 +200,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // Check for errors returned by Lambda.
   // If we detect an error, we skip the encodeData step to hand the error back to the user as is.
   // Errors can be in the form of HTTP status code or x-amz-function-error header
-  if (auto http_status_header = headers.Status()) {
-    auto value = http_status_header->value().getStringView();
-    int code = 0;
-    const auto res = SimpleAtoi(value, &code);
-    ASSERT(res);
-    if (code == 0 || code >= 300) {
-      skip_ = true;
-      return Http::FilterHeadersStatus::Continue;
-    }
+  const auto http_status = Http::Utility::getResponseStatus(headers);
+  if (http_status >= 300) {
+    skip_ = true;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   // Just the existence of this header means we have an error, so skip.
@@ -323,11 +318,8 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
   }
 
   MessageUtil::validate(json_req, ProtobufMessage::getStrictValidationVisitor());
-  Protobuf::util::JsonPrintOptions json_options;
-  json_options.always_print_primitive_fields = true;
-  std::string json_data;
-  const auto status = Protobuf::util::MessageToJsonString(json_req, &json_data, json_options);
-  ASSERT(status.ok());
+  const std::string json_data = MessageUtil::getJsonStringFromMessage(
+      json_req, false /* pretty_print  */, true /* always_print_primitive_fields */);
   out.add(json_data);
 }
 
@@ -361,7 +353,9 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
     headers.addReferenceKey(Http::Headers::get().SetCookie, cookie);
   }
 
-  headers.setStatus(json_resp.status_code());
+  if (json_resp.status_code() != 0) {
+    headers.setStatus(json_resp.status_code());
+  }
   headers.setReferenceContentType(content_type_json);
   if (!json_resp.body().empty()) {
     if (json_resp.is_base64_encoded()) {

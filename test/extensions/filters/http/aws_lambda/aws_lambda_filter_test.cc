@@ -358,6 +358,7 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersEndStreamShouldSkip) {
 TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambdaErrorShouldSkipAndContinue) {
   setupFilter({Arn, false /*passthrough*/});
   Http::TestResponseHeaderMapImpl headers;
+  headers.setStatus(200);
   headers.addCopy(Http::LowerCaseString("x-Amz-Function-Error"), "unhandled");
   auto result = filter_->encodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
@@ -380,6 +381,7 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambda5xxShouldSkipAndContinue) {
 TEST_F(AwsLambdaFilterTest, EncodeHeadersStopsIteration) {
   setupFilter({Arn, false /*passthrough*/});
   Http::TestResponseHeaderMapImpl headers;
+  headers.setStatus(200);
   auto result = filter_->encodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
 }
@@ -418,6 +420,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
   setupFilter({Arn, false /*passthrough*/});
   filter_->resolveSettings();
   Http::TestResponseHeaderMapImpl headers;
+  headers.setStatus(200);
   filter_->encodeHeaders(headers, false /*end_stream*/);
 
   constexpr auto json_response = R"EOF(
@@ -442,6 +445,9 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
 
   auto result = filter_->encodeData(encoded_buf, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
+
+  ASSERT_NE(nullptr, headers.Status());
+  EXPECT_EQ("201", headers.Status()->value().getStringView());
 
   EXPECT_EQ(nullptr, headers.get(Http::LowerCaseString(":other")));
 
@@ -471,6 +477,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeBase64EncodedBody) {
   setupFilter({Arn, false /*passthrough*/});
   filter_->resolveSettings();
   Http::TestResponseHeaderMapImpl headers;
+  headers.setStatus(200);
   filter_->encodeHeaders(headers, false /*end_stream*/);
 
   constexpr auto json_base64_body = R"EOF(
@@ -517,6 +524,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeInvalidJson) {
   setupFilter({Arn, false /*passthrough*/});
   filter_->resolveSettings();
   Http::TestResponseHeaderMapImpl headers;
+  headers.setStatus(200);
   filter_->encodeHeaders(headers, false /*end_stream*/);
 
   constexpr auto json_response = R"EOF(
