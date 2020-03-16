@@ -43,9 +43,9 @@ std::string createHeaderFragment(int num_headers) {
   return headers;
 }
 
-Buffer::OwnedImpl createBufferWithOneByteSlices(std::string_view data) {
+Buffer::OwnedImpl createBufferWithOneByteSlices(std::string_view input) {
   Buffer::OwnedImpl buffer;
-  for (const char& c : data) {
+  for (const char& c : input) {
     buffer.appendSliceForTest(&c, 1);
   }
   return buffer;
