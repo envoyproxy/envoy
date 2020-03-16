@@ -960,7 +960,7 @@ void ConnectionImpl::sendSettings(
       insertParameter({NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()});
   if (!result) {
     ENVOY_CONN_LOG(warn,
-                   "the named allow_connect SETTINGS parameter is being overriden by a custom "
+                   "the named allow_connect SETTINGS parameter is being overridden by a custom "
                    "parameter with value {}",
                    connection_, http2_options.allow_connect());
   }
