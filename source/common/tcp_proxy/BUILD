@@ -39,6 +39,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/http:headers_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",

@@ -878,6 +878,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "tcp_tunneling_integration_test",
+    srcs = [
+        "tcp_tunneling_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "tcp_conn_pool_integration_test",
     srcs = [
         "tcp_conn_pool_integration_test.cc",
