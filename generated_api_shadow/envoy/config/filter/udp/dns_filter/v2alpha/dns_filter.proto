@@ -34,7 +34,7 @@ message DnsFilterConfig {
   // endpoint
   message DnsEndpoint {
     oneof endpoint_config {
-      AddressList addresslist = 1;
+      AddressList address_list = 1;
     }
   }
 
@@ -68,13 +68,13 @@ message DnsFilterConfig {
   // This message contains the configuration for the Dns Filter operating
   // in a server context. This message will contain the virtual hosts and
   // associated addresses with which Envoy will respond to queries
-  message ServerCtxConfig {
+  message ServerContextConfig {
     oneof config_source {
       // Load the configuration specified from the control plane
-      ControlPlaneConfig control_plane_cfg = 1;
+      ControlPlaneConfig control_plane_config = 1;
 
       // Seed the filter configuration from an external path
-      api.v2.core.DataSource filter_server_cfg = 2;
+      api.v2.core.DataSource filter_server_config = 2;
     }
   }
 
@@ -82,5 +82,5 @@ message DnsFilterConfig {
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // Server context configuration
-  ServerCtxConfig server_config = 2;
+  ServerContextConfig server_config = 2;
 }

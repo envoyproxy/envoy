@@ -17,17 +17,19 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   // store configured data for server context
   const auto& server_config = config.server_config();
 
-  if (server_config.has_control_plane_cfg()) {
+  if (server_config.has_control_plane_config()) {
 
-    const auto& cfg = server_config.control_plane_cfg();
+    const auto& cfg = server_config.control_plane_config();
     const size_t entries = cfg.virtual_domains().size();
 
+    // TODO (abaptiste): Check that the domain configured here appears
+    // in the known domains list
     virtual_domains_.reserve(entries);
     for (const auto virtual_domain : cfg.virtual_domains()) {
       DnsAddressList addresses{};
 
-      if (virtual_domain.endpoint().has_addresslist()) {
-        const auto& address_list = virtual_domain.endpoint().addresslist().address();
+      if (virtual_domain.endpoint().has_address_list()) {
+        const auto& address_list = virtual_domain.endpoint().address_list().address();
         addresses.reserve(address_list.size());
         for (const auto& configured_address : address_list) {
           addresses.push_back(configured_address);
