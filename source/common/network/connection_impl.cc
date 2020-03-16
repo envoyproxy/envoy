@@ -47,10 +47,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(dispatcher.timeSource()), filter_manager_(*this),
-      write_buffer_(
-          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
-                                                  [this]() -> void { this->onHighWatermark(); },
-                                                  [this]() -> void { this->onOverflowWatermark(); })),
+      write_buffer_(dispatcher.getWatermarkFactory().create(
+          [this]() -> void { this->onLowWatermark(); },
+          [this]() -> void { this->onHighWatermark(); },
+          [this]() -> void { this->onOverflowWatermark(); })),
       read_enabled_(true), above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
@@ -435,12 +435,17 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through
     // might need to change if we ever copy here.
     write_buffer_->move(data);
 
-    // Activating a write event before the socket is connected has the side-effect of tricking
-    // doWriteReady into thinking the socket is connected. On macOS, the underlying write may fail
-    // with a connection error if a call to write(2) occurs before the connection is completed.
-    if (!connecting_) {
-      ASSERT(file_event_ != nullptr, "ConnectionImpl file event was unexpectedly reset");
-      file_event_->activate(Event::FileReadyType::Write);
+    // If the writing to the buffer caused an overflow-watermark breach, the connection should be
+    // closed
+    // TODO(adip): what should be done if the state is Closing
+    if (state() != State::Closed) {
+      // Activating a write event before the socket is connected has the side-effect of tricking
+      // doWriteReady into thinking the socket is connected. On macOS, the underlying write may fail
+      // with a connection error if a call to write(2) occurs before the connection is completed.
+      if (!connecting_) {
+        ASSERT(file_event_ != nullptr, "ConnectionImpl file event was unexpectedly reset");
+        file_event_->activate(Event::FileReadyType::Write);
+      }
     }
   }
 }

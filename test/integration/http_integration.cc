@@ -629,6 +629,26 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   EXPECT_EQ(512U, response->body().size());
 }
 
+void HttpIntegrationTest::testRouterRequestAndResponseWithGiantHeader(uint64_t response_size) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  // Send response headers, and no end_stream (there's response body).
+  Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
+                                                    {":big", std::string(response_size, 'a')}};
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  // Send the response data, with end_stream true.
+  upstream_request_->encodeData(response_size, true);
+
+  // Overflow should happen, and the response should be reset
+  // Wait for the response to be read by the codec client.
+  codec_client_->waitForDisconnect();
+  EXPECT_FALSE(response->complete());
+}
+
 void HttpIntegrationTest::testRetry() {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

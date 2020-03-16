@@ -39,6 +39,11 @@ TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
   testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
 }
 
+TEST_P(Http2IntegrationTest, FlowControlOnAndDownstreamOverflowBufferHeader) {
+  config_helper_.setBufferLimits(4096, 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithGiantHeader(2048);
+}
+
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse();
 }

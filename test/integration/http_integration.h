@@ -213,6 +213,9 @@ protected:
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
                                     bool with_encoder_filter = false);
 
+  // Overflow watermark tests
+  void testRouterRequestAndResponseWithGiantHeader(uint64_t response_size);
+
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
   // Test that trailers are sent. request_trailers_present and
