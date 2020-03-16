@@ -120,12 +120,12 @@ bool MainCommonBase::run() {
                                   file_system_);
   }
   case Server::Mode::InitOnly:
-#ifdef ENVOY_CONFIG_COVERAGE
+    //#ifdef ENVOY_CONFIG_COVERAGE
     if (main_common_hack) {
       std::cerr << *global_str;
       // RELEASE_ASSERT(global_str != nullptr, "temporary to induce crash.");
     }
-#endif
+    //#endif
     PERF_DUMP();
     return true;
   }
@@ -150,7 +150,9 @@ MainCommon::MainCommon(int argc, const char* const* argv)
             std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
             platform_impl_.fileSystem(), nullptr) {
 #ifdef ENVOY_HANDLE_SIGNALS
-  BackwardsTrace::setLogToStderr(options_.logStacktraceToStderr());
+  if (options_.logStacktraceToStderr()) {
+    BackwardsTrace::setLogToStderr(true);
+  }
   // log_on_terminate_.setSendToStderr(
   // handle_sigs_.setSendToStderr(options_.logStacktraceToStderr());
 #endif

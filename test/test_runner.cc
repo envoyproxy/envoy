@@ -10,6 +10,8 @@
 
 #include "exe/process_wide.h"
 
+#include "server/backtrace.h"
+
 #include "test/common/runtime/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
@@ -105,8 +107,12 @@ int TestRunner::RunTests(int argc, char** argv) {
 
   TestEnvironment::initializeOptions(argc, argv);
   Thread::MutexBasicLockable lock;
-  Logger::Context logging_state(TestEnvironment::getOptions().logLevel(),
-                                TestEnvironment::getOptions().logFormat(), lock, false);
+
+  Server::Options& options = TestEnvironment::getOptions();
+  Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false);
+  if (options.logStacktraceToStderr()) {
+    BackwardsTrace::setLogToStderr(true);
+  }
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;
