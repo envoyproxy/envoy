@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/pure.h"
@@ -25,6 +26,14 @@ class StatNameList;
 class StatNameSet;
 
 using StatNameSetPtr = std::unique_ptr<StatNameSet>;
+
+/**
+ * Holds a range of indexes indicating which parts of a stat-name are
+ * dynamic. This is used to transfer stats from hot-restart parent to child,
+ * retaining the same name structure.
+ */
+using DynamicSpan = std::pair<uint32_t, uint32_t>;
+using DynamicSpans = std::vector<DynamicSpan>;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
@@ -178,6 +187,19 @@ public:
    * @return the set.
    */
   virtual StatNameSetPtr makeSet(absl::string_view name) PURE;
+
+  /**
+   * Identifies the dynamic components of a stat_name into an array of integer
+   * pairs, indicating the begin/end of spans of tokens in the stat-name that
+   * are created from StatNameDynamicStore or StatNameDynamicPool.
+   *
+   * This can be used to reconstruct the same exact StatNames in
+   * StatNames::mergeStats(), to enable stat continuity across hot-restart.
+   *
+   * @param stat_name the input stat name.
+   * @return the array of pairs indicating the bounds.
+   */
+  virtual DynamicSpans getDynamicSpans(StatName stat_name) const PURE;
 
 private:
   friend struct HeapStatData;

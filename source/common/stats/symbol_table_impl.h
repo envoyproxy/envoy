@@ -206,6 +206,7 @@ public:
   void clearRecentLookups() override;
   void setRecentLookupCapacity(uint64_t capacity) override;
   uint64_t recentLookupCapacity() const override;
+  DynamicSpans getDynamicSpans(StatName stat_name) const override;
 
 private:
   friend class StatName;

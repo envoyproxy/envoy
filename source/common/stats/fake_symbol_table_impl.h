@@ -122,6 +122,7 @@ public:
   void clearRecentLookups() override {}
   void setRecentLookupCapacity(uint64_t) override {}
   uint64_t recentLookupCapacity() const override { return 0; }
+  DynamicSpans getDynamicSpans(StatName) const override { return DynamicSpans(); }
 
 private:
   absl::string_view toStringView(const StatName& stat_name) const {

@@ -51,7 +51,7 @@ public:
 
     std::string name = symbol_table.toString(stat_name);
     StatMerger::DynamicsMap dynamic_map;
-    dynamic_map[name] = StatMerger::DynamicContext::encodeSegments(stat_name);
+    dynamic_map[name] = symbol_table.getDynamicSpans(stat_name);
     StatMerger::DynamicContext dynamic_context(symbol_table);
     StatName decoded = dynamic_context.makeDynamicStatName(name, dynamic_map);
     EXPECT_EQ(stat_name, decoded) << name;
@@ -256,7 +256,7 @@ public:
 
     std::string name = symbol_table_->toString(stat_name);
     StatMerger::DynamicsMap dynamic_map;
-    StatMerger::DynamicSpans spans = StatMerger::DynamicContext::encodeSegments(stat_name);
+    DynamicSpans spans = symbol_table_->getDynamicSpans(stat_name);
     uint32_t size = 0;
     if (!spans.empty()) {
       dynamic_map[name] = spans;
@@ -276,6 +276,12 @@ public:
 TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
   init(std::make_unique<SymbolTableImpl>());
 
+  for (uint32_t i = 1; i < 256; ++i) {
+    char ch = static_cast<char>(i);
+    absl::string_view one_char(&ch, 1);
+    EXPECT_EQ(1, dynamicEncodeDecodeTest(absl::StrCat("D:", one_char))) << "dynamic=" << one_char;
+    EXPECT_EQ(0, dynamicEncodeDecodeTest(one_char)) << "symbolic=" << one_char;
+  }
   EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
   EXPECT_EQ(1, dynamicEncodeDecodeTest("D:dynamic"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.world"));
@@ -299,6 +305,12 @@ TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
 TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
   init(std::make_unique<FakeSymbolTableImpl>());
 
+  for (uint32_t i = 1; i < 256; ++i) {
+    char ch = static_cast<char>(i);
+    absl::string_view one_char(&ch, 1);
+    EXPECT_EQ(0, dynamicEncodeDecodeTest(absl::StrCat("D:", one_char))) << "dynamic=" << one_char;
+    EXPECT_EQ(0, dynamicEncodeDecodeTest(one_char)) << "symbolic=" << one_char;
+  }
   EXPECT_EQ(0, dynamicEncodeDecodeTest("normal"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:dynamic"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("hello.world"));
