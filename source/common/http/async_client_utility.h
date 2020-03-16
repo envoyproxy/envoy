@@ -25,7 +25,7 @@ public:
 
 private:
   // Track active async HTTP requests to be able to cancel them on destruction.
-  std::unordered_set<AsyncClient::Request*> active_requests_;
+  absl::flat_hash_set<AsyncClient::Request*> active_requests_;
 };
 
 } // namespace Http
