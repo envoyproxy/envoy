@@ -1155,7 +1155,7 @@ route_config:
       route:
         cluster: fake_cluster
 http_filters:
-- name: envoy.router
+- name: envoy.filters.http.router
   typed_config: {}
 http2_protocol_options:
   hpack_table_size: 1024
@@ -1217,7 +1217,7 @@ route_config:
       route:
         cluster: fake_cluster
 http_filters:
-- name: envoy.router
+- name: envoy.filters.http.router
   typed_config: {}
 http2_protocol_options:
   allow_connect: true
