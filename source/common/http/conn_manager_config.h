@@ -5,10 +5,12 @@
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/date_provider.h"
 #include "common/network/utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -79,8 +81,16 @@ struct ConnectionManagerNamedStats {
 };
 
 struct ConnectionManagerStats {
+  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, const std::string& prefix,
+                         Stats::Scope& scope)
+      : named_(std::move(named_stats)), prefix_(prefix),
+        prefix_stat_name_storage_(prefix, scope.symbolTable()), scope_(scope) {}
+
+  Stats::StatName prefixStatName() const { return prefix_stat_name_storage_.statName(); }
+
   ConnectionManagerNamedStats named_;
   std::string prefix_;
+  Stats::StatNameManagedStorage prefix_stat_name_storage_;
   Stats::Scope& scope_;
 };
 
@@ -360,6 +370,11 @@ public:
    *         the same user agent will be written to the x-envoy-downstream-service-cluster header.
    */
   virtual const absl::optional<std::string>& userAgent() PURE;
+
+  /**
+   *  @return HttpTracerSharedPtr HttpTracer to use.
+   */
+  virtual Tracing::HttpTracerSharedPtr tracer() PURE;
 
   /**
    * @return tracing config.

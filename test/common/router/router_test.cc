@@ -470,7 +470,7 @@ TEST_F(RouterTest, Http2Upstream) {
 TEST_F(RouterTest, HashPolicy) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Return(absl::optional<uint64_t>(10)));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
@@ -495,7 +495,7 @@ TEST_F(RouterTest, HashPolicy) {
 TEST_F(RouterTest, HashPolicyNoHash) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Return(absl::optional<uint64_t>()));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, &router_))
       .WillOnce(
@@ -546,9 +546,10 @@ TEST_F(RouterTest, AddCookie) {
           }));
 
   std::string cookie_value;
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const Http::HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie,
+                           const StreamInfo::FilterStateSharedPtr) {
         cookie_value = add_cookie("foo", "", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
       }));
@@ -596,9 +597,10 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
             return &cm_.conn_pool_;
           }));
 
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const Http::HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie,
+                           const StreamInfo::FilterStateSharedPtr) {
         // this should be ignored
         add_cookie("foo", "", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
@@ -645,9 +647,10 @@ TEST_F(RouterTest, AddMultipleCookies) {
           }));
 
   std::string choco_c, foo_c;
-  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
-                           const Http::HashPolicy::AddCookieCallback add_cookie) {
+                           const Http::HashPolicy::AddCookieCallback add_cookie,
+                           const StreamInfo::FilterStateSharedPtr) {
         choco_c = add_cookie("choco", "", std::chrono::seconds(15));
         foo_c = add_cookie("foo", "/path", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
@@ -3596,7 +3599,8 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 TEST_F(RouterTest, Shadow) {
   ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("foo", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
-  policy = std::make_unique<TestShadowPolicy>("fizz", "buzz");
+  policy = std::make_unique<TestShadowPolicy>("fizz", "buzz", envoy::type::v3::FractionalPercent(),
+                                              false);
   callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
@@ -3627,17 +3631,21 @@ TEST_F(RouterTest, Shadow) {
   EXPECT_CALL(callbacks_, decodingBuffer())
       .Times(AtLeast(2))
       .WillRepeatedly(Return(body_data.get()));
-  EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
+  EXPECT_CALL(*shadow_writer_, shadow_("foo", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
-                          std::chrono::milliseconds) -> void {
+                          const Http::AsyncClient::RequestOptions& options) -> void {
         EXPECT_NE(nullptr, request->body());
         EXPECT_NE(nullptr, request->trailers());
+        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
+        EXPECT_TRUE(options.sampled_);
       }));
-  EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, std::chrono::milliseconds(10)))
+  EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
-                          std::chrono::milliseconds) -> void {
+                          const Http::AsyncClient::RequestOptions& options) -> void {
         EXPECT_NE(nullptr, request->body());
         EXPECT_NE(nullptr, request->trailers());
+        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
+        EXPECT_FALSE(options.sampled_);
       }));
   router_.decodeTrailers(trailers);
 
@@ -5147,8 +5155,8 @@ TEST_P(RouterTestStrictCheckOneHeader, SingleInvalidHeader) {
       {"X-envoy-Upstream-rq-timeout-ms", "10.0"},
       {"x-envoy-upstream-rq-per-try-timeout-ms", "1.0"},
       {"x-envoy-max-retries", "2.0"},
-      {"x-envoy-retry-on", "5xx,cancelled"},            // 'cancelled' is an invalid entry
-      {"x-envoy-retry-grpc-on", "cancelled, internal"}, // spaces are considered errors
+      {"x-envoy-retry-on", "5xx,cancelled"},                // 'cancelled' is an invalid entry
+      {"x-envoy-retry-grpc-on", "5xx,cancelled, internal"}, // '5xx' is an invalid entry
   };
   HttpTestUtility::addDefaultHeaders(req_headers);
   auto checked_header = GetParam();
@@ -5253,9 +5261,9 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       {"x-envoy-max-retries", "2"},
       {"not-checked", "always passes"},
       {"x-envoy-retry-on", "5xx,gateway-error,retriable-4xx,refused-stream,connect-failure,"
-                           "retriable-status-codes,reset"},
+                           "retriable-status-codes , reset"}, // space is allowed
       {"x-envoy-retry-grpc-on",
-       "cancelled,internal,deadline-exceeded,resource-exhausted,unavailable"},
+       "cancelled,internal,deadline-exceeded,resource-exhausted , unavailable"}, // space is allowed
   };
 
   for (const auto& target : SUPPORTED_STRICT_CHECKED_HEADERS) {
@@ -5269,8 +5277,8 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
       {"X-envoy-Upstream-rq-timeout-ms", "10.0"},
       {"x-envoy-upstream-rq-per-try-timeout-ms", "1.0"},
       {"x-envoy-max-retries", "2.0"},
-      {"x-envoy-retry-on", "5xx,cancelled"},            // 'cancelled' is an invalid entry
-      {"x-envoy-retry-grpc-on", "cancelled, internal"}, // spaces are considered errors
+      {"x-envoy-retry-on", "5xx,cancelled"},                // 'cancelled' is an invalid entry
+      {"x-envoy-retry-grpc-on", "5xx,cancelled, internal"}, // '5xx' is an invalid entry
   };
 
   for (const auto& target : SUPPORTED_STRICT_CHECKED_HEADERS) {
