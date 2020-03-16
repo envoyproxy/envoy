@@ -12,7 +12,11 @@ envoy_cc_test(
     name = "quic_http_integration_test",
     srcs = ["quic_http_integration_test.cc"],
     data = ["//test/config/integration/certs"],
-    tags = ["nofips"],
+    # Skipping as quiche quic_stream_send_buffer.cc does not currently compile on Windows
+    tags = [
+        "nofips",
+        "skip_on_windows",
+    ],
     deps = [
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",

@@ -8,11 +8,6 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
-    "envoy.filters.http.adaptive_concurrency",
-    "envoy.filters.network.kafka_broker",
-    "envoy.filters.network.mysql_proxy",
-    "envoy.stat_sinks.hystrix",
-    "envoy.stat_sinks.statsd",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -788,6 +783,7 @@ filegroup(
     http_archive(
         name = "kafka_source",
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
+        patches = ["@envoy//bazel/external:kafka_int32.patch"],
         **REPOSITORY_LOCATIONS["kafka_source"]
     )
 

@@ -184,7 +184,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   TestRandomGenerator generator;
-  const uint generated_parent_id = generator.random();
+  const uint64_t generated_parent_id = generator.random();
   SpanContext modified_root_span_context(root_span_context.trace_id_high(),
                                          root_span_context.trace_id(), root_span_context.id(),
                                          generated_parent_id, root_span_context.sampled());
