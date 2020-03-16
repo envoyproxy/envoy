@@ -325,16 +325,26 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket) {
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
+
   // Find matching filter chain.
   const auto filter_chain = config_.filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
     ENVOY_LOG(debug, "closing connection: no matching filter chain found");
     stats_.no_filter_chain_match_.inc();
+    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    stream_info->onRequestComplete();
+    for (const auto& access_log : config_.accessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, *stream_info);
+    }
     socket->close();
     return;
   }
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections,
@@ -438,6 +448,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
+  stream_info_->onRequestComplete();
   for (const auto& access_log : config_.accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, *stream_info_);
   }

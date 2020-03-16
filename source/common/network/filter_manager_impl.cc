@@ -46,6 +46,7 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
 
   std::list<ActiveReadFilterPtr>::iterator entry;
   if (!filter) {
+    connection_.streamInfo().addBytesReceived(buffer_source.getReadBuffer().buffer.length());
     entry = upstream_filters_.begin();
   } else {
     entry = std::next(filter->entry());
@@ -87,6 +88,7 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
 
   std::list<ActiveWriteFilterPtr>::iterator entry;
   if (!filter) {
+    connection_.streamInfo().addBytesSent(buffer_source.getWriteBuffer().buffer.length());
     entry = downstream_filters_.begin();
   } else {
     entry = std::next(filter->entry());
