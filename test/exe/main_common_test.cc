@@ -90,10 +90,14 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartEnabled) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
+extern bool main_common_hack;
+
 // Exercise the codepath to instantiate MainCommon and destruct it, without hot restart.
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabled) {
   addArg("--disable-hot-restart");
+  main_common_hack = true;
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+  main_common_hack = false;
 }
 
 // Exercise init_only explicitly.

@@ -135,15 +135,21 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
   });
 }
 
+bool main_common_hack = false;
+
 std::string* global_str = nullptr;
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
             std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
             platform_impl_.fileSystem(), nullptr) {
+#ifdef ENVOY_HANDLE_SIGNALS
   log_on_terminate_.setSendtoStderr(options_.logStacktraceToStderr());
+#endif
 #ifdef ENVOY_CONFIG_COVERAGE
-  std::cout << *global_str; // temporary to induce crash.
+  if (main_common_hack) {
+    std::cout << *global_str; // temporary to induce crash.
+  }
 #endif
 }
 
