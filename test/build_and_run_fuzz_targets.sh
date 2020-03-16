@@ -11,11 +11,14 @@ else
   echo "This script should be called from tools/run_envoy_bazel_coverage.sh"
 fi
 
+LIBFUZZER_TARGETS=""
 # Build all fuzz targets to run instrumented with libfuzzer in sequence.
 for t in ${FUZZ_TARGETS}
 do
-  bazel build "${t}_with_libfuzzer" --config asan-fuzzer -c opt
+  LIBFUZZER_TARGETS+=${t}_with_libfuzzer
 done
+
+bazel build ${LIBFUZZER_TARGETS} --config asan-fuzzer -c opt
 
 # Now run each fuzz target in parallel for 60 seconds.
 pids=""
