@@ -101,7 +101,6 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabled) {
 // Exercise init_only explicitly.
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   addArg("--disable-hot-restart");
-  addArg("--log-stacktrace-to-stderr");
   initOnly();
   MainCommon main_common(argc(), argv());
   main_common_hack = true;
