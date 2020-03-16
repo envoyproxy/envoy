@@ -205,6 +205,29 @@ public:
     router_.onDestroy();
   }
 
+  void verifyAttemptCountBasic(bool set_include_attempt_count, absl::optional<int> preset_count,
+                               int expected_count) {
+    setIncludeAttemptCount(set_include_attempt_count);
+
+    EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+    expectResponseTimerCreate();
+
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    if (preset_count) {
+      headers.setEnvoyAttemptCount(preset_count.value());
+    }
+    router_.decodeHeaders(headers, true);
+
+    EXPECT_EQ(expected_count,
+              atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+
+    // When the router filter gets reset we should cancel the pool request.
+    EXPECT_CALL(cancellable_, cancel());
+    router_.onDestroy();
+    EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  }
+
   void sendRequest(bool end_stream = true) {
     if (end_stream) {
       EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(1);
@@ -240,6 +263,10 @@ public:
         std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
         StreamInfo::FilterState::StateType::Mutable,
         StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+  }
+
+  void setIncludeAttemptCount(bool include) {
+    ON_CALL(callbacks_.route_->route_entry_, includeAttemptCount()).WillByDefault(Return(include));
   }
 
   void enableHedgeOnPerTryTimeout() {
@@ -866,6 +893,88 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
       }));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+// Validate that x-envoy-attempt-count is added to request headers when the option is true.
+TEST_F(RouterTest, EnvoyAttemptCountInRequest) {
+  verifyAttemptCountBasic(
+      /* set_include_attempt_count */ true,
+      /* preset_count*/ absl::nullopt,
+      /* expected_count */ 1);
+}
+
+// Validate that x-envoy-attempt-count is overwritten by the router on request headers, if the
+// header is sent from the downstream and the option is set to true.
+TEST_F(RouterTest, EnvoyAttemptCountInRequestOverwritten) {
+  verifyAttemptCountBasic(
+      /* set_include_attempt_count */ true,
+      /* preset_count*/ 123,
+      /* expected_count */ 1);
+}
+
+// Validate that x-envoy-attempt-count is not overwritten by the router on request headers, if the
+// header is sent from the downstream and the option is set to false.
+TEST_F(RouterTest, EnvoyAttemptCountInRequestNotOverwritten) {
+  verifyAttemptCountBasic(
+      /* set_include_attempt_count */ false,
+      /* preset_count*/ 123,
+      /* expected_count */ 123);
+}
+
+TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
+  setIncludeAttemptCount(true);
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  // Initial request has 1 attempt.
+  EXPECT_EQ(1, atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+
+  // 5xx response.
+  router_.retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // We expect the 5xx response to kick off a new request.
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+            return nullptr;
+          }));
+  router_.retry_state_->callback_();
+
+  // The retry should cause the header to increase to 2.
+  EXPECT_EQ(2, atoi(std::string(headers.EnvoyAttemptCount()->value().getStringView()).c_str()));
+
+  // Normal response.
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+  EXPECT_CALL(cm_.conn_pool_.host_->health_checker_, setUnhealthy()).Times(0);
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
 // Validate that the cluster is appended to the response when configured.
