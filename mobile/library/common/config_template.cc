@@ -18,6 +18,7 @@ static_resources:
           name: api_router
           virtual_hosts:
             - name: api
+              include_attempt_count_in_response: true
               domains:
                 - "*"
               routes:
