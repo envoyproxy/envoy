@@ -68,7 +68,9 @@ message HttpProtocolOptions {
   // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
 
-  // Specify duration to keep alive HTTP/2 stream and request/response pair. If not specified, this value is not set.
+  // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
+  // reset independent of any other timeouts. If not specified, this value is not set.
+  // [#comment:TODO(shikugawa): add this functionality to upstream.]
   google.protobuf.Duration max_stream_duration = 4;
 }
 
