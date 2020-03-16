@@ -23,7 +23,7 @@ else
   # For fuzz builds, this overrides to just fuzz targets.
   echo $(bazel --version)
   COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} ]] &&
-    COVERAGE_TARGETS=$(bazel query 'attr("tags", "fuzz_target", //test/...)')
+    COVERAGE_TARGETS="$(bazel query 'attr("tags", "fuzz_target", //test/...)')"
 fi
 
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
@@ -34,7 +34,7 @@ then
   "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
 else
   # Build and run libfuzzer linked target, grab collect temp directories.
-  TEMP_CORPORA=$("${SCRIPT_DIR}"/build_and_run_fuzz_targets.sh ${COVERAGE_TARGETS})
+  TEMP_CORPORA="$("${SCRIPT_DIR}"/build_and_run_fuzz_targets.sh ${COVERAGE_TARGETS})"
   echo ${TEMP_CORPORA}
 fi
 
@@ -52,10 +52,10 @@ do
     OBJECTS="bazel-bin/test/coverage/coverage_tests"
   else
     # If this is a fuzz target, set args to be the corpus.
-    CORPUS_LOCATION=$(bazel query "labels(data, ${t})" | head -1)
-    ORIGINAL_CORPUS=$(bazel query "labels(srcs, ${CORPUS_LOCATION})" | head -1)
+    CORPUS_LOCATION="$(bazel query "labels(data, ${t})" | head -1)"
+    ORIGINAL_CORPUS="$(bazel query "labels(srcs, ${CORPUS_LOCATION})" | head -1)"
     ORIGINAL_CORPUS=${ORIGINAL_CORPUS/://}
-    ORIGINAL_CORPUS=$(dirname ${ORIGINAL_CORPUS})
+    ORIGINAL_CORPUS="$(dirname ${ORIGINAL_CORPUS})"
     TEST_ARGS="--test_arg=$(pwd)${ORIGINAL_CORPUS} --test_arg=-runs=0"
     # Add to OBJECTS to pass in to llvm-cov
     TARGET_BINARY="${t/://}"

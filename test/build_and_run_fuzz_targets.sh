@@ -27,12 +27,12 @@ TEMP_CORPORA=""
 for t in ${FUZZ_TARGETS}
 do
   # Get the original corpus for the fuzz target
-  CORPUS_LOCATION=$(bazel query "labels(data, ${t})" | head -1)
-  ORIGINAL_CORPUS=$(bazel query "labels(srcs, ${CORPUS_LOCATION})" | head -1)
+  CORPUS_LOCATION="$(bazel query "labels(data, ${t})" | head -1)"
+  ORIGINAL_CORPUS="$(bazel query "labels(srcs, ${CORPUS_LOCATION})" | head -1)"
   ORIGINAL_CORPUS=${ORIGINAL_CORPUS/://}
-  ORIGINAL_CORPUS=$(dirname ${ORIGINAL_CORPUS})
+  ORIGINAL_CORPUS="$(dirname ${ORIGINAL_CORPUS})"
   # Create temp directory in target's corpus
-  CORPUS_DIR=$(mktemp -d -p $(pwd)/${ORIGINAL_CORPUS:2})
+  CORPUS_DIR="$(mktemp -d -p $(pwd)/${ORIGINAL_CORPUS:2})"
   TEMP_CORPORA+="${CORPUS_DIR} "
   # Run fuzzing process.
   TARGET_BINARY="${t/://}"
