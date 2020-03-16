@@ -267,7 +267,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   //                                          upgrading.
   // 2020/02/13  10042    43797       44136   Metadata: Metadata are shared across different
   //                                          clusters and hosts.
-  // 2020/02/18  9964     44327       44600   http2: support custom SETTINGS parameters.
+  // 2020/03/16  9964     44085       44600   http2: support custom SETTINGS parameters.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -281,7 +281,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 44327);
+  EXPECT_MEMORY_EQ(m_per_cluster, 44085);
   EXPECT_MEMORY_LE(m_per_cluster, 44600);
 }
 
@@ -322,7 +322,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/01/09  9227     35772       36500   router: per-cluster histograms w/ timeout budget
   // 2020/01/12  9633     35932       36500   config: support recovery of original message when
   //                                          upgrading.
-  // 2020/02/18  9964     36462       36800   http2: support custom SETTINGS parameters.
+  // 2020/03/16  9964     36220       36800   http2: support custom SETTINGS parameters.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -336,7 +336,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 36462);
+  EXPECT_MEMORY_EQ(m_per_cluster, 36220);
   EXPECT_MEMORY_LE(m_per_cluster, 36800);
 }
 
