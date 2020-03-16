@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/exception.h"
