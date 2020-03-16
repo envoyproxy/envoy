@@ -940,7 +940,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
                           validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
-      include_attempt_count_(virtual_host.include_request_attempt_count()),
+      include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
+      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
       virtual_cluster_catch_all_(stat_name_pool_) {
 
   switch (virtual_host.require_tls()) {

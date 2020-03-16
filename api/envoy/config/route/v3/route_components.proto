@@ -32,7 +32,7 @@ option java_multiple_files = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -140,7 +140,19 @@ message VirtualHost {
   // This header is unaffected by the
   // :ref:`suppress_envoy_headers
   // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  //
+  // [#next-major-version: rename to include_attempt_count_in_request.]
   bool include_request_attempt_count = 14;
+
+  // Decides whether the :ref:`x-envoy-attempt-count
+  // <config_http_filters_router_x-envoy-attempt-count>` header should be included
+  // in the downstream response. Setting this option will cause the router to override any existing header
+  // value, so in the case of two Envoys on the request path with this option enabled, the downstream
+  // will see the attempt count as perceived by the Envoy closest upstream from itself. Defaults to false.
+  // This header is unaffected by the
+  // :ref:`suppress_envoy_headers
+  // <envoy_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag.
+  bool include_attempt_count_in_response = 19;
 
   // Indicates the retry policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
