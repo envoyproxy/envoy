@@ -1883,8 +1883,8 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
 TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {
   const std::string SCRIPT{R"EOF(
       function envoy_on_request(request_handle)
-        request_handle:logTrace(request_handle:timestamp("milliseconds_since_epoch"))
-        request_handle:logTrace(request_handle:timestamp("nanoseconds_since_epoch"))
+        request_handle:logTrace(request_handle:timestamp(EnvoyTimestampResolution.MILLISECOND))
+        request_handle:logTrace(request_handle:timestamp(EnvoyTimestampResolution.NANOSECOND))
         request_handle:logTrace(request_handle:timestamp("invalid_format"))
       end
     )EOF"};
@@ -1898,9 +1898,9 @@ TEST_F(LuaHttpFilterTest, Timestamp_ReturnsFormatSet) {
   // Explicitly set to nanoseconds
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("1.583879145572e+18")));
   // Invalid format
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
-                                  StrEq("[string \"...\"]:5: timestamp format must be "
-                                        "milliseconds_since_epoch or nanoseconds_since_epoch.")));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::err, StrEq("[string \"...\"]:5: timestamp format must be "
+                                                  "MILLISECOND or NANOSECOND.")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 

@@ -86,6 +86,24 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   return filter.clusterManager().httpAsyncClientForCluster(cluster).send(
       std::move(message), callbacks, Http::AsyncClient::RequestOptions().setTimeout(timeout));
 }
+
+/**
+ * get number field from table.
+ * assumes that the table is on the stack top.
+ * @param key
+ * @return
+ */
+int get_field(lua_State* state, const char* global, const char* key) {
+  int result;
+  lua_getglobal(state, global);
+  lua_pushstring(state, key);
+  lua_gettable(state, -2);
+  if (!lua_isnumber(state, -1))
+    luaL_error(state, "invalid component in global {} at key {}", global, key);
+  result = lua_tointeger(state, -1);
+  lua_pop(state, 1); /* remove number */
+  return result;
+}
 } // namespace
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
@@ -504,17 +522,20 @@ int StreamHandleWrapper::luaTimestamp(lua_State* state) {
   auto now = time_source_.systemTime().time_since_epoch();
 
   absl::string_view unit_parameter = luaL_optstring(state, 2, "");
-  if (unit_parameter.empty() || unit_parameter.compare("milliseconds_since_epoch") == 0) {
+
+  auto millisecond = get_field(state, "EnvoyTimestampResolution", "MILLISECOND");
+  auto nanosecond = get_field(state, "EnvoyTimestampResolution", "NANOSECOND");
+
+  if (unit_parameter.empty() || unit_parameter.compare(std::to_string(millisecond)) == 0) {
     auto milliseconds_since_epoch =
         std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
     lua_pushnumber(state, milliseconds_since_epoch);
-  } else if (unit_parameter.compare("nanoseconds_since_epoch") == 0) {
+  } else if (unit_parameter.compare(std::to_string(nanosecond)) == 0) {
     auto nanoseconds_since_epoch =
         std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
     lua_pushnumber(state, nanoseconds_since_epoch);
   } else {
-    luaL_error(state,
-               "timestamp format must be milliseconds_since_epoch or nanoseconds_since_epoch.");
+    luaL_error(state, "timestamp format must be MILLISECOND or NANOSECOND.");
   }
 
   return 1;
@@ -553,18 +574,18 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<PublicKeyWrapper>();
 
   const Filters::Common::Lua::InitializerList initializers(
-    // EnvoyTimestampResolution "enum".
-    {
-      [](lua_State* state) {
-          lua_newtable(state);
-          {
-            LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
-            LUA_ENUM(state, NANOSECOND, Timestamp::Resolution::Nanosecond);
-          }
-          lua_setglobal(state, "EnvoyTimestampResolution");
-      },
-      // Add more initializers here.
-    });
+      // EnvoyTimestampResolution "enum".
+      {
+          [](lua_State* state) {
+            lua_newtable(state);
+            {
+              LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
+              LUA_ENUM(state, NANOSECOND, Timestamp::Resolution::Nanosecond);
+            }
+            lua_setglobal(state, "EnvoyTimestampResolution");
+          },
+          // Add more initializers here.
+      });
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request", initializers);
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
