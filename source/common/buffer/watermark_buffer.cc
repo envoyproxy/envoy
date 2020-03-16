@@ -73,12 +73,15 @@ void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_waterm
   low_watermark_ = low_watermark;
   high_watermark_ = high_watermark;
   overflow_watermark_ = high_watermark * overflow_multiplier_;
+  // TODO(adip): What should be done if there's an overflow (overflow_watermark_ <
+  // overflow_watermark_)? should this be a release_assert?
+  ASSERT((high_watermark <= overflow_watermark_) || (overflow_multiplier_ == 0));
   checkHighAndOverflowWatermarks();
   checkLowWatermark();
 }
 
 void WatermarkBuffer::checkLowWatermark() {
-  if (!above_high_watermark_called_ ||
+  if (above_overflow_watermark_called_ || !above_high_watermark_called_ ||
       (high_watermark_ != 0 && OwnedImpl::length() > low_watermark_)) {
     return;
   }
