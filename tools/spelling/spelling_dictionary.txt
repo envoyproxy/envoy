@@ -385,6 +385,7 @@ backgrounded
 backoff
 backpressure
 backticks
+backtraces
 balancer
 balancers
 barbaz
@@ -968,7 +969,6 @@ src
 ssize
 stackdriver
 stacktrace
-stacktraces
 startup
 stateful
 statsd

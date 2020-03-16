@@ -106,9 +106,6 @@ void MainCommonBase::configureComponentLogLevels() {
   }
 }
 
-bool main_common_hack = false;
-std::string* global_str = nullptr;
-
 bool MainCommonBase::run() {
   switch (options_.mode()) {
   case Server::Mode::Serve:
@@ -120,12 +117,6 @@ bool MainCommonBase::run() {
                                   file_system_);
   }
   case Server::Mode::InitOnly:
-#ifdef ENVOY_CONFIG_COVERAGE
-    if (main_common_hack) {
-      std::cerr << *global_str;
-      // RELEASE_ASSERT(global_str != nullptr, "temporary to induce crash.");
-    }
-#endif
     PERF_DUMP();
     return true;
   }
@@ -148,15 +139,7 @@ MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
             std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
-            platform_impl_.fileSystem(), nullptr) {
-#ifdef ENVOY_HANDLE_SIGNALS
-  if (options_.logStacktraceToStderr()) {
-    BackwardsTrace::setLogToStderr(true);
-  }
-  // log_on_terminate_.setSendToStderr(
-  // handle_sigs_.setSendToStderr(options_.logStacktraceToStderr());
-#endif
-}
+            platform_impl_.fileSystem(), nullptr) {}
 
 std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
 #ifdef ENVOY_HOT_RESTART

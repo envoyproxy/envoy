@@ -23,7 +23,7 @@ namespace Envoy {
 
 namespace {
 
-std::string findAndRemove(const std::regex& pattern, int& argc, char**& argv) {
+std::string findAndRemovePattern(const std::regex& pattern, int& argc, char**& argv) {
   std::smatch matched;
   std::string return_value;
   for (int i = 0; i < argc; ++i) {
@@ -35,6 +35,20 @@ std::string findAndRemove(const std::regex& pattern, int& argc, char**& argv) {
       }
     }
     if (!return_value.empty() && i < argc) {
+      argv[i] = argv[i + 1];
+    }
+  }
+  return return_value;
+}
+
+bool findAndRemoveExact(absl::string_view option, int& argc, char**& argv) {
+  bool return_value = false;
+  for (int i = 1; i < argc; ++i) {
+    if (option == argv[i]) {
+      return_value = true;
+      --argc;
+    }
+    if (return_value && i < argc) {
       argv[i] = argv[i + 1];
     }
   }
@@ -95,7 +109,7 @@ int TestRunner::RunTests(int argc, char** argv) {
   // This allows doing test overrides of Envoy runtime features without adding
   // test flags to the Envoy production command line.
   const std::regex PATTERN{"--runtime-feature-override-for-tests=(.*)", std::regex::optimize};
-  std::string runtime_override = findAndRemove(PATTERN, argc, argv);
+  std::string runtime_override = findAndRemovePattern(PATTERN, argc, argv);
   if (!runtime_override.empty()) {
     ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
                         "Running with runtime feature override {}", runtime_override);
@@ -105,14 +119,15 @@ int TestRunner::RunTests(int argc, char** argv) {
     listeners.Append(new RuntimeManagingListener(runtime_override));
   }
 
+  if (findAndRemoveExact("--log-stacktrace-to-stderr", argc, argv)) {
+    BackwardsTrace::setLogToStderr(true);
+  }
+
   TestEnvironment::initializeOptions(argc, argv);
   Thread::MutexBasicLockable lock;
 
   Server::Options& options = TestEnvironment::getOptions();
   Logger::Context logging_state(options.logLevel(), options.logFormat(), lock, false);
-  if (options.logStacktraceToStderr()) {
-    BackwardsTrace::setLogToStderr(true);
-  }
 
   // Allocate fake log access manager.
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;

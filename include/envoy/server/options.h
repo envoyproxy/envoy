@@ -190,11 +190,6 @@ public:
   virtual bool fakeSymbolTableEnabled() const PURE;
 
   /**
-   * @return whether stacktraces are sent directly to stderr, rather than via logs.
-   */
-  virtual bool logStacktraceToStderr() const PURE;
-
-  /**
    * @return bool indicating whether cpuset size should determine the number of worker threads.
    */
   virtual bool cpusetThreadsEnabled() const PURE;

@@ -90,8 +90,6 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartEnabled) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
-extern bool main_common_hack;
-
 // Exercise the codepath to instantiate MainCommon and destruct it, without hot restart.
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabled) {
   addArg("--disable-hot-restart");
@@ -103,9 +101,7 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   addArg("--disable-hot-restart");
   initOnly();
   MainCommon main_common(argc(), argv());
-  main_common_hack = true;
   EXPECT_TRUE(main_common.run());
-  main_common_hack = false;
 }
 
 // Test that std::set_new_handler() was called and the callback functions as expected.

@@ -48,6 +48,10 @@ public:
    * @param log_to_stderr Whether to log to stderr or the logging system.
    */
   static void setLogToStderr(bool log_to_stderr);
+
+  /**
+   * @return whether the system directing backtraces directly to stderr.
+   */
   static bool logToStderr() { return log_to_stderr_; }
 
   /**
