@@ -163,7 +163,7 @@ InstanceConstSharedPtr peerAddressFromFd(os_fd_t fd) {
 }
 
 IoHandlePtr InstanceBase::socketFromSocketType(SocketType socket_type) const {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(WIN32)
   int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
@@ -195,7 +195,7 @@ IoHandlePtr InstanceBase::socketFromSocketType(SocketType socket_type) const {
                  fmt::format("socket(2) failed, got error: {}", strerror(result.errno_)));
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(result.rc_);
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
   const int rc = os_sys_calls.setsocketblocking(io_handle->fd(), false).rc_;
   RELEASE_ASSERT(!SOCKET_FAILURE(rc), "");
