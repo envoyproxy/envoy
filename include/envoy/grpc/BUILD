@@ -29,6 +29,7 @@ envoy_cc_library(
     deps = [
         ":async_client_interface",
         "//include/envoy/stats:stats_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
