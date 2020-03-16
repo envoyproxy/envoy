@@ -4,11 +4,13 @@ set -e
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
 [[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
+[[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
 
 echo "Starting run_envoy_bazel_coverage.sh..."
 echo "    PWD=$(pwd)"
 echo "    SRCDIR=${SRCDIR}"
 echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
+echo "    FUZZ_COVERAGE=${FUZZ_COVERAGE}"
 
 # This is the target that will be run to generate coverage data. It can be overridden by consumer
 # projects that want to run coverage on a different/combined target.
@@ -18,32 +20,77 @@ if [[ $# -gt 0 ]]; then
 elif [[ -n "${COVERAGE_TARGET}" ]]; then
   COVERAGE_TARGETS=${COVERAGE_TARGET}
 else
-  COVERAGE_TARGETS=//test/...
+  # For fuzz builds, this overrides to just fuzz targets.
+  echo $(bazel --version)
+  COVERAGE_TARGETS=//test/... && [[ ${FUZZ_COVERAGE} ]] &&
+    COVERAGE_TARGETS=$(bazel query 'attr("tags", "fuzz_target", //test/...)')
 fi
 
-# Make sure //test/coverage:coverage_tests is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-"${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
+TEMP_CORPORA=""
+if [ "$FUZZ_COVERAGE" == false ]
+then
+  # Make sure //test/coverage:coverage_tests is up-to-date.
+  "${SCRIPT_DIR}"/coverage/gen_build.sh ${COVERAGE_TARGETS}
+else
+  # Build and run libfuzzer linked target, grab collect temp directories.
+  TEMP_CORPORA=$("${SCRIPT_DIR}"/build_and_run_fuzz_targets.sh ${COVERAGE_TARGETS})
+  echo ${TEMP_CORPORA}
+fi
+
+# Set the bazel targets to run.
+BAZEL_TARGET=//test/coverage:coverage_tests && [[ FUZZ_COVERAGE ]] && BAZEL_TARGET=${COVERAGE_TARGETS}
 
 # Using GTEST_SHUFFLE here to workaround https://github.com/envoyproxy/envoy/issues/10108
-BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
+OBJECTS=""
+for t in ${BAZEL_TARGET}
+do
+  # Set test args. If normal coverage run, this is --log-path /dev/null
+  if [ "$FUZZ_COVERAGE" == false ]
+  then
+    TEST_ARGS="--test_arg=--log-path /dev/null --test_arg=-l trace"
+    OBJECTS="bazel-bin/test/coverage/coverage_tests"
+  else
+    # If this is a fuzz target, set args to be the corpus.
+    CORPUS_LOCATION=$(bazel query "labels(data, ${t})" | head -1)
+    ORIGINAL_CORPUS=$(bazel query "labels(srcs, ${CORPUS_LOCATION})" | head -1)
+    ORIGINAL_CORPUS=${ORIGINAL_CORPUS/://}
+    ORIGINAL_CORPUS=$(dirname ${ORIGINAL_CORPUS})
+    TEST_ARGS="--test_arg=$(pwd)${ORIGINAL_CORPUS} --test_arg=-runs=0"
+    # Add to OBJECTS to pass in to llvm-cov
+    TARGET_BINARY="${t/://}"
+    if [[ -z $OBJECTS ]]; then
+      # The first object needs to be passed without -object= flag.
+      OBJECTS="bazel-bin/${TARGET_BINARY:2}_with_libfuzzer"
+    else
+      OBJECTS="$OBJECTS -object=bazel-bin/${TARGET_BINARY:2}_with_libfuzzer"
+    fi
+  fi
+
+  BAZEL_USE_LLVM_NATIVE_COVERAGE=1 GCOV=llvm-profdata bazel coverage ${BAZEL_BUILD_OPTIONS} \
     -c fastbuild --copt=-DNDEBUG --instrumentation_filter=//source/...,//include/... \
     --test_timeout=2000 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --test_output=errors \
-    --test_arg="--log-path /dev/null" --test_arg="-l trace" --test_env=HEAPCHECK= \
-    --test_env=GTEST_SHUFFLE=1 --flaky_test_attempts=5 //test/coverage:coverage_tests
+    ${TEST_ARGS} --test_env=HEAPCHECK= \
+    --test_env=GTEST_SHUFFLE=1 --flaky_test_attempts=5 ${t}_with_libfuzzer
+done
+
+for corpus in ${TEMP_CORPORA}
+do
+  rm -rf $corpus
+done
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
 mkdir -p "${COVERAGE_DIR}"
 
 COVERAGE_IGNORE_REGEX="(/external/|pb\.(validate\.)?(h|cc)|/chromium_url/|/test/|/tmp|/source/extensions/quic_listeners/quiche/)"
-COVERAGE_BINARY="bazel-bin/test/coverage/coverage_tests"
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 
 echo "Merging coverage data..."
-llvm-profdata merge -sparse -o ${COVERAGE_DATA} $(find -L bazel-out/k8-fastbuild/testlogs/test/coverage/coverage_tests/ -name coverage.dat)
+BAZEL_OUT=test/coverage/coverage_tests/ && [[ ${FUZZ_COVERAGE} ]] && BAZEL_OUT=test/
+llvm-profdata merge -sparse -o ${COVERAGE_DATA} $(find -L bazel-out/k8-fastbuild/testlogs/${BAZEL_OUT} -name coverage.dat)
 
 echo "Generating report..."
-llvm-cov show "${COVERAGE_BINARY}" -instr-profile="${COVERAGE_DATA}" -Xdemangler=c++filt \
+llvm-cov show "${OBJECTS}" -instr-profile="${COVERAGE_DATA}" -Xdemangler=c++filt \
   -ignore-filename-regex="${COVERAGE_IGNORE_REGEX}" -output-dir=${COVERAGE_DIR} -format=html
 sed -i -e 's|>proc/self/cwd/|>|g' "${COVERAGE_DIR}/index.html"
 sed -i -e 's|>bazel-out/[^/]*/bin/\([^/]*\)/[^<]*/_virtual_includes/[^/]*|>\1|g' "${COVERAGE_DIR}/index.html"
@@ -65,3 +112,5 @@ then
   fi
 fi
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"
+
+
