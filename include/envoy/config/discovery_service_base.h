@@ -14,7 +14,7 @@ template <typename Current> struct SubscriptionBase : public Config::Subscriptio
     switch (resource_api_version) {
     case envoy::config::core::v3::ApiVersion::AUTO:
     case envoy::config::core::v3::ApiVersion::V2:
-      return ApiTypeOracle::getEarlierVersionMessage(Current().GetDescriptor()->full_name())
+      return ApiTypeOracle::getEarlierVersionMessageTypeName(Current().GetDescriptor()->full_name())
           .value();
     case envoy::config::core::v3::ApiVersion::V3:
       return Current().GetDescriptor()->full_name();

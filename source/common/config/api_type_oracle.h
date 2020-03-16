@@ -21,7 +21,7 @@ public:
   static const Protobuf::Descriptor* getEarlierVersionDescriptor(const std::string& message_type);
 
   static const absl::optional<std::string>
-  getEarlierVersionMessage(const std::string& message_type);
+  getEarlierVersionMessageTypeName(const std::string& message_type);
 };
 
 } // namespace Config
