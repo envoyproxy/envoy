@@ -207,6 +207,7 @@ def _com_github_c_ares_c_ares():
     location = REPOSITORY_LOCATIONS["com_github_c_ares_c_ares"]
     http_archive(
         name = "com_github_c_ares_c_ares",
+        patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
         build_file_content = BUILD_ALL_CONTENT,
         **location
     )
@@ -800,6 +801,9 @@ def _is_arch(ctxt, arch):
 
 def _is_linux_ppc(ctxt):
     return _is_linux(ctxt) and _is_arch(ctxt, "ppc")
+
+def _is_linux_s390x(ctxt):
+    return _is_linux(ctxt) and _is_arch(ctxt, "s390x")
 
 def _is_linux_x86_64(ctxt):
     return _is_linux(ctxt) and _is_arch(ctxt, "x86_64")
