@@ -463,7 +463,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
-  ASSERT(pending_body_buffer_.length() == 0);
+  ASSERT(buffered_body_.length() == 0);
 
   if (maybeDirectDispatch(data)) {
     return;
@@ -483,11 +483,11 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
         break;
       }
     }
-    dispatchBody();
+    dispatchBufferedBody();
   } else {
     dispatchSlice(nullptr, 0);
   }
-  ASSERT(pending_body_buffer_.length() == 0);
+  ASSERT(buffered_body_.length() == 0);
 
   ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
   data.drain(total_parsed);
@@ -629,15 +629,14 @@ int ConnectionImpl::onHeadersCompleteBase() {
 }
 
 void ConnectionImpl::bufferBody(const char* data, size_t length) {
-  pending_body_buffer_.add(data, length);
+  buffered_body_.add(data, length);
 }
 
-void ConnectionImpl::dispatchBody() {
+void ConnectionImpl::dispatchBufferedBody() {
   ASSERT(HTTP_PARSER_ERRNO(&parser_) == HPE_OK || HTTP_PARSER_ERRNO(&parser_) == HPE_PAUSED);
-  if (pending_body_buffer_.length() > 0) {
-    onBody(pending_body_buffer_);
-    // Clear the buffer.
-    pending_body_buffer_.drain(pending_body_buffer_.length());
+  if (buffered_body_.length() > 0) {
+    onBody(buffered_body_);
+    buffered_body_.drain(buffered_body_.length());
   }
 }
 
@@ -645,14 +644,14 @@ void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
   if (is_final_chunk) {
     // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found
     // while processing trailers.
-    dispatchBody();
+    dispatchBufferedBody();
   }
 }
 
 void ConnectionImpl::onMessageCompleteBase() {
   ENVOY_CONN_LOG(trace, "message complete", connection_);
 
-  dispatchBody();
+  dispatchBufferedBody();
 
   if (handling_upgrade_) {
     // If this is an upgrade request, swallow the onMessageComplete. The

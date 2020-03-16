@@ -244,6 +244,18 @@ private:
   size_t dispatchSlice(const char* slice, size_t len);
 
   /**
+   * Called by the http_parser when body data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   */
+  void bufferBody(const char* data, size_t length);
+
+  /**
+   * Push the accumulated body through the filter pipeline.
+   */
+  void dispatchBufferedBody();
+
+  /**
    * Called when a request/response is beginning. A base routine happens first then a virtual
    * dispatch is invoked.
    */
@@ -281,12 +293,9 @@ private:
   virtual int onHeadersComplete() PURE;
 
   /**
-   * Called when body data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
+   * Called when body data is available for processing.
+   * @param data supplies the body data
    */
-  void bufferBody(const char* data, size_t length);
-  void dispatchBody();
   virtual void onBody(Buffer::Instance& data) PURE;
 
   /**
@@ -327,7 +336,7 @@ private:
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
-  Buffer::OwnedImpl pending_body_buffer_;
+  Buffer::OwnedImpl buffered_body_;
   Buffer::WatermarkBuffer output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
