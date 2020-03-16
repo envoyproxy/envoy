@@ -120,12 +120,12 @@ bool MainCommonBase::run() {
                                   file_system_);
   }
   case Server::Mode::InitOnly:
-    //#ifdef ENVOY_CONFIG_COVERAGE
+#ifdef ENVOY_CONFIG_COVERAGE
     if (main_common_hack) {
       std::cerr << *global_str;
       // RELEASE_ASSERT(global_str != nullptr, "temporary to induce crash.");
     }
-    //#endif
+#endif
     PERF_DUMP();
     return true;
   }
