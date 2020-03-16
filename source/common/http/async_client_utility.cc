@@ -9,7 +9,7 @@ AsyncClientRequestTracker::~AsyncClientRequestTracker() {
   }
 }
 
-AsyncClientRequestTracker& AsyncClientRequestTracker::operator+=(AsyncClient::Request* request) {
+AsyncClientRequestTracker& AsyncClientRequestTracker::add(AsyncClient::Request* request) {
   // Let client code to avoid conditionals.
   if (request) {
     ASSERT(active_requests_.find(request) == active_requests_.end());
@@ -18,8 +18,7 @@ AsyncClientRequestTracker& AsyncClientRequestTracker::operator+=(AsyncClient::Re
   return *this;
 }
 
-AsyncClientRequestTracker&
-AsyncClientRequestTracker::operator-=(const AsyncClient::Request* request) {
+AsyncClientRequestTracker& AsyncClientRequestTracker::remove(const AsyncClient::Request* request) {
   // Let client code to avoid conditionals.
   if (request) {
     auto it = active_requests_.find(const_cast<AsyncClient::Request*>(request));

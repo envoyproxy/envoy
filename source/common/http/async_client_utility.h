@@ -17,11 +17,11 @@ public:
   /**
    * Includes a given async HTTP request into a set of known active requests.
    */
-  AsyncClientRequestTracker& operator+=(AsyncClient::Request* request);
+  AsyncClientRequestTracker& add(AsyncClient::Request* request);
   /**
    * Excludes a given async HTTP request from a set of known active requests.
    */
-  AsyncClientRequestTracker& operator-=(const AsyncClient::Request* request);
+  AsyncClientRequestTracker& remove(const AsyncClient::Request* request);
 
 private:
   // Track active async HTTP requests to be able to cancel them on destruction.

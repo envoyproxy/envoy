@@ -30,11 +30,11 @@ TEST_F(AsyncClientRequestTrackerTest, OnDestructDoNothingIfThereAreNoActiveReque
 
 TEST_F(AsyncClientRequestTrackerTest, OnDestructCancelActiveRequests) {
   // Include active requests.
-  *active_requests_ += &request1_;
-  *active_requests_ += &request2_;
-  *active_requests_ += &request3_;
+  active_requests_->add(&request1_);
+  active_requests_->add(&request2_);
+  active_requests_->add(&request3_);
   // Exclude active requests.
-  *active_requests_ -= &request2_;
+  active_requests_->remove(&request2_);
 
   // Must cancel active requests on destruction.
   EXPECT_CALL(request1_, cancel());
