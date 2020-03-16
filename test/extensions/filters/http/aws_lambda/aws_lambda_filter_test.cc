@@ -358,7 +358,7 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersEndStreamShouldSkip) {
 TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambdaErrorShouldSkipAndContinue) {
   setupFilter({Arn, false /*passthrough*/});
   Http::TestResponseHeaderMapImpl headers;
-  headers.addReference(Http::LowerCaseString("x-Amz-Function-Error"), "unhandled");
+  headers.addCopy(Http::LowerCaseString("x-Amz-Function-Error"), "unhandled");
   auto result = filter_->encodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 }
@@ -447,7 +447,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
 
   const auto* custom_header = headers.get(Http::LowerCaseString("x-awesome-header"));
   EXPECT_NE(custom_header, nullptr);
-  EXPECT_STREQ("awesome value", custom_header->value().getStringView().data());
+  EXPECT_EQ("awesome value", custom_header->value().getStringView());
 
   std::vector<std::string> cookies;
   headers.iterate(

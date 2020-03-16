@@ -212,7 +212,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   // Just the existence of this header means we have an error, so skip.
-  if (auto function_error_header = headers.get(Http::LowerCaseString("x-amz-function-error"))) {
+  if (headers.get(Http::LowerCaseString("x-amz-function-error"))) {
     skip_ = true;
     return Http::FilterHeadersStatus::Continue;
   }
