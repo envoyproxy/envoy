@@ -9,6 +9,12 @@
 #include "absl/debugging/symbolize.h"
 
 namespace Envoy {
+#define BACKTRACE_LOG()                                                                            \
+  do {                                                                                             \
+    BackwardsTrace t;                                                                              \
+    t.capture();                                                                                   \
+    t.logTrace();                                                                                  \
+  } while (0)
 
 /**
  * Use absl::Stacktrace and absl::Symbolize to log resolved symbols
@@ -31,6 +37,17 @@ namespace Envoy {
 class BackwardsTrace : Logger::Loggable<Logger::Id::backtrace> {
 public:
   BackwardsTrace() = default;
+
+  /**
+   * Directs the output of logTrace() to directly stderr rather than the
+   * logging infrastructure.
+   *
+   * This is intended for coverage tests, where we enable trace logs, but send
+   * them to /dev/null to avoid accumulating too much data in CI.
+   *
+   * @param log_to_stderr Whether to log to stderr or the logging system.
+   */
+  static void setLogToStderr(bool log_to_stderr);
 
   /**
    * Capture a stack trace.
@@ -61,6 +78,11 @@ public:
    * Log the stack trace.
    */
   void logTrace() {
+    if (log_to_stderr_) {
+      printTrace(std::cerr);
+      return;
+    }
+
     ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
     ENVOY_LOG(critical, "Envoy version: {}", VersionInfo::version());
 
@@ -88,6 +110,8 @@ public:
   }
 
 private:
+  static bool log_to_stderr_;
+
   /**
    * Visit the previously captured stack trace.
    *
