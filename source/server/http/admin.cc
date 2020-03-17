@@ -1457,7 +1457,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
           {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
-           false},
+           true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}

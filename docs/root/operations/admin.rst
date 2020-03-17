@@ -559,6 +559,6 @@ modify different aspects of the server:
 
   * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`
 
-.. http:get:: /reopen_logs
+.. http:post:: /reopen_logs
 
   Triggers reopen of all access logs. Behavior is similar to SIGUSR1 handling.
