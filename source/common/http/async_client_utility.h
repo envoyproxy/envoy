@@ -16,10 +16,12 @@ public:
   ~AsyncClientRequestTracker();
   /**
    * Includes a given async HTTP request into a set of known active requests.
+   * @param request request handle
    */
   void add(AsyncClient::Request& request);
   /**
    * Excludes a given async HTTP request from a set of known active requests.
+   * @param request request handle
    */
   void remove(const AsyncClient::Request& request);
 
