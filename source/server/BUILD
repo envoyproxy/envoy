@@ -12,6 +12,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "backtrace_lib",
+    srcs = ["backtrace.cc"],
     hdrs = ["backtrace.h"],
     external_deps = [
         "abseil_stacktrace",
