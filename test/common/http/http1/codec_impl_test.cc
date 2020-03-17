@@ -1,5 +1,6 @@
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
