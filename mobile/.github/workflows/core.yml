@@ -18,7 +18,7 @@ jobs:
       - name: 'Install dependencies'
         run: ./envoy/ci/mac_ci_setup.sh
       - name: 'Run tests'
-        run: bazel test --test_output=all //test/common/...
+        run: bazel test --test_output=all //test/...
   tsan:
     name: tsan
     runs-on: ubuntu-18.04
@@ -34,7 +34,7 @@ jobs:
           export PATH=/usr/lib/llvm-8/bin:$PATH
           export CC=clang
           export CXX=clang++
-          bazel test --config=clang-tsan --test_output=all //test/common/...
+          bazel test --config=clang-tsan --test_output=all //test/...
   asan:
     name: asan
     runs-on: ubuntu-18.04
@@ -50,4 +50,4 @@ jobs:
           export PATH=/usr/lib/llvm-8/bin:$PATH
           export CC=clang
           export CXX=clang++
-          bazel test --config=clang-asan --test_output=all //test/common/...
+          bazel test --config=clang-asan --test_output=all //test/...
