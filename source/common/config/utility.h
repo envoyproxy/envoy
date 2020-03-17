@@ -324,20 +324,23 @@ public:
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
    * @param name the name of the filter.
-   * @param name the type of filter.
+   * @param filter_type the type of filter.
+   * @param filter_chain_type the type of filter chain.
    * @param is_terminal_filter true if the filter is designed to be terminal.
    * @param last_filter_in_current_config true if the filter is last in the configuration.
    * @throws EnvoyException if there is a mismatch between design and configuration.
    */
-  static void validateTerminalFilters(const std::string& name, const char* filter_type,
-                                      bool is_terminal_filter, bool last_filter_in_current_config) {
+  static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
+                                      const char* filter_chain_type, bool is_terminal_filter,
+                                      bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
-      throw EnvoyException(
-          fmt::format("Error: {} must be the terminal {} filter.", name, filter_type));
+      throw EnvoyException(fmt::format("Error: terminal filter named {} of type {} must be the "
+                                       "last filter in a {} filter chain.",
+                                       name, filter_type, filter_chain_type));
     } else if (!is_terminal_filter && last_filter_in_current_config) {
-      throw EnvoyException(
-          fmt::format("Error: non-terminal filter {} is the last filter in a {} filter chain.",
-                      name, filter_type));
+      throw EnvoyException(fmt::format(
+          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
+          name, filter_type, filter_chain_type));
     }
   }
 

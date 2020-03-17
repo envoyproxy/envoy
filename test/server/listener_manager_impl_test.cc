@@ -377,10 +377,10 @@ filter_chains:
     config: {}
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-                          EnvoyException,
-                          "Error: non-terminal filter non_terminal is the last "
-                          "filter in a network filter chain.");
+  EXPECT_THROW_WITH_REGEX(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
+      "Error: non-terminal filter named non_terminal of type non_terminal is the last "
+      "filter in a network filter chain.");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, NotTerminalLast) {
@@ -399,7 +399,8 @@ filter_chains:
 
   EXPECT_THROW_WITH_REGEX(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
-      "Error: envoy.filters.network.tcp_proxy must be the terminal network filter.");
+      "Error: terminal filter named envoy.filters.network.tcp_proxy of type "
+      "envoy.filters.network.tcp_proxy must be the last filter in a network filter chain.");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
