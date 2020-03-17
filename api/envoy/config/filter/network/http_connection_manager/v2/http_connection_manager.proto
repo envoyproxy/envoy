@@ -646,15 +646,6 @@ message HttpFilter {
 }
 
 message RequestIDUtils {
-  reserved 3;
-
-  // The name of the request id utilities extension to create.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
-
   // Request ID utility specific configuration.
-  oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
-
-    google.protobuf.Any typed_config = 4;
-  }
+  google.protobuf.Any typed_config = 1;
 }

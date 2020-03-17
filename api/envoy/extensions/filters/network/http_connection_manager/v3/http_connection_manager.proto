@@ -670,15 +670,6 @@ message RequestIDUtils {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.RequestIDUtils";
 
-  reserved 3, 2;
-
-  reserved "config";
-
-  // The name of the request id utilities extension to create.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
-
   // Request ID utility specific configuration.
-  oneof config_type {
-    google.protobuf.Any typed_config = 4;
-  }
+  google.protobuf.Any typed_config = 1;
 }
