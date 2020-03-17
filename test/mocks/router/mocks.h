@@ -405,12 +405,13 @@ public:
 
   // Router::Route
   MOCK_METHOD(const DirectResponseEntry*, directResponseEntry, (), (const));
-  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
+  MOCK_METHOD(const std::shared_ptr<const RouteEntry>, routeEntry, (), (const));
   MOCK_METHOD(const Decorator*, decorator, (), (const));
   MOCK_METHOD(const RouteTracing*, tracingConfig, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
 
-  testing::NiceMock<MockRouteEntry> route_entry_;
+  std::shared_ptr<testing::NiceMock<MockRouteEntry>> route_entry_{
+      new testing::NiceMock<MockRouteEntry>()};
   testing::NiceMock<MockDecorator> decorator_;
   testing::NiceMock<MockRouteTracing> route_tracing_;
 };
