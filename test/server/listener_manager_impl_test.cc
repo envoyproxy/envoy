@@ -377,10 +377,10 @@ filter_chains:
     config: {}
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-                          EnvoyException,
-                          "Error: non-terminal filter non_terminal is the last "
-                          "filter in a network filter chain.");
+  EXPECT_THROW_WITH_REGEX(
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
+      "Error: non-terminal filter named non_terminal of type non_terminal is the last "
+      "filter in a network filter chain.");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, NotTerminalLast) {
@@ -399,7 +399,8 @@ filter_chains:
 
   EXPECT_THROW_WITH_REGEX(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
-      "Error: envoy.filters.network.tcp_proxy must be the terminal network filter.");
+      "Error: terminal filter named envoy.filters.network.tcp_proxy of type "
+      "envoy.filters.network.tcp_proxy must be the last filter in a network filter chain.");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
@@ -2960,6 +2961,38 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector
 
   // TLS Inspector is automatically injected for filter chains with TLS requirements,
   // so make sure there is exactly 1 listener filter (and assume it's TLS Inspector).
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+}
+
+// Test the tls inspector is not injected twice when the deprecated name is used.
+TEST_F(ListenerManagerImplWithRealFiltersTest,
+       DEPRECATED_FEATURE_TEST(TlsFilterChainWithDeprecatedTlsInspectorName)) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        transport_protocol: "tls"
+    - filter_chain_match:
+        # empty
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // Make sure there is exactly 1 listener filter (and assume it's TLS Inspector). 2 filters
+  // would imply incorrect injection of a second filter.
   Network::ListenerConfig& listener = manager_->listeners().back().get();
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;

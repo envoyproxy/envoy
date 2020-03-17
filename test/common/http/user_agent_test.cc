@@ -35,11 +35,14 @@ TEST(UserAgentTest, All) {
       deliverHistogramToSinks(
           Property(&Stats::Metric::name, "test.user_agent.ios.downstream_cx_length_ms"), _));
 
+  UserAgentContext context(stat_store.symbolTable());
+  Stats::StatNamePool pool(stat_store.symbolTable());
+  Stats::StatName prefix = pool.add("test");
   {
-    UserAgent ua;
-    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa iOS bbb"}}, "test.",
+    UserAgent ua(context);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa iOS bbb"}}, prefix,
                              stat_store);
-    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, prefix,
                              stat_store);
     ua.completeConnectionLength(span);
   }
@@ -56,26 +59,26 @@ TEST(UserAgentTest, All) {
           Property(&Stats::Metric::name, "test.user_agent.android.downstream_cx_length_ms"), _));
 
   {
-    UserAgent ua;
-    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+    UserAgent ua(context);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, prefix,
                              stat_store);
     ua.completeConnectionLength(span);
     ua.onConnectionDestroy(Network::ConnectionEvent::RemoteClose, true);
   }
 
   {
-    UserAgent ua;
-    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa bbb"}}, "test.",
+    UserAgent ua(context);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa bbb"}}, prefix,
                              stat_store);
-    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, "test.",
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, prefix,
                              stat_store);
     ua.completeConnectionLength(span);
     ua.onConnectionDestroy(Network::ConnectionEvent::RemoteClose, false);
   }
 
   {
-    UserAgent ua;
-    ua.initializeFromHeaders(TestRequestHeaderMapImpl{}, "test.", stat_store);
+    UserAgent ua(context);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{}, prefix, stat_store);
     ua.completeConnectionLength(span);
   }
 }

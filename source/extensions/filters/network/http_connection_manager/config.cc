@@ -26,7 +26,8 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "common/tracing/http_tracer_config_impl.h"
+#include "common/tracing/http_tracer_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,6 +75,7 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
+SINGLETON_MANAGER_REGISTRATION(http_tracer_manager);
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
@@ -97,7 +99,15 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.admin(), *route_config_provider_manager);
           });
 
-  return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager};
+  auto http_tracer_manager = context.singletonManager().getTyped<Tracing::HttpTracerManagerImpl>(
+      SINGLETON_MANAGER_REGISTERED_NAME(http_tracer_manager), [&context] {
+        return std::make_shared<Tracing::HttpTracerManagerImpl>(
+            std::make_unique<Tracing::TracerFactoryContextImpl>(
+                context.getServerFactoryContext(), context.messageValidationVisitor()));
+      });
+
+  return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
+          http_tracer_manager};
 }
 
 std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
@@ -105,10 +115,11 @@ std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
         proto_config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
-    Config::ConfigProviderManager& scoped_routes_config_provider_manager) {
-  return std::make_shared<HttpConnectionManagerConfig>(proto_config, context, date_provider,
-                                                       route_config_provider_manager,
-                                                       scoped_routes_config_provider_manager);
+    Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+    Tracing::HttpTracerManager& http_tracer_manager) {
+  return std::make_shared<HttpConnectionManagerConfig>(
+      proto_config, context, date_provider, route_config_provider_manager,
+      scoped_routes_config_provider_manager, http_tracer_manager);
 }
 
 Network::FilterFactoryCb
@@ -118,9 +129,9 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     Server::Configuration::FactoryContext& context) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
-  auto filter_config = Utility::createConfig(proto_config, context, *singletons.date_provider_,
-                                             *singletons.route_config_provider_manager_,
-                                             *singletons.scoped_routes_config_provider_manager_);
+  auto filter_config = Utility::createConfig(
+      proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
@@ -151,7 +162,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
-    Config::ConfigProviderManager& scoped_routes_config_provider_manager)
+    Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+    Tracing::HttpTracerManager& http_tracer_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -278,6 +290,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_tracing()) {
+    http_tracer_ = http_tracer_manager.getOrCreateHttpTracer(getPerFilterTracerConfig(config));
+
     const auto& tracing_config = config.tracing();
 
     Tracing::OperationName tracing_operation_name;
@@ -381,10 +395,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
-    bool is_terminal = false;
-    processFilter(filters[i], i, "http", filter_factories_, is_terminal);
-    Config::Utility::validateTerminalFilters(filters[i].name(), "http", is_terminal,
-                                             i == filters.size() - 1);
+    processFilter(filters[i], i, "http", filter_factories_, "http", i == filters.size() - 1);
   }
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
@@ -398,11 +409,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
       for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
-        bool is_terminal = false;
-        processFilter(upgrade_config.filters(j), j, name, *factories, is_terminal);
-        Config::Utility::validateTerminalFilters(upgrade_config.filters(j).name(), "http upgrade",
-                                                 is_terminal,
-                                                 j == upgrade_config.filters().size() - 1);
+        processFilter(upgrade_config.filters(j), j, name, *factories, "http upgrade",
+                      j == upgrade_config.filters().size() - 1);
       }
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
@@ -418,7 +426,7 @@ void HttpConnectionManagerConfig::processFilter(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
         proto_config,
     int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories,
-    bool& is_terminal) {
+    const char* filter_chain_type, bool last_filter_in_current_config) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   ENVOY_LOG(debug, "      name: {}", proto_config.name());
   ENVOY_LOG(debug, "    config: {}",
@@ -437,7 +445,9 @@ void HttpConnectionManagerConfig::processFilter(
       proto_config, context_.messageValidationVisitor(), factory);
   Http::FilterFactoryCb callback =
       factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  is_terminal = factory.isTerminalFilter();
+  bool is_terminal = factory.isTerminalFilter();
+  Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
+                                           is_terminal, last_filter_in_current_config);
   filter_factories.push_back(callback);
 }
 
@@ -516,6 +526,22 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
 }
 
+/**
+ * Determines what tracing provider to use for a given
+ * "envoy.filters.network.http_connection_manager" filter instance.
+ */
+const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPerFilterTracerConfig(
+    const envoy::extensions::filters::network::http_connection_manager::v3::
+        HttpConnectionManager&) {
+  // At the moment, it is not yet possible to define tracing provider as part of
+  // "envoy.filters.network.http_connection_manager" config.
+  // Therefore, we always fallback to using the default server-wide tracing provider.
+  if (context_.httpContext().defaultTracingConfig().has_http()) {
+    return &context_.httpContext().defaultTracingConfig().http();
+  }
+  return nullptr;
+}
+
 std::function<Http::ApiListenerPtr()>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -524,9 +550,9 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
 
   Utility::Singletons singletons = Utility::createSingletons(context);
 
-  auto filter_config = Utility::createConfig(proto_config, context, *singletons.date_provider_,
-                                             *singletons.route_config_provider_manager_,
-                                             *singletons.scoped_routes_config_provider_manager_);
+  auto filter_config = Utility::createConfig(
+      proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.

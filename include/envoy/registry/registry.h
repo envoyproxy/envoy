@@ -337,13 +337,8 @@ public:
     auto it = deprecatedFactoryNames().find(name);
     const bool deprecated = it != deprecatedFactoryNames().end();
     if (deprecated) {
-      auto status = Extensions::Common::Utility::ExtensionNameUtil::deprecatedExtensionNameStatus();
-      if (status == Extensions::Common::Utility::ExtensionNameUtil::Status::Block) {
-        ENVOY_LOG(error, "{} is deprecated and disabled, use {} instead.", it->first, it->second);
-        return false;
-      }
-
-      ENVOY_LOG(warn, "{} is deprecated, use {} instead.", it->first, it->second);
+      return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
+          "", it->first, it->second);
     }
 
     return true;

@@ -36,8 +36,8 @@ or :ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not speci
 A few notes on how Envoy does retries:
 
 * The route timeout (set via :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` or the
-  :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` in route configuration or set via 
-  `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_  by specifying 
+  :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` in route configuration or set via
+  `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_  by specifying
   :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.timeout>` in route configuration) **includes** all
   retries. Thus if the request timeout is set to 3s, and the first request attempt takes 2.7s, the
   retry (including back-off) has .3s to complete. This is by design to avoid an exponential
@@ -232,8 +232,8 @@ x-envoy-upstream-rq-timeout-ms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Setting this header on egress requests will cause Envoy to override the :ref:`route configuration timeout
-<envoy_api_field_route.RouteAction.timeout>` or gRPC client timeout set via `grpc-timeout header 
-<https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_  by specifying :ref:`max_grpc_timeout 
+<envoy_api_field_route.RouteAction.timeout>` or gRPC client timeout set via `grpc-timeout header
+<https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_  by specifying :ref:`max_grpc_timeout
 <envoy_api_field_route.RouteAction.timeout>`. The timeout must be specified in millisecond
 units. See also :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`.
 
@@ -319,7 +319,13 @@ x-envoy-attempt-count
 
 Sent to the upstream to indicate which attempt the current request is in a series of retries. The value
 will be "1" on the initial request, incrementing by one for each retry. Only set if the
-:ref:`include_attempt_count_header <envoy_api_field_route.VirtualHost.include_request_attempt_count>`
+:ref:`include_request_attempt_count <envoy_api_field_route.VirtualHost.include_request_attempt_count>`
+flag is set to true.
+
+Sent to the downstream to indicate how many upstream requests took place. The header will be absent if
+the router did not send any upstream requests. The value will be "1" if only the original upstream
+request was sent, incrementing by one for each retry. Only set if the
+:ref:`include_attempt_count_in_response <envoy_api_field_route.VirtualHost.include_attempt_count_in_response>`
 flag is set to true.
 
 .. _config_http_filters_router_x-envoy-expected-rq-timeout-ms:
