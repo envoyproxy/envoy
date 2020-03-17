@@ -36,7 +36,9 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.grpc_json_transcoder",
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:http_body_utils_lib",
+        "//test/proto:bookstore_proto_cc_proto",
     ],
 )
 

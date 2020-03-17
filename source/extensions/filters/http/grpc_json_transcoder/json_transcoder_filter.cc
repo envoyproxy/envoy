@@ -16,7 +16,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
-#include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
+#include "extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
@@ -640,7 +640,7 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage() {
 
   Buffer::OwnedImpl message_payload;
   message_payload.move(request_prefix_);
-  HttpBodyUtils::createHttpBodyEnvelope(message_payload, method_->request_body_field_path,
+  HttpBodyUtils::appendHttpBodyEnvelope(message_payload, method_->request_body_field_path,
                                         std::move(content_type_), request_data_.length());
   content_type_.clear();
   message_payload.move(request_data_);

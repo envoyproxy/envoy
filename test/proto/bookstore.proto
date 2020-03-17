@@ -233,3 +233,17 @@ message EchoStructReqResp {
   // The content of request.
   google.protobuf.Struct content = 1;
 }
+
+// Test message for deeply-nested HttpBody field.
+message DeepNestedBody {
+  message Nested {
+    message Nested {
+      message Nested {
+        google.api.HttpBody body = 500000000;
+      }
+      Nested nested = 100000000;
+    }
+    Nested nested = 1000000;
+  }
+  Nested nested = 1;
+}

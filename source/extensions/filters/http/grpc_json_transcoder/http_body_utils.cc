@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
-void HttpBodyUtils::createHttpBodyEnvelope(
+void HttpBodyUtils::appendHttpBodyEnvelope(
     Buffer::Instance& output, const std::vector<const Protobuf::Field*>& request_body_field_path,
     std::string content_type, uint64_t content_length) {
   // Manually encode the protobuf envelope for the body.

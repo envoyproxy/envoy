@@ -14,7 +14,7 @@ namespace GrpcJsonTranscoder {
 class HttpBodyUtils {
 public:
   static void
-  createHttpBodyEnvelope(Buffer::Instance& output,
+  appendHttpBodyEnvelope(Buffer::Instance& output,
                          const std::vector<const Protobuf::Field*>& request_body_field_path,
                          std::string content_type, uint64_t content_length);
 };
