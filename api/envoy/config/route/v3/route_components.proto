@@ -159,6 +159,13 @@ message VirtualHost {
   // independently (e.g.: values are not inherited).
   RetryPolicy retry_policy = 16;
 
+  // [#not-implemented-hide:]
+  // Specifies the configuration for retry policy extension. Note that setting a route level entry
+  // will take precedence over this config and it'll be treated independently (e.g.: values are not
+  // inherited). :ref:`Retry policy <envoy_api_field_config.route.v3.VirtualHost.retry_policy>` should not be
+  // set if this field is used.
+  google.protobuf.Any retry_policy_typed_config = 19;
+
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
@@ -508,7 +515,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -872,6 +879,13 @@ message RouteAction {
   // it'll take precedence over the virtual host level retry policy entirely
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
+
+  // [#not-implemented-hide:]
+  // Specifies the configuration for retry policy extension. Note that if this is set, it'll take
+  // precedence over the virtual host level retry policy entirely (e.g.: policies are not merged,
+  // most internal one becomes the enforced policy). :ref:`Retry policy <envoy_api_field_config.route.v3.VirtualHost.retry_policy>`
+  // should not be set if this field is used.
+  google.protobuf.Any retry_policy_typed_config = 33;
 
   // Indicates that the route has request mirroring policies.
   repeated RequestMirrorPolicy request_mirror_policies = 30;
