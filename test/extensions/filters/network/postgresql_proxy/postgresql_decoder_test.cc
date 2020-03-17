@@ -27,11 +27,35 @@ class DecoderCallbacksMock : public DecoderCallbacks {
   MOCK_METHOD(void, incWarnings, (), (override));
 };
 
+// Test the Decoder::MessageImpl
+#if 0
+TEST(PostgreSQLMessageTest, Basic) {
+  MessageImpl msg("TestMsg", "Frontend");
+
+  ASSERT_THAT(msg.getDescr(), "TestMsg");
+  ASSERT_THAT(msg.getType(), "Frontend");
+
+  // create a function and add it to the message
+  MessageImpl::MsgAction action1 =  [](DecoderImpl*){};
+  msg.addAction(action1);
+  std::reference_wrapper<const std::vector<MessageImpl::MsgAction>> action_list = msg.getActions();
+  ASSERT_THAT(action1.target<MessageImpl::MsgAction>(), action_list.get().front().target<MessageImpl::MsgAction>());
+
+  // Add another action;
+  MessageImpl::MsgAction action2 = [](DecoderImpl*){};
+  msg.addAction(action2);
+  action_list = msg.getActions();
+  ASSERT_THAT(action_list.get().size(), 2);
+  ASSERT_THAT(action1.target<MessageImpl::MsgAction>(), action_list.get().front().target<MessageImpl::MsgAction>());
+  ASSERT_THAT(action2.target<MessageImpl::MsgAction>(), action_list.get().front().target<MessageImpl::MsgAction>());
+}
+#endif
 // Define fixture class witrh decoder and mock callbacks.
-class PostgreSQLProxyDecoderTest : public ::testing::Test {
+class PostgreSQLProxyDecoderTest : public ::testing::TestWithParam<std::string> {
 public:
   PostgreSQLProxyDecoderTest() {
     decoder_ = std::make_unique<DecoderImpl>(&callbacks_);
+    decoder_->initialize();
     decoder_->setInitial(false);
   }
 protected:
@@ -150,33 +174,35 @@ TEST_F(PostgreSQLProxyDecoderTest, TwoMessagesInOneBuffer) {
   ASSERT_THAT(data.length(), 0);
 }
 
-TEST_F(PostgreSQLProxyDecoderTest, DISABLED_FrontendBasic)
+TEST_F(PostgreSQLProxyDecoderTest, Unrecognized)
 {
-	// Create postgresql payload and feed it to decoder.
-	EXPECT_CALL(callbacks_, incUnrecognized())
+  // Create invalid message. The first byte is invalid "="
+  // Message must be at least 5 bytes to be parsed.
+  EXPECT_CALL(callbacks_, incUnrecognized())
 		.Times(1);
-	data.add("lalalalal");
+	data.add("=");
+  length_ = htonl(50);
+  data.add(&length_, sizeof(length_));
+  data.add(buf_, 46);
 	decoder_->onData(data);
-	data.drain(data.length());
-
-	EXPECT_CALL(callbacks_, incFrontend())
-		.Times(1);
-	data.add("P blah");
-	decoder_->onData(data);
-	data.drain(data.length());
-
-	EXPECT_CALL(callbacks_, incFrontend())
-		.Times(1);
-	data.add("Q blah");
-	decoder_->onData(data);
-	data.drain(data.length());
-
-	EXPECT_CALL(callbacks_, incFrontend())
-		.Times(1);
-	data.add("B blah");
-	decoder_->onData(data);
-	data.drain(data.length());
 }
+
+TEST_P(PostgreSQLProxyDecoderTest, FrontEnd) {
+	EXPECT_CALL(callbacks_, incFrontend())
+		.Times(1);
+	data.add(GetParam());
+  length_ = htonl(50);
+  data.add(&length_, sizeof(length_));
+  data.add(buf_, 46);
+	decoder_->onData(data);
+}
+
+
+INSTANTIATE_TEST_CASE_P(
+  FrontEndMessagesTests,
+  PostgreSQLProxyDecoderTest,
+  ::testing::Values("P", "Q", "B")
+  );
 
 } // namespace PostgreSQLProxy
 } // namespace NetworkFilters
