@@ -105,7 +105,6 @@ int TestRunner::RunTests(int argc, char** argv) {
     listeners.Append(new RuntimeManagingListener(runtime_override));
   }
 
-
 #ifdef ENVOY_CONFIG_COVERAGE
   // Coverage tests are run with -l trace --log-path /dev/null, in order to
   // ensure that all of the code-paths from the maximum level of tracing are
