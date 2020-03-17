@@ -91,19 +91,18 @@ void HotRestartingChild::sendParentTerminateRequest() {
 
 void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
-  using StatMerger = Stats::StatMerger;
   if (!stat_merger_) {
-    stat_merger_ = std::make_unique<StatMerger>(stats_store);
+    stat_merger_ = std::make_unique<Stats::StatMerger>(stats_store);
   }
 
   // Convert the protobuf for serialized dynamic spans into the structure
   // required by StatMerger.
-  StatMerger::DynamicsMap dynamics;
+  Stats::StatMerger::DynamicsMap dynamics;
   for (auto iter : stats_proto.dynamics()) {
-    StatMerger::DynamicSpans& spans = dynamics[iter.first];
+    Stats::DynamicSpans& spans = dynamics[iter.first];
     for (int i = 0; i < iter.second.spans_size(); ++i) {
       const HotRestartMessage::Reply::Span& span_proto = iter.second.spans(i);
-      spans.push_back(StatMerger::DynamicSpan(span_proto.first(), span_proto.last()));
+      spans.push_back(Stats::DynamicSpan(span_proto.first(), span_proto.last()));
     }
   }
   stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics);
