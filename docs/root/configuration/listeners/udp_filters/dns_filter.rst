@@ -41,18 +41,18 @@ Example Configuration
           virtual_domains:
             - name: "www.domain1.com"
               endpoint:
-                addresslist:
+                address_list:
                   address:
                     - 10.0.0.1
                     - 10.0.0.2
             - name: "www.domain2.com"
               endpoint:
-                addresslist:
+                address_list:
                   address:
                     - 2001:8a:c1::2800:7
             - name: "www.domain3.com"
               endpoint:
-                addresslist:
+                address_list:
                   address:
                     - 10.0.3.1
 
