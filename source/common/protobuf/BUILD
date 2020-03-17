@@ -34,8 +34,8 @@ envoy_cc_library(
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
+        "//source/common/common:logger_lib",
         "//source/common/common:macros",
-        "//source/common/common:minimal_logger_lib",
     ],
 )
 
