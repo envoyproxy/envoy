@@ -9,23 +9,17 @@ AsyncClientRequestTracker::~AsyncClientRequestTracker() {
   }
 }
 
-void AsyncClientRequestTracker::add(AsyncClient::Request* request) {
-  // Let client code to avoid conditionals.
-  if (request) {
-    ASSERT(active_requests_.find(request) == active_requests_.end());
-    active_requests_.insert(request);
-  }
+void AsyncClientRequestTracker::add(AsyncClient::Request& request) {
+  ASSERT(active_requests_.find(&request) == active_requests_.end());
+  active_requests_.insert(&request);
 }
 
-void AsyncClientRequestTracker::remove(const AsyncClient::Request* request) {
-  // Let client code to avoid conditionals.
-  if (request) {
-    auto it = active_requests_.find(const_cast<AsyncClient::Request*>(request));
-    // Support a use case where request callbacks might get called prior to a request handle
-    // is returned from AsyncClient::send().
-    if (it != active_requests_.end()) {
-      active_requests_.erase(it);
-    }
+void AsyncClientRequestTracker::remove(const AsyncClient::Request& request) {
+  auto it = active_requests_.find(const_cast<AsyncClient::Request*>(&request));
+  // Support a use case where request callbacks might get called prior to a request handle
+  // is returned from AsyncClient::send().
+  if (it != active_requests_.end()) {
+    active_requests_.erase(it);
   }
 }
 
