@@ -11,10 +11,11 @@ namespace NetworkFilters {
 namespace PostgreSQLProxy {
 
 using ::testing::WithArg;
+using ::testing::WithArgs;
 
 class DecoderTest : public Decoder {
 public:
-  MOCK_METHOD(bool, onData, (Buffer::Instance&), (override));
+  MOCK_METHOD(bool, onData, (Buffer::Instance&, bool), (override));
   MOCK_METHOD(void, onFrontendData, (Buffer::Instance&), (override));
   MOCK_METHOD(PostgreSQLSession&,  getSession, (), (override));
 };
@@ -51,14 +52,14 @@ TEST_P(PostgreSQLFilterTest, readData) {
 
   // Simulate reading entire buffer.
   EXPECT_CALL(*(reinterpret_cast<DecoderTest*>(filter_->getDecoder())), onData).
-		  WillOnce(WithArg<0>(Invoke([](Buffer::Instance& data)->bool {data.drain(data.length());return true;})));
+		  WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool)->bool {data.drain(data.length());return true;})));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
 
   // Simulate reading entire data in two steps
   EXPECT_CALL(*(reinterpret_cast<DecoderTest*>(filter_->getDecoder())), onData)
-		  .WillOnce(WithArg<0>(Invoke([](Buffer::Instance& data)->bool {data.drain(100); return true;})))
-		  .WillOnce(WithArg<0>(Invoke([](Buffer::Instance& data)->bool {data.drain(156); return true;})));
+		  .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool)->bool {data.drain(100); return true;})))
+		  .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool)->bool {data.drain(156); return true;})));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
 
@@ -66,9 +67,9 @@ TEST_P(PostgreSQLFilterTest, readData) {
   // for the third one there was not enough data. There should be 56 bytes 
   // of unprocessed data.
   EXPECT_CALL(*(reinterpret_cast<DecoderTest*>(filter_->getDecoder())), onData)
-		  .WillOnce(WithArg<0>(Invoke([](Buffer::Instance& data)->bool {data.drain(100); return true;})))
-		  .WillOnce(WithArg<0>(Invoke([](Buffer::Instance& data)->bool {data.drain(100); return true;})))
-		  .WillOnce(WithArg<0>(Invoke([](Buffer::Instance& data)->bool {data.drain(0); return false;})));
+		  .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool)->bool {data.drain(100); return true;})))
+		  .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool)->bool {data.drain(100); return true;})))
+		  .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool)->bool {data.drain(0); return false;})));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 56);
 }
