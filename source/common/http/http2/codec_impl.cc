@@ -959,7 +959,7 @@ void ConnectionImpl::sendSettings(
   const bool result =
       insertParameter({NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()});
   if (!result) {
-    ENVOY_CONN_LOG(warn,
+    ENVOY_CONN_LOG(debug,
                    "the named allow_connect SETTINGS parameter is being overridden by a custom "
                    "parameter with value {}",
                    connection_, http2_options.allow_connect());
