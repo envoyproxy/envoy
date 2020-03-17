@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package envoy.api.v2.core;
+package envoy.config.core.v3;
 
-import "udpa/annotations/migrate.proto";
+import "udpa/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.api.v2.core";
+option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "SocketOptionProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 
 // [#protodoc-title: Socket Option ]
 
@@ -16,6 +16,8 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 // might not exist in upstream kernels or precompiled Envoy binaries.
 // [#next-free-field: 7]
 message SocketOption {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.SocketOption";
+
   enum SocketState {
     // Socket options are applied after socket creation but before binding the socket to a port
     STATE_PREBIND = 0;
