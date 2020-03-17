@@ -2,9 +2,6 @@
 
 set -e
 
-shopt -s expand_aliases
-alias bash='/usr/local/bin/bash'
-
 if [[ $# -gt 0 ]]; then
   FUZZ_TARGETS=$*
 else
@@ -26,17 +23,21 @@ TEMP_CORPORA=""
 
 for t in ${FUZZ_TARGETS}
 do
+  # Make a temporary corpus for this fuzz target.
+  TARGET_BINARY="${t/://}"
+  TEMP_CORPUS_PATH=${TARGET_BINARY:2}
+  CORPUS_DIR="/tmp/${TEMP_CORPUS_PATH////_}_corpus"
+  mkdir -v ${CORPUS_DIR}
   # Get the original corpus for the fuzz target
   CORPUS_LOCATION="$(bazel query "labels(data, ${t})" | head -1)"
   ORIGINAL_CORPUS="$(bazel query "labels(srcs, ${CORPUS_LOCATION})" | head -1)"
   ORIGINAL_CORPUS=${ORIGINAL_CORPUS/://}
   ORIGINAL_CORPUS="$(dirname ${ORIGINAL_CORPUS})"
-  # Create temp directory in target's corpus
-  CORPUS_DIR="$(mktemp -d -p $(pwd)/${ORIGINAL_CORPUS:2})"
+  # Copy entries in original corpus into temp.
+  cp -r "$(pwd)"${ORIGINAL_CORPUS:1} ${CORPUS_DIR}
   TEMP_CORPORA+="${CORPUS_DIR} "
   # Run fuzzing process.
-  TARGET_BINARY="${t/://}"
-  bazel-bin/${TARGET_BINARY:2}_with_libfuzzer -max_total_time=60 ${CORPUS_DIR} $(pwd)${ORIGINAL_CORPUS:1} &
+  bazel-bin/${TARGET_BINARY:2}_with_libfuzzer -max_total_time=60 ${CORPUS_DIR} &
   # Add pid to pids list
   pids="$pids $!"
 done

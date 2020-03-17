@@ -42,6 +42,7 @@ fi
 BAZEL_TARGET=//test/coverage:coverage_tests && [[ FUZZ_COVERAGE ]] && BAZEL_TARGET=${COVERAGE_TARGETS}
 
 # Using GTEST_SHUFFLE here to workaround https://github.com/envoyproxy/envoy/issues/10108
+# Add binaries to OBJECTS to pass in to llvm-cov
 OBJECTS=""
 for t in ${BAZEL_TARGET}
 do
@@ -51,14 +52,10 @@ do
     TEST_ARGS="--test_arg=--log-path /dev/null --test_arg=-l trace"
     OBJECTS="bazel-bin/test/coverage/coverage_tests"
   else
-    # If this is a fuzz target, set args to be the corpus.
-    CORPUS_LOCATION="$(bazel query "labels(data, ${t})" | head -1)"
-    ORIGINAL_CORPUS="$(bazel query "labels(srcs, ${CORPUS_LOCATION})" | head -1)"
-    ORIGINAL_CORPUS=${ORIGINAL_CORPUS/://}
-    ORIGINAL_CORPUS="$(dirname ${ORIGINAL_CORPUS})"
-    TEST_ARGS="--test_arg=$(pwd)${ORIGINAL_CORPUS} --test_arg=-runs=0"
-    # Add to OBJECTS to pass in to llvm-cov
+    # If this is a fuzz target, set args to be the temp corpus.
     TARGET_BINARY="${t/://}"
+    CORPUS_LOCATION=${TAGET_BINARY:2}
+    TEST_ARGS="--test_arg=/tmp/${CORPUS_LOCATION///_}_corpus --test_arg=-runs=0"
     if [[ -z $OBJECTS ]]; then
       # The first object needs to be passed without -object= flag.
       OBJECTS="bazel-bin/${TARGET_BINARY:2}_with_libfuzzer"
@@ -76,7 +73,7 @@ done
 
 for corpus in ${TEMP_CORPORA}
 do
-  rm -rf $corpus
+  rm -rf "${corpus}"
 done
 
 COVERAGE_DIR="${SRCDIR}"/generated/coverage
@@ -112,5 +109,3 @@ then
   fi
 fi
 echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"
-
-
