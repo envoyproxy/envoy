@@ -333,7 +333,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   if (filter_chain == nullptr) {
     ENVOY_LOG(debug, "closing connection: no matching filter chain found");
     stats_.no_filter_chain_match_.inc();
-    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
     stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     stream_info->onRequestComplete();
     for (const auto& access_log : config_.accessLogs()) {

@@ -234,6 +234,6 @@ message Listener {
   bool reuse_port = 21;
 
   // Configuration for :ref:`access logs <arch_overview_access_logs>`
-  // emitted by the this listener.
+  // emitted by this listener.
   repeated accesslog.v3.AccessLog access_log = 22;
 }

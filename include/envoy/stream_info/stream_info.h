@@ -137,8 +137,6 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
-  // The downstream connection was rejected because no filter chain matched it.
-  const std::string FilterChainNotFound = "filter_chain_not_found";
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
