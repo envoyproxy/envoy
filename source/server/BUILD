@@ -12,6 +12,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "backtrace_lib",
+    srcs = ["backtrace.cc"],
     hdrs = ["backtrace.h"],
     external_deps = [
         "abseil_stacktrace",
@@ -48,7 +49,6 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
@@ -163,6 +163,8 @@ envoy_cc_library(
         ":hot_restarting_base",
         ":listener_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/stats:stat_merger_lib",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 
@@ -320,6 +322,7 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
+        "//source/common/init:target_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",

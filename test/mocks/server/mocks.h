@@ -20,6 +20,7 @@
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/server/overload_manager.h"
+#include "envoy/server/tracer_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
@@ -156,7 +157,7 @@ public:
                Stats::ScopePtr&& listener_scope));
   MOCK_METHOD(Http::Code, request,
               (absl::string_view path_and_query, absl::string_view method,
-               Http::HeaderMap& response_headers, std::string& body));
+               Http::ResponseHeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
 
   NiceMock<MockConfigTracker> config_tracker_;
@@ -170,7 +171,7 @@ public:
   MOCK_METHOD(void, setEndStreamOnComplete, (bool));
   MOCK_METHOD(void, addOnDestroyCallback, (std::function<void()>));
   MOCK_METHOD(const Buffer::Instance*, getRequestBody, (), (const));
-  MOCK_METHOD(Http::HeaderMap&, getRequestHeaders, (), (const));
+  MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const));
   MOCK_METHOD(NiceMock<Http::MockStreamDecoderFilterCallbacks>&, getDecoderFilterCallbacks, (),
               (const));
 };
@@ -406,9 +407,14 @@ public:
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
+  MOCK_METHOD(void, flushStats, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
+
+  void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
+    http_context_.setDefaultTracingConfig(tracing_config);
+  }
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -454,7 +460,6 @@ public:
   ~MockMain() override;
 
   MOCK_METHOD(Upstream::ClusterManager*, clusterManager, ());
-  MOCK_METHOD(Tracing::HttpTracer&, httpTracer, ());
   MOCK_METHOD(std::list<Stats::SinkPtr>&, statsSinks, ());
   MOCK_METHOD(std::chrono::milliseconds, statsFlushInterval, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, wdMissTimeout, (), (const));
@@ -485,8 +490,10 @@ public:
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  Grpc::Context& grpcContext() override { return grpc_context_; }
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -496,10 +503,12 @@ public:
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Api::MockApi> api_;
+  Grpc::ContextImpl grpc_context_;
 };
 
 class MockFactoryContext : public virtual FactoryContext {
@@ -514,7 +523,6 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(bool, healthCheckFailed, ());
-  MOCK_METHOD(Tracing::HttpTracer&, httpTracer, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
   MOCK_METHOD(Envoy::Runtime::RandomGenerator&, random, ());
@@ -533,14 +541,15 @@ public:
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 
+  testing::NiceMock<MockServerFactoryContext> server_factory_context_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
-  testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -552,6 +561,7 @@ public:
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
+  testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
@@ -624,6 +634,17 @@ class MockFilterChainFactoryContext : public MockFactoryContext, public FilterCh
 public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
+};
+
+class MockTracerFactoryContext : public TracerFactoryContext {
+public:
+  MockTracerFactoryContext();
+  ~MockTracerFactoryContext() override;
+
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
+
+  testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
 };
 
 } // namespace Configuration

@@ -105,8 +105,8 @@ envoy_cc_library(
     hdrs = ["context_impl.h"],
     deps = [
         ":codes_lib",
+        ":user_agent_lib",
         "//include/envoy/http:context_interface",
-        "//source/common/tracing:http_tracer_lib",
     ],
 )
 
@@ -318,6 +318,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/stats:timespan_interface",
+        "//source/common/stats:symbol_table_lib",
     ],
 )
 

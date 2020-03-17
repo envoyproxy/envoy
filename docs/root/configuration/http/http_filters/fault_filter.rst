@@ -25,7 +25,7 @@ Configuration
   including the router filter.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>`
-* This filter should be configured with the name *envoy.fault*.
+* This filter should be configured with the name *envoy.filters.http.fault*.
 
 .. _config_http_filters_fault_injection_http_header:
 
@@ -36,10 +36,18 @@ The fault filter has the capability to allow fault configuration to be specified
 This is useful in certain scenarios in which it is desired to allow the client to specify its own
 fault configuration. The currently supported header controls are:
 
+* Request abort configuration via the *x-envoy-fault-abort-request* header. The header value
+  should be an integer that specifies the HTTP status code to return in response to a request
+  and must be in the range [200, 600). In order for the header to work, :ref:`header_abort
+  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set.
 * Request delay configuration via the *x-envoy-fault-delay-request* header. The header value
   should be an integer that specifies the number of milliseconds to throttle the latency for.
+  In order for the header to work, :ref:`header_delay
+  <envoy_api_field_config.filter.fault.v2.FaultDelay.header_delay>` needs to be set.
 * Response rate limit configuration via the *x-envoy-fault-throughput-response* header. The
-  header value should be an integer that specified the limit in KiB/s and must be > 0.
+  header value should be an integer that specifies the limit in KiB/s and must be > 0. In order
+  for the header to work, :ref:`header_limit
+  <envoy_api_field_config.filter.fault.v2.FaultRateLimit.header_limit>` needs to be set.
 
 .. attention::
 
@@ -53,10 +61,14 @@ options:
 
 .. code-block:: yaml
 
-  name: envoy.fault
+  name: envoy.filters.http.fault
   typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
     max_active_faults: 100
+    abort:
+      header_abort: {}
+      percentage:
+        numerator: 100
     delay:
       header_delay: {}
       percentage:

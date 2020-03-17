@@ -72,7 +72,8 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   return true;
 }
 
-void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
+void Utility::appendXff(RequestHeaderMap& headers,
+                        const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
     return;
   }
@@ -80,14 +81,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
   headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
 }
 
-void Utility::appendVia(HeaderMap& headers, const std::string& via) {
+void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& via) {
   // TODO(asraa): Investigate whether it is necessary to append with whitespace here by:
   //     (a) Validating we do not expect whitespace in via headers
   //     (b) Add runtime guarding in case users have upstreams which expect it.
   headers.appendVia(via, ", ");
 }
 
-std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
+std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());
   return fmt::format("https://{}{}", headers.Host()->value().getStringView(),
@@ -211,7 +212,7 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   return cookie_value;
 }
 
-uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
+uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.Status()->value().getStringView(), &response_code)) {
@@ -220,7 +221,7 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   return response_code;
 }
 
-bool Utility::isUpgrade(const HeaderMap& headers) {
+bool Utility::isUpgrade(const RequestOrResponseHeaderMap& headers) {
   // In firefox the "Connection" request header value is "keep-alive, Upgrade",
   // we should check if it contains the "Upgrade" token.
   return (headers.Connection() && headers.Upgrade() &&
@@ -228,13 +229,13 @@ bool Utility::isUpgrade(const HeaderMap& headers) {
                                            Http::Headers::get().ConnectionValues.Upgrade.c_str()));
 }
 
-bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
+bool Utility::isH2UpgradeRequest(const RequestHeaderMap& headers) {
   return headers.Method() &&
          headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect &&
          headers.Protocol() && !headers.Protocol()->value().empty();
 }
 
-bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.Upgrade()->value().getStringView(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
@@ -351,7 +352,8 @@ void Utility::sendLocalReply(
 }
 
 Utility::GetLastAddressFromXffInfo
-Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t num_to_skip) {
+Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
+                               uint32_t num_to_skip) {
   const auto xff_header = request_headers.ForwardedFor();
   if (xff_header == nullptr) {
     return {nullptr, false};
@@ -391,7 +393,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 }
 
-bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
+bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
   static const size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
   static const size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
 
@@ -600,7 +602,7 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
+void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {
   ASSERT(Utility::isUpgrade(headers));
 
   const HeaderString& upgrade = headers.Upgrade()->value();
@@ -616,7 +618,7 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
   }
 }
 
-void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
+void Utility::transformUpgradeResponseFromH1toH2(ResponseHeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
     headers.setStatus(200);
   }
@@ -628,7 +630,7 @@ void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   }
 }
 
-void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
+void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
   const HeaderString& protocol = headers.Protocol()->value();
@@ -638,7 +640,8 @@ void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
   headers.removeProtocol();
 }
 
-void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
+void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
+                                                 absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
     headers.setUpgrade(upgrade);
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
@@ -780,7 +783,8 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
     // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
     // now, just do all the trimming here, but in the future we should consider whether we can
     // have unified [] handling as low as possible in the stack.
-    if (potential_ip_address.front() == '[' && potential_ip_address.back() == ']') {
+    if (!potential_ip_address.empty() && potential_ip_address.front() == '[' &&
+        potential_ip_address.back() == ']') {
       potential_ip_address.remove_prefix(1);
       potential_ip_address.remove_suffix(1);
     }

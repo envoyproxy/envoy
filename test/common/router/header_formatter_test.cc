@@ -480,7 +480,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
 
   // Prove we're testing the expected types.
   const auto& nested_struct =
-      Envoy::Config::Metadata::metadataValue(*metadata, "namespace", "nested").struct_value();
+      Envoy::Config::Metadata::metadataValue(metadata.get(), "namespace", "nested").struct_value();
   EXPECT_EQ(nested_struct.fields().at("str_key").kind_case(), ProtobufWkt::Value::kStringValue);
   EXPECT_EQ(nested_struct.fields().at("bool_key1").kind_case(), ProtobufWkt::Value::kBoolValue);
   EXPECT_EQ(nested_struct.fields().at("bool_key2").kind_case(), ProtobufWkt::Value::kBoolValue);
@@ -825,7 +825,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
 
-  Http::HeaderMapImpl request_headers;
+  Http::RequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
   ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
 

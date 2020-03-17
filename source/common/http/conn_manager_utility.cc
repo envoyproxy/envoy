@@ -57,8 +57,9 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 }
 
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
-    HeaderMap& request_headers, Network::Connection& connection, ConnectionManagerConfig& config,
-    const Router::Config& route_config, const LocalInfo::LocalInfo& local_info) {
+    RequestHeaderMap& request_headers, Network::Connection& connection,
+    ConnectionManagerConfig& config, const Router::Config& route_config,
+    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (Utility::isUpgrade(request_headers)) {
@@ -231,7 +232,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   return final_remote_address;
 }
 
-void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_headers,
+void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& request_headers,
                                                           Runtime::Loader& runtime,
                                                           ConnectionManagerConfig& config,
                                                           const Router::Route* route) {
@@ -279,7 +280,7 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
   }
 }
 
-void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_headers,
+void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request_headers,
                                                        Network::Connection& connection,
                                                        ConnectionManagerConfig& config) {
   // When AlwaysForwardOnly is set, always forward the XFCC header without modification.
@@ -365,8 +366,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers,
-                                                     const HeaderMap* request_headers,
+void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
+                                                     const RequestHeaderMap* request_headers,
                                                      const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
@@ -398,8 +399,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
   }
 }
 
-/* static */
-bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
+bool ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                                   const ConnectionManagerConfig& config) {
   ASSERT(request_headers.Path());
   bool is_valid_path = true;

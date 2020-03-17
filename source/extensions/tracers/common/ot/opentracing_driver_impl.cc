@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-#include "envoy/stats/store.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
@@ -36,7 +36,7 @@ private:
 
 class OpenTracingHTTPHeadersReader : public opentracing::HTTPHeadersReader {
 public:
-  explicit OpenTracingHTTPHeadersReader(const Http::HeaderMap& request_headers)
+  explicit OpenTracingHTTPHeadersReader(const Http::RequestHeaderMap& request_headers)
       : request_headers_(request_headers) {}
 
   using OpenTracingCb = std::function<opentracing::expected<void>(opentracing::string_view,
@@ -66,7 +66,7 @@ public:
   }
 
 private:
-  const Http::HeaderMap& request_headers_;
+  const Http::RequestHeaderMap& request_headers_;
 
   static Http::HeaderMap::Iterate headerMapCallback(const Http::HeaderEntry& header,
                                                     void* context) {
@@ -104,7 +104,7 @@ void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
   finish_options_.log_records.emplace_back(std::move(record));
 }
 
-void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
+void OpenTracingSpan::injectContext(Http::RequestHeaderMap& request_headers) {
   if (driver_.propagationMode() == OpenTracingDriver::PropagationMode::SingleHeader) {
     // Inject the span context using Envoy's single-header format.
     std::ostringstream oss;
@@ -143,11 +143,11 @@ Tracing::SpanPtr OpenTracingSpan::spawnChild(const Tracing::Config&, const std::
   return Tracing::SpanPtr{new OpenTracingSpan{driver_, std::move(ot_span)}};
 }
 
-OpenTracingDriver::OpenTracingDriver(Stats::Store& stats)
-    : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.opentracing."))} {}
+OpenTracingDriver::OpenTracingDriver(Stats::Scope& scope)
+    : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.opentracing."))} {}
 
 Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
-                                              Http::HeaderMap& request_headers,
+                                              Http::RequestHeaderMap& request_headers,
                                               const std::string& operation_name,
                                               SystemTime start_time,
                                               const Tracing::Decision tracing_decision) {

@@ -207,9 +207,11 @@ public:
     return upstream_transport_failure_reason_;
   }
 
-  void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
+  void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
+    request_headers_ = &headers;
+  }
 
-  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
+  const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
   void setRequestIDUtils(RequestIDUtils::UtilitiesSharedPtr utils) override {
     request_id_utils_ = utils;
@@ -254,7 +256,7 @@ public:
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
-  const Http::HeaderMap* request_headers_{};
+  const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
   RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
 };

@@ -55,9 +55,9 @@ public:
 private:
   friend class GrpcWebFilterTest;
 
-  void chargeStat(const Http::HeaderMap& headers);
-  void setupStatTracking(const Http::HeaderMap& headers);
-  bool isGrpcWebRequest(const Http::HeaderMap& headers);
+  void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
+  void setupStatTracking(const Http::RequestHeaderMap& headers);
+  bool isGrpcWebRequest(const Http::RequestHeaderMap& headers);
 
   static const uint8_t GRPC_WEB_TRAILER;
   const absl::flat_hash_set<std::string>& gRpcWebContentTypes() const;

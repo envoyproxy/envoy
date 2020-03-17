@@ -412,7 +412,7 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  Http::TestHeaderMapImpl header_map{};
+  Http::TestRequestHeaderMapImpl header_map{};
   stream_info_.health_check_request_ = true;
   EXPECT_CALL(*file_, write(_)).Times(0);
 
@@ -431,7 +431,7 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  Http::TestHeaderMapImpl header_map{};
+  Http::TestRequestHeaderMapImpl header_map{};
   EXPECT_CALL(*file_, write(_));
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -452,7 +452,7 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   {
-    Http::TestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
+    Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", random.uuid()}};
     stream_info_.getRequestIDUtils()->setTraceStatus(forced_header,
                                                      RequestIDUtils::TraceStatus::Forced);
     EXPECT_CALL(*file_, write(_));
@@ -460,13 +460,13 @@ typed_config:
   }
 
   {
-    Http::TestHeaderMapImpl not_traceable{{"x-request-id", random.uuid()}};
+    Http::TestRequestHeaderMapImpl not_traceable{{"x-request-id", random.uuid()}};
     EXPECT_CALL(*file_, write(_)).Times(0);
     log->log(&not_traceable, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
-    Http::TestHeaderMapImpl sampled_header{{"x-request-id", random.uuid()}};
+    Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", random.uuid()}};
     stream_info_.getRequestIDUtils()->setTraceStatus(sampled_header,
                                                      RequestIDUtils::TraceStatus::Sampled);
     EXPECT_CALL(*file_, write(_)).Times(0);
@@ -529,14 +529,14 @@ typed_config:
 
   {
     EXPECT_CALL(*file_, write(_));
-    Http::TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
+    Http::TestRequestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    Http::TestHeaderMapImpl header_map{};
+    Http::TestRequestHeaderMapImpl header_map{};
     stream_info_.health_check_request_ = true;
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
@@ -565,14 +565,14 @@ typed_config:
 
   {
     EXPECT_CALL(*file_, write(_));
-    Http::TestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
+    Http::TestRequestHeaderMapImpl header_map{{"user-agent", "NOT/Envoy/HC"}};
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_));
-    Http::TestHeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
+    Http::TestRequestHeaderMapImpl header_map{{"user-agent", "Envoy/HC"}};
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 }
@@ -608,14 +608,14 @@ typed_config:
 
   {
     EXPECT_CALL(*file_, write(_));
-    Http::TestHeaderMapImpl header_map{};
+    Http::TestRequestHeaderMapImpl header_map{};
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
   }
 
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
-    Http::TestHeaderMapImpl header_map{};
+    Http::TestRequestHeaderMapImpl header_map{};
     stream_info_.health_check_request_ = true;
 
     log->log(&header_map, &response_headers_, &response_trailers_, stream_info_);
@@ -1273,15 +1273,15 @@ typed_config:
 }
 
 /**
- * Sample extension filter which allows every sample_rate-th request.
+ * Sample extension filter which allows every 1 of every `sample_rate` log attempts.
  */
 class SampleExtensionFilter : public Filter {
 public:
   SampleExtensionFilter(uint32_t sample_rate) : sample_rate_(sample_rate) {}
 
   // AccessLog::Filter
-  bool evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMap&, const Http::HeaderMap&,
-                const Http::HeaderMap&) override {
+  bool evaluate(const StreamInfo::StreamInfo&, const Http::RequestHeaderMap&,
+                const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) override {
     if (current_++ == 0) {
       return true;
     }

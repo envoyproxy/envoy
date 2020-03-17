@@ -12,9 +12,9 @@ namespace Common {
 namespace Expr {
 
 ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
-                               const Http::HeaderMap* request_headers,
-                               const Http::HeaderMap* response_headers,
-                               const Http::HeaderMap* response_trailers) {
+                               const Http::RequestHeaderMap* request_headers,
+                               const Http::ResponseHeaderMap* response_headers,
+                               const Http::ResponseTrailerMap* response_trailers) {
   auto activation = std::make_unique<Activation>();
   activation->InsertValueProducer(Request, std::make_unique<RequestWrapper>(request_headers, info));
   activation->InsertValueProducer(
@@ -67,9 +67,9 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena,
                                   const StreamInfo::StreamInfo& info,
-                                  const Http::HeaderMap* request_headers,
-                                  const Http::HeaderMap* response_headers,
-                                  const Http::HeaderMap* response_trailers) {
+                                  const Http::RequestHeaderMap* request_headers,
+                                  const Http::ResponseHeaderMap* response_headers,
+                                  const Http::ResponseTrailerMap* response_trailers) {
   auto activation = createActivation(info, request_headers, response_headers, response_trailers);
   auto eval_status = expr.Evaluate(*activation.get(), arena);
   if (!eval_status.ok()) {
@@ -80,7 +80,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::HeaderMap& headers) {
+             const Http::RequestHeaderMap& headers) {
   Protobuf::Arena arena;
   auto eval_status = Expr::evaluate(expr, &arena, info, &headers, nullptr, nullptr);
   if (!eval_status.has_value()) {

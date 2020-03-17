@@ -174,7 +174,7 @@ public:
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(void, addDecodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectDecodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(HeaderMap&, addDecodedTrailers, ());
+  MOCK_METHOD(RequestTrailerMap&, addDecodedTrailers, ());
   MOCK_METHOD(MetadataMapVector&, addDecodedMetadata, ());
   MOCK_METHOD(const Buffer::Instance*, decodingBuffer, ());
   MOCK_METHOD(void, modifyDecodingBuffer, (std::function<void(Buffer::Instance&)>));
@@ -228,7 +228,7 @@ public:
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(HeaderMap&, addEncodedTrailers, ());
+  MOCK_METHOD(ResponseTrailerMap&, addEncodedTrailers, ());
   MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr &&));
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());

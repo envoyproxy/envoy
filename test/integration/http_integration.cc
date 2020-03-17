@@ -331,8 +331,8 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
 }
 
 void HttpIntegrationTest::sendRequestAndVerifyResponse(
-    const Http::TestHeaderMapImpl& request_headers, const int request_size,
-    const Http::TestHeaderMapImpl& response_headers, const int response_size,
+    const Http::TestRequestHeaderMapImpl& request_headers, const int request_size,
+    const Http::TestResponseHeaderMapImpl& response_headers, const int response_size,
     const int backend_idx) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
@@ -346,13 +346,13 @@ void HttpIntegrationTest::sendRequestAndVerifyResponse(
 
 void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
                                          const std::string& response_code,
-                                         const Http::TestHeaderMapImpl& expected_headers,
+                                         const Http::TestResponseHeaderMapImpl& expected_headers,
                                          const std::string& expected_body) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response_code, response->headers().Status()->value().getStringView());
   expected_headers.iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        auto response_headers = static_cast<Http::HeaderMap*>(context);
+        auto response_headers = static_cast<Http::ResponseHeaderMap*>(context);
         const Http::HeaderEntry* entry =
             response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
         EXPECT_NE(entry, nullptr);
@@ -667,6 +667,7 @@ void HttpIntegrationTest::testRetry() {
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
+  host.set_include_attempt_count_in_response(true);
   config_helper_.addVirtualHost(host);
 
   initialize();
@@ -708,6 +709,9 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
+  EXPECT_EQ(
+      2,
+      atoi(std::string(response->headers().EnvoyAttemptCount()->value().getStringView()).c_str()));
 }
 
 void HttpIntegrationTest::testGrpcRetry() {
@@ -811,7 +815,7 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
                                                        bool with_encoder_filter) {
   if (with_encoder_filter) {
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
-    config_helper_.addFilter("name: envoy.cors");
+    config_helper_.addFilter("name: envoy.filters.http.cors");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
@@ -1022,18 +1026,21 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
             max_request_headers_count_);
       });
 
-  Http::TestRequestHeaderMapImpl big_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto big_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
+      {{Http::Headers::get().Method, "GET"},
+       {Http::Headers::get().Path, "/test/long/url"},
+       {Http::Headers::get().Scheme, "http"},
+       {Http::Headers::get().Host, "host"}});
 
   for (int i = 0; i < 20000; i++) {
-    big_headers.addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
+    big_headers->addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
   }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response =
-      sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0, 0, time);
+      sendRequestAndWaitForResponse(*big_headers, 0, default_response_headers_, 0, 0, time);
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());

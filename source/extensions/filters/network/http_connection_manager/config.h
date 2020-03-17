@@ -13,6 +13,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/router/route_config_provider_manager.h"
+#include "envoy/tracing/http_tracer_manager.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
@@ -20,6 +21,7 @@
 #include "common/json/json_loader.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -82,7 +84,8 @@ public:
           config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
-      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+      Tracing::HttpTracerManager& http_tracer_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -139,6 +142,7 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  Tracing::HttpTracerSharedPtr tracer() override { return http_tracer_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override {
     return tracing_config_.get();
   }
@@ -157,7 +161,15 @@ private:
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
                 int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
-                bool& is_terminal);
+                const char* filter_chain_type, bool last_filter_in_current_config);
+
+  /**
+   * Determines what tracing provider to use for a given
+   * "envoy.filters.network.http_connection_manager" filter instance.
+   */
+  const envoy::config::trace::v3::Tracing_Http* getPerFilterTracerConfig(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          filter_config);
 
   RequestIDUtils::UtilitiesSharedPtr request_id_utils;
   Server::Configuration::FactoryContext& context_;
@@ -182,6 +194,7 @@ private:
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
@@ -229,6 +242,7 @@ public:
     std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager_;
     std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
         scoped_routes_config_provider_manager_;
+    Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
   };
 
   /**
@@ -254,7 +268,8 @@ public:
           proto_config,
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
-      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager,
+      Tracing::HttpTracerManager& http_tracer_manager);
 };
 
 } // namespace HttpConnectionManager

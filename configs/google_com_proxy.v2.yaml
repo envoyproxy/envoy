@@ -31,7 +31,7 @@ static_resources:
                   host_rewrite: www.google.com
                   cluster: service_google
           http_filters:
-          - name: envoy.router
+          - name: envoy.filters.http.router
   clusters:
   - name: service_google
     connect_timeout: 0.25s

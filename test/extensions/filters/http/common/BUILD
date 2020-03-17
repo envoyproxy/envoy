@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -47,5 +48,17 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = [
+        "utility_test.cc",
+    ],
+    deps = [
+        "//source/extensions/filters/http/common:utility_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

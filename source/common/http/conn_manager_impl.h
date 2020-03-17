@@ -26,6 +26,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -265,7 +266,7 @@ private:
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
     void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
-    HeaderMap& addDecodedTrailers() override;
+    RequestTrailerMap& addDecodedTrailers() override;
     MetadataMapVector& addDecodedMetadata() override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
@@ -378,7 +379,7 @@ private:
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
     void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
-    HeaderMap& addEncodedTrailers() override;
+    ResponseTrailerMap& addEncodedTrailers() override;
     void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
@@ -450,7 +451,7 @@ private:
 
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
-    void chargeStats(const HeaderMap& headers);
+    void chargeStats(const ResponseHeaderMap& headers);
     // Returns the encoder filter to start iteration with.
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream,
@@ -461,7 +462,7 @@ private:
                        FilterIterationStartState filter_iteration_start_state);
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
-    HeaderMap& addDecodedTrailers();
+    RequestTrailerMap& addDecodedTrailers();
     MetadataMapVector& addDecodedMetadata();
     void decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers,
                        bool end_stream);
@@ -474,7 +475,7 @@ private:
     void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
-    HeaderMap& addEncodedTrailers();
+    ResponseTrailerMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         bool is_head_request,
@@ -743,8 +744,10 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
-  Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
+  Tracing::HttpTracer& tracer() { return *config_.tracer(); }
   void handleCodecException(const char* error);
+  void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
+                         absl::optional<StreamInfo::ResponseFlag> response_flag);
 
   enum class DrainState { NotDraining, Draining, Closing };
 

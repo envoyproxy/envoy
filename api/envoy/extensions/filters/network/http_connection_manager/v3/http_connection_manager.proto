@@ -7,6 +7,7 @@ import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/route/v3/route.proto";
 import "envoy/config/route/v3/scoped_route.proto";
+import "envoy/config/trace/v3/trace.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -91,7 +92,7 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -144,6 +145,12 @@ message HttpConnectionManager {
 
     // A list of custom tags with unique tag name to create tags for the active span.
     repeated type.tracing.v3.CustomTag custom_tags = 8;
+
+    // Configuration for an external tracing provider.
+    // If not specified, Envoy will fall back to using tracing provider configuration
+    // from the bootstrap config.
+    // [#not-implemented-hide:]
+    config.trace.v3.Tracing.Http provider = 9;
   }
 
   message InternalAddressConfig {
