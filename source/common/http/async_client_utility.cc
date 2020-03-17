@@ -9,16 +9,15 @@ AsyncClientRequestTracker::~AsyncClientRequestTracker() {
   }
 }
 
-AsyncClientRequestTracker& AsyncClientRequestTracker::add(AsyncClient::Request* request) {
+void AsyncClientRequestTracker::add(AsyncClient::Request* request) {
   // Let client code to avoid conditionals.
   if (request) {
     ASSERT(active_requests_.find(request) == active_requests_.end());
     active_requests_.insert(request);
   }
-  return *this;
 }
 
-AsyncClientRequestTracker& AsyncClientRequestTracker::remove(const AsyncClient::Request* request) {
+void AsyncClientRequestTracker::remove(const AsyncClient::Request* request) {
   // Let client code to avoid conditionals.
   if (request) {
     auto it = active_requests_.find(const_cast<AsyncClient::Request*>(request));
@@ -28,7 +27,6 @@ AsyncClientRequestTracker& AsyncClientRequestTracker::remove(const AsyncClient::
       active_requests_.erase(it);
     }
   }
-  return *this;
 }
 
 } // namespace Http
