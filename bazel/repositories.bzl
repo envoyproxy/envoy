@@ -5,8 +5,19 @@ load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 
-# dict of {build recipe name: longform extension name,}
-PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
+
+WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.adaptive_concurrency",
+    "envoy.filters.network.kafka_broker",
+    "envoy.filters.network.mysql_proxy",
+    "envoy.stat_sinks.hystrix",
+    "envoy.stat_sinks.statsd",
+    "envoy.tracers.dynamic_ot",
+    "envoy.tracers.lightstep",
+    "envoy.tracers.datadog",
+    "envoy.tracers.opencensus",
+]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP
 # archives, e.g. cares.
