@@ -371,7 +371,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
       content_type_.assign(content_type.begin(), content_type.end());
     }
 
-    bool done = !readToBuffer(*transcoder_->RequestOutput(), request_prefix_);
+    bool done = !readToBuffer(*transcoder_->RequestOutput(), initial_request_data_);
     if (!done) {
       ENVOY_LOG(
           debug,
@@ -639,7 +639,7 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage() {
   }
 
   Buffer::OwnedImpl message_payload;
-  message_payload.move(request_prefix_);
+  message_payload.move(initial_request_data_);
   HttpBodyUtils::appendHttpBodyEnvelope(message_payload, method_->request_body_field_path,
                                         std::move(content_type_), request_data_.length());
   content_type_.clear();

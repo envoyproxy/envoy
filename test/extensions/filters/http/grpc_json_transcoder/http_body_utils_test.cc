@@ -62,6 +62,14 @@ TEST_F(HttpBodyUtilsTest, LargeMessage) {
                                    [](google::api::HttpBody http_body) { return http_body; });
 }
 
+TEST_F(HttpBodyUtilsTest, LargeContentType) {
+  // Check some content type with more than single byte in varint encoding of the size.
+  std::string content_type;
+  content_type.assign(20000, 'a');
+  basicTest<google::api::HttpBody>("abcd", content_type, {},
+                                   [](google::api::HttpBody http_body) { return http_body; });
+}
+
 TEST_F(HttpBodyUtilsTest, NestedFieldsList) {
   basicTest<bookstore::DeepNestedBody>(
       "abcd", "text/nested", {1, 1000000, 100000000, 500000000},

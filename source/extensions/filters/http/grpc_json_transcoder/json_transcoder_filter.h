@@ -182,7 +182,8 @@ private:
   Http::ResponseHeaderMap* response_headers_{nullptr};
   Grpc::Decoder decoder_;
 
-  Buffer::OwnedImpl request_prefix_;
+  // Data of the initial request message, initialized from query arguments, path, etc.
+  Buffer::OwnedImpl initial_request_data_;
   Buffer::OwnedImpl request_data_;
   bool first_request_sent_{false};
   std::string content_type_;
