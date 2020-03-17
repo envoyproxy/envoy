@@ -59,7 +59,7 @@ public:
      *                 requests in progress.
      * @param response the HTTP response
      */
-    virtual void onRequestSuccess(const Request* request, ResponseMessagePtr&& response) PURE;
+    virtual void onRequestSuccess(const Request& request, ResponseMessagePtr&& response) PURE;
 
     /**
      * Called when the async HTTP request fails.
@@ -69,7 +69,7 @@ public:
      *                requests in progress.
      * @param reason  failure reason
      */
-    virtual void onRequestFailure(const Request* request, FailureReason reason) PURE;
+    virtual void onRequestFailure(const Request& request, FailureReason reason) PURE;
   };
 
   /**
@@ -93,11 +93,11 @@ public:
 
     // Callbacks
 
-    void onRequestSuccess(const Request*, ResponseMessagePtr&& response) override {
+    void onRequestSuccess(const Request&, ResponseMessagePtr&& response) override {
       onSuccess(std::forward<ResponseMessagePtr>(response));
     }
 
-    void onRequestFailure(const Request*, FailureReason reason) override { onFailure(reason); }
+    void onRequestFailure(const Request&, FailureReason reason) override { onFailure(reason); }
   };
 
   /**

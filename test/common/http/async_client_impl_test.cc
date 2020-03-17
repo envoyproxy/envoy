@@ -54,7 +54,7 @@ public:
 
   void expectSuccess(uint64_t code) {
     EXPECT_CALL(callbacks_, onRequestSuccess_(_, _))
-        .WillOnce(Invoke([code](const AsyncClient::Request*, ResponseMessage* response) -> void {
+        .WillOnce(Invoke([code](const AsyncClient::Request&, ResponseMessage* response) -> void {
           EXPECT_EQ(code, Utility::getResponseStatus(response->headers()));
         }));
   }
