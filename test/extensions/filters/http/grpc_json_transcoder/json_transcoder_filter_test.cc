@@ -759,7 +759,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   std::vector<Grpc::Frame> frames;
 
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .Times(testing::AtLeast(2))
+      .Times(testing::AtLeast(1))
       .WillRepeatedly(testing::Invoke([&decoder, &frames](Buffer::Instance& data, bool end_stream) {
         EXPECT_TRUE(end_stream);
         decoder.decode(data, frames);

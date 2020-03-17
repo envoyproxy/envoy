@@ -31,6 +31,16 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "http_body_utils_test",
+    srcs = ["http_body_utils_test.cc"],
+    extension_name = "envoy.filters.http.grpc_json_transcoder",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/grpc_json_transcoder:http_body_utils_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "transcoder_input_stream_test",
     srcs = ["transcoder_input_stream_test.cc"],
     extension_name = "envoy.filters.http.grpc_json_transcoder",

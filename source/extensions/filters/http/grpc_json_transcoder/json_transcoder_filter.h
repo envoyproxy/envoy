@@ -49,6 +49,10 @@ struct MethodInfo {
 };
 typedef std::shared_ptr<MethodInfo> MethodInfoSharedPtr;
 
+void createHttpBodyEnvelope(Buffer::Instance& output,
+                            const std::vector<const Protobuf::Field*>& request_body_field_path,
+                            std::string content_type, uint64_t content_length);
+
 /**
  * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
  */
@@ -160,7 +164,6 @@ public:
 private:
   bool checkIfTranscoderFailed(const std::string& details);
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
-  void createHttpBodyEnvelope(Buffer::Instance& data, uint64_t content_length);
   void maybeSendHttpBodyRequestMessage();
   void buildResponseFromHttpBodyOutput(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& data);

@@ -22,6 +22,14 @@ void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& o
   output[4] = static_cast<uint8_t>(length);
 }
 
+void Encoder::prependFrameHeader(uint8_t flags, Buffer::Instance& buffer) {
+  // Compute the size of the payload and construct the length prefix.
+  std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
+  Grpc::Encoder().newFrame(flags, buffer.length(), frame);
+  Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
+  buffer.prepend(frame_buffer);
+}
+
 bool Decoder::decode(Buffer::Instance& input, std::vector<Frame>& output) {
   decoding_error_ = false;
   output_ = &output;
