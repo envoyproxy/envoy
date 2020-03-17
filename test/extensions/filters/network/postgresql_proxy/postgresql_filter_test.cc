@@ -34,8 +34,7 @@ public:
   std::unique_ptr<PostgreSQLFilter> filter_;
   PostgreSQLFilterConfigSharedPtr config_;
 
-
-  // often used variables
+  // These variables are used internally in tests 
   Buffer::OwnedImpl data_;
   char buf_[256];
 };

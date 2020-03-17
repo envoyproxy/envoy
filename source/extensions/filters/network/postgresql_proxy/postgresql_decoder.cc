@@ -1,10 +1,21 @@
 #include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
 #include "extensions/filters/network/postgresql_proxy/postgresql_utils.h"
 
+#include <vector>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace PostgreSQLProxy {
+
+void DecoderImpl::initialize() {
+  // Create handler for unrecognized message
+  unrecognized_ = std::tuple<std::string, std::string, std::vector<MsgAction>>{"Unrecognized", "", {&DecoderImpl::incUnrecognized}};
+  first_ = std::tuple<std::string, std::string, std::vector<MsgAction>>{"Initial", "", {}};
+  messages_['Q'] = std::tuple<std::string, std::string, std::vector<MsgAction>>{"Q(Query)", "Frontend", {&DecoderImpl::incFrontend}};
+  messages_['P'] = std::tuple<std::string, std::string, std::vector<MsgAction>>{"Parse", "Frontend", {&DecoderImpl::incFrontend}};
+  messages_['B'] = Message{"Bind", "Frontend", {&DecoderImpl::incFrontend}};
+}
 
 bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   ENVOY_LOG(trace, "postgresql_proxy: parsing message, len {}", data.length());
@@ -48,7 +59,6 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   BufferHelper::readStringBySize(data, length - 4, message);
   setMessage(message);
 
-  initial_ = false;
   ENVOY_LOG(trace, "postgresql_proxy: msg parsed");
   return true;
 }
@@ -59,6 +69,35 @@ bool DecoderImpl::onData(Buffer::Instance& data) {
   if(!parseMessage(data)) {
     return false;
   }
+
+  std::tuple<std::string, std::string, std::vector<MsgAction>> msg = std::ref(unrecognized_);;
+  if(initial_) {
+	  msg = std::ref(first_);
+	  initial_ = false;
+  } else {
+  auto it = messages_.find(command_);
+  if (it != messages_.end()) {
+     msg = std::ref((*it).second);
+  }
+  }
+
+  std::vector<MsgAction>& actions = std::get<2>(msg);
+  for (const auto action : actions) {
+    action(this);
+  } 
+
+#if 0
+  std::reference_wrapper<const std::unique_ptr<MessageImpl>> msg = std::cref(unrecognized_); 
+  auto it = messages_.find(command_);
+  if (it != messages_.end()) {
+     msg = std::cref((*it).second);
+  }
+
+  for (const auto action : msg.get()->getActions()) {
+    action(this);
+  } 
+#endif
+#if 0 
 
   std::string command_type = "(Backend)";
 
@@ -102,10 +141,11 @@ bool DecoderImpl::onData(Buffer::Instance& data) {
     callbacks_->incUnrecognized();
     break;
   }
+#endif
 
-  ENVOY_LOG(debug, "{} command = {}", command_type, command_);
-  ENVOY_LOG(debug, "{} length = {}",  command_type, getMessageLength());
-  ENVOY_LOG(debug, "{} message = {}", command_type, getMessage());
+  ENVOY_LOG(debug, "{} command = {}", std::get<1>(msg), std::get<0>(msg));
+  ENVOY_LOG(debug, "{} length = {}",  std::get<1>(msg), getMessageLength());
+  //ENVOY_LOG(debug, "{} message = {}", std::get<1>(msg), getMessage());
  /* 
   if (isBackend()) {
     decodeBackend();
@@ -194,6 +234,13 @@ void DecoderImpl::decodeBackendStatements() {
     callbacks_->incStatementsOther();
     callbacks_->incTransactionsCommit();
   }
+}
+void DecoderImpl::incFrontend() {
+    callbacks_->incFrontend();
+}
+
+void DecoderImpl::incUnrecognized() {
+    callbacks_->incUnrecognized();
 }
 
 void DecoderImpl::decodeBackendErrorResponse() {
