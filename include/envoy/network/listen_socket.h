@@ -193,7 +193,7 @@ public:
 
   /**
    * @return the direct remote address of the socket. This is the address of the directly
-   *         connected peer, and cannot be modifed by listener filters.
+   *         connected peer, and cannot be modified by listener filters.
    */
   virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
 
