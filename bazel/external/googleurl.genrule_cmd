@@ -1,0 +1,29 @@
+#!/bin/bash
+
+echo "Hello"
+
+set -e
+
+# Determine base directory of unmodified QUICHE source files. In practice, this
+# ends up being "external/com_googlesource_quiche".
+src_base_dir=#$$(dirname $$(dirname $$(dirname $(rootpath url/gurl.h))))
+
+cat <<EOF >sed_commands
+
+# Rewrite #pragma clang
+/^#pragma/ s!clang!GCC!
+/^#pragma/ s!-Weverything!-Wall!
+EOF
+
+for src_file in $(SRCS); do
+  # Extract relative path (e.g. "url/gurl.cc") from full path in
+  # src_path (e.g. "external/com_googlesource_googleurl/url/gurl.cc").
+  src_path="$${src_file#$$src_base_dir/}"
+
+  # Map to output file with googleurl/ base directory inserted in path.
+  out_file="$(@D)/googleurl/$$src_path"
+  mkdir -p "$$(dirname "$$out_file")"
+
+  # Apply text substitutions. -E ensures consistent behavior on Linux vs. OS X.
+  sed -E -f sed_commands "$$src_file" > "$$out_file"
+done
