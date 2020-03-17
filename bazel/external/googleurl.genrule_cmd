@@ -1,12 +1,10 @@
 #!/bin/bash
 
-echo "Hello"
-
 set -e
 
 # Determine base directory of unmodified QUICHE source files. In practice, this
 # ends up being "external/com_googlesource_quiche".
-src_base_dir=#$$(dirname $$(dirname $$(dirname $(rootpath url/gurl.h))))
+src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath url/gurl.h))))
 
 cat <<EOF >sed_commands
 
