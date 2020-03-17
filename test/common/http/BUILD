@@ -2,9 +2,10 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
-    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
@@ -106,7 +107,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "codes_speed_test",
     srcs = ["codes_speed_test.cc"],
     external_deps = [
@@ -117,6 +118,11 @@ envoy_cc_test_binary(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
     ],
+)
+
+envoy_benchmark_test(
+    name = "codes_speed_test_benchmark_test",
+    benchmark_binary = "codes_speed_test",
 )
 
 envoy_cc_test_library(
@@ -259,7 +265,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_binary(
+envoy_cc_benchmark_binary(
     name = "header_map_impl_speed_test",
     srcs = ["header_map_impl_speed_test.cc"],
     external_deps = [
@@ -268,6 +274,11 @@ envoy_cc_test_binary(
     deps = [
         "//source/common/http:header_map_lib",
     ],
+)
+
+envoy_benchmark_test(
+    name = "header_map_impl_speed_test_benchmark_test",
+    benchmark_binary = "header_map_impl_speed_test",
 )
 
 envoy_proto_library(
