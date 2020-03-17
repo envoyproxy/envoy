@@ -1256,7 +1256,7 @@ TEST_P(AdminInstanceTest, ReopenLogs) {
 
   EXPECT_CALL(server_, accessLogManager()).WillRepeatedly(ReturnRef(access_log_manager_));
   EXPECT_CALL(access_log_manager_, reopen());
-  EXPECT_EQ(Http::Code::OK, getCallback("/reopen_logs", header_map, response));
+  EXPECT_EQ(Http::Code::OK, postCallback("/reopen_logs", header_map, response));
 }
 
 TEST_P(AdminInstanceTest, TracingStatsDisabled) {
