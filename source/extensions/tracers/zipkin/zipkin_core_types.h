@@ -45,9 +45,12 @@ public:
    *
    * @return a stringified JSON.
    */
-  const std::string toJson(Util::Replacements& replacements) const {
+  const std::string toJson() const {
+    Util::Replacements replacements;
     return absl::StrReplaceAll(
-        MessageUtil::getJsonStringFromMessage(toStruct(replacements), false, true), replacements);
+        MessageUtil::getJsonStringFromMessage(toStruct(replacements), /* pretty_print */ false,
+                                              /* always_print_primitive_fields */ true),
+        replacements);
   };
 };
 

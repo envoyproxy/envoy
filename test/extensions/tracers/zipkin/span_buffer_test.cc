@@ -73,7 +73,9 @@ std::string withDefaultTimestamp(const std::string& expected) {
 }
 
 // To wrap JSON array string in a object for JSON string comparison through JsonStringEq test
-// utility.
+// utility. Every DEFAULT_TEST_TIMESTAMP string found in array_string will be replaced by
+// DEFAULT_TEST_REPLACEMENTS. i.e. to replace every DEFAULT_TEST_TIMESTAMP string occurrence with
+// DEFAULT_TEST_TIMESTAMP value.
 std::string wrapAsObject(absl::string_view array_string) {
   return withDefaultTimestamp(absl::StrFormat(R"({"root":%s})", array_string));
 }
