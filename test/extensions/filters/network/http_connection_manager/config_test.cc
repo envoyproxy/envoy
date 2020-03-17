@@ -111,7 +111,9 @@ http_filters:
       HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException, "Error: envoy.filters.http.router must be the terminal http filter.");
+      EnvoyException,
+      "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
+      "must be the last filter in a http filter chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, NonTerminalFilter) {
@@ -141,7 +143,9 @@ http_filters:
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException,
-      "Error: non-terminal filter health_check is the last filter in a http filter chain.");
+      "Error: non-terminal filter named health_check of type "
+      "envoy.filters.http.health_check is the last filter in a http filter "
+      "chain.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
@@ -1335,7 +1339,9 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
       HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
                                   route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
-      EnvoyException, "Error: envoy.filters.http.router must be the terminal http upgrade filter.");
+      EnvoyException,
+      "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
+      "must be the last filter in a http upgrade filter chain.");
 }
 
 TEST_F(FilterChainTest, InvalidConfig) {

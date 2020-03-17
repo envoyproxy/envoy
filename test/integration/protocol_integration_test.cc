@@ -295,11 +295,12 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ(512U, response->body().size());
 }
 
-// Tests that the x-envoy-attempt-count header is properly set on the upstream request
-// and updated after the request is retried.
+// Tests that the x-envoy-attempt-count header is properly set on the upstream request and the
+// downstream response, and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
+  host.set_include_attempt_count_in_response(true);
   config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -340,6 +341,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
+  EXPECT_EQ(
+      2,
+      atoi(std::string(response->headers().EnvoyAttemptCount()->value().getStringView()).c_str()));
 }
 
 // Verifies that a retry priority can be configured and affect the host selected during retries.
