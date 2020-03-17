@@ -55,14 +55,14 @@ context request/stream is interchangeable.
   recommended for streaming APIs (requests or responses that never end).
 * The HTTP protocol :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>` 
   is defined in a generic message used by the HTTP connection manager. The max stream duration is the 
-  maximum time that a stream's lifetime will span. You can use this functionality when you want to kill 
-  HTTP request/response stream periodically. You can't use :ref:`request_timeout 
+  maximum time that a stream's lifetime will span. You can use this functionality when you want to reset 
+  HTTP request/response streams periodically. You can't use :ref:`request_timeout 
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>`
-  in this situation because this timer will be disarmed if a response header is arrived to the request/response stream.
+  in this situation because this timer will be disarmed if a response header is received on the request/response streams.
 
   .. attention::
 
-    Now, We can apply this functionality to downstream only.
+    The current implementation implements this timeout on downstream connections only.
 
 Route timeouts
 ^^^^^^^^^^^^^^
