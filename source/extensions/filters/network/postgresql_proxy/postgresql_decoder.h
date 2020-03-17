@@ -67,7 +67,7 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
   
-  virtual bool onData(Buffer::Instance& data) PURE;
+  virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgreSQLSession& getSession() PURE;
   
   // decode frontend messages
@@ -84,7 +84,7 @@ public:
 
   // PostgreSQLProxy::Decoder
   void onFrontendData(Buffer::Instance& data) override;
-  bool onData(Buffer::Instance& data) override;
+  bool onData(Buffer::Instance& data, bool frontend) override;
   PostgreSQLSession& getSession() override { return session_; }
 
   // Temp stuff for testing purposes
@@ -126,14 +126,23 @@ protected:
   bool in_transaction_{false};
   bool initial_{true}; // initial stage does not have 1st byte command
 
-  using Message = std::tuple<std::string, std::string, std::vector<MsgAction>>;
-  absl::flat_hash_map<char, Message> messages_;
+  using Message = std::tuple<std::string, std::vector<MsgAction>>;
+  //absl::flat_hash_map<char, Message> messages_;
   //absl::flat_hash_map<char, std::tuple<std::string, std::string, std::vector<MsgAction>>> messages_;
   //absl::flat_hash_map<char, std::unique_ptr<MessageImpl>> messages_;
 //  std::unique_ptr<MessageImpl> unrecognized_;
   //std::tuple<std::string, std::string, std::vector<MsgAction>>unrecognized_;
-  Message unrecognized_;
+  //Message unrecognized_;
   Message first_;
+
+  // Frontend mnd Backend essages
+  // Class could be used to group those values, but tuple is used until
+  // functionality requires a switch.
+  // field 0 - string describing direction (Frontend or Backend)
+  // field 1 - hash map indexed by messages'1 1st byte points to data used for processing messages
+  // field 2 - data used for processing messages not found in hash map
+  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> FEmessages_; 
+  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message> BEmessages_; 
 };
 
 } // namespace PostgreSQLProxy

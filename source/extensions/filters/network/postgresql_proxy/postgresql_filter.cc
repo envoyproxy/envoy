@@ -26,7 +26,7 @@ Network::FilterStatus PostgreSQLFilter::onData(Buffer::Instance& data, bool) {
   // Frontend Buffer
   frontend_buffer_.add(data);
   //decoder_->getSession().setProtocolDirection(PostgreSQLSession::ProtocolDirection::Frontend);
-  doDecode(frontend_buffer_);
+  doDecode(frontend_buffer_, true);
 
   return Network::FilterStatus::Continue;
 }
@@ -43,7 +43,7 @@ Network::FilterStatus PostgreSQLFilter::onWrite(Buffer::Instance& data, bool) {
   // Backend Buffer
   backend_buffer_.add(data);
 //  decoder_->getSession().setProtocolDirection(PostgreSQLSession::ProtocolDirection::Backend);
-  doDecode(backend_buffer_);
+  doDecode(backend_buffer_, false);
 
   return Network::FilterStatus::Continue;
 }
@@ -106,10 +106,10 @@ void PostgreSQLFilter::incTransactionsRollback() {
 
 void PostgreSQLFilter::incWarnings() { config_->stats_.warnings_.inc(); }
 
-void PostgreSQLFilter::doDecode(Buffer::Instance& data) {
+void PostgreSQLFilter::doDecode(Buffer::Instance& data, bool frontend) {
   // Keep processing data until buffer is empty or decoder says
   // that it cannot process data in the buffer.
-  while((0 < data.length()) && (decoder_->onData(data))) {
+  while((0 < data.length()) && (decoder_->onData(data, frontend))) {
     ;
   }
 }

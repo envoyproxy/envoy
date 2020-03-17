@@ -82,7 +82,7 @@ TEST_F(PostgreSQLProxyDecoderTest, InitialMessage) {
   data.add(&length_, sizeof(length_));
   // add 8 bytes of some data
   data.add(buf_, 8);
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 0);
 
   // Now feed normal message with 1bytes as command
@@ -90,7 +90,7 @@ TEST_F(PostgreSQLProxyDecoderTest, InitialMessage) {
   length_ = htonl(6); // 4 bytes of length + 2 bytes of data
   data.add(&length_, sizeof(length_));
   data.add("AB");
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 0);
 }
 
@@ -100,19 +100,19 @@ TEST_F(PostgreSQLProxyDecoderTest, InitialMessage) {
 TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferSingleMessages) {
 
   // Feed empty buffer - should not crash
-  decoder_->onData(data);
+  decoder_->onData(data, true);
 
   // Put one byte. This is not enough to parse the message and that byte
   // should stay in the buffer.
   data.add("P");
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 1);
 
   // Add length of 4 bytes. It would mean completely empty message.
   // but it should be consumed.
   length_ = htonl(4);
   data.add(&length_, sizeof(length_));
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 0);
 
   // Create a message with 5 additional bytes.
@@ -120,7 +120,7 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferSingleMessages) {
   length_ = htonl(9); // 4 bytes of length field + 5 of data
   data.add(&length_, sizeof(length_));
   data.add(buf_, 5);
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 0);
 }
 
@@ -135,13 +135,13 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferLargeMessages) {
   length_ = htonl(100); // This also includes length field
   data.add(&length_, sizeof(length_));
   data.add(buf_, 94);
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   // The buffer contains command (1 byte), length (4 bytes) and 94 bytes of message
   ASSERT_THAT(data.length(), 99);
 
   // Add 2 missing bytes and feed again to decoder 
   data.add("AB");
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 0);
 }
 
@@ -167,10 +167,10 @@ TEST_F(PostgreSQLProxyDecoderTest, TwoMessagesInOneBuffer) {
   // 2nd: command (1 byte), length (4 bytes), 92 bytes of data
   ASSERT_THAT(data.length(), 148);
   // Process the first message
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 97);
   // Process the second message
-  decoder_->onData(data);
+  decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 0);
 }
 
@@ -184,7 +184,7 @@ TEST_F(PostgreSQLProxyDecoderTest, Unrecognized)
   length_ = htonl(50);
   data.add(&length_, sizeof(length_));
   data.add(buf_, 46);
-	decoder_->onData(data);
+	decoder_->onData(data, true);
 }
 
 TEST_P(PostgreSQLProxyDecoderTest, FrontEnd) {
@@ -194,7 +194,7 @@ TEST_P(PostgreSQLProxyDecoderTest, FrontEnd) {
   length_ = htonl(50);
   data.add(&length_, sizeof(length_));
   data.add(buf_, 46);
-	decoder_->onData(data);
+	decoder_->onData(data, true);
 }
 
 

@@ -9,12 +9,25 @@ namespace NetworkFilters {
 namespace PostgreSQLProxy {
 
 void DecoderImpl::initialize() {
-  // Create handler for unrecognized message
-  unrecognized_ = std::tuple<std::string, std::string, std::vector<MsgAction>>{"Unrecognized", "", {&DecoderImpl::incUnrecognized}};
-  first_ = std::tuple<std::string, std::string, std::vector<MsgAction>>{"Initial", "", {}};
-  messages_['Q'] = std::tuple<std::string, std::string, std::vector<MsgAction>>{"Q(Query)", "Frontend", {&DecoderImpl::incFrontend}};
-  messages_['P'] = std::tuple<std::string, std::string, std::vector<MsgAction>>{"Parse", "Frontend", {&DecoderImpl::incFrontend}};
-  messages_['B'] = Message{"Bind", "Frontend", {&DecoderImpl::incFrontend}};
+  // Special handler for first message of the transaction
+  first_ = Message{"Initial", {}};
+
+  // Frontend messages
+  std::get<0>(FEmessages_) = "Frontend";
+  // Setup handlers for known messages
+  absl::flat_hash_map<char, Message>& FE_known_msgs = std::get<1>(FEmessages_);
+  FE_known_msgs['Q'] = Message{"Q(Query)", {&DecoderImpl::incFrontend}};
+  FE_known_msgs['P'] = Message{"P(Parse)", {&DecoderImpl::incFrontend}};
+  FE_known_msgs['B'] = Message{"B(Bind)", {&DecoderImpl::incFrontend}};
+  // Handler for unknown messages
+  std::get<2>(FEmessages_) = Message{"Other", {&DecoderImpl::incUnrecognized}};
+  
+  // Backend messages
+  std::get<0>(BEmessages_) = "Backend";
+  // Setup handlers for known messages
+  //absl::flat_hash_map<char, Message>& BE_known_msgs = std::get<1>(BEmessages_);
+  // Handler for unknown messages
+  std::get<2>(BEmessages_) = Message{"Other", {&DecoderImpl::incUnrecognized}};
 }
 
 bool DecoderImpl::parseMessage(Buffer::Instance& data) {
@@ -63,25 +76,28 @@ bool DecoderImpl::parseMessage(Buffer::Instance& data) {
   return true;
 }
 
-bool DecoderImpl::onData(Buffer::Instance& data) {
+bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   ENVOY_LOG(trace, "postgresql_proxy: decoding {} bytes", data.length());
 
   if(!parseMessage(data)) {
     return false;
   }
+  
 
-  std::tuple<std::string, std::string, std::vector<MsgAction>> msg = std::ref(unrecognized_);;
+  std::tuple<std::string, absl::flat_hash_map<char, Message>, Message>& msg_processor = std::ref(frontend ? FEmessages_ : BEmessages_); 
+
+  Message& msg = std::ref(std::get<2>(msg_processor));;
   if(initial_) {
 	  msg = std::ref(first_);
 	  initial_ = false;
   } else {
-  auto it = messages_.find(command_);
-  if (it != messages_.end()) {
+  auto it = std::get<1>(msg_processor).find(command_);
+  if (it != std::get<1>(msg_processor).end()) {
      msg = std::ref((*it).second);
   }
   }
 
-  std::vector<MsgAction>& actions = std::get<2>(msg);
+  std::vector<MsgAction>& actions = std::get<1>(msg);
   for (const auto action : actions) {
     action(this);
   } 
@@ -143,9 +159,9 @@ bool DecoderImpl::onData(Buffer::Instance& data) {
   }
 #endif
 
-  ENVOY_LOG(debug, "{} command = {}", std::get<1>(msg), std::get<0>(msg));
-  ENVOY_LOG(debug, "{} length = {}",  std::get<1>(msg), getMessageLength());
-  //ENVOY_LOG(debug, "{} message = {}", std::get<1>(msg), getMessage());
+  ENVOY_LOG(debug, "{} command = {}", std::get<0>(msg_processor), std::get<0>(msg));
+  ENVOY_LOG(debug, "{} length = {}",  std::get<0>(msg_processor), getMessageLength());
+  ENVOY_LOG(debug, "{} message = {}", std::get<0>(msg_processor), getMessage());
  /* 
   if (isBackend()) {
     decodeBackend();

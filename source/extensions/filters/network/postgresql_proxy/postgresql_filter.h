@@ -89,7 +89,7 @@ public:
   void incTransactionsRollback() override;
   void incWarnings() override;
 
-  void doDecode(Buffer::Instance& data);
+  void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);
   void setDecoder(std::unique_ptr<Decoder> decoder) { decoder_ = std::move(decoder); }
   Decoder* getDecoder() const {return decoder_.get(); }
