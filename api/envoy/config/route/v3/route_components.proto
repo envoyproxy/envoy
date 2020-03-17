@@ -32,7 +32,7 @@ option java_multiple_files = true;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -164,7 +164,7 @@ message VirtualHost {
   // will take precedence over this config and it'll be treated independently (e.g.: values are not
   // inherited). :ref:`Retry policy <envoy_api_field_config.route.v3.VirtualHost.retry_policy>` should not be
   // set if this field is used.
-  google.protobuf.Any retry_policy_typed_config = 19;
+  google.protobuf.Any retry_policy_typed_config = 20;
 
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
   // route level entry will take precedence over this config and it'll be treated
