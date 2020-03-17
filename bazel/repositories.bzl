@@ -143,6 +143,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _com_googlesource_chromium_v8()
     _com_googlesource_quiche()
+    _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
     _io_opentracing_cpp()
     _net_zlib()
@@ -639,6 +640,20 @@ def _com_googlesource_quiche():
     native.bind(
         name = "quiche_quic_platform_base",
         actual = "@com_googlesource_quiche//:quic_platform_base",
+    )
+
+def _com_googlesource_googleurl():
+    location = REPOSITORY_LOCATIONS["com_googlesource_googleurl"]
+    genrule_repository(
+        name = "com_googlesource_googleurl",
+        urls = location["urls"],
+        sha256 = location["sha256"],
+        genrule_cmd_file = "@envoy//bazel/external:googleurl.genrule_cmd",
+        build_file = "@envoy//bazel/external:googleurl.BUILD",
+    )
+    native.bind(
+        name = "googleurl",
+        actual = "@com_googlesource_googleurl//:url_lib",
     )
 
 def _org_llvm_releases_compiler_rt():
