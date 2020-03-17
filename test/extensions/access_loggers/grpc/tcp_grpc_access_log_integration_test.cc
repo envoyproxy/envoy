@@ -181,11 +181,15 @@ tcp_logs:
         socket_address:
           address: {}
       upstream_cluster: cluster_0
+      downstream_direct_remote_address:
+        socket_address:
+          address: {}
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
 )EOF",
                   VersionInfo::version(), Network::Test::getLoopbackAddressString(ipVersion()),
+                  Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()))));
