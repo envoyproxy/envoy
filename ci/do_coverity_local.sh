@@ -12,7 +12,7 @@
 
 set -e
 
-. ./ci/envoy_build_sha.sh
+. ./ci/envoy_build_tag.sh
 
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
 mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
@@ -44,8 +44,8 @@ then
     --form token="${COVERITY_TOKEN}" \
     --form email="${COVERITY_USER_EMAIL}" \
     --form file=@"${COVERITY_OUTPUT_FILE}" \
-    --form version="${ENVOY_BUILD_SHA}" \
-    --form description="Envoy Proxy Build ${ENVOY_BUILD_SHA}" \
+    --form version="${ENVOY_BUILD_TAG}" \
+    --form description="Envoy Proxy Build ${ENVOY_BUILD_TAG}" \
     https://scan.coverity.com/projects/envoy-proxy
 else
   echo "Coverity Scan output file appears to be too small."

@@ -158,8 +158,8 @@ build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
 # Docker sandbox
-# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:3788a87461f2b3dc8048ad0ce5df40438a56e0a8f1a4ab0f61b4ef0d8c11ff1f
+# NOTE: The default building image uses the latest version of envoy-build-ubuntu in dockerhub for multi-arch supported.
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:e1146ed8c34b94073c1218c1f9d6f5493a1a325b
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
