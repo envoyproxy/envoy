@@ -170,7 +170,7 @@ struct CollectorInfo {
  *
  * The default values for the runtime parameters are 5 spans and 5000ms.
  */
-class ReporterImpl : public Reporter, Http::AsyncClient::RequestCallbacks {
+class ReporterImpl : public Reporter, Http::AsyncClient::Callbacks {
 public:
   /**
    * Constructor.
@@ -192,10 +192,10 @@ public:
    */
   void reportSpan(Span&& span) override;
 
-  // Http::AsyncClient::RequestCallbacks.
+  // Http::AsyncClient::Callbacks.
   // The callbacks below record Zipkin-span-related stats.
-  void onSuccess(Http::ResponseMessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
   /**
    * Creates a heap-allocated ZipkinReporter.

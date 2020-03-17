@@ -53,51 +53,23 @@ public:
 
     /**
      * Called when the async HTTP request succeeds.
-     * @param request  request handle or nullptr if no request could be created.
+     * @param request  request handle.
      *                 NOTE: request handle is passed for correlation purposes only, e.g.
      *                 for client code to be able to exclude that handle from a list of
      *                 requests in progress.
      * @param response the HTTP response
      */
-    virtual void onRequestSuccess(const Request& request, ResponseMessagePtr&& response) PURE;
+    virtual void onSuccess(const Request& request, ResponseMessagePtr&& response) PURE;
 
     /**
      * Called when the async HTTP request fails.
-     * @param request request handle or nullptr if no request could be created.
+     * @param request request handle.
      *                NOTE: request handle is passed for correlation purposes only, e.g.
      *                for client code to be able to exclude that handle from a list of
      *                requests in progress.
      * @param reason  failure reason
      */
-    virtual void onRequestFailure(const Request& request, FailureReason reason) PURE;
-  };
-
-  /**
-   * Notifies caller of async HTTP request status.
-   */
-  class RequestCallbacks : public Callbacks {
-  public:
-    virtual ~RequestCallbacks() override = default;
-
-    /**
-     * Called when the async HTTP request succeeds.
-     * @param response the HTTP response
-     */
-    virtual void onSuccess(ResponseMessagePtr&& response) PURE;
-
-    /**
-     * Called when the async HTTP request fails.
-     * @param reason failure reason
-     */
-    virtual void onFailure(FailureReason reason) PURE;
-
-    // Callbacks
-
-    void onRequestSuccess(const Request&, ResponseMessagePtr&& response) override {
-      onSuccess(std::forward<ResponseMessagePtr>(response));
-    }
-
-    void onRequestFailure(const Request&, FailureReason reason) override { onFailure(reason); }
+    virtual void onFailure(const Request& request, FailureReason reason) PURE;
   };
 
   /**

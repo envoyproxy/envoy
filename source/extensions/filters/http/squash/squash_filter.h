@@ -56,16 +56,18 @@ private:
 
 using SquashFilterConfigSharedPtr = std::shared_ptr<SquashFilterConfig>;
 
-class AsyncClientCallbackShim : public Http::AsyncClient::RequestCallbacks {
+class AsyncClientCallbackShim : public Http::AsyncClient::Callbacks {
 public:
   AsyncClientCallbackShim(std::function<void(Http::ResponseMessagePtr&&)>&& on_success,
                           std::function<void(Http::AsyncClient::FailureReason)>&& on_fail)
       : on_success_(on_success), on_fail_(on_fail) {}
-  // Http::AsyncClient::RequestCallbacks
-  void onSuccess(Http::ResponseMessagePtr&& m) override {
+  // Http::AsyncClient::Callbacks
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override {
     on_success_(std::forward<Http::ResponseMessagePtr>(m));
   }
-  void onFailure(Http::AsyncClient::FailureReason f) override { on_fail_(f); }
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason f) override {
+    on_fail_(f);
+  }
 
 private:
   const std::function<void(Http::ResponseMessagePtr&&)> on_success_;

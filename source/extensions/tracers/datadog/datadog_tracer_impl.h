@@ -94,7 +94,7 @@ private:
  * The timer interval can be controlled with the setting
  * tracing.datadog.flush_interval_ms, and defaults to 2000ms.
  */
-class TraceReporter : public Http::AsyncClient::RequestCallbacks,
+class TraceReporter : public Http::AsyncClient::Callbacks,
                       protected Logger::Loggable<Logger::Id::tracing> {
 public:
   /**
@@ -106,9 +106,9 @@ public:
    */
   TraceReporter(TraceEncoderSharedPtr encoder, Driver& driver, Event::Dispatcher& dispatcher);
 
-  // Http::AsyncClient::RequestCallbacks.
-  void onSuccess(Http::ResponseMessagePtr&&) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
+  // Http::AsyncClient::Callbacks.
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
 
 private:
   /**

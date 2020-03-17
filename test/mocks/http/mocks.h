@@ -334,27 +334,15 @@ public:
   MockAsyncClientCallbacks();
   ~MockAsyncClientCallbacks() override;
 
-  void onRequestSuccess(const Http::AsyncClient::Request& request,
-                        ResponseMessagePtr&& response) override {
-    onRequestSuccess_(request, response.get());
+  void onSuccess(const Http::AsyncClient::Request& request,
+                 ResponseMessagePtr&& response) override {
+    onSuccess_(request, response.get());
   }
 
   // Http::AsyncClient::Callbacks
-  MOCK_METHOD(void, onRequestSuccess_, (const Http::AsyncClient::Request&, ResponseMessage*));
-  MOCK_METHOD(void, onRequestFailure,
+  MOCK_METHOD(void, onSuccess_, (const Http::AsyncClient::Request&, ResponseMessage*));
+  MOCK_METHOD(void, onFailure,
               (const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason));
-};
-
-class MockAsyncClientRequestCallbacks : public AsyncClient::RequestCallbacks {
-public:
-  MockAsyncClientRequestCallbacks();
-  ~MockAsyncClientRequestCallbacks() override;
-
-  void onSuccess(ResponseMessagePtr&& response) override { onSuccess_(response.get()); }
-
-  // Http::AsyncClient::RequestCallbacks
-  MOCK_METHOD(void, onSuccess_, (ResponseMessage * response));
-  MOCK_METHOD(void, onFailure, (Http::AsyncClient::FailureReason reason));
 };
 
 class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {

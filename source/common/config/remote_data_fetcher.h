@@ -42,16 +42,17 @@ public:
  * Remote data fetcher.
  */
 class RemoteDataFetcher : public Logger::Loggable<Logger::Id::config>,
-                          public Http::AsyncClient::RequestCallbacks {
+                          public Http::AsyncClient::Callbacks {
 public:
   RemoteDataFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
                     const std::string& content_hash, RemoteDataFetcherCallback& callback);
 
   ~RemoteDataFetcher() override;
 
-  // Http::AsyncClient::RequestCallbacks
-  void onSuccess(Http::ResponseMessagePtr&& response) override;
-  void onFailure(Http::AsyncClient::FailureReason reason) override;
+  // Http::AsyncClient::Callbacks
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
+  void onFailure(const Http::AsyncClient::Request&,
+                 Http::AsyncClient::FailureReason reason) override;
 
   /**
    * Fetch data from remote.

@@ -220,7 +220,7 @@ void RawHttpClientImpl::cancel() {
 }
 
 // Client
-void RawHttpClientImpl::check(Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v3::CheckRequest& request,
                               Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
@@ -286,14 +286,16 @@ void RawHttpClientImpl::check(Filters::Common::ExtAuthz::RequestCallbacks& callb
   }
 }
 
-void RawHttpClientImpl::onSuccess(Http::ResponseMessagePtr&& message) {
+void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
+                                  Http::ResponseMessagePtr&& message) {
   callbacks_->onComplete(toResponse(std::move(message)));
   span_->finishSpan();
   callbacks_ = nullptr;
   span_ = nullptr;
 }
 
-void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
+void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
+                                  Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);

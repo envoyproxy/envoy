@@ -15,7 +15,7 @@ namespace Router {
  */
 class ShadowWriterImpl : Logger::Loggable<Logger::Id::router>,
                          public ShadowWriter,
-                         public Http::AsyncClient::RequestCallbacks {
+                         public Http::AsyncClient::Callbacks {
 public:
   ShadowWriterImpl(Upstream::ClusterManager& cm) : cm_(cm) {}
 
@@ -23,9 +23,9 @@ public:
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
               const Http::AsyncClient::RequestOptions& options) override;
 
-  // Http::AsyncClient::RequestCallbacks
-  void onSuccess(Http::ResponseMessagePtr&&) override {}
-  void onFailure(Http::AsyncClient::FailureReason) override {}
+  // Http::AsyncClient::Callbacks
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
 
 private:
   Upstream::ClusterManager& cm_;
