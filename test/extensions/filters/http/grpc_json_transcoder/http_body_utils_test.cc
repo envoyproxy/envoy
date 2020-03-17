@@ -1,11 +1,12 @@
 #include "common/buffer/buffer_impl.h"
-
 #include "common/buffer/zero_copy_input_stream_impl.h"
+
 #include "extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
-#include "gtest/gtest.h"
-#include "google/api/httpbody.pb.h"
 #include "test/proto/bookstore.pb.h"
+
+#include "google/api/httpbody.pb.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
