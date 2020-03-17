@@ -98,6 +98,7 @@ public:
     // Clear fields which are not deterministic.
     auto* log_entry = request_msg.mutable_tcp_logs()->mutable_log_entry(0);
     clearPort(*log_entry->mutable_common_properties()->mutable_downstream_remote_address());
+    clearPort(*log_entry->mutable_common_properties()->mutable_downstream_direct_remote_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_downstream_local_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_upstream_remote_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_upstream_local_address());
