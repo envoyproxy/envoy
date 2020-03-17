@@ -150,7 +150,7 @@ TEST_P(DispatcherIntegrationTest, Basic) {
   };
 
   // Build a set of request headers.
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
@@ -210,7 +210,7 @@ TEST_P(DispatcherIntegrationTest, RaceDoesNotCauseDoubleDeletion) {
   };
 
   // Build a set of request headers.
-  Http::TestHeaderMapImpl headers;
+  Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
 
