@@ -1,6 +1,5 @@
 #include <memory>
 #include <string>
-#include <string_view>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
@@ -19,6 +18,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
 
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -44,7 +44,7 @@ std::string createHeaderFragment(int num_headers) {
   return headers;
 }
 
-Buffer::OwnedImpl createBufferWithOneByteSlices(std::string_view input) {
+Buffer::OwnedImpl createBufferWithOneByteSlices(absl::string_view input) {
   Buffer::OwnedImpl buffer;
   for (const char& c : input) {
     buffer.appendSliceForTest(&c, 1);
