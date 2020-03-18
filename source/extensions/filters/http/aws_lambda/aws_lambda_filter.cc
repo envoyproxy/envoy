@@ -64,7 +64,7 @@ absl::optional<Arn> Filter::calculateRouteArn() {
   if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
     return absl::nullopt;
   }
-  const auto* route_entry = decoder_callbacks_->route()->routeEntry();
+  const auto route_entry = decoder_callbacks_->route()->routeEntry();
   const auto* settings = route_entry->mostSpecificPerFilterConfigTyped<FilterSettings>(
       HttpFilterNames::get().AwsLambda);
   if (!settings) {
