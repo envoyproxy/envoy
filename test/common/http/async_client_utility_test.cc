@@ -23,6 +23,11 @@ public:
   StrictMock<MockAsyncClientRequest> request3_{&async_client_};
 };
 
+TEST_F(AsyncClientRequestTrackerTest, ShouldSupportRemoveWithoutAdd) {
+  // Should not fail.
+  active_requests_->remove(request1_);
+}
+
 TEST_F(AsyncClientRequestTrackerTest, OnDestructDoNothingIfThereAreNoActiveRequests) {
   // Trigger destruction.
   active_requests_.reset();
