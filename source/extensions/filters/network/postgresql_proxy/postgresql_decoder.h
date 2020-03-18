@@ -103,6 +103,7 @@ protected:
   void incStatements();
   void incStatementsOther();
   void incSessions();
+  void onAuthentication();
 
   DecoderCallbacks* callbacks_;
   PostgreSQLSession session_;
