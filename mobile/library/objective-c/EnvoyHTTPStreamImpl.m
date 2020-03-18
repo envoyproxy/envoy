@@ -55,6 +55,7 @@ static envoy_headers toNativeHeaders(EnvoyHeaders *headers) {
 
 static NSData *to_ios_data(envoy_data data) {
   // TODO: we are copying from envoy_data to NSData.
+  // https://github.com/lyft/envoy-mobile/issues/398
   NSData *platformData = [NSData dataWithBytes:(void *)data.bytes length:data.length];
   data.release(data.context);
   return platformData;

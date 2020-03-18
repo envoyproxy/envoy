@@ -25,10 +25,12 @@ Engine::Engine(envoy_engine_callbacks callbacks, const char* config, const char*
     : callbacks_(callbacks) {
   // Ensure static factory registration occurs on time.
   // TODO: ensure this is only called one time once multiple Engine objects can be allocated.
+  // https://github.com/lyft/envoy-mobile/issues/332
   registerFactories();
 
   // Create the Http::Dispatcher first since it contains initial queueing logic.
   // TODO: consider centralizing initial queueing in this class.
+  // https://github.com/lyft/envoy-mobile/issues/720
   http_dispatcher_ = std::make_unique<Http::Dispatcher>(preferred_network);
 
   // Start the Envoy on a dedicated thread.

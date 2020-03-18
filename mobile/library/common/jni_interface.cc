@@ -100,8 +100,10 @@ static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) 
 
     // Create platform byte array for header key
     jbyteArray key = env->NewByteArray(headers.headers[i].key.length);
-    // FIXME: check if copied via isCopy
-    void* critical_key = env->GetPrimitiveArrayCritical(key, nullptr); // FIXME: check for NULL
+    // TODO: check if copied via isCopy.
+    // TODO: check for NULL.
+    // https://github.com/lyft/envoy-mobile/issues/758
+    void* critical_key = env->GetPrimitiveArrayCritical(key, nullptr);
     memcpy(critical_key, headers.headers[i].key.bytes, headers.headers[i].key.length);
     // Here '0' (for which there is no named constant) indicates we want to commit the changes back
     // to the JVM and free the c array, where applicable.
@@ -109,7 +111,8 @@ static void pass_headers(JNIEnv* env, envoy_headers headers, jobject j_context) 
 
     // Create platform byte array for header value
     jbyteArray value = env->NewByteArray(headers.headers[i].value.length);
-    void* critical_value = env->GetPrimitiveArrayCritical(value, nullptr); // FIXME: check for NULL
+    // TODO: check for NULL.
+    void* critical_value = env->GetPrimitiveArrayCritical(value, nullptr);
     memcpy(critical_value, headers.headers[i].value.bytes, headers.headers[i].value.length);
     env->ReleasePrimitiveArrayCritical(value, critical_value, 0);
 
@@ -146,8 +149,8 @@ static void jvm_on_headers(envoy_headers headers, bool end_stream, void* context
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_onHeaders = env->GetMethodID(jcls_JvmCallbackContext, "onHeaders", "(JZ)V");
-  // Note: be careful of JVM types
-  // FIXME: make this cast safer
+  // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
+  // TODO: make this cast safer.
   env->CallVoidMethod(j_context, jmid_onHeaders, (jlong)headers.length,
                       end_stream ? JNI_TRUE : JNI_FALSE);
 
@@ -164,8 +167,10 @@ static void jvm_on_data(envoy_data data, bool end_stream, void* context) {
   jmethodID jmid_onData = env->GetMethodID(jcls_JvmCallbackContext, "onData", "([BZ)V");
 
   jbyteArray j_data = env->NewByteArray(data.length);
-  // FIXME: check if copied via isCopy
-  void* critical_data = env->GetPrimitiveArrayCritical(j_data, nullptr); // FIXME: check for NULL
+  // TODO: check if copied via isCopy.
+  // TODO: check for NULL.
+  // https://github.com/lyft/envoy-mobile/issues/758
+  void* critical_data = env->GetPrimitiveArrayCritical(j_data, nullptr);
   memcpy(critical_data, data.bytes, data.length);
   // Here '0' (for which there is no named constant) indicates we want to commit the changes back
   // to the JVM and free the c array, where applicable.
@@ -190,8 +195,8 @@ static void jvm_on_trailers(envoy_headers trailers, void* context) {
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_onTrailers = env->GetMethodID(jcls_JvmCallbackContext, "onTrailers", "(J)V");
-  // Note: be careful of JVM types
-  // FIXME: make this cast safer
+  // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
+  // TODO: make this cast safer.
   env->CallVoidMethod(j_context, jmid_onTrailers, (jlong)trailers.length);
 
   env->DeleteLocalRef(jcls_JvmCallbackContext);
@@ -207,9 +212,10 @@ static void jvm_on_error(envoy_error error, void* context) {
   jmethodID jmid_onError = env->GetMethodID(jcls_JvmObserverContext, "onError", "([BI)V");
 
   jbyteArray j_error_message = env->NewByteArray(error.message.length);
-  // FIXME: check if copied via isCopy
-  void* critical_error_message =
-      env->GetPrimitiveArrayCritical(j_error_message, nullptr); // FIXME: check for NULL
+  // TODO: check if copied via isCopy.
+  // TODO: check for NULL.
+  // https://github.com/lyft/envoy-mobile/issues/758
+  void* critical_error_message = env->GetPrimitiveArrayCritical(j_error_message, nullptr);
   memcpy(critical_error_message, error.message.bytes, error.message.length);
   // Here '0' (for which there is no named constant) indicates we want to commit the changes back
   // to the JVM and free the c array, where applicable.
@@ -306,7 +312,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
 
-  // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref
+  // TODO: To be truly safe we may need stronger guarantees of operation ordering on this ref.
   jobject retained_context = env->NewGlobalRef(j_context);
   envoy_http_callbacks native_callbacks = {jvm_on_headers,  jvm_on_data,     jvm_on_metadata,
                                            jvm_on_trailers, jvm_on_error,    jvm_on_complete,
@@ -326,7 +332,7 @@ extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendData__JLjava_nio_ByteBuffer_2Z(
     JNIEnv* env, jclass, jlong stream_handle, jobject data, jboolean end_stream) {
 
-  // TODO: check for null pointer in envoy_data.bytes - we could copy or raise an exception
+  // TODO: check for null pointer in envoy_data.bytes - we could copy or raise an exception.
   return send_data(static_cast<envoy_stream_t>(stream_handle), buffer_to_native_data(env, data),
                    end_stream);
 }
@@ -336,7 +342,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendData__JLjava_nio_ByteBuffer
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_sendData__J_3BZ(
     JNIEnv* env, jclass, jlong stream_handle, jbyteArray data, jboolean end_stream) {
 
-  // TODO: check for null pointer in envoy_data.bytes - we could copy or raise an exception
+  // TODO: check for null pointer in envoy_data.bytes - we could copy or raise an exception.
   return send_data(static_cast<envoy_stream_t>(stream_handle), array_to_native_data(env, data),
                    end_stream);
 }

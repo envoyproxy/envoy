@@ -11,7 +11,7 @@ import java.nio.ByteOrder
 class GRPCStreamEmitterTest {
 
   // TODO: Problems with nhaarman/mockito-kotlin https://github.com/lyft/envoy-mobile/issues/504
-  // This is a total hack to get something to work
+  // This is a total hack to get something to work.
   private lateinit var emitter: StreamEmitter
 
   private val dataOutputStream = ByteArrayOutputStream()
