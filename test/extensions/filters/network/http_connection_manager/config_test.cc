@@ -1202,6 +1202,38 @@ http2_protocol_options:
       EnvoyException,
       R"(the \{hpack_table_size,max_concurrent_streams\} HTTP/2 SETTINGS parameter\(s\) can not be)"
       " configured");
+}
+
+// Validates that `allow_connect` can only be configured through the named field. All other
+// SETTINGS parameters can be set via the named _or_ custom parameters fields, but `allow_connect`
+// required an exception due to the use of a primitive type for which presence can not be checked.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsAllowConnectOnlyViaNamedField) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.filters.http.router
+  typed_config: {}
+http2_protocol_options:
+  custom_settings_parameters:
+    - { identifier: 8, value: 0 }
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException,
+      "the \"allow_connect\" SETTINGS parameter should only be configured through the named field");
 
   const std::string yaml_string2 = R"EOF(
 codec_type: http2
@@ -1221,8 +1253,6 @@ http_filters:
   typed_config: {}
 http2_protocol_options:
   allow_connect: true
-  custom_settings_parameters:
-    - { identifier: 8, value: 0 }
   )EOF";
   HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string2), context_,
                               date_provider_, route_config_provider_manager_,

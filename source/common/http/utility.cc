@@ -51,11 +51,10 @@ void validateCustomSettingsParameters(
       }
       break;
     case NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL:
-      // This parameter can not be validated due to the use of proto3 bool, which doesn't allow
-      // checking for presence.
-      // TODO: This can be fixed via a breaking API change of the type to
-      // `google.protobuf.BoolValue`.
-      break;
+      // An exception is made for `allow_connect` which can't be checked for presence due to the use
+      // of a primitive type (bool).
+      throw EnvoyException("the \"allow_connect\" SETTINGS parameter should only be configured "
+                           "through the named field");
     case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         duplicate_parameters.push_back("hpack_table_size");

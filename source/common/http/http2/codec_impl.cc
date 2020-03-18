@@ -931,14 +931,7 @@ void ConnectionImpl::sendSettings(
   }
 
   for (const auto it : http2_options.custom_settings_parameters()) {
-    // Validate that named parameters (with the exception of `allow_connect`) are not being
-    // overridden by custom parameters.
-    ASSERT((absl::c_none_of<std::array<uint16_t, 4>>(
-        {NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, NGHTTP2_SETTINGS_ENABLE_PUSH,
-         NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE},
-        [it](const uint16_t& entry) { return entry == it.identifier().value(); })));
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
-
     const bool result =
         insertParameter({static_cast<int32_t>(it.identifier().value()), it.value().value()});
     if (!result) {
@@ -954,17 +947,9 @@ void ConnectionImpl::sendSettings(
   settings.insert(
       settings.end(),
       {{NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_options.hpack_table_size().value()},
+       {NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()},
        {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
        {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()}});
-  const bool result =
-      insertParameter({NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()});
-  if (!result) {
-    ENVOY_CONN_LOG(debug,
-                   "the named allow_connect SETTINGS parameter is being overridden by a custom "
-                   "parameter with value {}",
-                   connection_, http2_options.allow_connect());
-  }
-
   if (!settings.empty()) {
     int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &settings[0], settings.size());
     ASSERT(rc == 0);

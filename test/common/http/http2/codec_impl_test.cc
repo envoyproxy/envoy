@@ -1215,52 +1215,6 @@ TEST_P(Http2CustomSettingsTest, UserDefinedSettings) {
   }
 }
 
-// Validates that the only custom settings parameter allowed to override a named parameter is
-// 'allow_connect' (id = 0x8).
-TEST_P(Http2CustomSettingsTest, UserDefinedSettingsParametersAllowConnectOverrideOnly) {
-  // The named allow_connect value defaults to 0.
-  std::vector<SettingsParameter> named_parameter_overrides{
-      {NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, 1}};
-  setHttp2CustomSettingsParameters(getCustomOptions(), named_parameter_overrides);
-  initialize();
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
-  request_encoder_->encodeHeaders(request_headers, false);
-  for (const auto& parameter : named_parameter_overrides) {
-    EXPECT_THAT(getSettingsProvider().getRemoteSettingsParameterValue(parameter.identifier),
-                HasValue(parameter.value));
-  }
-}
-
-class Http2CustomSettingsDeathTest
-    : public Http2CustomSettingsTestBase,
-      public ::testing::TestWithParam<
-          ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple, bool, uint16_t>> {
-
-public:
-  Http2CustomSettingsDeathTest()
-      : Http2CustomSettingsTestBase(::testing::get<0>(GetParam()), ::testing::get<1>(GetParam()),
-                                    ::testing::get<2>(GetParam())),
-        custom_parameter_identifier_(::testing::get<3>(GetParam())) {}
-
-protected:
-  uint16_t custom_parameter_identifier_{0};
-};
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CustomSettingsDeathTest,
-                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
-                                            HTTP2SETTINGS_DEFAULT_COMBINE, ::testing::Bool(),
-                                            ::testing::Values(0x1, 0x2, 0x3, 0x4)));
-
-// Validates that overriding named parameters with custom parameters will trigger an ASSERT().
-// NOTE: `allow_connect` is the only exception since presence can not be checked without a breaking
-// API change.
-TEST_P(Http2CustomSettingsDeathTest, DisallowNamedParameterOverrides) {
-  std::vector<SettingsParameter> custom_parameters{{custom_parameter_identifier_, 1}};
-  setHttp2CustomSettingsParameters(client_http2_options_, custom_parameters);
-  EXPECT_DEBUG_DEATH(initialize(), "");
-}
-
 // Tests request headers whose size is larger than the default limit of 60K.
 TEST_P(Http2CodecImplTest, LargeRequestHeadersInvokeResetStream) {
   initialize();
