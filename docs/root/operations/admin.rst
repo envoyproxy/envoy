@@ -558,3 +558,7 @@ modify different aspects of the server:
   been configured to accept admin configuration. See:
 
   * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`
+
+.. http:post:: /reopen_logs
+
+  Triggers reopen of all access logs. Behavior is similar to SIGUSR1 handling.
