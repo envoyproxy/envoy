@@ -34,8 +34,8 @@ envoy_cc_library(
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
-        "//source/common/common:logger_lib",
         "//source/common/common:macros",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -49,6 +49,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "protobuf_utility_lib",
+    hdrs = ["protobuf_utility.h"],
+    external_deps = [
+        "protobuf",
+    ],
+    deps = [
+        ":protobuf",
+        "//source/common/common:hash_lib",
+    ],
+)
+
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -59,6 +72,7 @@ envoy_cc_library(
     deps = [
         ":message_validator_lib",
         ":protobuf",
+        ":protobuf_utility_lib",
         ":well_known_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/protobuf:message_validator_interface",

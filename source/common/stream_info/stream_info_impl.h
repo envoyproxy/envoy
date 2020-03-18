@@ -207,6 +207,14 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_ssl_info_;
   }
 
+  void setUpstreamEndpointInfo(
+      const Router::UpstreamEndpointInfoConstSharedPtr& upstream_endpoint_info) override {
+    upstream_endpoint_info_ = upstream_endpoint_info;
+  }
+  const Router::UpstreamEndpointInfo* upstreamEndpointInfo() const override {
+    return upstream_endpoint_info_.get();
+  }
+
   void setRouteEntry(const std::shared_ptr<const Router::RouteEntry>& route_entry) override {
     route_entry_ = route_entry;
   }
@@ -276,6 +284,7 @@ struct StreamInfoImpl : public StreamInfo {
   FilterStateSharedPtr filter_state_;
   FilterStateSharedPtr upstream_filter_state_;
   std::string route_name_;
+  Router::UpstreamEndpointInfoConstSharedPtr upstream_endpoint_info_{};
 
 private:
   uint64_t bytes_received_{};

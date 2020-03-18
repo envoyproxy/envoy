@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
+#include "envoy/router/upstream_endpoint_info.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
@@ -452,6 +453,17 @@ public:
    * connection does not use SSL.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
+
+  /**
+   * @param upstream_endpoint_info sets the upstream endpoint info like cluster_name.
+   */
+  virtual void setUpstreamEndpointInfo(
+      const Router::UpstreamEndpointInfoConstSharedPtr& upstream_endpoint_info) PURE;
+  /**
+  * @return const Router::UpstreamEndpointInfo* Get the upstream endpoint info selected for this
+  * request. Note: this will be nullptr if no route was selected.
+  */
+  virtual const Router::UpstreamEndpointInfo* upstreamEndpointInfo() const PURE;
 
   /**
    * @param route_entry sets the RouteEntry for HTTP and UpstreamEndpointInfo for TCP.

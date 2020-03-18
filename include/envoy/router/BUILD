@@ -53,6 +53,7 @@ envoy_cc_library(
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":upstream_endpoint_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:matchers_interface",
         "//include/envoy/config:typed_metadata_interface",
@@ -64,9 +65,17 @@ envoy_cc_library(
         "//include/envoy/upstream:resource_manager_interface",
         "//include/envoy/upstream:retry_interface",
         "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_endpoint_interface",
+    hdrs = ["upstream_endpoint_info.h"],
+    deps = [
+        "//source/common/protobuf",
+        "//source/common/protobuf:protobuf_utility_lib",
     ],
 )
 

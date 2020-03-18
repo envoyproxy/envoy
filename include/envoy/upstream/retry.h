@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
