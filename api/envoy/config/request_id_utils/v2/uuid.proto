@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package envoy.config.request_id_utils.v2;
+
+option java_package = "io.envoyproxy.envoy.config.grpc_credential.v2";
+option java_outer_classname = "UUID";
+option java_multiple_files = true;
+
+// [#protodoc-title: UUID Request ID Utils]
+// [#extension: extension_envoy.request_id_utils.uuid]
+// 
+// There are not configuration options at the moment.
+//
+// The extension makes Envoy use request ID with the following properties:
+//
+// 1. Request ID is propagated using *x-request-id* header.
+//
+// 2. Request ID is a universally unique identifier (UUID).
+//
+// 3. Tracing decision (sampled, forced, etc) is set in 14th bit of the UUID.
+
+message UUIDConfig {
+}
