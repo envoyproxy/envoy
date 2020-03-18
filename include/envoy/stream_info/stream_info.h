@@ -520,6 +520,16 @@ public:
    * @return request headers.
    */
   virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
+
+  /**
+   * @param Upstream connection's ClusterName.
+   */
+  virtual void setUpstreamClusterName(const absl::string_view upstream_cluster_name) PURE;
+
+  /**
+   * @return Upstream connection's ClusterName.
+   */
+  virtual const std::string& upstreamClusterName() const PURE;
 };
 
 } // namespace StreamInfo

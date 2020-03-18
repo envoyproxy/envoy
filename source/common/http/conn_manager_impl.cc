@@ -1397,6 +1397,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
+  stream_info_.setUpstreamClusterName(
+      stream_info_.route_entry_ ? stream_info_.route_entry_->clusterName() : EMPTY_STRING);
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {
     cached_cluster_info_ = nullptr;

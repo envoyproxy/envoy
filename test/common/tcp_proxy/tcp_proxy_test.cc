@@ -1927,6 +1927,23 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   filter_->onNewConnection();
 }
 
+TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ClusterNameSet)) {
+  setup();
+
+  initializeFilter();
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  // Expect filter to try to open a connection to specified cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(nullptr));
+
+  filter_->onNewConnection();
+
+  EXPECT_EQ(connection_.stream_info_.upstreamClusterName(), "fake_cluster");
+}
+
 class TcpProxyHashingTest : public testing::Test {
 public:
   TcpProxyHashingTest() = default;

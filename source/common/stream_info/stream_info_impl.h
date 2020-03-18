@@ -253,6 +253,12 @@ struct StreamInfoImpl : public StreamInfo {
        << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
 
+  void setUpstreamClusterName(absl::string_view upstream_cluster_name) override {
+    upstream_cluster_name_ = std::string(upstream_cluster_name);
+  }
+
+  const std::string& upstreamClusterName() const override { return upstream_cluster_name_; }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -287,6 +293,7 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
+  std::string upstream_cluster_name_;
 };
 
 } // namespace StreamInfo

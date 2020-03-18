@@ -175,6 +175,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     absl::string_view sni_name = "stubserver.org";
     stream_info.setRequestedServerName(sni_name);
     EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
+
+    EXPECT_EQ("", stream_info.upstreamClusterName());
+    absl::string_view upstream_cluster_name = "fake_cluster";
+    stream_info.setUpstreamClusterName(upstream_cluster_name);
+    EXPECT_EQ(std::string(upstream_cluster_name), stream_info.upstreamClusterName());
   }
 }
 
