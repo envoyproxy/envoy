@@ -204,6 +204,139 @@ INSTANTIATE_TEST_CASE_P(
   ::testing::Values("P", "Q", "B")
   );
 
+// Test Backend messages
+TEST_F(PostgreSQLProxyDecoderTest, Backend) {
+  std::string payload;
+  // C message
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsOther());
+  payload = "BEGIN 123";
+  data.add("C");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsOther());
+  payload = "START TR";
+  data.add("C");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsOther());
+  EXPECT_CALL(callbacks_, incTransactionsCommit());
+  payload = "COMMIT";
+  data.add("C");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsOther());
+  EXPECT_CALL(callbacks_, incTransactionsRollback());
+  payload = "ROLLBACK";
+  data.add("C");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsInsert());
+  EXPECT_CALL(callbacks_, incTransactionsCommit());
+  payload = "INSERT 1";
+  data.add("C");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsUpdate());
+  EXPECT_CALL(callbacks_, incTransactionsCommit());
+  payload = "UPDATE 1i23";
+  data.add("C");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsDelete());
+  EXPECT_CALL(callbacks_, incTransactionsCommit());
+  payload = "DELETE 88";
+  data.add("C");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // T message
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsSelect());
+  EXPECT_CALL(callbacks_, incTransactionsCommit());
+  payload = "blah blah";
+  data.add("T");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // '1' Message
+  EXPECT_CALL(callbacks_, incStatements());
+  EXPECT_CALL(callbacks_, incStatementsOther());
+  payload = "blah blah";
+  data.add("1");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // R message
+  EXPECT_CALL(callbacks_, incSessions());
+  payload = "blah blah";
+  data.add("R");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // E message
+  EXPECT_CALL(callbacks_, incErrors());
+  payload = "blah VERROR blah";
+  data.add("E");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // N message
+  EXPECT_CALL(callbacks_, incWarnings());
+  payload = "blah VWARNING blah";
+  data.add("N");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+}
+
 } // namespace PostgreSQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

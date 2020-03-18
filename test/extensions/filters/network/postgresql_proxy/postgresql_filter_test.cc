@@ -16,7 +16,6 @@ using ::testing::WithArgs;
 class DecoderTest : public Decoder {
 public:
   MOCK_METHOD(bool, onData, (Buffer::Instance&, bool), (override));
-  MOCK_METHOD(void, onFrontendData, (Buffer::Instance&), (override));
   MOCK_METHOD(PostgreSQLSession&,  getSession, (), (override));
 };
 
