@@ -427,10 +427,11 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
     ActiveConnections& active_connections, Network::ConnectionPtr&& new_connection,
     TimeSource& time_source, Network::ListenerConfig& config,
     std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
-    : active_connections_(active_connections), connection_(std::move(new_connection)),
+    : stream_info_(std::move(stream_info)), active_connections_(active_connections),
+      connection_(std::move(new_connection)),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)),
-      config_(config), stream_info_(std::move(stream_info)) {
+      config_(config) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);

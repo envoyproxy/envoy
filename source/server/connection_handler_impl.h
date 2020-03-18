@@ -192,11 +192,11 @@ private:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
+    std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
     ActiveConnections& active_connections_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;
     Network::ListenerConfig& config_;
-    std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   };
 
   /**
