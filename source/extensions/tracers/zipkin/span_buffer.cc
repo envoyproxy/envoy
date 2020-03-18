@@ -81,7 +81,9 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
                      toListOfSpans(zipkin_span, replacements), ",",
                      [&replacement_values](std::string* element, const ProtobufWkt::Struct& span) {
                        const std::string json = MessageUtil::getJsonStringFromMessage(
-                           span, /*pretty_print*/ false, /*always_print_primitive_fields*/ true);
+                           span, /* pretty_print */ false,
+                           /* always_print_primitive_fields */ true);
+
                        // The Zipkin API V2 specification mandates to store timestamp value as int64
                        // https://github.com/openzipkin/zipkin-api/blob/228fabe660f1b5d1e28eac9df41f7d1deed4a1c2/zipkin2-api.yaml#L447-L463
                        // (often translated as uint64 in some of the official implementations:
