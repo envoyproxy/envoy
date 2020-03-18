@@ -2820,6 +2820,7 @@ virtual_hosts:
   - name: "www2"
     domains: ["www.lyft.com"]
     include_request_attempt_count: true
+    include_attempt_count_in_response: true
     routes:
       - match: { prefix: "/"}
         route:
@@ -2830,7 +2831,11 @@ virtual_hosts:
 
   EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                   ->routeEntry()
-                  ->includeAttemptCount());
+                  ->includeAttemptCountInRequest());
+
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->includeAttemptCountInResponse());
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCode) {
@@ -3651,6 +3656,108 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
+}
+
+TEST_F(RouteMatcherTest, TestInvalidCharactersInPrefixRewrites) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/foo" }
+    route:
+      prefix_rewrite: "/\ndroptable"
+      cluster: www
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "RouteActionValidationError.PrefixRewrite:.*value does not match regex pattern");
+}
+
+TEST_F(RouteMatcherTest, TestInvalidCharactersInHostRewrites) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/foo" }
+    route:
+      host_rewrite: "new_host\ndroptable"
+      cluster: www
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "RouteActionValidationError.HostRewriteLiteral:.*value does not match regex pattern");
+}
+
+TEST_F(RouteMatcherTest, TestInvalidCharactersInAutoHostRewrites) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/foo" }
+    route:
+      auto_host_rewrite_header: "x-host\ndroptable"
+      cluster: www
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "RouteActionValidationError.HostRewriteHeader:.*value does not match regex pattern");
+}
+
+TEST_F(RouteMatcherTest, TestInvalidCharactersInHostRedirect) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/foo" }
+    redirect: { host_redirect: "new.host\ndroptable" }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "RedirectActionValidationError.HostRedirect:.*value does not match regex pattern");
+}
+
+TEST_F(RouteMatcherTest, TestInvalidCharactersInPathRedirect) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/foo" }
+    redirect: { path_redirect: "/new_path\ndroptable" }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "RedirectActionValidationError.PathRedirect:.*value does not match regex pattern");
+}
+
+TEST_F(RouteMatcherTest, TestInvalidCharactersInPrefixRewriteRedirect) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/foo" }
+    redirect: { prefix_rewrite: "/new/prefix\ndroptable"}
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "RedirectActionValidationError.PrefixRewrite:.*value does not match regex pattern");
 }
 
 TEST_F(RouteMatcherTest, TestPrefixAndRegexRewrites) {

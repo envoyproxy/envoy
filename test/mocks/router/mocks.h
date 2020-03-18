@@ -190,16 +190,19 @@ public:
 class TestShadowPolicy : public ShadowPolicy {
 public:
   TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
-                   envoy::type::v3::FractionalPercent default_value = {})
-      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value) {}
+                   envoy::type::v3::FractionalPercent default_value = {}, bool trace_sampled = true)
+      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value),
+        trace_sampled_(trace_sampled) {}
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
+  bool traceSampled() const override { return trace_sampled_; }
 
   std::string cluster_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
+  bool trace_sampled_;
 };
 
 class MockShadowWriter : public ShadowWriter {
@@ -209,13 +212,13 @@ public:
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-              std::chrono::milliseconds timeout) override {
-    shadow_(cluster, request, timeout);
+              const Http::AsyncClient::RequestOptions& options) override {
+    shadow_(cluster, request, options);
   }
 
   MOCK_METHOD(void, shadow_,
               (const std::string& cluster, Http::RequestMessagePtr& request,
-               std::chrono::milliseconds timeout));
+               const Http::AsyncClient::RequestOptions& options));
 };
 
 class TestVirtualCluster : public VirtualCluster {
@@ -238,7 +241,8 @@ public:
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(const Config&, routeConfig, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
-  MOCK_METHOD(bool, includeAttemptCount, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
@@ -344,7 +348,8 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
-  MOCK_METHOD(bool, includeAttemptCount, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(InternalRedirectAction, internalRedirectAction, (), (const));
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));

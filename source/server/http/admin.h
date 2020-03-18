@@ -150,6 +150,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override;
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
+  Tracing::HttpTracerSharedPtr tracer() override { return nullptr; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
@@ -356,6 +357,9 @@ private:
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream&);
+  Http::Code handlerReopenLogs(absl::string_view path_and_query,
+                               Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream&);
   bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {

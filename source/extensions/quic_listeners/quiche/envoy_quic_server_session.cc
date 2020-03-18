@@ -88,12 +88,6 @@ void EnvoyQuicServerSession::Initialize() {
   quic_connection_->setEnvoyConnection(*this);
 }
 
-void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) {
-  if (transport_version() < quic::QUIC_VERSION_99) {
-    quic::QuicServerSessionBase::SendGoAway(error_code, reason);
-  }
-}
-
 void EnvoyQuicServerSession::OnCanWrite() {
   quic::QuicServerSessionBase::OnCanWrite();
   // Do not update delay close state according to connection level packet egress because that is

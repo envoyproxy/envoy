@@ -8,6 +8,7 @@
 
 #include "common/common/utility.h"
 
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -102,6 +103,13 @@ TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;
   EXPECT_TRUE(DateUtil::timePointValid(test_time.timeSystem().systemTime()));
+}
+
+TEST(DateUtil, NowToMilliseconds) {
+  Event::SimulatedTimeSystem test_time;
+  const SystemTime time_with_millis(std::chrono::seconds(12345) + std::chrono::milliseconds(67));
+  test_time.setSystemTime(time_with_millis);
+  EXPECT_EQ(12345067, DateUtil::nowToMilliseconds(test_time));
 }
 
 TEST(InputConstMemoryStream, All) {
@@ -344,6 +352,36 @@ TEST(StringUtil, StringViewSplit) {
                 ContainerEq(StringUtil::splitToken("hello world ", " ", true)));
     EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
                 ContainerEq(StringUtil::splitToken("hello world", " ", true)));
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one , two , three ", ",", true, true);
+    EXPECT_EQ(3, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "two") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", true, true);
+    EXPECT_EQ(4, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", false, true);
+    EXPECT_EQ(3, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "one") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five") != tokens.end());
+  }
+  {
+    auto tokens = StringUtil::splitToken(" one ,  , three=five ", ",=", false);
+    EXPECT_EQ(4, tokens.size());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " one ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "  ") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), " three") != tokens.end());
+    EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five ") != tokens.end());
   }
 }
 

@@ -314,6 +314,32 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
   return total;
 }
 
+DynamicSpans SymbolTableImpl::getDynamicSpans(StatName stat_name) const {
+  DynamicSpans dynamic_spans;
+
+  uint32_t index = 0;
+  auto record_dynamic = [&dynamic_spans, &index](absl::string_view str) {
+    DynamicSpan span;
+    span.first = index;
+    index += std::count(str.begin(), str.end(), '.');
+    span.second = index;
+    ++index;
+    dynamic_spans.push_back(span);
+  };
+
+  // Use decodeTokens to suss out which components of stat_name are
+  // symbolic vs dynamic. The lambda that takes a Symbol is called
+  // for symbolic components. The lambda called with a string_view
+  // is called for dynamic components.
+  //
+  // Note that with fake symbol tables, the Symbol lambda is called
+  // once for each character in the string, and no dynamics will
+  // be recorded.
+  Encoding::decodeTokens(
+      stat_name.data(), stat_name.dataSize(), [&index](Symbol) { ++index; }, record_dynamic);
+  return dynamic_spans;
+}
+
 void SymbolTableImpl::setRecentLookupCapacity(uint64_t capacity) {
   Thread::LockGuard lock(lock_);
   recent_lookups_.setCapacity(capacity);

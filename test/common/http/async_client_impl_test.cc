@@ -191,6 +191,8 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   expectSuccess(200);
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  EXPECT_CALL(*child_span, setSampled(true));
+  EXPECT_CALL(*child_span, injectContext(_));
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
@@ -228,8 +230,12 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _)).WillOnce(Return(child_span));
   expectSuccess(200);
 
-  AsyncClient::RequestOptions options =
-      AsyncClient::RequestOptions().setParentSpan(parent_span_).setChildSpanName(child_span_name_);
+  AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
+                                            .setParentSpan(parent_span_)
+                                            .setChildSpanName(child_span_name_)
+                                            .setSampled(false);
+  EXPECT_CALL(*child_span, setSampled(false));
+  EXPECT_CALL(*child_span, injectContext(_));
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
@@ -868,6 +874,8 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
       .WillOnce(Return(child_span));
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  EXPECT_CALL(*child_span, setSampled(true));
+  EXPECT_CALL(*child_span, injectContext(_));
   AsyncClient::Request* request = client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
@@ -927,6 +935,8 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
       .WillOnce(Return(child_span));
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
+  EXPECT_CALL(*child_span, setSampled(true));
+  EXPECT_CALL(*child_span, injectContext(_));
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(callbacks_, onFailure(_));
@@ -1084,6 +1094,8 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
                                             .setParentSpan(parent_span_)
                                             .setTimeout(std::chrono::milliseconds(40));
+  EXPECT_CALL(*child_span, setSampled(true));
+  EXPECT_CALL(*child_span, injectContext(_));
   client_.send(std::move(message_), callbacks_, options);
 
   EXPECT_CALL(*child_span,
@@ -1279,7 +1291,8 @@ TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
   EXPECT_TRUE(route_impl_.routeEntry()->virtualHost().rateLimitPolicy().empty());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().corsPolicy());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().perFilterConfig("bar"));
-  EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeAttemptCount());
+  EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeAttemptCountInRequest());
+  EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().includeAttemptCountInResponse());
   EXPECT_FALSE(route_impl_.routeEntry()->virtualHost().routeConfig().usesVhds());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->tlsContextMatchCriteria());
 }
