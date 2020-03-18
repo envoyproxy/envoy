@@ -2401,7 +2401,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutIsDisarmedOnConnectionTermin
   EXPECT_EQ(0U, stats_.named_.downstream_rq_timeout_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, NotInvokeStreamDeletionConfiguredZero) {
+TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationDisabledIfSetToZero) {
   max_stream_duration_ = std::chrono::milliseconds(0);
   setup(false, "");
 
