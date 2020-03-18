@@ -57,6 +57,45 @@ HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
 
   return nullptr;
 }
+
+/**
+ * Determines whether Envoy supports the encodings provided for the transfer-encoding header. Envoy
+ * currently only supports chunked and identity. Per RFC 7230 Section 3.3.3 when encodings are chained
+ * then chunked must be the last encoding, so possible values are:
+ * chunked
+ * identity,chunked
+ * identity, chunked
+ * etc.
+ * The following is a regex-less match that also minimizes copies (std::regex must use a std::string).
+ *
+ * @param encoding The transfer-encoding value from the HTTP message
+ * @return whether the encoding only contains supported encodings.
+ */
+bool IsSupportedTransferEncoding(absl::string_view encoding) {
+  const std::string& chunked = Headers::get().TransferEncodingValues.Chunked;
+  if (absl::EqualsIgnoreCase(encoding, chunked)) {
+    return true;
+  }
+
+  // The only other encoding we support is identity when chained with chunked.
+  const std::string& identity = Headers::get().TransferEncodingValues.Identity;
+  const auto identity_len = identity.length();
+  const auto chunked_len = chunked.length();
+
+  // The shortest valid value is "identity,chunked".
+  const auto min_len = identity_len + chunked_len + 1;
+
+  if (encoding.size() >= min_len && absl::StartsWithIgnoreCase(encoding, identity) && absl::EndsWithIgnoreCase(encoding, chunked)) {
+    const auto comma_pos = encoding.find_first_of(',');
+    const auto after_identity = encoding.substr(comma_pos + 1);
+    const auto chunked_start_pos = after_identity.size() - chunked_len;
+    if (after_identity.find_first_not_of(' ') == chunked_start_pos) {
+      return true;
+    }
+  }
+
+  return false;
+}
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
@@ -597,14 +636,13 @@ int ConnectionImpl::onHeadersCompleteBase() {
   }
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
-  // transfer-codings it does not understand.
+  // transfer-encodings it does not understand.
   if (request_or_response_headers.TransferEncoding()) {
-    absl::string_view encoding =
+    const absl::string_view encoding =
         request_or_response_headers.TransferEncoding()->value().getStringView();
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
-        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Identity) &&
-        !absl::EqualsIgnoreCase(encoding, Headers::get().TransferEncodingValues.Chunked)) {
+        !IsSupportedTransferEncoding(encoding)) {
       error_code_ = Http::Code::NotImplemented;
       sendProtocolError(Http1ResponseCodeDetails::get().InvalidTransferEncoding);
       throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");

@@ -273,7 +273,9 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
+// We support the identity encoding, but because there it does not end in
+// chunked encoding we reject it per RFC 7230 Section 3.3.3
+TEST_F(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
   initialize();
 
   InSequence sequence;
@@ -281,15 +283,36 @@ TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-  TestHeaderMapImpl expected_headers{
-      {":path", "/"},
-      {":method", "GET"},
-      {"transfer-encoding", "identity, chunked"},
-  };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity, chunked\r\n\r\n");
-  codec_->dispatch(buffer);
-  EXPECT_EQ(0U, buffer.length());
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: unsupported transfer encoding");
+}
+
+TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: gzip\r\n\r\n");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: unsupported transfer encoding");
+}
+
+TEST_F(Http1ServerConnectionImplTest, UnsupportedChainedEncoding) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: "
+                           "deflate, chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: unsupported transfer encoding");
 }
 
 TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
@@ -340,7 +363,6 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedBodyCase) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// Currently http_parser does not support chained transfer encodings.
 TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   initialize();
 
@@ -349,10 +371,19 @@ TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
   MockRequestDecoder decoder;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
+  TestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "identity, chunked"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
+  Buffer::OwnedImpl expected_data("Hello World");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(_, true)).Times(1);
   Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: "
-                           "identity,chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: unsupported transfer encoding");
+                           "identity, chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
 }
 
 TEST_F(Http1ServerConnectionImplTest, HostWithLWS) {
