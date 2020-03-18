@@ -296,7 +296,7 @@ public:
 
   /**
    * Represents the binary annotation as a protobuf struct.
-   *
+   * @param replacements Used to hold the required replacements on serialization step.
    * @return a protobuf struct.
    */
   const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;

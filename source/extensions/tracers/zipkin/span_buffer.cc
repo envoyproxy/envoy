@@ -89,14 +89,16 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
                        // (often translated as uint64 in some of the official implementations:
                        // https://github.com/openzipkin/zipkin-go/blob/62dc8b26c05e0e8b88eb7536eff92498e65bbfc3/model/span.go#L114,
                        // and see the discussion here:
-                       // https://github.com/openzipkin/zipkin-go/pull/161#issuecomment-598558072),
-                       // however when the timestamp is stored as number value (double) there is a
-                       // possibility that the value will be rendered as a number with scientific
-                       // notation as reported in:
+                       // https://github.com/openzipkin/zipkin-go/pull/161#issuecomment-598558072).
+                       // However, when the timestamp is stored as number value in a protobuf
+                       // struct, it is stored as a double. Because of how protobuf serializes
+                       // doubles, there is a possibility that the value will be rendered as a
+                       // number with scientific notation as reported in:
                        // https://github.com/envoyproxy/envoy/issues/9341#issuecomment-566912973. To
                        // deal with that issue, here we do a workaround by storing the timestamp as
-                       // string and keeping track that with the corresponding integer replacements,
-                       // and do the replacement here so we can meet the Zipkin API V2 requirements.
+                       // string and keeping track of that with the corresponding integer
+                       // replacements, and do the replacement here so we can meet the Zipkin API V2
+                       // requirements.
                        //
                        // TODO(dio): The right fix for this is to introduce additional knob when
                        // serializing double in protobuf DoubleToBuffer function, and make it
@@ -128,11 +130,11 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
     }
 
     if (annotation.isSetEndpoint()) {
-      // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue, however
-      // due to the possibility of rendering that to a number with scientific notation, we chose to
-      // store it as a string and keeping track the corresponding replacement. e.g. we have
-      // 1584324295476870 if we stored it as a double value, MessageToJsonString gives
-      // us 1.58432429547687e+15, instead we store it as the string of 1584324295476870 (when it is
+      // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
+      // However, due to the possibility of rendering that to a number with scientific notation, we
+      // chose to store it as a string and keeping track the corresponding replacement. For example,
+      // we have 1584324295476870 if we stored it as a double value, MessageToJsonString gives
+      // us 1.58432429547687e+15. Instead we store it as the string of 1584324295476870 (when it is
       // serialized: "1584324295476870"), and replace it post MessageToJsonString serialization with
       // integer (1584324295476870 without `"`), see: JsonV2Serializer::serialize.
       (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(annotation.timestamp(), replacements);
