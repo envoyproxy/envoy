@@ -58,7 +58,7 @@ public:
   const std::string config_yaml = R"EOF(
 stat_prefix: "my_prefix"
 server_config:
-  control_plane_config:
+  inline_dns_table:
     external_retry_count: 3
     virtual_domains:
       - name: "www.foo1.com"

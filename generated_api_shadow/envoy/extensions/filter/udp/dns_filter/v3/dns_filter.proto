@@ -60,9 +60,9 @@ message DnsFilterConfig {
 
   // This message contains the configuration for the DNS Filter if populated
   // from the control plane
-  message ControlPlaneConfig {
+  message InlineDnsTable {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.ControlPlaneConfig";
+        "envoy.config.filter.udp.dns_filter.v2alpha.DnsFilterConfig.InlineDnsTable";
 
     // Control how many times envoy makes an attempt to forward a query to
     // an external server
@@ -85,10 +85,10 @@ message DnsFilterConfig {
 
     oneof config_source {
       // Load the configuration specified from the control plane
-      ControlPlaneConfig control_plane_config = 1;
+      InlineDnsTable inline_dns_table = 1;
 
       // Seed the filter configuration from an external path
-      config.core.v3.DataSource filter_server_config = 2;
+      config.core.v3.DataSource external_dns_table = 2;
     }
   }
 

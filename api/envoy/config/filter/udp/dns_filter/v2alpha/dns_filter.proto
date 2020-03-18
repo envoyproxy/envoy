@@ -52,7 +52,7 @@ message DnsFilterConfig {
 
   // This message contains the configuration for the DNS Filter if populated
   // from the control plane
-  message ControlPlaneConfig {
+  message InlineDnsTable {
     // Control how many times envoy makes an attempt to forward a query to
     // an external server
     uint32 external_retry_count = 1;
@@ -71,10 +71,10 @@ message DnsFilterConfig {
   message ServerContextConfig {
     oneof config_source {
       // Load the configuration specified from the control plane
-      ControlPlaneConfig control_plane_config = 1;
+      InlineDnsTable inline_dns_table = 1;
 
       // Seed the filter configuration from an external path
-      api.v2.core.DataSource filter_server_config = 2;
+      api.v2.core.DataSource external_dns_table = 2;
     }
   }
 

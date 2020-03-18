@@ -17,9 +17,9 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   // store configured data for server context
   const auto& server_config = config.server_config();
 
-  if (server_config.has_control_plane_config()) {
+  if (server_config.has_inline_dns_table()) {
 
-    const auto& cfg = server_config.control_plane_config();
+    const auto& cfg = server_config.inline_dns_table();
     const size_t entries = cfg.virtual_domains().size();
 
     // TODO (abaptiste): Check that the domain configured here appears
