@@ -303,8 +303,6 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
 TEST_P(ActiveQuicListenerTest, QuicProcessingDisabled) {
   EnvoyQuicDispatcher* const envoy_quic_dispatcher =
       ActiveQuicListenerPeer::quic_dispatcher(*quic_listener_);
-  quic::QuicBufferedPacketStore* const buffered_packets =
-      quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
   EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true)).WillRepeatedly(Return(false));
   SendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
