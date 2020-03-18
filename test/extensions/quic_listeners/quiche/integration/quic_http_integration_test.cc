@@ -43,8 +43,8 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
-class QuicHttpIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                public HttpIntegrationTest {
+class QuicHttpIntegrationTest : public HttpIntegrationTest,
+ public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   QuicHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam(),
@@ -439,6 +439,10 @@ TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   codec_client_->close();
 
   EXPECT_TRUE(makeRawHttpConnection(makeClientConnection((lookupPort("http"))))->disconnected());
+}
+
+TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
+  testAdminDrain(Http::CodecClient::Type::HTTP1);
 }
 
 } // namespace Quic
