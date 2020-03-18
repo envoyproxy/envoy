@@ -61,9 +61,8 @@ HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
 /**
  * Determines whether Envoy supports the encodings provided for the transfer-encoding header. Envoy
  * currently only supports chunked and identity. Per RFC 7230 Section 3.3.3 when encodings are
- * chained then chunked must be the last encoding, so possible values are: chunked identity,chunked
- * identity, chunked
- * etc.
+ * chained then chunked must be the last encoding, so possible values are: "chunked",
+ * "identity,chunked" "identity, chunked", etc.
  *
  * @param encoding The transfer-encoding value from the HTTP message
  * @return whether the encoding only contains supported encodings.

@@ -273,8 +273,8 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-// We support the identity encoding, but because there it does not end in
-// chunked encoding we reject it per RFC 7230 Section 3.3.3
+// We support the identity encoding, but because it does not end in chunked encoding we reject it
+// per RFC 7230 Section 3.3.3
 TEST_F(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
   initialize();
 
