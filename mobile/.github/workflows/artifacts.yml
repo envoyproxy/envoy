@@ -61,6 +61,8 @@ jobs:
     needs: [master_ios_dist]
     steps:
       - uses: actions/checkout@v1
+        with:
+          submodules: true
       - name: 'Install dependencies'
         run: ./envoy/ci/mac_ci_setup.sh
       - uses: actions/download-artifact@v1
