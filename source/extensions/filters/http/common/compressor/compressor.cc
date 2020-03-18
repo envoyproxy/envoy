@@ -118,7 +118,6 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
     compressor_ = config_->makeCompressor();
   } else if (!skip_compression_) {
     skip_compression_ = true;
-    config_->stats().not_compressed_.inc();
   }
   return Http::FilterHeadersStatus::Continue;
 }

@@ -152,7 +152,7 @@ protected:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
     Http::TestResponseTrailerMapImpl trailers;
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
-    EXPECT_EQ(1, stats_.counter("test.test.not_compressed").value());
+    EXPECT_EQ(0U, stats_.counter("test.test.compressed").value());
   }
 
   CompressorFilterConfigSharedPtr config_;
