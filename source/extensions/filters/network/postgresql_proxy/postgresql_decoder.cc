@@ -25,7 +25,16 @@ void DecoderImpl::initialize() {
   // Backend messages
   std::get<0>(BEmessages_) = "Backend";
   // Setup handlers for known messages
-  //absl::flat_hash_map<char, Message>& BE_known_msgs = std::get<1>(BEmessages_);
+  absl::flat_hash_map<char, Message>& BE_known_msgs = std::get<1>(BEmessages_);
+  BE_known_msgs['C'] = Message{"C(CommandComplete)", {&DecoderImpl::decodeBackendStatements}};
+  BE_known_msgs['2'] = Message{"2(BindComplete)", {&DecoderImpl::decodeBackendStatements}};
+  BE_known_msgs['S'] = Message{"S(ParameterStatus)", {&DecoderImpl::decodeBackendStatements}};
+  BE_known_msgs['T'] = Message{"T(RowDescription)", {&DecoderImpl::decodeBackendRowDescription}};
+  BE_known_msgs['1'] = Message{"1(ParseComplete)", {&DecoderImpl::incStatements, &DecoderImpl::incStatementsOther}};
+  BE_known_msgs['R'] = Message{"R(AuthenticationOk)", {&DecoderImpl::incSessions}};
+  BE_known_msgs['E'] = Message{"E(ErrorResponse)", {&DecoderImpl::decodeBackendErrorResponse}};
+  BE_known_msgs['N'] = Message{"N(NoticeResponse)", {&DecoderImpl::decodeBackendNoticeResponse}};
+
   // Handler for unknown messages
   std::get<2>(BEmessages_) = Message{"Other", {&DecoderImpl::incUnrecognized}};
 }
@@ -86,7 +95,7 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 
   std::tuple<std::string, absl::flat_hash_map<char, Message>, Message>& msg_processor = std::ref(frontend ? FEmessages_ : BEmessages_); 
 
-  Message& msg = std::ref(std::get<2>(msg_processor));;
+  std::reference_wrapper<Message> msg = std::get<2>(msg_processor);;
   if(initial_) {
 	  msg = std::ref(first_);
 	  initial_ = false;
@@ -97,128 +106,18 @@ bool DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
   }
   }
 
-  std::vector<MsgAction>& actions = std::get<1>(msg);
+  std::vector<MsgAction>& actions = std::get<1>(msg.get());
   for (const auto action : actions) {
     action(this);
   } 
 
-#if 0
-  std::reference_wrapper<const std::unique_ptr<MessageImpl>> msg = std::cref(unrecognized_); 
-  auto it = messages_.find(command_);
-  if (it != messages_.end()) {
-     msg = std::cref((*it).second);
-  }
-
-  for (const auto action : msg.get()->getActions()) {
-    action(this);
-  } 
-#endif
-#if 0 
-
-  std::string command_type = "(Backend)";
-
-  switch (command_)
-  {
-  case 'Q':
-  case 'P':
-  case 'B':
-    command_type = "(Frontend)";
-    callbacks_->incFrontend();
-    break;
-
-  case 'C': // CommandComplete
-  case '2': // BindComplete
-  case 'S': // ParameterStatus
-    decodeBackendStatements();
-    break;
-
-  case '1': // ParseComplete
-    callbacks_->incStatements();
-    callbacks_->incStatementsOther();
-    break;
-
-  case 'T': // RowDescription
-    decodeBackendRowDescription();
-    break;
-
-  case 'R': // AuthenticationOk
-    callbacks_->incSessions();
-    break;
-
-  case 'E': // ErrorResponse
-    decodeBackendErrorResponse();
-    break;
-
-  case 'N': // NoticeResponse
-    decodeBackendNoticeResponse();
-    break;
-
-  default:
-    callbacks_->incUnrecognized();
-    break;
-  }
-#endif
-
-  ENVOY_LOG(debug, "{} command = {}", std::get<0>(msg_processor), std::get<0>(msg));
+  ENVOY_LOG(debug, "{} command = {}", std::get<0>(msg_processor), std::get<0>(msg.get()));
   ENVOY_LOG(debug, "{} length = {}",  std::get<0>(msg_processor), getMessageLength());
   ENVOY_LOG(debug, "{} message = {}", std::get<0>(msg_processor), getMessage());
- /* 
-  if (isBackend()) {
-    decodeBackend();
-  } else {
-    decodeFrontend();
-  }
-*/
+
   ENVOY_LOG(trace, "postgresql_proxy: {} bytes remaining in buffer", data.length());
 
   return true;
-}
-
-
-void DecoderImpl::onFrontendData(Buffer::Instance& data) {
-  parseMessage(data);
-
-  ENVOY_LOG(debug, "(Frontend) command = {}", command_);
-  ENVOY_LOG(debug, "(Frontend) length = {}", getMessageLength());
-  ENVOY_LOG(debug, "(Frontend) message = {}", getMessage());
-
-}
-
-void DecoderImpl::decodeBackend() {
-  ENVOY_LOG(debug, "(Backend) command = {}", command_);
-  ENVOY_LOG(debug, "(Backend) length = {}", getMessageLength());
-  ENVOY_LOG(debug, "(Backend) message = {}", getMessage());
-
-  // Decode the backend commands
-  switch (command_)
-  {
-  case 'C': // CommandComplete
-  case '2': // BindComplete
-  case 'S': // ParameterStatus
-    decodeBackendStatements();
-    break;
-
-  case '1': // ParseComplete
-    callbacks_->incStatements();
-    callbacks_->incStatementsOther();
-    break;
-
-  case 'T': // RowDescription
-    decodeBackendRowDescription();
-    break;
-
-  case 'R': // AuthenticationOk
-    callbacks_->incSessions();
-    break;
-
-  case 'E': // ErrorResponse
-    decodeBackendErrorResponse();
-    break;
-
-  case 'N': // NoticeResponse
-    decodeBackendNoticeResponse();
-    break;
-  }
 }
 
 void DecoderImpl::decodeBackendStatements() {
@@ -226,7 +125,7 @@ void DecoderImpl::decodeBackendStatements() {
   if (getMessage().find("BEGIN") != std::string::npos) {
     callbacks_->incStatementsOther();
     session_.setInTransaction(true);
-  } else if (getMessage().find("START TRANSACTION") != std::string::npos) {
+  } else if (getMessage().find("START") != std::string::npos) {
     callbacks_->incStatementsOther();
     session_.setInTransaction(true);
   } else if (getMessage().find("ROLLBACK") != std::string::npos) {
@@ -258,6 +157,16 @@ void DecoderImpl::incFrontend() {
 void DecoderImpl::incUnrecognized() {
     callbacks_->incUnrecognized();
 }
+void DecoderImpl::incStatements() {
+    callbacks_->incStatements();
+}
+void DecoderImpl::incStatementsOther() {
+    callbacks_->incStatementsOther();
+}
+void DecoderImpl::incSessions() {
+    callbacks_->incSessions();
+}
+
 
 void DecoderImpl::decodeBackendErrorResponse() {
   if (getMessage().find("VERROR") != std::string::npos) {
@@ -276,37 +185,6 @@ void DecoderImpl::decodeBackendRowDescription() {
   callbacks_->incStatementsSelect();
   callbacks_->incTransactionsCommit();
 }
-
-void DecoderImpl::decodeFrontend() {
-  ENVOY_LOG(debug, "(Frontend) command = {}", command_);
-  ENVOY_LOG(debug, "(Frontend) length = {}", getMessageLength());
-  ENVOY_LOG(debug, "(Frontend) message = {}", getMessage());
-
-  switch (command_)
-  {
-  case 'Q':
-    session_.setProtocolType(PostgreSQLSession::ProtocolType::Simple);
-    break;
-
-  case 'P':
-  case 'B':
-    session_.setProtocolType(PostgreSQLSession::ProtocolType::Extended);
-    break;
-  }
-}
-
-bool DecoderImpl::isBackend() {
-  return (session_.getProtocolDirection() == PostgreSQLSession::ProtocolDirection::Backend);
-}
-
-bool DecoderImpl::isFrontend() {
-  return (session_.getProtocolDirection() == PostgreSQLSession::ProtocolDirection::Frontend);
-}
-#if 0
-void DecoderImpl::onData(Buffer::Instance& data) {
-  decode(data);
-}
-#endif
 
 } // namespace PostgreSQLProxy
 } // namespace NetworkFilters

@@ -69,9 +69,6 @@ public:
   
   virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgreSQLSession& getSession() PURE;
-  
-  // decode frontend messages
-  virtual void onFrontendData(Buffer::Instance& data) PURE;
 };
 
 
@@ -83,13 +80,8 @@ public:
   DecoderImpl(DecoderCallbacks* callbacks) : callbacks_(callbacks) {initialize();}
 
   // PostgreSQLProxy::Decoder
-  void onFrontendData(Buffer::Instance& data) override;
   bool onData(Buffer::Instance& data, bool frontend) override;
   PostgreSQLSession& getSession() override { return session_; }
-
-  // Temp stuff for testing purposes
-//  void setCommand(std::string command) { command_ = command; }
-//  std::string getCommand() { return command_; }
 
   void setMessage(std::string message) { message_ = message; }
   std::string getMessage() { return message_; }
@@ -102,17 +94,15 @@ public:
 protected:
   bool parseMessage(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
-  void decodeBackend();
   void decodeBackendStatements();
   void decodeBackendErrorResponse();
   void decodeBackendNoticeResponse();
   void decodeBackendRowDescription();
   void incFrontend();
   void incUnrecognized();
-
-  void decodeFrontend();
-  bool isFrontend();
-  bool isBackend();
+  void incStatements();
+  void incStatementsOther();
+  void incSessions();
 
   DecoderCallbacks* callbacks_;
   PostgreSQLSession session_;
@@ -127,12 +117,10 @@ protected:
   bool initial_{true}; // initial stage does not have 1st byte command
 
   using Message = std::tuple<std::string, std::vector<MsgAction>>;
-  //absl::flat_hash_map<char, Message> messages_;
-  //absl::flat_hash_map<char, std::tuple<std::string, std::string, std::vector<MsgAction>>> messages_;
-  //absl::flat_hash_map<char, std::unique_ptr<MessageImpl>> messages_;
-//  std::unique_ptr<MessageImpl> unrecognized_;
-  //std::tuple<std::string, std::string, std::vector<MsgAction>>unrecognized_;
-  //Message unrecognized_;
+  // Handler for initial postgresql message. 
+  // Initial message is the only message which does not start with
+  // 1 byte TYPE. It starts with message length and must be 
+  // therefore handled differently.
   Message first_;
 
   // Frontend mnd Backend essages
