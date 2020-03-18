@@ -126,11 +126,6 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, upstreamTransportFailureReason())
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
-  ON_CALL(*this, setUpstreamClusterName(_))
-      .WillByDefault(Invoke([this](const absl::string_view upstream_cluster_name) {
-        upstream_cluster_name_ = std::string(upstream_cluster_name);
-      }));
-  ON_CALL(*this, upstreamClusterName()).WillByDefault(ReturnRef(upstream_cluster_name_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

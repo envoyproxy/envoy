@@ -209,10 +209,13 @@ public:
 
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
-  void setUpstreamClusterName(const absl::string_view upstream_cluster_name) override {
-    upstream_cluster_name_ = std::string(upstream_cluster_name);
+  void setUpstreamClusterInfo(
+      const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) override {
+    upstream_cluster_info_ = upstream_cluster_info;
   }
-  const std::string& upstreamClusterName() const override { return upstream_cluster_name_; }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+    return upstream_cluster_info_;
+  }
 
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -250,7 +253,7 @@ public:
   std::string upstream_transport_failure_reason_;
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
-  std::string upstream_cluster_name_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
 };
 
 } // namespace Envoy

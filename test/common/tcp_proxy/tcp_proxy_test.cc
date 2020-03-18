@@ -1938,10 +1938,18 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ClusterNameSet)) {
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
       .WillOnce(Return(nullptr));
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
+  EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
+      .WillOnce(
+          Invoke([&cluster_info](const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) {
+            cluster_info = upstream_cluster_info;
+          }));
+  EXPECT_CALL(connection_.stream_info_, upstreamClusterInfo())
+      .WillOnce(ReturnPointee(&cluster_info));
 
   filter_->onNewConnection();
 
-  EXPECT_EQ(connection_.stream_info_.upstreamClusterName(), "fake_cluster");
+  EXPECT_EQ(connection_.stream_info_.upstreamClusterInfo().value()->name(), "fake_cluster");
 }
 
 class TcpProxyHashingTest : public testing::Test {

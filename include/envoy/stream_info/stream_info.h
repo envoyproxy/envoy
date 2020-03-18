@@ -13,6 +13,8 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
+//#include "envoy/upstream/upstream.h"
+
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"
@@ -24,6 +26,11 @@ namespace Envoy {
 namespace Router {
 class RouteEntry;
 } // namespace Router
+
+namespace Upstream {
+class ClusterInfo;
+using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
+} // namespace Upstream
 
 namespace StreamInfo {
 
@@ -522,14 +529,15 @@ public:
   virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
 
   /**
-   * @param Upstream connection's ClusterName.
+   * @param Upstream connection's ClusterInfo.
    */
-  virtual void setUpstreamClusterName(const absl::string_view upstream_cluster_name) PURE;
+  virtual void
+  setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
 
   /**
-   * @return Upstream connection's ClusterName.
+   * @return Upstream connection's ClusterInfo.
    */
-  virtual const std::string& upstreamClusterName() const PURE;
+  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 };
 
 } // namespace StreamInfo

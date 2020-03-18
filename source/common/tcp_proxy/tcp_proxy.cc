@@ -391,7 +391,6 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   route_ = pickRoute();
 
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
-  getStreamInfo().setUpstreamClusterName(cluster_name);
 
   Upstream::ThreadLocalCluster* thread_local_cluster = cluster_manager_.get(cluster_name);
 
@@ -406,6 +405,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
+  getStreamInfo().setUpstreamClusterInfo(cluster);
 
   // Check this here because the TCP conn pool will queue our request waiting for a connection that
   // will never be released.

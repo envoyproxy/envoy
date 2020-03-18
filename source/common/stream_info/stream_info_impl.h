@@ -253,11 +253,14 @@ struct StreamInfoImpl : public StreamInfo {
        << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
   }
 
-  void setUpstreamClusterName(absl::string_view upstream_cluster_name) override {
-    upstream_cluster_name_ = std::string(upstream_cluster_name);
+  void setUpstreamClusterInfo(
+      const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) override {
+    upstream_cluster_info_ = upstream_cluster_info;
   }
 
-  const std::string& upstreamClusterName() const override { return upstream_cluster_name_; }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+    return upstream_cluster_info_;
+  }
 
   TimeSource& time_source_;
   const SystemTime start_time_;
@@ -293,7 +296,7 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
-  std::string upstream_cluster_name_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
 };
 
 } // namespace StreamInfo

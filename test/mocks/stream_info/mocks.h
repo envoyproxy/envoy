@@ -89,8 +89,9 @@ public:
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
   MOCK_METHOD(const Http::RequestHeaderMap*, getRequestHeaders, (), (const));
-  MOCK_METHOD(void, setUpstreamClusterName, (const absl::string_view));
-  MOCK_METHOD(const std::string&, upstreamClusterName, (), (const));
+  MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
+  MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
+              (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -123,7 +124,6 @@ public:
   std::string requested_server_name_;
   std::string route_name_;
   std::string upstream_transport_failure_reason_;
-  std::string upstream_cluster_name_;
 };
 
 } // namespace StreamInfo
