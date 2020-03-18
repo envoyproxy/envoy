@@ -53,7 +53,7 @@ void validateCustomSettingsParameters(
     case NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the use
       // of a primitive type (bool).
-      throw EnvoyException("the \"allow_connect\" SETTINGS parameter should only be configured "
+      throw EnvoyException("the \"allow_connect\" SETTINGS parameter must only be configured "
                            "through the named field");
     case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
