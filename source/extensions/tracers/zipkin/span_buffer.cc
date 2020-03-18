@@ -89,7 +89,7 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
                        // and see the discussion here:
                        // https://github.com/openzipkin/zipkin-go/pull/161#issuecomment-598558072),
                        // however when the timestamp is stored as number value (double) there is a
-                       // possibility that the value will be rendered as a number wth scientific
+                       // possibility that the value will be rendered as a number with scientific
                        // notation as reported in:
                        // https://github.com/envoyproxy/envoy/issues/9341#issuecomment-566912973. To
                        // deal with that issue, here we do a workaround by storing the timestamp as
