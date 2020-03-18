@@ -341,7 +341,7 @@ public:
     auto* resource = response.add_resources();
     resource->set_name("cannot-resolve-alias");
     resource->set_version(version);
-    for (const auto alias : aliases) {
+    for (const auto& alias : aliases) {
       resource->add_aliases(alias);
     }
     response.set_nonce("noncense");

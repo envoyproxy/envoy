@@ -327,6 +327,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
   stream_info->setDownstreamLocalAddress(socket->localAddress());
   stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
+  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
 
   // Find matching filter chain.
   const auto filter_chain = config_.filterChainManager().findFilterChain(*socket);

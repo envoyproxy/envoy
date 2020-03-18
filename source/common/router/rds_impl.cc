@@ -82,11 +82,10 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
-
+  const auto resource_name = getResourceName(rds.config_source().resource_api_version());
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          rds.config_source(), loadTypeUrl(rds.config_source().resource_api_version()), *scope_,
-          *this);
+          rds.config_source(), Grpc::Common::typeUrl(resource_name), *scope_, *this);
   local_init_manager_.add(local_init_target_);
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator_);
@@ -221,22 +220,6 @@ bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
     // (would be a return false here)
   }
   return true;
-}
-
-std::string
-RdsRouteConfigSubscription::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3::ApiVersion::AUTO:
-  case envoy::config::core::v3::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()));
-  case envoy::config::core::v3::ApiVersion::V3:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::config::route::v3::RouteConfiguration().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
 }
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(

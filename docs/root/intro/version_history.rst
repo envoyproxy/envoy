@@ -5,10 +5,12 @@ Version history
 ================
 * access loggers: access logger extensions use the "envoy.access_loggers" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* access log: fix %DOWSTREAM_DIRECT_REMOTE_ADDRESS% when used with PROXY protocol listener filter
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
 * aws_request_signing: a few fixes so that it works with S3.
 * admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
+* admin: added :http:post:`/reopen_logs` endpoint to control log rotation.
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
 * config: added stat :ref:`update_time <config_cluster_manager_cds>`.
@@ -41,6 +43,8 @@ Version history
 * router: added support for :ref:`regex_rewrite
   <envoy_api_field_route.RouteAction.regex_rewrite>` for path rewriting using regular expressions and capture groups.
 * router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
+* router: added ability to set attempt count in downstream response, see :ref:`virtual host's include response
+  attempt count config <envoy_api_field_route.VirtualHost.include_attempt_count_in_response>`.
 * router: strip whitespace for :ref:`retry_on <envoy_api_field_route.RetryPolicy.retry_on>`, :ref:`grpc-retry-on header <config_http_filters_router_x-envoy-retry-grpc-on>` and :ref:`retry-on header <config_http_filters_router_x-envoy-retry-on>`.
 * runtime: enabling the runtime feature "envoy.deprecated_features.allow_deprecated_extension_names"
   disables the use of deprecated extension names.

@@ -12,6 +12,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "backtrace_lib",
+    srcs = ["backtrace.cc"],
     hdrs = ["backtrace.h"],
     external_deps = [
         "abseil_stacktrace",
@@ -254,6 +255,7 @@ envoy_cc_library(
     srcs = ["lds_api.cc"],
     hdrs = ["lds_api.h"],
     deps = [
+        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/init:manager_interface",

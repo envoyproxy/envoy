@@ -44,6 +44,7 @@ public:
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
   const Network::Address::InstanceConstSharedPtr& remoteAddress() const override;
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override;
   const Network::Address::InstanceConstSharedPtr& localAddress() const override;
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
