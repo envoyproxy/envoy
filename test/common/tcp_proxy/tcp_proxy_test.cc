@@ -1927,7 +1927,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   filter_->onNewConnection();
 }
 
-TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ClusterNameSet)) {
+TEST_F(TcpProxyRoutingTest, ClusterNameSet) {
   setup();
 
   initializeFilter();
