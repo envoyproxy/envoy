@@ -16,7 +16,8 @@ class AwsLambdaFilterIntegrationTest : public testing::TestWithParam<Network::Ad
                                        public HttpIntegrationTest {
 public:
   AwsLambdaFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+
   void SetUp() override { setUpstreamProtocol(FakeHttpConnection::Type::HTTP1); }
 
   void TearDown() override {
@@ -43,19 +44,21 @@ public:
     config_helper_.addClusterFilterMetadata(metadata_yaml);
   }
 
-  template <typename TMap> void compareMaps(const TMap& m1, const TMap& m2) {
+  template <typename TMap>
+  ABSL_MUST_USE_RESULT testing::AssertionResult compareMaps(const TMap& m1, const TMap& m2) {
     for (auto&& kvp : m1) {
       auto it = m2.find(kvp.first);
       if (it == m2.end()) {
-        FAIL() << "Failed to find value: " << kvp.first;
-        return;
+        return AssertionFailure() << "Failed to find value: " << kvp.first;
+        ;
       }
       if (it->second != kvp.second) {
-        FAIL() << "Values of key: " << kvp.first << " are different. expected: " << kvp.second
-               << " actual: " << it->second;
-        return;
+        return AssertionFailure() << "Values of key: " << kvp.first
+                                  << " are different. expected: " << kvp.second
+                                  << " actual: " << it->second;
       }
     }
+    return AssertionSuccess();
   }
 
   void runTest(const Http::RequestHeaderMap& request_headers, const std::string& request_body,
@@ -91,9 +94,9 @@ public:
     EXPECT_EQ(expected_request.method(), transformed_request.method());
     EXPECT_EQ(expected_request.body(), transformed_request.body());
     EXPECT_EQ(expected_request.is_base64_encoded(), transformed_request.is_base64_encoded());
-    compareMaps(expected_request.headers(), transformed_request.headers());
-    compareMaps(expected_request.query_string_parameters(),
-                transformed_request.query_string_parameters());
+    EXPECT_TRUE(compareMaps(expected_request.headers(), transformed_request.headers()));
+    EXPECT_TRUE(compareMaps(expected_request.query_string_parameters(),
+                            transformed_request.query_string_parameters()));
 
     if (lambda_response_body.empty()) {
       upstream_request_->encodeHeaders(lambda_response_headers, true /*end_stream*/);
@@ -147,7 +150,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AwsLambdaFilterIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedHeaderOnlyRequest) {
   setupLambdaFilter(false /*passthrough*/);
