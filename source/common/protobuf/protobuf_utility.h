@@ -42,7 +42,7 @@ public:
    * @param v2 message of type type.googleapis.com/google.protobuf.Value
    * @return true if v1 and v2 are identical
    */
-static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
+  static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
 
   /**
    * @return wrapped ProtobufWkt::NULL_VALUE.
@@ -64,7 +64,7 @@ static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
   static ProtobufWkt::Value boolValue(bool b);
 
   /**
-  * Wrap ProtobufWkt::Struct into ProtobufWkt::Value struct value.
+   * Wrap ProtobufWkt::Struct into ProtobufWkt::Value struct value.
    * @param obj struct to be wrapped.
    * @return wrapped struct.
    */
@@ -86,7 +86,7 @@ static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
    * @param values collection of ProtobufWkt::Values to be wrapped.
    * @return wrapped list value.
    */
-static ProtobufWkt::Value listValue(const std::vector<ProtobufWkt::Value>& values);
+  static ProtobufWkt::Value listValue(const std::vector<ProtobufWkt::Value>& values);
 };
 
 /**
@@ -106,6 +106,7 @@ public:
   }
 
   bool operator!=(const HashedValue& rhs) const { return !(*this == rhs); }
+
 private:
   const ProtobufWkt::Value value_;
   const std::size_t hash_;
@@ -120,4 +121,3 @@ template <> struct hash<Envoy::HashedValue> {
 };
 
 } // namespace std
-

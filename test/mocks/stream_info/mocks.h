@@ -73,6 +73,8 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, downstreamSslConnection, (), (const));
   MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, upstreamSslConnection, (), (const));
+  MOCK_METHOD(void, setUpstreamEndpointInfo, (const Router::UpstreamEndpointInfoConstSharedPtr&));
+  MOCK_METHOD(const Router::UpstreamEndpointInfo*, upstreamEndpointInfo, (), (const));
   MOCK_METHOD(void, setRouteEntry, (const std::shared_ptr<const Router::RouteEntry>&));
   MOCK_METHOD(const Router::RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());

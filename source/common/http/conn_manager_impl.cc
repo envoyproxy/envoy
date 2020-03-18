@@ -1397,7 +1397,9 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     }
   }
   stream_info_.setRouteEntry(route ? route->routeEntry() : nullptr);
-  stream_info_.setUpstreamEndpointInfo(route ? std::dynamic_pointer_cast<const Router::UpstreamEndpointInfo>(route->routeEntry()) : nullptr);
+  stream_info_.setUpstreamEndpointInfo(
+      route ? std::dynamic_pointer_cast<const Router::UpstreamEndpointInfo>(route->routeEntry())
+            : nullptr);
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {
     cached_cluster_info_ = nullptr;

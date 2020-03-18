@@ -108,7 +108,18 @@ public:
   }
   const std::string& getRouteName() const override { return route_name_; }
 
-  const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+  void setUpstreamEndpointInfo(
+      const Router::UpstreamEndpointInfoConstSharedPtr& upstream_endpoint_info) override {
+    upstream_endpoint_info_ = upstream_endpoint_info;
+  }
+  const Router::UpstreamEndpointInfo* upstreamEndpointInfo() const override {
+    return upstream_endpoint_info_.get();
+  }
+
+  void setRouteEntry(const std::shared_ptr<const Router::RouteEntry>& route_entry) override {
+    route_entry_ = route_entry;
+  }
+  const Router::RouteEntry* routeEntry() const override { return route_entry_.get(); }
 
   absl::optional<std::chrono::nanoseconds>
   duration(const absl::optional<MonotonicTime>& time) const {
@@ -234,7 +245,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
-  const Router::RouteEntry* route_entry_{};
+  std::shared_ptr<const Router::RouteEntry> route_entry_{};
   envoy::config::core::v3::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateSharedPtr filter_state_{
       std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
@@ -245,6 +256,7 @@ public:
   std::string upstream_transport_failure_reason_;
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
+  Router::UpstreamEndpointInfoConstSharedPtr upstream_endpoint_info_{};
 };
 
 } // namespace Envoy

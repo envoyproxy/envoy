@@ -460,9 +460,9 @@ public:
   virtual void setUpstreamEndpointInfo(
       const Router::UpstreamEndpointInfoConstSharedPtr& upstream_endpoint_info) PURE;
   /**
-  * @return const Router::UpstreamEndpointInfo* Get the upstream endpoint info selected for this
-  * request. Note: this will be nullptr if no route was selected.
-  */
+   * @return const Router::UpstreamEndpointInfo* Get the upstream endpoint info selected for this
+   * request. Note: this will be nullptr if no route was selected.
+   */
   virtual const Router::UpstreamEndpointInfo* upstreamEndpointInfo() const PURE;
 
   /**

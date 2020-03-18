@@ -1935,12 +1935,15 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ClusterName)) {
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
       .WillOnce(Return(nullptr));
+  EXPECT_CALL(connection_.stream_info_, setUpstreamEndpointInfo(_))
+      .WillOnce(
+          Invoke([](const Router::UpstreamEndpointInfoConstSharedPtr& upstream_endpoint_info) {
+            EXPECT_EQ(upstream_endpoint_info->clusterName(), "fake_cluster");
+          }));
   // Port 9999 is within the specified destination port range.
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   filter_->onNewConnection();
-
-  // EXPECT_EQ(connection_.streamInfo().routeEntry()->clusterName(),"fake_cluster");
 }
 
 class TcpProxyHashingTest : public testing::Test {

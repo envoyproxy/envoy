@@ -60,7 +60,6 @@ envoy_cc_library(
     ],
 )
 
-
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],

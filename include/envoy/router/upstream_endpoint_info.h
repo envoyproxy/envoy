@@ -77,7 +77,7 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
- * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
+   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
    * selecting an upstream host
    */
   virtual const MetadataMatchCriteria* metadataMatchCriteria() const PURE;
