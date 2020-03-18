@@ -357,6 +357,9 @@ private:
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream&);
+  Http::Code handlerReopenLogs(absl::string_view path_and_query,
+                               Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream&);
   bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
