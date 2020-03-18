@@ -2,6 +2,7 @@
 
 #include "envoy/http/codec.h"
 
+#include "common/http/utility.h"
 #include "common/http/http2/codec_impl.h"
 
 namespace Envoy {
@@ -10,18 +11,6 @@ namespace Http2 {
 
 class TestCodecSettingsProvider {
 public:
-  struct SettingsEntryHash {
-    size_t operator()(const nghttp2_settings_entry& entry) const {
-      return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
-    }
-  };
-
-  struct SettingsEntryEquals {
-    bool operator()(const nghttp2_settings_entry& lhs, const nghttp2_settings_entry& rhs) const {
-      return lhs.settings_id == rhs.settings_id;
-    }
-  };
-
   // Returns the value of the SETTINGS parameter keyed by |identifier| sent by the remote endpoint.
   absl::optional<uint32_t> getRemoteSettingsParameterValue(int32_t identifier) const {
     const auto it = settings_.find({identifier, 0});
@@ -42,7 +31,9 @@ protected:
   }
 
 private:
-  std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals> settings_;
+  std::unordered_set<nghttp2_settings_entry, ::Envoy::Http2::Utility::SettingsEntryHash,
+                     ::Envoy::Http2::Utility::SettingsEntryEquals>
+      settings_;
 };
 
 class TestServerConnectionImpl : public ServerConnectionImpl, public TestCodecSettingsProvider {

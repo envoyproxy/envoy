@@ -934,11 +934,7 @@ void ConnectionImpl::sendSettings(
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     const bool result =
         insertParameter({static_cast<int32_t>(it.identifier().value()), it.value().value()});
-    if (!result) {
-      ENVOY_CONN_LOG(debug, "duplicate custom settings parameter with id {:#x}, value {}",
-                     connection_, it.identifier().value(), it.value().value());
-      continue;
-    }
+    ASSERT(result);
     ENVOY_CONN_LOG(debug, "adding custom settings parameter with id {:#x} to {}", connection_,
                    it.identifier().value(), it.value().value());
   }

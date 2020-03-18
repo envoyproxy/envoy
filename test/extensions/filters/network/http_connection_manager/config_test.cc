@@ -1234,7 +1234,7 @@ http2_protocol_options:
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException,
-      "the \"allow_connect\" SETTINGS parameter should only be configured through the named field");
+      "the \"allow_connect\" SETTINGS parameter must only be configured through the named field");
 
   const std::string yaml_string2 = R"EOF(
 codec_type: http2
@@ -1322,6 +1322,40 @@ http2_protocol_options:
                                   scoped_routes_config_provider_manager_, http_tracer_manager_),
       EnvoyException,
       "server push is not supported by Envoy and can not be enabled via a SETTINGS parameter.");
+}
+
+// Validates that inconsistent custom parameters are rejected.
+TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsRejectInconsistentCustomParameters) {
+  const std::string yaml_string = R"EOF(
+codec_type: http2
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.filters.http.router
+  typed_config: {}
+http2_protocol_options:
+  custom_settings_parameters:
+    - { identifier: 10, value: 0 }
+    - { identifier: 10, value: 1 }
+    - { identifier: 12, value: 10 }
+    - { identifier: 14, value: 1 }
+    - { identifier: 12, value: 10 }
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                  date_provider_, route_config_provider_manager_,
+                                  scoped_routes_config_provider_manager_, http_tracer_manager_),
+      EnvoyException,
+      R"(inconsistent HTTP/2 custom SETTINGS parameter\(s\) detected; identifiers = \{0x0a\})");
 }
 
 // Test that the deprecated extension name still functions.

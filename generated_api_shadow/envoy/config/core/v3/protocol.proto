@@ -252,6 +252,7 @@ message Http2ProtocolOptions {
   // See `RFC7540, sec. 8.1 <https://tools.ietf.org/html/rfc7540#section-8.1>`_ for details.
   bool stream_error_on_invalid_http_messaging = 12;
 
+  // [#not-implemented-hide:]
   // Specifies SETTINGS frame parameters to be sent to the peer, with two exceptions:
   //
   // 1. SETTINGS_ENABLE_PUSH (0x2) is not configurable as HTTP/2 server push is not supported by
@@ -271,7 +272,8 @@ message Http2ProtocolOptions {
   //   0x3   max_concurrent_streams
   //   0x4   initial_stream_window_size
   //
-  // Collisions will trigger config validation failure on load/update.
+  // Collisions will trigger config validation failure on load/update. Likewise, inconsistencies
+  // between custom parameters with the same identifier will trigger a failure.
   //
   // See `IANA HTTP/2 Settings
   // <https://www.iana.org/assignments/http2-parameters/http2-parameters.xhtml#settings>`_ for

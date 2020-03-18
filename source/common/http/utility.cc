@@ -39,10 +39,22 @@ namespace {
 
 void validateCustomSettingsParameters(
     const envoy::config::core::v3::Http2ProtocolOptions& options) {
-  std::vector<std::string> duplicate_parameters;
+  std::vector<std::string> parameter_collisions, custom_parameter_collisions;
+  std::unordered_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
+      custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
   for (const auto it : options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
+    // Check for custom parameter inconsistencies.
+    const auto result = custom_parameters.insert(
+        {static_cast<int32_t>(it.identifier().value()), it.value().value()});
+    if (!result.second) {
+      if (result.first->value != it.value().value()) {
+        custom_parameter_collisions.push_back(
+            absl::StrCat("0x", absl::Hex(it.identifier().value(), absl::kZeroPad2)));
+        // Fall through to allow unbatched exceptions to throw first.
+      }
+    }
     switch (it.identifier().value()) {
     case NGHTTP2_SETTINGS_ENABLE_PUSH:
       if (it.value().value() == 1) {
@@ -51,23 +63,23 @@ void validateCustomSettingsParameters(
       }
       break;
     case NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL:
-      // An exception is made for `allow_connect` which can't be checked for presence due to the use
-      // of a primitive type (bool).
+      // An exception is made for `allow_connect` which can't be checked for presence due to the
+      // use of a primitive type (bool).
       throw EnvoyException("the \"allow_connect\" SETTINGS parameter must only be configured "
                            "through the named field");
     case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
-        duplicate_parameters.push_back("hpack_table_size");
+        parameter_collisions.push_back("hpack_table_size");
       }
       break;
     case NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS:
       if (options.has_max_concurrent_streams()) {
-        duplicate_parameters.push_back("max_concurrent_streams");
+        parameter_collisions.push_back("max_concurrent_streams");
       }
       break;
     case NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE:
       if (options.has_initial_stream_window_size()) {
-        duplicate_parameters.push_back("initial_stream_window_size");
+        parameter_collisions.push_back("initial_stream_window_size");
       }
       break;
     default:
@@ -76,14 +88,16 @@ void validateCustomSettingsParameters(
     }
   }
 
-  if (!duplicate_parameters.empty()) {
+  if (!custom_parameter_collisions.empty()) {
+    throw EnvoyException(fmt::format(
+        "inconsistent HTTP/2 custom SETTINGS parameter(s) detected; identifiers = {{{}}}",
+        absl::StrJoin(custom_parameter_collisions, ",")));
+  }
+  if (!parameter_collisions.empty()) {
     throw EnvoyException(fmt::format(
         "the {{{}}} HTTP/2 SETTINGS parameter(s) can not be configured through both named and "
-        "custom "
-        "parameters",
-        absl::StrJoin(duplicate_parameters, ",", [](std::string* out, const std::string& str) {
-          absl::StrAppend(out, str);
-        })));
+        "custom parameters",
+        absl::StrJoin(parameter_collisions, ",")));
   }
 }
 
