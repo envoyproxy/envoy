@@ -22,11 +22,8 @@ UtilitiesSharedPtr RequestIDUtilsFactory::fromProto(
         fmt::format("Didn't find a registered implementation for type: '{}'", type));
   }
 
-  // FIXME(euroelessar): Use Config::Utility::translateAnyToFactoryConfig once
-  // https://github.com/envoyproxy/envoy/pull/10418 is merged.
-  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  Config::Utility::translateOpaqueConfig(config.typed_config(), ProtobufWkt::Struct(),
-                                         context.messageValidationVisitor(), *message);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      config.typed_config(), context.messageValidationVisitor(), *factory);
   return factory->createUtilitiesInstance(*message, context);
 }
 

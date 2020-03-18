@@ -19,7 +19,8 @@ public:
   virtual ~Utilities() = default;
 
   /**
-   * Directly set a request ID into the provided request headers
+   * Directly set a request ID into the provided request headers. Override any previous request ID
+   * if any.
    * @param request_headers supplies the incoming request headers for setting a request ID.
    */
   virtual void setRequestID(Http::RequestHeaderMap& request_headers) PURE;
