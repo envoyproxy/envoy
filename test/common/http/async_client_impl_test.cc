@@ -1053,8 +1053,8 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
 
   EXPECT_CALL(callbacks_, onSuccess_(_, _))
       .WillOnce(Invoke([](const AsyncClient::Request& request, ResponseMessage* response) -> void {
-        // Verify that callback is called with the same request handle as returned by
-        // AsyncClient::send().
+        // The callback gets called before AsyncClient::send() completes, which means that we don't
+        // have a request handle to compare to.
         EXPECT_NE(nullptr, &request);
         EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
       }));
@@ -1077,8 +1077,8 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
 
   EXPECT_CALL(callbacks_, onSuccess_(_, _))
       .WillOnce(Invoke([](const AsyncClient::Request& request, ResponseMessage* response) -> void {
-        // Verify that callback is called with the same request handle as returned by
-        // AsyncClient::send().
+        // The callback gets called before AsyncClient::send() completes, which means that we don't
+        // have a request handle to compare to.
         EXPECT_NE(nullptr, &request);
         EXPECT_EQ(503, Utility::getResponseStatus(response->headers()));
       }));
