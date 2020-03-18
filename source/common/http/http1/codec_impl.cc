@@ -60,13 +60,10 @@ HeaderKeyFormatterPtr formatter(const Http::Http1Settings& settings) {
 
 /**
  * Determines whether Envoy supports the encodings provided for the transfer-encoding header. Envoy
- * currently only supports chunked and identity. Per RFC 7230 Section 3.3.3 when encodings are chained
- * then chunked must be the last encoding, so possible values are:
- * chunked
- * identity,chunked
+ * currently only supports chunked and identity. Per RFC 7230 Section 3.3.3 when encodings are
+ * chained then chunked must be the last encoding, so possible values are: chunked identity,chunked
  * identity, chunked
  * etc.
- * The following is a regex-less match that also minimizes copies (std::regex must use a std::string).
  *
  * @param encoding The transfer-encoding value from the HTTP message
  * @return whether the encoding only contains supported encodings.
@@ -85,7 +82,8 @@ bool IsSupportedTransferEncoding(absl::string_view encoding) {
   // The shortest valid value is "identity,chunked".
   const auto min_len = identity_len + chunked_len + 1;
 
-  if (encoding.size() >= min_len && absl::StartsWithIgnoreCase(encoding, identity) && absl::EndsWithIgnoreCase(encoding, chunked)) {
+  if (encoding.size() >= min_len && absl::StartsWithIgnoreCase(encoding, identity) &&
+      absl::EndsWithIgnoreCase(encoding, chunked)) {
     const auto comma_pos = encoding.find_first_of(',');
     const auto after_identity = encoding.substr(comma_pos + 1);
     const auto chunked_start_pos = after_identity.size() - chunked_len;
