@@ -98,7 +98,7 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  OptProcessContextRef processContext() override { return absl::nullopt; }
+  ProcessContextOptRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
@@ -106,10 +106,17 @@ public:
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
+  void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
-  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+    return server_contexts_;
+  }
+  void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
+    http_context_.setDefaultTracingConfig(tracing_config);
+  }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) override {
@@ -198,7 +205,7 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
-  ServerFactoryContextImpl server_context_;
+  ServerFactoryContextImpl server_contexts_;
 };
 
 } // namespace Server

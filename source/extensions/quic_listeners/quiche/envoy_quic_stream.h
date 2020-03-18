@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Quic {
 
 // Base class for EnvoyQuicServer|ClientStream.
-class EnvoyQuicStream : public Http::StreamEncoder,
+class EnvoyQuicStream : public virtual Http::StreamEncoder,
                         public Http::Stream,
                         public Http::StreamCallbackHelper,
                         protected Logger::Loggable<Logger::Id::quic_stream> {
@@ -80,10 +80,6 @@ public:
     return connection()->localAddress();
   }
 
-  // Needs to be called during quic stream creation before the stream receives
-  // any headers and data.
-  void setDecoder(Http::StreamDecoder& decoder) { decoder_ = &decoder; }
-
   void maybeCheckWatermark(uint64_t buffered_data_old, uint64_t buffered_data_new,
                            QuicFilterManagerConnectionImpl& connection) {
     if (buffered_data_new == buffered_data_old) {
@@ -106,11 +102,6 @@ protected:
   virtual uint32_t streamId() PURE;
   virtual Network::Connection* connection() PURE;
 
-  Http::StreamDecoder* decoder() {
-    ASSERT(decoder_ != nullptr);
-    return decoder_;
-  }
-
   // True once end of stream is propagated to Envoy. Envoy doesn't expect to be
   // notified more than once about end of stream. So once this is true, no need
   // to set it in the callback to Envoy stream any more.
@@ -121,8 +112,6 @@ protected:
   bool in_decode_data_callstack_{false};
 
 private:
-  // Not owned.
-  Http::StreamDecoder* decoder_{nullptr};
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
   // upon crossing high and low watermarks.
   // Its high watermark is also the buffer limit of stream read/write filters in

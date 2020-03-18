@@ -4,6 +4,8 @@
 
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
+#include "common/stats/stat_merger.h"
+#include "common/stats/symbol_table_impl.h"
 
 #include "server/listener_impl.h"
 
@@ -82,6 +84,19 @@ void HotRestartingParent::onSocketEvent() {
 
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
+HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(server) {
+  // Track the hot-restart generation. Using gauge's accumulate semantics,
+  // the increments will be combined across hot-restart. This may be useful
+  // at some point, though the main motivation for this stat is to enable
+  // an integration test showing that dynamic stat-names can be coalesced
+  // across hot-restarts. There's no other reason this particular stat-name
+  // needs to be created dynamically.
+  Stats::StatNameDynamicPool pool(server_->stats().symbolTable());
+  Stats::Gauge& gauge = server_->stats().gaugeFromStatName(
+      pool.add("server.hot_restart_generation"), Stats::Gauge::ImportMode::Accumulate);
+  gauge.inc();
+}
+
 HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
   server_->shutdownAdmin();
   HotRestartMessage wrapped_reply;
@@ -117,7 +132,9 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
   for (const auto& gauge : server_->stats().gauges()) {
     if (gauge->used()) {
-      (*stats->mutable_gauges())[gauge->name()] = gauge->value();
+      const std::string name = gauge->name();
+      (*stats->mutable_gauges())[name] = gauge->value();
+      recordDynamics(stats, name, gauge->statName());
     }
   }
 
@@ -127,12 +144,38 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
       // latching) by the time it begins exporting to the hot restart child.
       uint64_t latched_value = counter->latch();
       if (latched_value > 0) {
-        (*stats->mutable_counter_deltas())[counter->name()] = latched_value;
+        const std::string name = counter->name();
+        (*stats->mutable_counter_deltas())[name] = latched_value;
+        recordDynamics(stats, name, counter->statName());
       }
     }
   }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
   stats->set_num_connections(server_->listenerManager().numConnections());
+}
+
+void HotRestartingParent::Internal::recordDynamics(HotRestartMessage::Reply::Stats* stats,
+                                                   const std::string& name,
+                                                   Stats::StatName stat_name) {
+  // Compute an array of spans describing which components of the stat name are
+  // dynamic. This is needed so that when the child recovers the StatName, it
+  // correlates with how the system generates those stats, with the same exact
+  // components using a dynamic representation.
+  //
+  // See https://github.com/envoyproxy/envoy/issues/9874 for more details.
+  Stats::DynamicSpans spans = server_->stats().symbolTable().getDynamicSpans(stat_name);
+
+  // Convert that C++ structure (controlled by stat_merger.cc) into a protobuf
+  // for serialization.
+  if (!spans.empty()) {
+    HotRestartMessage::Reply::RepeatedSpan spans_proto;
+    for (const Stats::DynamicSpan& span : spans) {
+      HotRestartMessage::Reply::Span* span_proto = spans_proto.add_spans();
+      span_proto->set_first(span.first);
+      span_proto->set_last(span.second);
+    }
+    (*stats->mutable_dynamics())[name] = spans_proto;
+  }
 }
 
 void HotRestartingParent::Internal::drainListeners() { server_->drainListeners(); }

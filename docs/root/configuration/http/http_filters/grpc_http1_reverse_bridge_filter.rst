@@ -59,11 +59,11 @@ How to disable HTTP/1.1 reverse bridge filter per route
           port_value: 80
       filter_chains:
       - filters:
-        - name: envoy.http_connection_manager
+        - name: envoy.filters.network.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             access_log:
-            - name: envoy.file_access_log
+            - name: envoy.access_loggers.file
               typed_config:
                 "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
                 path: /dev/stdout
@@ -96,7 +96,7 @@ How to disable HTTP/1.1 reverse bridge filter per route
                 "@type": type.googleapis.com/envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfig
                 content_type: application/grpc+proto
                 withhold_grpc_frames: true
-            - name: envoy.router
+            - name: envoy.filters.http.router
               typed_config: {}
     clusters:
     - name: other

@@ -75,6 +75,8 @@ protected:
           : parent_(parent), stream_info_(parent_.parent_.factory_context_.timeSource()),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
+      void raiseConnectionEvent(Network::ConnectionEvent event);
+
       // Network::FilterManager
       void addWriteFilter(Network::WriteFilterSharedPtr) override {
         NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -84,7 +86,9 @@ protected:
       bool initializeReadFilters() override { return true; }
 
       // Network::Connection
-      void addConnectionCallbacks(Network::ConnectionCallbacks&) override {}
+      void addConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
+        callbacks_.push_back(&cb);
+      }
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
       }
@@ -100,6 +104,9 @@ protected:
       void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       bool readEnabled() const override { return true; }
       const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
+        return parent_.parent_.address();
+      }
+      const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
         return parent_.parent_.address();
       }
       absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
@@ -129,6 +136,7 @@ protected:
       SyntheticReadCallbacks& parent_;
       StreamInfo::StreamInfoImpl stream_info_;
       Network::ConnectionSocket::OptionsSharedPtr options_;
+      std::list<Network::ConnectionCallbacks*> callbacks_;
     };
 
     ApiListenerImplBase& parent_;
@@ -157,6 +165,9 @@ public:
   // ApiListener
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }
   Http::ApiListenerOptRef http() override;
+  void shutdown() override;
+
+  Network::ReadFilterCallbacks& readCallbacksForTest() { return read_callbacks_; }
 
 private:
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,

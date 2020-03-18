@@ -52,7 +52,7 @@ public:
   ~AsyncClientImpl() override;
 
   // Http::AsyncClient
-  Request* send(MessagePtr&& request, Callbacks& callbacks,
+  Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
                 const AsyncClient::RequestOptions& options) override;
 
   Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
@@ -90,9 +90,9 @@ public:
   absl::optional<Router::ConfigConstSharedPtr> routeConfig() override { return {}; }
 
   // Http::AsyncClient::Stream
-  void sendHeaders(HeaderMap& headers, bool end_stream) override;
+  void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
   void sendData(Buffer::Instance& data, bool end_stream) override;
-  void sendTrailers(HeaderMap& trailers) override;
+  void sendTrailers(RequestTrailerMap& trailers) override;
   void reset() override;
 
 protected:
@@ -159,7 +159,7 @@ private:
   };
 
   struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
+    Router::RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                       uint64_t) const override {
       return nullptr;
     }
@@ -184,7 +184,8 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
-    bool includeAttemptCount() const override { return false; }
+    bool includeAttemptCountInRequest() const override { return false; }
+    bool includeAttemptCountInResponse() const override { return false; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -214,9 +215,10 @@ private:
       return Http::Code::InternalServerError;
     }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    void finalizeRequestHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&,
+    void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
-    void finalizeResponseHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&) const override {}
+    void finalizeResponseHeaders(Http::ResponseHeaderMap&,
+                                 const StreamInfo::StreamInfo&) const override {}
     const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
     const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
@@ -267,7 +269,8 @@ private:
       return nullptr;
     }
 
-    bool includeAttemptCount() const override { return false; }
+    bool includeAttemptCountInRequest() const override { return false; }
+    bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     Router::InternalRedirectAction internalRedirectAction() const override {
       return Router::InternalRedirectAction::PassThrough;
@@ -326,7 +329,7 @@ private:
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  RequestTrailerMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void addDecodedData(Buffer::Instance&, bool) override {
     // This should only be called if the user has set up buffering. The request is already fully
     // buffered. Note that this is only called via the async client's internal use of the router
@@ -342,13 +345,13 @@ private:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void sendLocalReply(Code code, absl::string_view body,
-                      std::function<void(HeaderMap& headers)> modify_headers,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override {
     stream_info_.setResponseCodeDetails(details);
     Utility::sendLocalReply(
         is_grpc_request_,
-        [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+        [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
           if (modify_headers != nullptr) {
             modify_headers(*headers);
           }
@@ -359,10 +362,10 @@ private:
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
-  void encode100ContinueHeaders(HeaderMapPtr&&) override {}
-  void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
+  void encode100ContinueHeaders(ResponseHeaderMapPtr&&) override {}
+  void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void encodeTrailers(HeaderMapPtr&& trailers) override;
+  void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
   void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override {}
   void onDecoderFilterBelowWriteBufferLowWatermark() override {}
@@ -404,8 +407,8 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                AsyncStreamImpl,
                                AsyncClient::StreamCallbacks {
 public:
-  AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   const AsyncClient::RequestOptions& options);
+  AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
+                   AsyncClient::Callbacks& callbacks, const AsyncClient::RequestOptions& options);
 
   // AsyncClient::Request
   void cancel() override;
@@ -414,9 +417,9 @@ private:
   void initialize();
 
   // AsyncClient::StreamCallbacks
-  void onHeaders(HeaderMapPtr&& headers, bool end_stream) override;
+  void onHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
-  void onTrailers(HeaderMapPtr&& trailers) override;
+  void onTrailers(ResponseTrailerMapPtr&& trailers) override;
   void onComplete() override;
   void onReset() override;
 
@@ -430,9 +433,9 @@ private:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
-  MessagePtr request_;
+  RequestMessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
-  std::unique_ptr<MessageImpl> response_;
+  std::unique_ptr<ResponseMessageImpl> response_;
   bool cancelled_{};
   Tracing::SpanPtr child_span_;
 

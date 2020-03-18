@@ -58,7 +58,14 @@ protected:
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
    * requests to hosts regardless of whether they are healthy or not.
    */
-  bool isGlobalPanic(const HostSet& host_set);
+  bool isHostSetInPanic(const HostSet& host_set);
+
+  /**
+   * Method is called when all host sets are in panic mode.
+   * In such state the load is distributed based on the number of hosts
+   * in given priority regardless of their health.
+   */
+  void recalculateLoadInTotalPanic();
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                    Runtime::RandomGenerator& random,
@@ -137,7 +144,7 @@ public:
 
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }
 
   const HealthyAndDegradedLoad&
   determinePriorityLoad(const PrioritySet&,
@@ -265,9 +272,9 @@ private:
   uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set);
 
   /**
-   * @return (number of hosts in a given locality)/(total number of hosts) in ret param.
+   * @return (number of hosts in a given locality)/(total number of hosts) in `ret` param.
    * The result is stored as integer number and scaled by 10000 multiplier for better precision.
-   * Caller is responsible for allocation/de-allocation of ret.
+   * Caller is responsible for allocation/de-allocation of `ret`.
    */
   void calculateLocalityPercentage(const HostsPerLocality& hosts_per_locality, uint64_t* ret);
 

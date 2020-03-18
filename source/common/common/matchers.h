@@ -7,6 +7,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 #include "envoy/type/matcher/v3/number.pb.h"
+#include "envoy/type/matcher/v3/path.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
@@ -18,6 +19,9 @@ namespace Matchers {
 
 class ValueMatcher;
 using ValueMatcherConstSharedPtr = std::shared_ptr<const ValueMatcher>;
+
+class PathMatcher;
+using PathMatcherConstSharedPtr = std::shared_ptr<const PathMatcher>;
 
 class ValueMatcher {
 public:
@@ -79,28 +83,12 @@ public:
   bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
+  const envoy::type::matcher::v3::StringMatcher& matcher() const { return matcher_; }
+
 private:
   const envoy::type::matcher::v3::StringMatcher matcher_;
   Regex::CompiledMatcherPtr regex_;
 };
-
-class LowerCaseStringMatcher : public ValueMatcher {
-public:
-  LowerCaseStringMatcher(const envoy::type::matcher::v3::StringMatcher& matcher)
-      : matcher_(toLowerCase(matcher)) {}
-
-  bool match(const absl::string_view value) const;
-
-  bool match(const ProtobufWkt::Value& value) const override;
-
-private:
-  envoy::type::matcher::v3::StringMatcher
-  toLowerCase(const envoy::type::matcher::v3::StringMatcher& matcher);
-
-  const StringMatcherImpl matcher_;
-};
-
-using LowerCaseStringMatcherPtr = std::unique_ptr<LowerCaseStringMatcher>;
 
 class ListMatcher : public ValueMatcher {
 public:
@@ -130,6 +118,20 @@ private:
   std::vector<std::string> path_;
 
   ValueMatcherConstSharedPtr value_matcher_;
+};
+
+class PathMatcher : public StringMatcher {
+public:
+  PathMatcher(const envoy::type::matcher::v3::PathMatcher& path) : matcher_(path.path()) {}
+  PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher) : matcher_(matcher) {}
+
+  static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
+  static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
+
+  bool match(const absl::string_view path) const override;
+
+private:
+  const StringMatcherImpl matcher_;
 };
 
 } // namespace Matchers

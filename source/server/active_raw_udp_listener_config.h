@@ -11,7 +11,7 @@ class ActiveRawUdpListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
   Network::ConnectionHandler::ActiveListenerPtr
   createActiveUdpListener(Network::ConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          Network::ListenerConfig& config) const override;
+                          Network::ListenerConfig& config) override;
 
   bool isTransportConnectionless() const override { return true; }
 };
@@ -24,7 +24,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   Network::ActiveUdpListenerFactoryPtr
-  createActiveUdpListenerFactory(const Protobuf::Message&) override;
+  createActiveUdpListenerFactory(const Protobuf::Message&, uint32_t concurrency) override;
 
   std::string name() const override;
 };

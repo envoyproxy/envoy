@@ -20,7 +20,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/common/stack_array.h"
 #include "common/config/api_version.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
@@ -37,6 +36,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/container/fixed_array.h"
 #include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
@@ -94,14 +94,15 @@ void IntegrationStreamDecoder::waitForReset() {
   }
 }
 
-void IntegrationStreamDecoder::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+void IntegrationStreamDecoder::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
   continue_headers_ = std::move(headers);
   if (waiting_for_continue_headers_) {
     dispatcher_.exit();
   }
 }
 
-void IntegrationStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
+void IntegrationStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                             bool end_stream) {
   saw_end_stream_ = end_stream;
   headers_ = std::move(headers);
   if ((end_stream && waiting_for_end_stream_) || waiting_for_headers_) {
@@ -123,7 +124,7 @@ void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_strea
   }
 }
 
-void IntegrationStreamDecoder::decodeTrailers(Http::HeaderMapPtr&& trailers) {
+void IntegrationStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   saw_end_stream_ = true;
   trailers_ = std::move(trailers);
   if (waiting_for_end_stream_) {
@@ -208,6 +209,9 @@ void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
 }
 
 void IntegrationTcpClient::waitForHalfClose() {
+  if (payload_reader_->readLastByte()) {
+    return;
+  }
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(payload_reader_->readLastByte());
 }
@@ -447,7 +451,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
     const char* success = "listener_manager.listener_create_success";
     const char* rejected = "listener_manager.lds.update_rejected";
     while ((test_server_->counter(success) == nullptr ||
-            test_server_->counter(success)->value() == 0) &&
+            test_server_->counter(success)->value() < concurrency_) &&
            (!allow_lds_rejection || test_server_->counter(rejected) == nullptr ||
             test_server_->counter(rejected)->value() == 0)) {
       if (time_system_.monotonicTime() >= end_time) {

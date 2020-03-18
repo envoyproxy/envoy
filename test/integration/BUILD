@@ -830,6 +830,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "sds_generic_secret_integration_test",
+    srcs = [
+        "sds_generic_secret_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//include/envoy/registry",
+        "//source/common/grpc:common_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "tcp_proxy_integration_test",
     srcs = [
         "tcp_proxy_integration_test.cc",
@@ -858,6 +874,22 @@ envoy_cc_test(
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "tcp_tunneling_integration_test",
+    srcs = [
+        "tcp_tunneling_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
     ],
 )
 
@@ -919,6 +951,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/stats:stats_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -958,19 +991,29 @@ envoy_cc_test(
     ],
 )
 
+H1_FUZZ_LIB_DEPS = [
+    ":capture_fuzz_proto_cc_proto",
+    ":http_integration_lib",
+    "//source/common/common:assert_lib",
+    "//source/common/common:logger_lib",
+    "//test/fuzz:fuzz_runner_lib",
+    "//test/integration:integration_lib",
+    "//test/test_common:environment_lib",
+]
+
 envoy_cc_test_library(
     name = "h1_fuzz_lib",
     srcs = ["h1_fuzz.cc"],
     hdrs = ["h1_fuzz.h"],
-    deps = [
-        ":capture_fuzz_proto_cc_proto",
-        ":http_integration_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
-        "//test/fuzz:fuzz_runner_lib",
-        "//test/integration:integration_lib",
-        "//test/test_common:environment_lib",
-    ],
+    deps = H1_FUZZ_LIB_DEPS,
+)
+
+envoy_cc_test_library(
+    name = "h1_fuzz_persistent_lib",
+    srcs = ["h1_fuzz.cc"],
+    hdrs = ["h1_fuzz.h"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    deps = H1_FUZZ_LIB_DEPS,
 )
 
 envoy_cc_fuzz_test(
@@ -981,11 +1024,30 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_fuzz_test(
+    name = "h1_capture_persistent_fuzz_test",
+    srcs = ["h1_capture_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h1_corpus",
+    deps = [":h1_fuzz_persistent_lib"],
+)
+
+envoy_cc_fuzz_test(
     name = "h1_capture_direct_response_fuzz_test",
     srcs = ["h1_capture_direct_response_fuzz_test.cc"],
     corpus = "h1_corpus",
     deps = [
         ":h1_fuzz_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "h1_capture_direct_response_persistent_fuzz_test",
+    srcs = ["h1_capture_direct_response_fuzz_test.cc"],
+    copts = ["-DPERSISTENT_FUZZER"],
+    corpus = "h1_corpus",
+    deps = [
+        ":h1_fuzz_persistent_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
@@ -1014,20 +1076,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "aws_metadata_fetcher_integration_test",
+    name = "listener_lds_integration_test",
     srcs = [
-        "aws_metadata_fetcher_integration_test.cc",
+        "listener_lds_integration_test.cc",
     ],
     deps = [
-        ":integration_lib",
-        "//source/common/common:fmt_lib",
-        "//source/extensions/filters/http/common/aws:utility_lib",
-        "//source/extensions/filters/http/fault:config",
-        "//source/extensions/filters/http/fault:fault_filter_lib",
-        "//source/extensions/filters/http/router:config",
-        "//source/extensions/filters/network/echo:config",
-        "//source/extensions/filters/network/http_connection_manager:config",
-        "//test/server:utility_lib",
+        ":http_integration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

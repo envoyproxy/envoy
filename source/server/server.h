@@ -15,6 +15,7 @@
 #include "envoy/server/instance.h"
 #include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
@@ -57,9 +58,11 @@ namespace Server {
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, Accumulate)                                                \
   GAUGE(hot_restart_epoch, NeverImport)                                                            \
+  /* hot_restart_generation is an Accumulate gauge; we omit it here for testing dynamics. */       \
   GAUGE(live, NeverImport)                                                                         \
   GAUGE(memory_allocated, Accumulate)                                                              \
   GAUGE(memory_heap_size, Accumulate)                                                              \
+  GAUGE(memory_physical_size, Accumulate)                                                          \
   GAUGE(parent_connections, Accumulate)                                                            \
   GAUGE(state, NeverImport)                                                                        \
   GAUGE(stats_recent_lookups, NeverImport)                                                         \
@@ -95,8 +98,6 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
-  enum class BootstrapVersion { V2 };
-
   /**
    * Default implementation of runtime loader creation used in the real server and in most
    * integration tests where a mock runtime is not needed.
@@ -112,17 +113,16 @@ public:
   static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
 
   /**
-   * Load a bootstrap config from either v1 or v2 and perform validation.
+   * Load a bootstrap config and perform validation.
    * @param bootstrap supplies the bootstrap to fill.
-   * @param config_path supplies the config path.
-   * @param v2_only supplies whether to attempt v1 fallback.
+   * @param options supplies the server options.
    * @param api reference to the Api object
    * @param validation_visitor message validation visitor instance.
-   * @return BootstrapVersion to indicate which version of the API was parsed.
    */
-  static BootstrapVersion
-  loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
-                      ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  const Options& options,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api);
 };
 
 /**
@@ -144,14 +144,22 @@ private:
   Event::SignalEventPtr sig_hup_;
 };
 
-class ServerFactoryContextImpl : public Configuration::ServerFactoryContext {
+// ServerFactoryContextImpl implements both ServerFactoryContext and
+// TransportSocketFactoryContext for convenience as these two contexts
+// share common member functions and member variables.
+class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
+                                 public Configuration::TransportSocketFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
       : server_(server), server_scope_(server_.stats().createScope("")) {}
 
+  // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    return server_.messageValidationContext();
+  }
   Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
@@ -160,6 +168,23 @@ public:
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
+  Grpc::Context& grpcContext() override { return server_.grpcContext(); }
+
+  // Configuration::TransportSocketFactoryContext
+  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
+  Stats::Store& stats() override { return server_.stats(); }
+  Init::Manager* initManager() override { return &server_.initManager(); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Server has two message validation visitors, one for static and
+    // other for dynamic configuration. Choose the dynamic validation
+    // visitor if server's init manager indicates that the server is
+    // in the Initialized state, as this state is engaged right after
+    // the static configuration (e.g., bootstrap) has been completed.
+    return initManager()->state() == Init::Manager::State::Initialized
+               ? server_.messageValidationContext().dynamicValidationVisitor()
+               : server_.messageValidationContext().staticValidationVisitor();
+  }
 
 private:
   Instance& server_;
@@ -219,12 +244,17 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
-  OptProcessContextRef processContext() override { return *process_context_; }
+  ProcessContextOptRef processContext() override { return *process_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
+  void flushStats() override;
 
-  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
+
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+    return server_contexts_;
+  }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
@@ -234,6 +264,10 @@ public:
     return validation_context_;
   }
 
+  void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
+    http_context_.setDefaultTracingConfig(tracing_config);
+  }
+
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
@@ -241,7 +275,6 @@ public:
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
-  void flushStats();
   void flushStatsInternal();
   void updateServerStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
@@ -318,7 +351,7 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
 
-  ServerFactoryContextImpl server_context_;
+  ServerFactoryContextImpl server_contexts_;
 
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {

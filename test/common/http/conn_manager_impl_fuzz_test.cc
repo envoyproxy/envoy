@@ -62,10 +62,9 @@ public:
   };
 
   FuzzConfig()
-      : stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
+      : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
-               "",
-               fake_stats_},
+               "", fake_stats_),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))} {
     ON_CALL(route_config_provider_, lastUpdated()).WillByDefault(Return(time_system_.systemTime()));
@@ -140,6 +139,7 @@ public:
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
+  Tracing::HttpTracerSharedPtr tracer() override { return http_tracer_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
@@ -178,6 +178,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
   bool preserve_external_request_id_{false};
@@ -205,9 +206,16 @@ public:
     EXPECT_CALL(*config_.codec_, dispatch(_))
         .WillOnce(InvokeWithoutArgs([this, &request_headers, end_stream] {
           decoder_ = &conn_manager_.newStream(encoder_);
-          auto headers = std::make_unique<TestHeaderMapImpl>(request_headers);
+          auto headers = std::make_unique<TestRequestHeaderMapImpl>(request_headers);
           if (headers->Method() == nullptr) {
             headers->setReferenceKey(Headers::get().Method, "GET");
+          }
+          if (headers->Host() != nullptr &&
+              !HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
+            // Sanitize host header so we don't fail at ASSERTs that verify header sanity checks
+            // which should have been performed by the codec.
+            headers->setHost(
+                Fuzz::replaceInvalidHostCharacters(headers->Host()->value().getStringView()));
           }
           decoder_->decodeHeaders(std::move(headers), end_stream);
         }));
@@ -312,8 +320,8 @@ public:
                 }));
         EXPECT_CALL(*config_.codec_, dispatch(_))
             .WillOnce(InvokeWithoutArgs([this, &trailers_action] {
-              decoder_->decodeTrailers(std::make_unique<TestHeaderMapImpl>(
-                  Fuzz::fromHeaders(trailers_action.headers())));
+              decoder_->decodeTrailers(std::make_unique<TestRequestTrailerMapImpl>(
+                  Fuzz::fromHeaders<TestRequestTrailerMapImpl>(trailers_action.headers())));
             }));
         fakeOnData();
         state = StreamState::Closed;
@@ -346,8 +354,8 @@ public:
     switch (response_action.response_action_selector_case()) {
     case test::common::http::ResponseAction::kContinueHeaders: {
       if (state == StreamState::PendingHeaders) {
-        auto headers = std::make_unique<TestHeaderMapImpl>(
-            Fuzz::fromHeaders(response_action.continue_headers()));
+        auto headers = std::make_unique<TestResponseHeaderMapImpl>(
+            Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
         decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
       }
@@ -355,8 +363,8 @@ public:
     }
     case test::common::http::ResponseAction::kHeaders: {
       if (state == StreamState::PendingHeaders) {
-        auto headers =
-            std::make_unique<TestHeaderMapImpl>(Fuzz::fromHeaders(response_action.headers()));
+        auto headers = std::make_unique<TestResponseHeaderMapImpl>(
+            Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.headers()));
         // The client codec will ensure we always have a valid :status.
         // Similarly, local replies should always contain this.
         try {
@@ -379,8 +387,8 @@ public:
     }
     case test::common::http::ResponseAction::kTrailers: {
       if (state == StreamState::PendingDataOrTrailers) {
-        decoder_filter_->callbacks_->encodeTrailers(
-            std::make_unique<TestHeaderMapImpl>(Fuzz::fromHeaders(response_action.trailers())));
+        decoder_filter_->callbacks_->encodeTrailers(std::make_unique<TestResponseTrailerMapImpl>(
+            Fuzz::fromHeaders<TestResponseTrailerMapImpl>(response_action.trailers())));
         state = StreamState::Closed;
       }
       break;
@@ -409,8 +417,8 @@ public:
 
   ConnectionManagerImpl& conn_manager_;
   FuzzConfig& config_;
-  StreamDecoder* decoder_{};
-  NiceMock<MockStreamEncoder> encoder_;
+  RequestDecoder* decoder_{};
+  NiceMock<MockResponseEncoder> encoder_;
   MockStreamDecoderFilter* decoder_filter_{};
   MockStreamEncoderFilter* encoder_filter_{};
   StreamState request_state_;
@@ -456,9 +464,10 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
     switch (action.action_selector_case()) {
     case test::common::http::Action::kNewStream: {
-      streams.emplace_back(new FuzzStream(conn_manager, config,
-                                          Fuzz::fromHeaders(action.new_stream().request_headers()),
-                                          action.new_stream().end_stream()));
+      streams.emplace_back(new FuzzStream(
+          conn_manager, config,
+          Fuzz::fromHeaders<TestRequestHeaderMapImpl>(action.new_stream().request_headers()),
+          action.new_stream().end_stream()));
       break;
     }
     case test::common::http::Action::kStreamAction: {

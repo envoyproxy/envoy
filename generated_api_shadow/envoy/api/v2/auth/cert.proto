@@ -180,8 +180,19 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message CertificateValidationContext {
+  // Peer certificate verification mode.
+  enum TrustChainVerification {
+    // Perform default certificate verification (e.g., against CA / verification lists)
+    VERIFY_TRUST_CHAIN = 0;
+
+    // Connections where the certificate fails verification will be permitted.
+    // For HTTP connections, the result of certificate verification can be used in route matching. (
+    // see :ref:`validated <envoy_api_field_route.RouteMatch.TlsContextMatchOptions.validated>` ).
+    ACCEPT_UNTRUSTED = 1;
+  }
+
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
   // for listeners). If not specified and a peer certificate is presented it will not be
@@ -278,6 +289,16 @@ message CertificateValidationContext {
   // An optional list of Subject Alternative name matchers. Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified matches.
   //
+  // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
+  // configured with exact match type in the :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>`.
+  // For example if the certificate has "\*.example.com" as DNS SAN entry, to allow only "api.example.com",
+  // it should be configured as shown below.
+  //
+  // .. code-block:: yaml
+  //
+  //  match_subject_alt_names:
+  //    exact: "api.example.com"
+  //
   // .. attention::
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
@@ -300,6 +321,10 @@ message CertificateValidationContext {
 
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
+
+  // Certificate trust chain verification mode.
+  TrustChainVerification trust_chain_verification = 10
+      [(validate.rules).enum = {defined_only: true}];
 }
 
 // TLS context shared by both client and server TLS contexts.
@@ -420,6 +445,11 @@ message DownstreamTlsContext {
   }];
 }
 
+message GenericSecret {
+  // Secret of generic type and is available to filters.
+  core.DataSource secret = 1 [(udpa.annotations.sensitive) = true];
+}
+
 message SdsSecretConfig {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   // When both name and config are specified, then secret can be fetched and/or reloaded via
@@ -429,6 +459,7 @@ message SdsSecretConfig {
   core.ConfigSource sds_config = 2;
 }
 
+// [#next-free-field: 6]
 message Secret {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;
@@ -439,5 +470,7 @@ message Secret {
     TlsSessionTicketKeys session_ticket_keys = 3;
 
     CertificateValidationContext validation_context = 4;
+
+    GenericSecret generic_secret = 5;
   }
 }

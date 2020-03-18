@@ -1,3 +1,4 @@
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -6,6 +7,8 @@
 #include "common/common/matchers.h"
 #include "common/config/metadata.h"
 #include "common/protobuf/protobuf.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -258,6 +261,51 @@ TEST(MetadataTest, MatchDoubleListValue) {
   metadataValue.Clear();
 }
 
+TEST(StringMatcher, ExactMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("exact");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("exact"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("EXACT"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("exacz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("exact"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("EXACT"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("exacz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+}
+
+TEST(StringMatcher, PrefixMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix("prefix");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("prefix-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("PREFIX-ABC"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("prefiz-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("prefix-abc"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("PREFIX-ABC"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("prefiz-abc"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+}
+
+TEST(StringMatcher, SuffixMatchIgnoreCase) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_suffix("suffix");
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("abc-suffix"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("ABC-SUFFIX"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("abc-suffiz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+
+  matcher.set_ignore_case(true);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("abc-suffix"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("ABC-SUFFIX"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("abc-suffiz"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("other"));
+}
+
 TEST(StringMatcher, SafeRegexValue) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.mutable_safe_regex()->mutable_google_re2();
@@ -267,36 +315,107 @@ TEST(StringMatcher, SafeRegexValue) {
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("bar"));
 }
 
-TEST(LowerCaseStringMatcher, MatchExactValue) {
+TEST(StringMatcher, RegexValueIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("Foo");
-
-  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo"));
-  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo"));
+  matcher.set_ignore_case(true);
+  matcher.set_hidden_envoy_deprecated_regex("foo");
+  EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
+                            "ignore_case has no effect for regex.");
 }
 
-TEST(LowerCaseStringMatcher, MatchPrefixValue) {
+TEST(StringMatcher, SafeRegexValueIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_prefix("Foo.");
-
-  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
-  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo."));
+  matcher.set_ignore_case(true);
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex("foo");
+  EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
+                            "ignore_case has no effect for safe_regex.");
 }
 
-TEST(LowerCaseStringMatcher, MatchSuffixValue) {
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_suffix(".Bar");
+TEST(PathMatcher, MatchExactPath) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", false);
 
-  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
-  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match(".Bar"));
+  EXPECT_TRUE(matcher->match("/exact"));
+  EXPECT_TRUE(matcher->match("/exact?param=val"));
+  EXPECT_TRUE(matcher->match("/exact#fragment"));
+  EXPECT_TRUE(matcher->match("/exact#fragment?param=val"));
+  EXPECT_FALSE(matcher->match("/EXACT"));
+  EXPECT_FALSE(matcher->match("/exacz"));
+  EXPECT_FALSE(matcher->match("/exact-abc"));
+  EXPECT_FALSE(matcher->match("/exacz?/exact"));
+  EXPECT_FALSE(matcher->match("/exacz#/exact"));
 }
 
-TEST(LowerCaseStringMatcher, MatchRegexValue) {
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex("Foo.*");
+TEST(PathMatcher, MatchExactPathIgnoreCase) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", true);
 
-  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
-  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo.Bar"));
+  EXPECT_TRUE(matcher->match("/exact"));
+  EXPECT_TRUE(matcher->match("/EXACT"));
+  EXPECT_TRUE(matcher->match("/exact?param=val"));
+  EXPECT_TRUE(matcher->match("/Exact#fragment"));
+  EXPECT_TRUE(matcher->match("/EXACT#fragment?param=val"));
+  EXPECT_FALSE(matcher->match("/exacz"));
+  EXPECT_FALSE(matcher->match("/exact-abc"));
+  EXPECT_FALSE(matcher->match("/exacz?/exact"));
+  EXPECT_FALSE(matcher->match("/exacz#/exact"));
+}
+
+TEST(PathMatcher, MatchPrefixPath) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createPrefix("/prefix", false);
+
+  EXPECT_TRUE(matcher->match("/prefix"));
+  EXPECT_TRUE(matcher->match("/prefix-abc"));
+  EXPECT_TRUE(matcher->match("/prefix?param=val"));
+  EXPECT_TRUE(matcher->match("/prefix#fragment"));
+  EXPECT_TRUE(matcher->match("/prefix#fragment?param=val"));
+  EXPECT_FALSE(matcher->match("/PREFIX"));
+  EXPECT_FALSE(matcher->match("/prefiz"));
+  EXPECT_FALSE(matcher->match("/prefiz?/prefix"));
+  EXPECT_FALSE(matcher->match("/prefiz#/prefix"));
+}
+
+TEST(PathMatcher, MatchPrefixPathIgnoreCase) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createPrefix("/prefix", true);
+
+  EXPECT_TRUE(matcher->match("/prefix"));
+  EXPECT_TRUE(matcher->match("/prefix-abc"));
+  EXPECT_TRUE(matcher->match("/Prefix?param=val"));
+  EXPECT_TRUE(matcher->match("/Prefix#fragment"));
+  EXPECT_TRUE(matcher->match("/PREFIX#fragment?param=val"));
+  EXPECT_TRUE(matcher->match("/PREFIX"));
+  EXPECT_FALSE(matcher->match("/prefiz"));
+  EXPECT_FALSE(matcher->match("/prefiz?/prefix"));
+  EXPECT_FALSE(matcher->match("/prefiz#/prefix"));
+}
+
+TEST(PathMatcher, MatchSuffixPath) {
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->set_suffix("suffix");
+
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/abc-suffix"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix?param=val"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix#fragment"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix#fragment?param=val"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/suffiz"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/suffiz?param=suffix"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/suffiz#suffix"));
+}
+
+TEST(PathMatcher, MatchRegexPath) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_safe_regex()->set_regex(".*regex.*");
+
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex/xyz"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/xyz/regex"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex?param=val"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex#fragment"));
+  EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex#fragment?param=val"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez?param=regex"));
+  EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez#regex"));
 }
 
 } // namespace

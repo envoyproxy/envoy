@@ -12,7 +12,7 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "MetadataProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: MetadataMatcher]
+// [#protodoc-title: Metadata matcher]
 
 // MetadataMatcher provides a general interface to check if a given value is matched in
 // :ref:`Metadata <envoy_api_msg_config.core.v3.Metadata>`. It uses `filter` and `path` to retrieve the value
@@ -72,6 +72,8 @@ option java_multiple_files = true;
 // enforce access control based on dynamic metadata in a request. See :ref:`Permission
 // <envoy_api_msg_config.rbac.v3.Permission>` and :ref:`Principal
 // <envoy_api_msg_config.rbac.v3.Principal>`.
+
+// [#next-major-version: MetadataMatcher should use StructMatcher]
 message MetadataMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.MetadataMatcher";
 

@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
 using testing::NiceMock;
 using testing::Throw;
 using testing::UnorderedElementsAre;
@@ -24,8 +25,7 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 
 class DeltaSubscriptionStateTest : public testing::Test {
 protected:
-  DeltaSubscriptionStateTest()
-      : state_(TypeUrl, callbacks_, local_info_, std::chrono::milliseconds(0U), dispatcher_) {
+  DeltaSubscriptionStateTest() : state_(TypeUrl, callbacks_, local_info_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
         state_.getNextRequestAckless();
@@ -52,17 +52,17 @@ protected:
   UpdateAck deliverBadDiscoveryResponse(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& version_info, std::string nonce) {
+      const std::string& version_info, std::string nonce, std::string error_message) {
     envoy::service::discovery::v3::DeltaDiscoveryResponse message;
     *message.mutable_resources() = added_resources;
     *message.mutable_removed_resources() = removed_resources;
     message.set_system_version_info(version_info);
     message.set_nonce(nonce);
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).WillOnce(Throw(EnvoyException("oh no")));
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _)).WillOnce(Throw(EnvoyException(error_message)));
     return state_.handleResponse(message);
   }
 
-  NiceMock<MockSubscriptionCallbacks<envoy::config::cluster::v3::Cluster>> callbacks_;
+  NiceMock<MockSubscriptionCallbacks> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   // We start out interested in three resources: name1, name2, and name3.
@@ -80,7 +80,7 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
   return add_to;
 }
 
-// Basic gaining/losing interest in resources should lead to (un)subscriptions.
+// Basic gaining/losing interest in resources should lead to subscription updates.
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
     state_.updateSubscriptionInterest({"name4"}, {"name1"});
@@ -196,7 +196,7 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
         populateRepeatedResource(
             {{"name1", "version1C"}, {"name2", "version2C"}, {"name3", "version3B"}});
-    UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug3", "nonce3");
+    UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug3", "nonce3", "oh no");
     EXPECT_EQ("nonce3", ack.nonce_);
     EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
@@ -208,6 +208,19 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug4", "nonce4");
     EXPECT_EQ("nonce4", ack.nonce_);
     EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
+  }
+  // Bad response error detail is truncated if it's too large.
+  {
+    const std::string very_large_error_message(1 << 20, 'A');
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
+        populateRepeatedResource(
+            {{"name1", "version1D"}, {"name2", "version2D"}, {"name3", "version3D"}});
+    UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug5", "nonce5",
+                                                very_large_error_message);
+    EXPECT_EQ("nonce5", ack.nonce_);
+    EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
+    EXPECT_TRUE(absl::EndsWith(ack.error_detail_.message(), "AAAAAAA...(truncated)"));
+    EXPECT_LT(ack.error_detail_.message().length(), very_large_error_message.length());
   }
 }
 
@@ -290,7 +303,8 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
   // name1: do not include: we lost interest.
   // name2: yes do include: we're interested and we have a version of it.
   // name3: yes do include: even though we don't have a version of it, we are interested.
-  // name4: yes do include: we are newly interested. (If this wasn't a stream reconnect, only name4
+  // name4: yes do include: we are newly interested. (If this wasn't a stream reconnect, only
+  // name4
   //                        would belong in this subscribe field).
   EXPECT_THAT(cur_request.resource_names_subscribe(),
               UnorderedElementsAre("name2", "name3", "name4"));
@@ -345,8 +359,8 @@ TEST_F(DeltaSubscriptionStateTest, CheckUpdatePending) {
 }
 
 // The next three tests test that duplicate resource names (whether additions or removals) cause
-// DeltaSubscriptionState to reject the update without even trying to hand it to the consuming API's
-// onConfigUpdate().
+// DeltaSubscriptionState to reject the update without even trying to hand it to the consuming
+// API's onConfigUpdate().
 TEST_F(DeltaSubscriptionStateTest, DuplicatedAdd) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> additions =
       populateRepeatedResource({{"name1", "version1A"}, {"name1", "sdfsdfsdfds"}});

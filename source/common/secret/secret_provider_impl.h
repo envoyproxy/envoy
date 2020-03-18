@@ -79,5 +79,26 @@ private:
   Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
 };
 
+class GenericSecretConfigProviderImpl : public GenericSecretConfigProvider {
+public:
+  GenericSecretConfigProviderImpl(
+      const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret);
+
+  const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret() const override {
+    return generic_secret_.get();
+  }
+
+  Common::CallbackHandle* addValidationCallback(
+      std::function<void(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>)
+      override {
+    return nullptr;
+  }
+
+  Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
+
+private:
+  Secret::GenericSecretPtr generic_secret_;
+};
+
 } // namespace Secret
 } // namespace Envoy

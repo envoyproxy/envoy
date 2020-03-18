@@ -31,7 +31,7 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   }
 }
 
-void Filter::initiateCall(const Http::HeaderMap& headers) {
+void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (filter_return_ == FilterReturn::StopDecoding) {
     return;
   }
@@ -43,7 +43,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   cluster_ = callbacks_->clusterInfo();
 
   // Fast route - if we are disabled, no need to merge.
-  const FilterConfigPerRoute* specific_per_route_config =
+  const auto* specific_per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
           HttpFilterNames::get().ExtAuthorization, route);
   if (specific_per_route_config != nullptr) {
@@ -88,7 +88,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   initiating_call_ = false;
 }
 
-Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   if (!config_->filterEnabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -133,7 +133,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   if (buffer_data_) {
     if (filter_return_ != FilterReturn::StopDecoding) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);

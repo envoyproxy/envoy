@@ -40,7 +40,7 @@ protected:
   Api::ApiPtr api_;
 };
 
-TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
+TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
@@ -48,7 +48,7 @@ TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
                EnvoyException);
 }
 
-TEST_F(ProtobufUtilityTest, convertPercentNaN) {
+TEST_F(ProtobufUtilityTest, ConvertPercentNaN) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
@@ -59,7 +59,7 @@ TEST_F(ProtobufUtilityTest, convertPercentNaN) {
 
 namespace ProtobufPercentHelper {
 
-TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
+TEST_F(ProtobufUtilityTest, EvaluateFractionalPercent) {
   { // 0/100 (default)
     envoy::type::v3::FractionalPercent percent;
     EXPECT_FALSE(evaluateFractionalPercent(percent, 0));
@@ -1460,7 +1460,9 @@ TEST_P(DeprecatedFieldsTest,
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
-      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
+      "warning",
+      "Using runtime overrides to continue using now fatal-by-default deprecated option "
+      "'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
       checkForDeprecation(base));
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
@@ -1602,7 +1604,13 @@ TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_FATAL", "true"}});
 
-  checkForDeprecation(base);
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using runtime overrides to continue using now fatal-by-default deprecated value "
+      "DEPRECATED_FATAL for enum "
+      "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' "
+      "from file deprecated.proto. This enum value will be removed from Envoy soon.",
+      checkForDeprecation(base));
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
@@ -1645,8 +1653,9 @@ TEST(StatusCode, Strings) {
   for (int i = 0; i < last_code; ++i) {
     EXPECT_NE(MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(i)), "");
   }
-  ASSERT_EQ("",
+  ASSERT_EQ("UNKNOWN",
             MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+  ASSERT_EQ("OK", MessageUtil::CodeEnumToString(ProtobufUtil::error::OK));
 }
 
 TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {

@@ -173,6 +173,7 @@ public:
 
 using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
+using SocketOptRef = absl::optional<std::reference_wrapper<Socket>>;
 
 /**
  * A socket passed to a connection. For server connections this represents the accepted socket, and
@@ -189,6 +190,12 @@ public:
    * @return the remote address of the socket.
    */
   virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+
+  /**
+   * @return the direct remote address of the socket. This is the address of the directly
+   *         connected peer, and cannot be modified by listener filters.
+   */
+  virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
 
   /**
    * Restores the local address of the socket. On accepted sockets the local address defaults to the

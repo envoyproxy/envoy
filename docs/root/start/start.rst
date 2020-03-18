@@ -68,7 +68,7 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
           socket_address: { address: 0.0.0.0, port_value: 10000 }
         filter_chains:
         - filters:
-          - name: envoy.http_connection_manager
+          - name: envoy.filters.network.http_connection_manager
             typed_config:
               "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
               stat_prefix: ingress_http
@@ -82,7 +82,7 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
                   - match: { prefix: "/" }
                     route: { host_rewrite: www.google.com, cluster: service_google }
               http_filters:
-              - name: envoy.router
+              - name: envoy.filters.http.router
 
 The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`.
 
@@ -167,6 +167,7 @@ features. The following sandboxes are available:
     sandboxes/grpc_bridge
     sandboxes/jaeger_native_tracing
     sandboxes/jaeger_tracing
+    sandboxes/load_reporting_service
     sandboxes/lua
     sandboxes/mysql
     sandboxes/redis

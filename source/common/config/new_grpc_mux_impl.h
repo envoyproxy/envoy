@@ -34,13 +34,8 @@ public:
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
-  Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
-                          const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
-                          std::chrono::milliseconds init_fetch_timeout) override;
-  void removeWatch(const std::string& type_url, Watch* watch) override;
-
-  // TODO(fredlas) PR #8478 will remove this.
-  bool isDelta() const override { return true; }
+  GrpcMuxWatchPtr addWatch(const std::string& type_url, const std::set<std::string>& resources,
+                           SubscriptionCallbacks& callbacks) override;
 
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
@@ -56,20 +51,15 @@ public:
 
   void kickOffAck(UpdateAck ack);
 
-  // TODO(fredlas) remove these two from the GrpcMux interface.
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override;
+  // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout,
-                      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info)
-        : sub_state_(type_url, watch_map_, local_info, init_fetch_timeout, dispatcher),
-          init_fetch_timeout_(init_fetch_timeout) {}
+    SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info)
+        : sub_state_(type_url, watch_map_, local_info) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
-    const std::chrono::milliseconds init_fetch_timeout_;
 
     SubscriptionStuff(const SubscriptionStuff&) = delete;
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
@@ -81,8 +71,31 @@ public:
   }
 
 private:
-  Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                  SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout);
+  class WatchImpl : public GrpcMuxWatch {
+  public:
+    WatchImpl(const std::string& type_url, Watch* watch, NewGrpcMuxImpl& parent)
+        : type_url_(type_url), watch_(watch), parent_(parent) {}
+
+    ~WatchImpl() { remove(); }
+
+    void remove() {
+      if (watch_) {
+        parent_.removeWatch(type_url_, watch_);
+        watch_ = nullptr;
+      }
+    }
+
+    void update(const std::set<std::string>& resources) override {
+      parent_.updateWatch(type_url_, watch_, resources);
+    }
+
+  private:
+    const std::string type_url_;
+    Watch* watch_;
+    NewGrpcMuxImpl& parent_;
+  };
+
+  void removeWatch(const std::string& type_url, Watch* watch);
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
@@ -90,7 +103,7 @@ private:
   void updateWatch(const std::string& type_url, Watch* watch,
                    const std::set<std::string>& resources);
 
-  void addSubscription(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout);
+  void addSubscription(const std::string& type_url);
 
   void trySendDiscoveryRequests();
 
@@ -105,9 +118,6 @@ private:
   // Then, prioritizes non-ACK updates in the order the various types
   // of subscriptions were activated.
   absl::optional<std::string> whoWantsToSendDiscoveryRequest();
-
-  Event::Dispatcher& dispatcher_;
-  const LocalInfo::LocalInfo& local_info_;
 
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue. See class for
@@ -124,6 +134,9 @@ private:
   GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
              envoy::service::discovery::v3::DeltaDiscoveryResponse>
       grpc_stream_;
+
+  const LocalInfo::LocalInfo& local_info_;
+
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 

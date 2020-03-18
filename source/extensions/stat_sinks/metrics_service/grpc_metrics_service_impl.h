@@ -33,12 +33,12 @@ public:
   virtual void send(envoy::service::metrics::v3::StreamMetricsMessage& message) PURE;
 
   // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void
   onReceiveMessage(std::unique_ptr<envoy::service::metrics::v3::StreamMetricsResponse>&&) override {
   }
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override{};
 };
 

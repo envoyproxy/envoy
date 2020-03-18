@@ -2,6 +2,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -29,12 +30,15 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ = grpc_mux_->subscribe(type_url_, resources, *this);
+  watch_ = grpc_mux_->addWatch(type_url_, resources, *this);
+
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
   // "attempt" for a given xDS API combined by ADS is not really that meaningful.
   stats_.update_attempt_.inc();
 
+  // ADS initial request batching relies on the users of the GrpcMux *not* calling start on it,
+  // whereas non-ADS xDS users must call it themselves.
   if (!is_aggregated_) {
     grpc_mux_->start();
   }
@@ -42,15 +46,11 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
 
 void GrpcSubscriptionImpl::updateResourceInterest(
     const std::set<std::string>& update_to_these_names) {
-  // First destroy the watch, so that this subscribe doesn't send a request for both the
-  // previously watched resources and the new ones (we may have lost interest in some of the
-  // previously watched ones).
-  watch_.reset();
-  watch_ = grpc_mux_->subscribe(type_url_, update_to_these_names, *this);
+  watch_->update(update_to_these_names);
   stats_.update_attempt_.inc();
 }
 
-// Config::GrpcMuxCallbacks
+// Config::SubscriptionCallbacks
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
@@ -62,9 +62,22 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   callbacks_.onConfigUpdate(resources, version_info);
   stats_.update_success_.inc();
   stats_.update_attempt_.inc();
+  stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
   stats_.version_.set(HashUtil::xxHash64(version_info));
   ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
             resources.size(), version_info);
+}
+
+void GrpcSubscriptionImpl::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+    const std::string& system_version_info) {
+  disableInitFetchTimeoutTimer();
+  stats_.update_attempt_.inc();
+  callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
+  stats_.update_success_.inc();
+  stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
+  stats_.version_.set(HashUtil::xxHash64(system_version_info));
 }
 
 void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
@@ -78,6 +91,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     stats_.init_fetch_timeout_.inc();
     disableInitFetchTimeoutTimer();
     ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
+    callbacks_.onConfigUpdateFailed(reason, e);
     break;
   case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
     // We expect Envoy exception to be thrown when update is rejected.
@@ -85,22 +99,20 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
     ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
+    callbacks_.onConfigUpdateFailed(reason, e);
     break;
   }
 
   stats_.update_attempt_.inc();
-  if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
-    // New gRPC stream will be established and send requests again.
-    // If init_fetch_timeout is non-zero, server will continue startup after it timeout
-    return;
-  }
-
-  callbacks_.onConfigUpdateFailed(reason, e);
 }
 
 std::string GrpcSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
   return callbacks_.resourceName(resource);
 }
+
+void GrpcSubscriptionImpl::pause() { grpc_mux_->pause(type_url_); }
+
+void GrpcSubscriptionImpl::resume() { grpc_mux_->resume(type_url_); }
 
 void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
   if (init_fetch_timeout_timer_) {

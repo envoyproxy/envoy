@@ -232,7 +232,7 @@ modify different aspects of the server:
 
     Generally only used during development.
 
-.. http:post:: /memory
+.. http:get:: /memory
 
   Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
 
@@ -558,3 +558,7 @@ modify different aspects of the server:
   been configured to accept admin configuration. See:
 
   * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`
+
+.. http:post:: /reopen_logs
+
+  Triggers reopen of all access logs. Behavior is similar to SIGUSR1 handling.

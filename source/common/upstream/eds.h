@@ -3,6 +3,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
@@ -23,10 +24,12 @@ namespace Upstream {
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
-class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallbacks {
+class EdsClusterImpl
+    : public BaseDynamicClusterImpl,
+      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
-                 Server::Configuration::TransportSocketFactoryContext& factory_context,
+                 Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                  Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
@@ -44,7 +47,6 @@ private:
     return MessageUtil::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
         .cluster_name();
   }
-  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
   using LocalityWeightsMap = std::unordered_map<envoy::config::core::v3::Locality, uint32_t,
                                                 LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
@@ -89,11 +91,10 @@ public:
   EdsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Eds) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

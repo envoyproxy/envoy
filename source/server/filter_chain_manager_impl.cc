@@ -53,6 +53,9 @@ envoy::config::core::v3::TrafficDirection FilterChainFactoryContextImpl::directi
   return parent_context_.direction();
 }
 
+ProtobufMessage::ValidationContext& FilterChainFactoryContextImpl::messageValidationContext() {
+  return parent_context_.messageValidationContext();
+}
 ProtobufMessage::ValidationVisitor& FilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
@@ -76,8 +79,6 @@ Grpc::Context& FilterChainFactoryContextImpl::grpcContext() {
 bool FilterChainFactoryContextImpl::healthCheckFailed() {
   return parent_context_.healthCheckFailed();
 }
-
-Tracing::HttpTracer& FilterChainFactoryContextImpl::httpTracer() { return httpContext().tracer(); }
 
 Http::Context& FilterChainFactoryContextImpl::httpContext() {
   return parent_context_.httpContext();
@@ -115,13 +116,18 @@ ServerLifecycleNotifier& FilterChainFactoryContextImpl::lifecycleNotifier() {
   return parent_context_.lifecycleNotifier();
 }
 
-OptProcessContextRef FilterChainFactoryContextImpl::processContext() {
+ProcessContextOptRef FilterChainFactoryContextImpl::processContext() {
   return parent_context_.processContext();
 }
 
 Configuration::ServerFactoryContext&
 FilterChainFactoryContextImpl::getServerFactoryContext() const {
   return parent_context_.getServerFactoryContext();
+}
+
+Configuration::TransportSocketFactoryContext&
+FilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
+  return parent_context_.getTransportSocketFactoryContext();
 }
 
 Stats::Scope& FilterChainFactoryContextImpl::listenerScope() {
@@ -590,7 +596,6 @@ Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.
 Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
 bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
-Tracing::HttpTracer& FactoryContextImpl::httpTracer() { return server_.httpContext().tracer(); }
 Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
 Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
 const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }
@@ -602,6 +607,9 @@ OverloadManager& FactoryContextImpl::overloadManager() { return server_.overload
 ThreadLocal::SlotAllocator& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
 Admin& FactoryContextImpl::admin() { return server_.admin(); }
 TimeSource& FactoryContextImpl::timeSource() { return server_.timeSource(); }
+ProtobufMessage::ValidationContext& FactoryContextImpl::messageValidationContext() {
+  return server_.messageValidationContext();
+}
 ProtobufMessage::ValidationVisitor& FactoryContextImpl::messageValidationVisitor() {
   return server_.messageValidationContext().staticValidationVisitor();
 }
@@ -609,9 +617,13 @@ Api::Api& FactoryContextImpl::api() { return server_.api(); }
 ServerLifecycleNotifier& FactoryContextImpl::lifecycleNotifier() {
   return server_.lifecycleNotifier();
 }
-OptProcessContextRef FactoryContextImpl::processContext() { return server_.processContext(); }
+ProcessContextOptRef FactoryContextImpl::processContext() { return server_.processContext(); }
 Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
+}
+Configuration::TransportSocketFactoryContext&
+FactoryContextImpl::getTransportSocketFactoryContext() const {
+  return server_.transportSocketFactoryContext();
 }
 const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
   return config_.metadata();

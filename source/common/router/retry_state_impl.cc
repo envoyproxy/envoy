@@ -32,7 +32,7 @@ const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
-                                     Http::HeaderMap& request_headers,
+                                     Http::RequestHeaderMap& request_headers,
                                      const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                      Runtime::RandomGenerator& random,
                                      Event::Dispatcher& dispatcher,
@@ -52,7 +52,8 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
   return ret;
 }
 
-RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
+RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
+                               Http::RequestHeaderMap& request_headers,
                                const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
@@ -152,7 +153,7 @@ void RetryStateImpl::enableBackoffTimer() {
 std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config) {
   uint32_t ret = 0;
   bool all_fields_valid = true;
-  for (const auto retry_on : StringUtil::splitToken(config, ",")) {
+  for (const auto retry_on : StringUtil::splitToken(config, ",", false, true)) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnValues._5xx) {
       ret |= RetryPolicy::RETRY_ON_5XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.GatewayError) {
@@ -180,7 +181,7 @@ std::pair<uint32_t, bool> RetryStateImpl::parseRetryOn(absl::string_view config)
 std::pair<uint32_t, bool> RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header) {
   uint32_t ret = 0;
   bool all_fields_valid = true;
-  for (const auto retry_on : StringUtil::splitToken(retry_grpc_on_header, ",")) {
+  for (const auto retry_on : StringUtil::splitToken(retry_grpc_on_header, ",", false, true)) {
     if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Cancelled) {
       ret |= RetryPolicy::RETRY_ON_GRPC_CANCELLED;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.DeadlineExceeded) {
@@ -243,7 +244,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
   return RetryStatus::Yes;
 }
 
-RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_headers,
+RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                                DoRetryCallback callback) {
   return shouldRetry(wouldRetryFromHeaders(response_headers), callback);
 }
@@ -264,7 +265,7 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
   return shouldRetry(true, callback);
 }
 
-bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {
+bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) {
   if (response_headers.EnvoyOverloaded() != nullptr) {
     return false;
   }

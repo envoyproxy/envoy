@@ -29,33 +29,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     StatName dynamic_stat_name = dynamic_pool.add(next_data);
     StatName fake_dynamic_stat_name = fake_dynamic_pool.add(next_data);
 
-    // We can add stat-names with trailing dots, but note that they will be
-    // trimmed by the Symbol Table implementation, so we must trim the input
-    // string before comparing.
-    absl::string_view trimmed_fuzz_data = StringUtil::removeTrailingCharacters(next_data, '.');
-    FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(stat_name));
-    FUZZ_ASSERT(trimmed_fuzz_data == fake_symbol_table.toString(fake_stat_name));
-    FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(dynamic_stat_name));
-    FUZZ_ASSERT(trimmed_fuzz_data == fake_symbol_table.toString(fake_dynamic_stat_name));
-
-    // Test all combinations of joins within each symbol table.
-    std::string joined =
-        trimmed_fuzz_data.empty() ? "" : absl::StrCat(trimmed_fuzz_data, ".", trimmed_fuzz_data);
-    auto join = [](SymbolTable& table, StatName name1, StatName name2) -> std::string {
-      SymbolTable::StoragePtr storage = table.join({name1, name2});
-      StatName stat_name(storage.get());
-      return table.toString(stat_name);
-    };
-    FUZZ_ASSERT(joined == join(symbol_table, stat_name, stat_name));
-    FUZZ_ASSERT(joined == join(symbol_table, stat_name, dynamic_stat_name));
-    FUZZ_ASSERT(joined == join(symbol_table, dynamic_stat_name, dynamic_stat_name));
-    FUZZ_ASSERT(joined == join(symbol_table, dynamic_stat_name, stat_name));
-    FUZZ_ASSERT(joined == join(fake_symbol_table, fake_stat_name, fake_stat_name));
-    FUZZ_ASSERT(joined == join(fake_symbol_table, fake_stat_name, fake_dynamic_stat_name));
-    FUZZ_ASSERT(joined == join(fake_symbol_table, fake_dynamic_stat_name, fake_dynamic_stat_name));
-    FUZZ_ASSERT(joined == join(fake_symbol_table, fake_dynamic_stat_name, fake_stat_name));
-
-    // Also encode the string directly, without symbolizing it.
+    // Encode the string directly first.
     TestUtil::serializeDeserializeString(next_data);
 
     // Grab the first few bytes from next_data to synthesize together a random uint64_t.
@@ -69,6 +43,51 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       }
       TestUtil::serializeDeserializeNumber(number);
     }
+
+    // We can add stat-names with trailing dots, but note that they will be
+    // trimmed by the Symbol Table implementation, so we must trim the input
+    // string before comparing.
+    absl::string_view trimmed_fuzz_data = StringUtil::removeTrailingCharacters(next_data, '.');
+    FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(stat_name));
+    FUZZ_ASSERT(trimmed_fuzz_data == fake_symbol_table.toString(fake_stat_name));
+    FUZZ_ASSERT(trimmed_fuzz_data == symbol_table.toString(dynamic_stat_name));
+    FUZZ_ASSERT(trimmed_fuzz_data == fake_symbol_table.toString(fake_dynamic_stat_name));
+
+    // The 'join' tests only work if the trimmed fuzz data is not empty.
+    if (trimmed_fuzz_data.empty()) {
+      continue;
+    }
+
+    std::string joined = absl::StrCat(trimmed_fuzz_data, ".", trimmed_fuzz_data);
+    auto join = [joined](SymbolTable& table, StatName name1, StatName name2) -> bool {
+      bool ok = true;
+      SymbolTable::StoragePtr storage = table.join({name1, name2});
+      StatName stat_name(storage.get());
+      std::string name1_name2 = table.toString(stat_name);
+      if (joined.size() != name1_name2.size()) {
+        std::cerr << "lengths don't match: " << joined.size() << " != " << name1_name2.size()
+                  << std::endl;
+        ok = false;
+      } else {
+        for (uint32_t i = 0; i < joined.size(); ++i) {
+          if (joined[i] != name1_name2[i]) {
+            ENVOY_LOG_MISC(error, "char [{}] mismatch: {}({}) != {}({})", i, joined[i],
+                           static_cast<uint32_t>(joined[i]), name1_name2[i],
+                           static_cast<uint32_t>(name1_name2[i]));
+            ok = false;
+          }
+        }
+      }
+      return ok;
+    };
+    FUZZ_ASSERT(join(symbol_table, stat_name, stat_name));
+    FUZZ_ASSERT(join(symbol_table, stat_name, dynamic_stat_name));
+    FUZZ_ASSERT(join(symbol_table, dynamic_stat_name, dynamic_stat_name));
+    FUZZ_ASSERT(join(symbol_table, dynamic_stat_name, stat_name));
+    FUZZ_ASSERT(join(fake_symbol_table, fake_stat_name, fake_stat_name));
+    FUZZ_ASSERT(join(fake_symbol_table, fake_stat_name, fake_dynamic_stat_name));
+    FUZZ_ASSERT(join(fake_symbol_table, fake_dynamic_stat_name, fake_dynamic_stat_name));
+    FUZZ_ASSERT(join(fake_symbol_table, fake_dynamic_stat_name, fake_stat_name));
   }
 }
 

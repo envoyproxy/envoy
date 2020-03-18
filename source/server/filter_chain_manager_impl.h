@@ -49,7 +49,6 @@ public:
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
-  Tracing::HttpTracer& httpTracer() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
@@ -64,10 +63,12 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
+  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
 private:
@@ -89,7 +90,6 @@ public:
   Event::Dispatcher& dispatcher() override;
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
-  Tracing::HttpTracer& httpTracer() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
@@ -101,11 +101,13 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override;
   Admin& admin() override;
   TimeSource& timeSource() override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
+  ProcessContextOptRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;

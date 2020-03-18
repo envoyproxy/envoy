@@ -17,6 +17,7 @@
 #include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/process_context.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -53,6 +54,12 @@ public:
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationContext& validation visitor for xDS and static configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
 
   /**
    * @return RandomGenerator& the random generator for the server.
@@ -104,6 +111,11 @@ public:
 class ServerFactoryContext : public virtual CommonFactoryContext {
 public:
   ~ServerFactoryContext() override = default;
+
+  /**
+   * @return the server-wide grpc context.
+   */
+  virtual Grpc::Context& grpcContext() PURE;
 };
 
 /**
@@ -119,6 +131,11 @@ public:
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
   virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+
+  /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.
@@ -141,11 +158,6 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() PURE;
-
-  /**
-   * @return the server-wide http tracer.
-   */
-  virtual Tracing::HttpTracer& httpTracer() PURE;
 
   /**
    * @return the server's init manager. This can be used for extensions that need to initialize
@@ -189,10 +201,10 @@ public:
   virtual Grpc::Context& grpcContext() PURE;
 
   /**
-   * @return OptProcessContextRef an optional reference to the
+   * @return ProcessContextOptRef an optional reference to the
    * process context. Will be unset when running in validation mode.
    */
-  virtual OptProcessContextRef processContext() PURE;
+  virtual ProcessContextOptRef processContext() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration

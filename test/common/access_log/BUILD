@@ -21,6 +21,10 @@ envoy_cc_fuzz_test(
     name = "access_log_formatter_fuzz_test",
     srcs = ["access_log_formatter_fuzz_test.cc"],
     corpus = "access_log_formatter_corpus",
+    dictionaries = [
+        "access_log_formatter_fuzz_test.dict",
+        "//test/fuzz:headers.dict",
+    ],
     deps = [
         ":access_log_formatter_fuzz_proto_cc_proto",
         "//source/common/access_log:access_log_formatter_lib",
@@ -53,6 +57,8 @@ envoy_cc_test(
     deps = [
         "//source/common/access_log:access_log_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/access_loggers/grpc:http_config",
+        "//source/extensions/access_loggers/grpc:tcp_config",
         "//test/common/stream_info:test_util",
         "//test/common/upstream:utility_lib",
         "//test/mocks/access_log:access_log_mocks",

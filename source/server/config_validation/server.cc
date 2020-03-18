@@ -50,7 +50,8 @@ ValidationInstance::ValidationInstance(
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system), server_context_(*this) {
+      http_context_(stats_store_.symbolTable()), time_system_(time_system),
+      server_contexts_(*this) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {
@@ -98,10 +99,9 @@ void ValidationInstance::initialize(const Options& options,
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      accessLogManager(), singletonManager(), time_system_);
+      grpc_context_, accessLogManager(), singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   runtime_loader_->initialize(clusterManager());
-  http_context_.setTracer(config_.httpTracer());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
 

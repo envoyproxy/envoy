@@ -51,6 +51,16 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
   cb(connection);
 }
 
+// Test that the deprecated extension name still functions.
+TEST(ExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
+  const std::string deprecated_name = "envoy.ext_authz";
+
+  ASSERT_NE(
+      nullptr,
+      Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
+          deprecated_name));
+}
+
 } // namespace ExtAuthz
 } // namespace NetworkFilters
 } // namespace Extensions

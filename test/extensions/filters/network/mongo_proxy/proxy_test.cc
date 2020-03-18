@@ -18,6 +18,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -40,11 +41,6 @@ namespace MongoProxy {
 class MockDecoder : public Decoder {
 public:
   MOCK_METHOD(void, onData, (Buffer::Instance & data));
-};
-
-class TestStatStore : public Stats::IsolatedStoreImpl {
-public:
-  MOCK_METHOD(void, deliverHistogramToSinks, (const Stats::Histogram& histogram, uint64_t value));
 };
 
 class TestProxyFilter : public ProxyFilter {
@@ -114,7 +110,7 @@ public:
   }
 
   Buffer::OwnedImpl fake_data_;
-  NiceMock<TestStatStore> store_;
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
   MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -497,6 +493,21 @@ TEST_F(MongoProxyFilterTest, MaxTime) {
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addInt32("$maxTimeMS", 100));
+    filter_->callbacks_->decodeQuery(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
+}
+
+TEST_F(MongoProxyFilterTest, MaxTimeCursor) {
+  initializeFilter();
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create()->addInt32("maxTimeMS", 500));
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);

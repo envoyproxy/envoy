@@ -12,13 +12,15 @@ fi
 DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 # push the envoy image on tags or merge to master
-if [[ -n "$CIRCLE_TAG" ]] || [[ "$AZP_BRANCH" = 'refs/heads/master' ]]; then
+if [[ "${AZP_BRANCH}" == 'refs/heads/master' ]] || [[ "${AZP_BRANCH}" =~ ^refs/heads/release/v.* ]]; then
     docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
     for BUILD_TYPE in "" "-alpine" "-alpine-debug"; do
-        docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:latest"
-        docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:latest" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:${CIRCLE_SHA1}"
         docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:${CIRCLE_SHA1}"
+        if [[ "$AZP_BRANCH" == 'refs/heads/master' ]]; then
+            docker tag "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:${CIRCLE_SHA1}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:latest"
+            docker push "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}-dev:latest"
+        fi
     done
 
     # This script tests the docker examples.

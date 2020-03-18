@@ -5,6 +5,7 @@ package envoy.config.rbac.v2;
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/route/route_components.proto";
 import "envoy/type/matcher/metadata.proto";
+import "envoy/type/matcher/path.proto";
 import "envoy/type/matcher/string.proto";
 
 import "google/api/expr/v1alpha1/syntax.proto";
@@ -48,7 +49,8 @@ option java_multiple_files = true;
 //           - and_rules:
 //               rules:
 //                 - header: { name: ":method", exact_match: "GET" }
-//                 - header: { name: ":path", regex_match: "/products(/.*)?" }
+//                 - url_path:
+//                     path: { prefix: "/products" }
 //                 - or_rules:
 //                     rules:
 //                       - destination_port: 80
@@ -99,7 +101,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Permission {
   // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
   // each are applied with the associated behavior.
@@ -121,7 +123,12 @@ message Permission {
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
+    // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
+    // field if you want to match the URL path without the query and fragment string.
     api.v2.route.HeaderMatcher header = 4;
+
+    // A URL path on the incoming HTTP request. Only available for HTTP.
+    type.matcher.PathMatcher url_path = 10;
 
     // A CIDR block that describes the destination IP.
     api.v2.core.CidrRange destination_ip = 5;
@@ -161,7 +168,7 @@ message Permission {
 }
 
 // Principal defines an identity or a group of identities for a downstream subject.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Principal {
   // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
   // each are applied with the associated behavior.
@@ -199,7 +206,12 @@ message Principal {
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
+    // Note: the pseudo-header :path includes the query and fragment string. Use the `url_path`
+    // field if you want to match the URL path without the query and fragment string.
     api.v2.route.HeaderMatcher header = 6;
+
+    // A URL path on the incoming HTTP request. Only available for HTTP.
+    type.matcher.PathMatcher url_path = 9;
 
     // Metadata that describes additional information about the principal.
     type.matcher.MetadataMatcher metadata = 7;

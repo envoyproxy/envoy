@@ -67,6 +67,7 @@ def _envoy_linkopts():
             "-pthread",
             "-lrt",
             "-ldl",
+            "-Wl,-z,relro,-z,now",
             "-Wl,--hash-style=gnu",
         ],
     }) + select({
@@ -77,6 +78,7 @@ def _envoy_linkopts():
 
 def _envoy_stamped_deps():
     return select({
+        "@envoy//bazel:windows_x86_64": [],
         "@envoy//bazel:apple": [
             "@envoy//bazel:raw_build_id.ldscript",
         ],

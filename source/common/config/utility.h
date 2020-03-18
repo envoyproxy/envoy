@@ -26,6 +26,8 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "udpa/type/v1/typed_struct.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -215,12 +217,31 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
+    const ProtobufWkt::Any& typed_config = message.typed_config();
+    static const std::string& typed_struct_type =
+        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+
+    if (!typed_config.type_url().empty()) {
+      // Unpack methods will only use the fully qualified type name after the last '/'.
+      // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
+      auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
+      if (type == typed_struct_type) {
+        udpa::type::v1::TypedStruct typed_struct;
+        MessageUtil::unpackTo(typed_config, typed_struct);
+        // Not handling nested structs or typed structs in typed structs
+        type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
+      }
+      Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
+      if (factory != nullptr) {
+        return *factory;
+      }
+    }
+
     return Utility::getAndCheckFactoryByName<Factory>(message.name());
   }
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
-   * @param extension_name name of extension corresponding to config.
    * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
    * provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
@@ -246,6 +267,35 @@ public:
                           *config);
     return config;
   }
+
+  /**
+   * Translate the typed any field into a proto message provided by the implementation factory.
+   * @param typed_config typed configuration.
+   * @param validation_visitor message validation visitor instance.
+   * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
+   * proto to be filled with the translated configuration.
+   */
+  template <class Factory>
+  static ProtobufTypes::MessagePtr
+  translateAnyToFactoryConfig(const ProtobufWkt::Any& typed_config,
+                              ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr, "");
+
+    // Check that the config type is not google.protobuf.Empty
+    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+
+    translateOpaqueConfig(typed_config, ProtobufWkt::Struct(), validation_visitor, *config);
+    return config;
+  }
+
+  /**
+   * Truncates the message to a length less than default GRPC trailers size limit (by default 8KiB).
+   */
+  static std::string truncateGrpcStatusMessage(absl::string_view error_message);
 
   /**
    * Create TagProducer instance. Check all tag names for conflicts to avoid
@@ -297,33 +347,49 @@ public:
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
    * @param name the name of the filter.
-   * @param name the type of filter.
+   * @param filter_type the type of filter.
+   * @param filter_chain_type the type of filter chain.
    * @param is_terminal_filter true if the filter is designed to be terminal.
    * @param last_filter_in_current_config true if the filter is last in the configuration.
    * @throws EnvoyException if there is a mismatch between design and configuration.
    */
-  static void validateTerminalFilters(const std::string& name, const char* filter_type,
-                                      bool is_terminal_filter, bool last_filter_in_current_config) {
+  static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
+                                      const char* filter_chain_type, bool is_terminal_filter,
+                                      bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
-      throw EnvoyException(
-          fmt::format("Error: {} must be the terminal {} filter.", name, filter_type));
+      throw EnvoyException(fmt::format("Error: terminal filter named {} of type {} must be the "
+                                       "last filter in a {} filter chain.",
+                                       name, filter_type, filter_chain_type));
     } else if (!is_terminal_filter && last_filter_in_current_config) {
-      throw EnvoyException(
-          fmt::format("Error: non-terminal filter {} is the last filter in a {} filter chain.",
-                      name, filter_type));
+      throw EnvoyException(fmt::format(
+          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
+          name, filter_type, filter_chain_type));
     }
   }
 
   /**
    * Prepares the DNS failure refresh backoff strategy given the cluster configuration.
-   * @param cluster the cluster configuration.
+   * @param config the config that contains dns refresh information.
    * @param dns_refresh_rate_ms the default DNS refresh rate.
    * @param random the random generator.
    * @return BackOffStrategyPtr for scheduling refreshes.
    */
-  static BackOffStrategyPtr
-  prepareDnsRefreshStrategy(const envoy::config::cluster::v3::Cluster& cluster,
-                            uint64_t dns_refresh_rate_ms, Runtime::RandomGenerator& random);
+  template <typename T>
+  static BackOffStrategyPtr prepareDnsRefreshStrategy(const T& config, uint64_t dns_refresh_rate_ms,
+                                                      Runtime::RandomGenerator& random) {
+    if (config.has_dns_failure_refresh_rate()) {
+      uint64_t base_interval_ms =
+          PROTOBUF_GET_MS_REQUIRED(config.dns_failure_refresh_rate(), base_interval);
+      uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config.dns_failure_refresh_rate(),
+                                                            max_interval, base_interval_ms * 10);
+      if (max_interval_ms < base_interval_ms) {
+        throw EnvoyException("dns_failure_refresh_rate must have max_interval greater than "
+                             "or equal to the base_interval");
+      }
+      return std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
+    }
+    return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
+  }
 };
 
 } // namespace Config

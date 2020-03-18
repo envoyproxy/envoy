@@ -39,9 +39,8 @@ absl::optional<Address::IpVersion> getVersionFromSocket(const Socket& socket) {
   return absl::nullopt;
 }
 
-absl::optional<std::reference_wrapper<SocketOptionImpl>>
-getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
-                   SocketOptionImpl& ipv6_option) {
+SocketOptionImplOptRef getOptionForSocket(const Socket& socket, SocketOptionImpl& ipv4_option,
+                                          SocketOptionImpl& ipv6_option) {
   auto version = getVersionFromSocket(socket);
   if (!version.has_value()) {
     return absl::nullopt;

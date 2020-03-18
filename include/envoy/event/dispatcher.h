@@ -119,7 +119,7 @@ public:
    * @param events supplies a logical OR of FileReadyType events that the file event should
    *               initially listen on.
    */
-  virtual FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
+  virtual FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                        uint32_t events) PURE;
 
   /**
@@ -186,8 +186,8 @@ public:
    *              run() will return.
    */
   enum class RunType {
-    Block,       // Executes any events that have been activated, then exit.
-    NonBlock,    // Waits for any pending events to activate, executes them,
+    Block,       // Runs the event-loop until there are no pending events.
+    NonBlock,    // Checks for any pending events to activate, executes them,
                  // then exits. Exits immediately if there are no pending or
                  // active events.
     RunUntilExit // Runs the event-loop until loopExit() is called, blocking

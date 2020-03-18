@@ -152,25 +152,5 @@ public:
  */
 REGISTER_FACTORY(DefaultGoogleGrpcCredentialsFactory, GoogleGrpcCredentialsFactory);
 
-std::shared_ptr<grpc::ChannelCredentials>
-getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service,
-                                Api::Api& api) {
-  GoogleGrpcCredentialsFactory* credentials_factory = nullptr;
-  const std::string& google_grpc_credentials_factory_name =
-      grpc_service.google_grpc().credentials_factory_name();
-  if (google_grpc_credentials_factory_name.empty()) {
-    credentials_factory = Registry::FactoryRegistry<GoogleGrpcCredentialsFactory>::getFactory(
-        "envoy.grpc_credentials.default");
-  } else {
-    credentials_factory = Registry::FactoryRegistry<GoogleGrpcCredentialsFactory>::getFactory(
-        google_grpc_credentials_factory_name);
-  }
-  if (credentials_factory == nullptr) {
-    throw EnvoyException(absl::StrCat("Unknown google grpc credentials factory: ",
-                                      google_grpc_credentials_factory_name));
-  }
-  return credentials_factory->getChannelCredentials(grpc_service, api);
-}
-
 } // namespace Grpc
 } // namespace Envoy
