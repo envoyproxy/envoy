@@ -123,6 +123,7 @@ envoy_cc_library(
     hdrs = ["vhds.h"],
     deps = [
         ":config_lib",
+        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -151,6 +152,7 @@ envoy_cc_library(
     hdrs = ["rds_impl.h"],
     deps = [
         ":config_lib",
+        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -208,6 +210,7 @@ envoy_cc_library(
         ":rds_lib",
         ":scoped_config_lib",
         "//include/envoy/config:config_provider_interface",
+        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/router:route_config_provider_manager_interface",
         "//include/envoy/stats:stats_interface",
