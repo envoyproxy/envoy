@@ -1126,7 +1126,7 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   }
 }
 
- void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_type) {
+void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_type) {
   initialize();
 
   uint32_t http_port = lookupPort("http");
@@ -1166,8 +1166,7 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
       Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
                                            http_port),
       nullptr, true));
-  }
-
+}
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
   if (version_ == Network::Address::IpVersion::v4) {

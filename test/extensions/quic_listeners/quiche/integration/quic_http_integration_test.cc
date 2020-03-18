@@ -44,7 +44,7 @@ public:
 };
 
 class QuicHttpIntegrationTest : public HttpIntegrationTest,
- public testing::TestWithParam<Network::Address::IpVersion> {
+                                public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   QuicHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP3, GetParam(),
