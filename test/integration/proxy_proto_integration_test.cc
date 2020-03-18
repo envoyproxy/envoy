@@ -92,8 +92,9 @@ TEST_P(ProxyProtoIntegrationTest, RouterProxyUnknownLongRequestAndResponseWithBo
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
 }
 
-// Test that %DOWNSTREAM_DIRECT_REMOTE_ADDRESS*% returns the direct address, and
-// %DOWSTREAM_REMOTE_ADDRESS% returns the proxy-protocol-provided address.
+// Test that %DOWNSTREAM_DIRECT_REMOTE_ADDRESS%/%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT%
+// returns the direct address, and %DOWSTREAM_REMOTE_ADDRESS% returns the proxy-protocol-provided
+// address.
 TEST_P(ProxyProtoIntegrationTest, AccessLog) {
   useAccessLog("%DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_REMOTE_ADDRESS%");
 
