@@ -31,7 +31,7 @@ void DecoderImpl::initialize() {
   BE_known_msgs['S'] = Message{"S(ParameterStatus)", {&DecoderImpl::decodeBackendStatements}};
   BE_known_msgs['T'] = Message{"T(RowDescription)", {&DecoderImpl::decodeBackendRowDescription}};
   BE_known_msgs['1'] = Message{"1(ParseComplete)", {&DecoderImpl::incStatements, &DecoderImpl::incStatementsOther}};
-  BE_known_msgs['R'] = Message{"R(AuthenticationOk)", {&DecoderImpl::incSessions}};
+  BE_known_msgs['R'] = Message{"R(Authentication)", {&DecoderImpl::onAuthentication}};
   BE_known_msgs['E'] = Message{"E(ErrorResponse)", {&DecoderImpl::decodeBackendErrorResponse}};
   BE_known_msgs['N'] = Message{"N(NoticeResponse)", {&DecoderImpl::decodeBackendNoticeResponse}};
 
@@ -166,6 +166,14 @@ void DecoderImpl::incStatementsOther() {
 void DecoderImpl::incSessions() {
     callbacks_->incSessions();
 }
+void DecoderImpl::onAuthentication() {
+  // check if auth message indicates successful authentication
+  // Length must be 8 and payload must be 0
+  if((8 == message_len_) && (0 == *(reinterpret_cast<const uint32_t*>(message_.data())))) {
+    callbacks_->incSessions();
+  }
+}
+
 
 
 void DecoderImpl::decodeBackendErrorResponse() {

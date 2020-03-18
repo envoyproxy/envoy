@@ -306,16 +306,6 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   decoder_->onData(data, false);
   data.drain(data.length());
 
-  // R message
-  EXPECT_CALL(callbacks_, incSessions());
-  payload = "blah blah";
-  data.add("R");
-  length_ = htonl(4 + payload.length());
-  data.add(&length_, sizeof(length_));
-  data.add(payload);
-  decoder_->onData(data, false);
-  data.drain(data.length());
-
   // E message
   EXPECT_CALL(callbacks_, incErrors());
   payload = "blah VERROR blah";
@@ -333,6 +323,39 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
   length_ = htonl(4 + payload.length());
   data.add(&length_, sizeof(length_));
   data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+}
+
+// Test checks deep inspection of the R message
+// During login/authentiation phase client and server exchange
+// multiple R messages. Only payload with length is 8 and
+// payload with uint32 number equal to 0 indicates
+// successful authentication.
+TEST_F(PostgreSQLProxyDecoderTest, AuthenticationMsg) {
+  std::string payload;
+
+  // Create authentication message which does not 
+  // mean that authentication was OK. The number of 
+  // sessions must not be increased. 
+  EXPECT_CALL(callbacks_, incSessions())
+    .Times(0);
+  payload = "blah blah";
+  data.add("R");
+  length_ = htonl(4 + payload.length());
+  data.add(&length_, sizeof(length_));
+  data.add(payload);
+  decoder_->onData(data, false);
+  data.drain(data.length());
+
+  // Create the correct payload which means that
+  // authentication completed successfully.
+  EXPECT_CALL(callbacks_, incSessions());
+  data.add("R");
+  length_ = htonl(8);
+  data.add(&length_, sizeof(length_));
+  uint32_t code = 0;
+  data.add(&code, sizeof(code));
   decoder_->onData(data, false);
   data.drain(data.length());
 }
