@@ -1206,7 +1206,8 @@ http2_protocol_options:
 
 // Validates that `allow_connect` can only be configured through the named field. All other
 // SETTINGS parameters can be set via the named _or_ custom parameters fields, but `allow_connect`
-// required an exception due to the use of a primitive type for which presence can not be checked.
+// required an exception due to the use of a primitive type which does not support presence
+// checks.
 TEST_F(HttpConnectionManagerConfigTest, UserDefinedSettingsAllowConnectOnlyViaNamedField) {
   const std::string yaml_string = R"EOF(
 codec_type: http2
