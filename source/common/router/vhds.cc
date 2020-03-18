@@ -40,11 +40,11 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
   if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
     throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
-
+  const auto resource_name = getResourceName(resource_api_version);
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
-          loadTypeUrl(resource_api_version), *scope_, *this);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
@@ -75,20 +75,5 @@ void VhdsSubscription::onConfigUpdate(
   init_target_.ready();
 }
 
-std::string
-VhdsSubscription::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3::ApiVersion::AUTO:
-  case envoy::config::core::v3::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()));
-  case envoy::config::core::v3::ApiVersion::V3:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-}
 } // namespace Router
 } // namespace Envoy

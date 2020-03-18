@@ -4,6 +4,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/event/dispatcher.h"
@@ -31,7 +32,8 @@ namespace Secret {
 /**
  * SDS API implementation that fetches secrets from SDS server via Subscription.
  */
-class SdsApi : public Config::SubscriptionCallbacks {
+class SdsApi : public Envoy::Config::SubscriptionBase<
+                   envoy::extensions::transport_sockets::tls::v3::Secret> {
 public:
   struct SecretData {
     const std::string resource_name_;
@@ -63,7 +65,6 @@ protected:
     return MessageUtil::anyConvert<envoy::extensions::transport_sockets::tls::v3::Secret>(resource)
         .name();
   }
-  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
 
 private:
   void validateUpdateSize(int num_resources);

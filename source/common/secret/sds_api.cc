@@ -84,24 +84,10 @@ void SdsApi::validateUpdateSize(int num_resources) {
 }
 
 void SdsApi::initialize() {
+  const auto resource_name = getResourceName(sds_config_.resource_api_version());
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, loadTypeUrl(sds_config_.resource_api_version()), stats_, *this);
+      sds_config_, Grpc::Common::typeUrl(resource_name), stats_, *this);
   subscription_->start({sds_config_name_});
-}
-
-std::string SdsApi::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3::ApiVersion::AUTO:
-  case envoy::config::core::v3::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
-  case envoy::config::core::v3::ApiVersion::V3:
-    return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::extensions::transport_sockets::tls::v3::Secret().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
 }
 
 SdsApi::SecretData SdsApi::secretData() { return secret_data_; }

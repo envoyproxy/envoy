@@ -4,6 +4,7 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -85,8 +86,9 @@ struct ScopedRdsStats {
 };
 
 // A scoped RDS subscription to be used with the dynamic scoped RDS ConfigProvider.
-class ScopedRdsConfigSubscription : public Envoy::Config::DeltaConfigSubscriptionInstance,
-                                    Envoy::Config::SubscriptionCallbacks {
+class ScopedRdsConfigSubscription
+    : public Envoy::Config::DeltaConfigSubscriptionInstance,
+      Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration> {
 public:
   using ScopedRouteConfigurationMap =
       std::map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
@@ -164,7 +166,6 @@ private:
     return MessageUtil::anyConvert<envoy::config::route::v3::ScopedRouteConfiguration>(resource)
         .name();
   }
-  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,
                          RdsRouteConfigSubscription& rds_subscription);

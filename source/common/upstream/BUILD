@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["cds_api_impl.cc"],
     hdrs = ["cds_api_impl.h"],
     deps = [
+        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -344,6 +345,7 @@ envoy_cc_library(
     deps = [
         ":cluster_factory_lib",
         ":upstream_includes",
+        "//include/envoy/config:discovery_service_base_interface",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_factory_interface",
         "//include/envoy/config:subscription_interface",

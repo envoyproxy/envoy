@@ -36,10 +36,11 @@ EdsClusterImpl::EdsClusterImpl(
   } else {
     initialize_phase_ = InitializePhase::Secondary;
   }
+  const auto resource_name =
+      getResourceName(cluster.eds_cluster_config().eds_config().resource_api_version());
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config, loadTypeUrl(cluster.eds_cluster_config().eds_config().resource_api_version()),
-          info_->statsScope(), *this);
+          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -224,21 +225,6 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
   if (host_to_exclude != nullptr) {
     ASSERT(all_hosts_.find(host_to_exclude->address()->asString()) != all_hosts_.end());
     all_hosts_.erase(host_to_exclude->address()->asString());
-  }
-}
-
-std::string EdsClusterImpl::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3::ApiVersion::AUTO:
-  case envoy::config::core::v3::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()));
-  case envoy::config::core::v3::ApiVersion::V3:
-    return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::config::endpoint::v3::ClusterLoadAssignment().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
