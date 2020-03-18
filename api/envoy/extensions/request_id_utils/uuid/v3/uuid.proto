@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.request_id_utils.uuid.v3;
+
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.request_id_utils.uuid.v3";
+option java_outer_classname = "UuidProto";
+option java_multiple_files = true;
+
+// [#protodoc-title: UUID Request ID Utils]
+//
+// This extension is used by default and makes Envoy use request ID with the following properties:
+//
+// 1. Request ID is propagated using *x-request-id* header.
+//
+// 2. Request ID is a universally unique identifier (UUID).
+//
+// 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
+
+message UUIDConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.request_id_utils.v2.UUIDConfig";
+}

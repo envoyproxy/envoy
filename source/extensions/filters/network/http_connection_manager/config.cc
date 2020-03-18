@@ -226,13 +226,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   // If we are provided a different request_id_utils implementation to use try and create a new
-  // instance of it.
-  if (config.request_id_utils().has_typed_config()) {
-    request_id_utils_ =
-        Envoy::RequestIDUtils::RequestIDUtilsFactory::fromProto(config.request_id_utils(), context);
-  } else {
-    request_id_utils_ = RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context);
-  }
+  // instance of it, otherwise use default one.
+  request_id_utils_ = Envoy::RequestIDUtils::RequestIDUtilsFactory::fromProto(
+      config.request_id_utils().has_typed_config()
+          ? config.request_id_utils()
+          : RequestIDUtils::RequestIDUtilsFactory::defaultConfig(),
+      context);
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.

@@ -1,5 +1,7 @@
 #include "common/request_id_utils/request_id_utils_impl.h"
 
+#include "envoy/extensions/request_id_utils/uuid/v3/uuid.pb.h"
+
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 
@@ -28,10 +30,12 @@ UtilitiesSharedPtr RequestIDUtilsFactory::fromProto(
   return factory->createUtilitiesInstance(*message, context);
 }
 
-UtilitiesSharedPtr
-RequestIDUtilsFactory::defaultInstance(Server::Configuration::FactoryContext& context) {
-  return Envoy::Extensions::RequestIDUtils::UUID::UUIDUtilsFactory().createUtilitiesInstance(
-      ProtobufWkt::Empty(), context);
+envoy::extensions::filters::network::http_connection_manager::v3::RequestIDUtils
+RequestIDUtilsFactory::defaultConfig() {
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDUtils config;
+  config.mutable_typed_config()->PackFrom(
+      envoy::extensions::request_id_utils::uuid::v3::UUIDConfig());
+  return config;
 }
 
 } // namespace RequestIDUtils

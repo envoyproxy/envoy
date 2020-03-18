@@ -36,5 +36,6 @@ envoy_cc_extension(
         "//include/envoy/server:request_id_utils_config_interface",
         "//source/common/protobuf",
         "//source/extensions/request_id_utils:well_known_names",
+        "@envoy_api//envoy/extensions/request_id_utils/uuid/v3:pkg_cc_proto",
     ],
 )

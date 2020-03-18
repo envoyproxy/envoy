@@ -14,4 +14,5 @@ Extensions
   common/common
   cluster/cluster
   grpc_credential/grpc_credential
+  request_id_utils/request_id_utils
   retry/retry

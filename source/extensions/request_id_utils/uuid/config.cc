@@ -1,5 +1,7 @@
 #include "extensions/request_id_utils/uuid/config.h"
 
+#include "envoy/extensions/request_id_utils/uuid/v3/uuid.pb.h"
+
 #include "extensions/request_id_utils/uuid/uuid_impl.h"
 #include "extensions/request_id_utils/well_known_names.h"
 
@@ -16,7 +18,7 @@ UUIDUtilsFactory::createUtilitiesInstance(const Protobuf::Message&,
 std::string UUIDUtilsFactory::name() const { return RequestIDUtilNames::get().UUID; }
 
 ProtobufTypes::MessagePtr UUIDUtilsFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new ProtobufWkt::Empty()};
+  return std::make_unique<envoy::extensions::request_id_utils::uuid::v3::UUIDConfig>();
 }
 
 std::string UUIDUtilsFactory::category() const { return "request_id_utils"; }

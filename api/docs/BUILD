@@ -95,6 +95,7 @@ proto_library(
         "//envoy/config/overload/v2alpha:pkg",
         "//envoy/config/ratelimit/v2:pkg",
         "//envoy/config/rbac/v2:pkg",
+        "//envoy/config/request_id_utils/v2:pkg",
         "//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg",
         "//envoy/config/resource_monitor/injected_resource/v2alpha:pkg",
         "//envoy/config/retry/omit_canary_hosts/v2:pkg",
