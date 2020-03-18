@@ -308,7 +308,7 @@ TEST_P(ActiveQuicListenerTest, QuicProcessingDisabled) {
   EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true)).WillRepeatedly(Return(false));
   SendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  // if listener was enabled, there should have been session created for active connection
+  // If listener was enabled, there should have been session created for active connection.
   EXPECT_TRUE(envoy_quic_dispatcher->session_map().empty());
   EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(1)));
   ReadFromClientSockets();

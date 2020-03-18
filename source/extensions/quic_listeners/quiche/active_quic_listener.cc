@@ -74,10 +74,6 @@ void ActiveQuicListener::onListenerShutdown() {
 }
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
-  if (!enabled()) {
-    ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
-    return;
-  }
   quic::QuicSocketAddress peer_address(
       envoyAddressInstanceToQuicSocketAddress(data.addresses_.peer_));
   quic::QuicSocketAddress self_address(
@@ -108,10 +104,6 @@ void ActiveQuicListener::onReadReady() {
 }
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
-  if (!enabled()) {
-    ENVOY_LOG(trace, "Quic listener {}: runtime disabled", config_.name());
-    return;
-  }
   quic_dispatcher_->OnCanWrite();
 }
 
