@@ -835,7 +835,7 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_TRUE(state_->enabled());
 
   EXPECT_CALL(random_, random()).WillOnce(Return(190));
-  retry_timer_ = new testing::StrictMock<Event::MockTimer>(&dispatcher_);
+  retry_timer_ = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(15), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
