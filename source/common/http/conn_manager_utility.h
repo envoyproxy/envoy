@@ -57,6 +57,7 @@ public:
 
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                     const RequestHeaderMap* request_headers,
+                                    const RequestIDUtils::UtilitiesSharedPtr &rid_utils,
                                     const std::string& via);
 
   // Sanitize the path in the header map if forced by config.

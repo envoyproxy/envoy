@@ -366,9 +366,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 }
 
-void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
-                                                     const RequestHeaderMap* request_headers,
-                                                     const std::string& via) {
+void ConnectionManagerUtility::mutateResponseHeaders(
+    ResponseHeaderMap& response_headers, const RequestHeaderMap* request_headers,
+    const RequestIDUtils::UtilitiesSharedPtr& rid_utils, const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -385,12 +385,9 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
   response_headers.removeTransferEncoding();
 
-  // TODO(rossdylan): How we do implement this generically with RequestIDUtils?
-  if (request_headers != nullptr && request_headers->EnvoyForceTrace() &&
-      request_headers->RequestId()) {
-    response_headers.setRequestId(request_headers->RequestId()->value().getStringView());
+  if (request_headers != nullptr) {
+    rid_utils->maybePreserveRequestIDInResponse(response_headers, *request_headers);
   }
-
   response_headers.removeKeepAlive();
   response_headers.removeProxyConnection();
 

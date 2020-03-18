@@ -27,6 +27,13 @@ void UUIDUtils::ensureRequestID(Http::RequestHeaderMap& request_headers) {
   }
 }
 
+void UUIDUtils::maybePreserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
+                                                 const Http::RequestHeaderMap& request_headers) {
+  if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
+    response_headers.setRequestId(request_headers.RequestId()->value().getStringView());
+  }
+}
+
 bool UUIDUtils::modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
                                uint64_t mod) {
   if (request_headers.RequestId() == nullptr) {
