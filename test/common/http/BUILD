@@ -38,6 +38,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "async_client_utility_test",
+    srcs = ["async_client_utility_test.cc"],
+    deps = [
+        "//source/common/http:async_client_utility_lib",
+        "//test/mocks/http:http_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
     deps = [
