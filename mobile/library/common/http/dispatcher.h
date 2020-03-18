@@ -205,6 +205,7 @@ private:
   // in cancellation (which happens in a platform thread) with an erase (which always happens in the
   // Envoy Main thread) is not safe.
   // TODO: implement a lock-free access scheme here.
+  // https://github.com/lyft/envoy-mobile/issues/647
   Thread::MutexBasicLockable streams_lock_;
   // streams_ holds shared_ptr in order to allow cancellation to happen synchronously even though
   // DirectStream cleanup happens asynchronously. This is also done to keep the scope of the
