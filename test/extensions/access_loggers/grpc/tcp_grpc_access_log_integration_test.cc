@@ -54,12 +54,7 @@ public:
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* filter_chain = listener->mutable_filter_chains(0);
-      auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
-      auto tcp_proxy_config =
-          MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
-              *config_blob);
-      auto* access_log = tcp_proxy_config.add_access_log();
+      auto* access_log = listener->add_access_log();
       access_log->set_name("grpc_accesslog");
       envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig access_log_config;
       auto* common_config = access_log_config.mutable_common_config();
@@ -67,7 +62,6 @@ public:
       setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                      fake_upstreams_.back()->localAddress());
       access_log->mutable_typed_config()->PackFrom(access_log_config);
-      config_blob->PackFrom(tcp_proxy_config);
     });
     BaseIntegrationTest::initialize();
   }
