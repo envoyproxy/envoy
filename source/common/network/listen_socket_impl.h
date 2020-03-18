@@ -120,13 +120,17 @@ public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address) {}
+      : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address),
+        direct_remote_address_(remote_address) {}
 
   // Network::Socket
   Address::SocketType socketType() const override { return Address::SocketType::Stream; }
 
   // Network::ConnectionSocket
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
+  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return direct_remote_address_;
+  }
   void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     setLocalAddress(local_address);
     local_address_restored_ = true;
@@ -158,6 +162,7 @@ public:
 
 protected:
   Address::InstanceConstSharedPtr remote_address_;
+  const Address::InstanceConstSharedPtr direct_remote_address_;
   bool local_address_restored_{false};
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;

@@ -98,6 +98,7 @@ public:
     // Clear fields which are not deterministic.
     auto* log_entry = request_msg.mutable_tcp_logs()->mutable_log_entry(0);
     clearPort(*log_entry->mutable_common_properties()->mutable_downstream_remote_address());
+    clearPort(*log_entry->mutable_common_properties()->mutable_downstream_direct_remote_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_downstream_local_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_upstream_remote_address());
     clearPort(*log_entry->mutable_common_properties()->mutable_upstream_local_address());
@@ -181,11 +182,15 @@ tcp_logs:
         socket_address:
           address: {}
       upstream_cluster: cluster_0
+      downstream_direct_remote_address:
+        socket_address:
+          address: {}
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
 )EOF",
                   VersionInfo::version(), Network::Test::getLoopbackAddressString(ipVersion()),
+                  Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()),
                   Network::Test::getLoopbackAddressString(ipVersion()))));

@@ -173,6 +173,13 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 
   /**
+   * @return The address of the remote directly connected peer. Note that this method
+   * will never return nullptr. This address is not affected or modified by PROXY protocol
+   * or any other listener filter.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
+
+  /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.
    */
   struct UnixDomainSocketPeerCredentials {
