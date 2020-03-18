@@ -68,6 +68,9 @@ public:
   const Address::InstanceConstSharedPtr& remoteAddress() const override {
     return socket_->remoteAddress();
   }
+  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return socket_->directRemoteAddress();
+  }
   const Address::InstanceConstSharedPtr& localAddress() const override {
     return socket_->localAddress();
   }
