@@ -58,7 +58,7 @@ public:
  * Requests that are _not_ header only, should result in StopIteration.
  */
 TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
-  setupFilter({Arn, true /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, result);
@@ -68,7 +68,7 @@ TEST_F(AwsLambdaFilterTest, DecodingHeaderStopIteration) {
  * Header only pass-through requests should be signed and Continue iteration.
  */
 TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
-  setupFilter({Arn, true /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
   EXPECT_CALL(*signer_, sign(_));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
@@ -83,7 +83,7 @@ TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
  * If the filter is configured with an invalid ARN, then we stop.
  */
 TEST_F(AwsLambdaFilterTest, ConfigurationWithInvalidARN) {
-  setupFilter({"BadARN", true /*passthrough*/});
+  setupFilter({"BadARN", InvocationMode::Synchronous, true /*passthrough*/});
   EXPECT_CALL(decoder_callbacks_, sendLocalReply);
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, true /*end_stream*/);
@@ -94,8 +94,8 @@ TEST_F(AwsLambdaFilterTest, ConfigurationWithInvalidARN) {
  * If there's a per-route configuration with an invalid ARN, then we stop.
  */
 TEST_F(AwsLambdaFilterTest, PerRouteConfigWithInvalidARN) {
-  setupFilter({Arn, true /*passthrough*/});
-  FilterSettings route_settings{"BadARN", true /*passthrough*/};
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
+  FilterSettings route_settings{"BadARN", InvocationMode::Synchronous, true /*passthrough*/};
   ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().AwsLambda))
       .WillByDefault(Return(&route_settings));
@@ -119,8 +119,8 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
   TestUtility::loadFromYaml(metadata_yaml, cluster_metadata);
   metadata.mutable_filter_metadata()->insert({"WrongMetadataKey", cluster_metadata});
 
-  setupFilter({Arn, true /*passthrough*/});
-  FilterSettings route_settings{Arn, true /*passthrough*/};
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
+  FilterSettings route_settings{Arn, InvocationMode::Synchronous, true /*passthrough*/};
   ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().AwsLambda))
       .WillByDefault(Return(&route_settings));
@@ -142,8 +142,8 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigWrongClusterMetadata) {
  * process the request (i.e. StopIteration if end_stream is false)
  */
 TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
-  setupFilter({Arn, true /*passthrough*/});
-  FilterSettings route_settings{Arn, true /*passthrough*/};
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
+  FilterSettings route_settings{Arn, InvocationMode::Synchronous, true /*passthrough*/};
   ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().AwsLambda))
       .WillByDefault(Return(&route_settings));
@@ -154,7 +154,7 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
 }
 
 TEST_F(AwsLambdaFilterTest, DecodeDataShouldBuffer) {
-  setupFilter({Arn, true /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
   Http::TestRequestHeaderMapImpl headers;
   const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, header_result);
@@ -164,7 +164,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldBuffer) {
 }
 
 TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
-  setupFilter({Arn, true /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
   Http::TestRequestHeaderMapImpl headers;
   const auto header_result = filter_->decodeHeaders(headers, false /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, header_result);
@@ -179,6 +179,27 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, data_result);
 }
 
+TEST_F(AwsLambdaFilterTest, DecodeHeadersInvocationModeSetsHeader) {
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
+  Http::TestRequestHeaderMapImpl headers;
+  const auto header_result = filter_->decodeHeaders(headers, true /*end_stream*/);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, header_result);
+
+  std::string invocation_header_value;
+  headers.iterate(
+      [](const Http::HeaderEntry& entry, void* ctx) {
+        auto* out = static_cast<std::string*>(ctx);
+        if (entry.key().getStringView() == "x-amz-invocation-type") {
+          out->append(std::string(entry.value().getStringView()));
+          return Http::HeaderMap::Iterate::Break;
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &invocation_header_value);
+
+  EXPECT_EQ("RequestResponse", invocation_header_value);
+}
+
 /**
  * A header-only request with pass-through turned off should result in:
  * - a request with JSON body.
@@ -188,7 +209,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
  */
 TEST_F(AwsLambdaFilterTest, DecodeHeadersOnlyRequestWithJsonOn) {
   using source::extensions::filters::http::aws_lambda::Request;
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   Buffer::OwnedImpl json_buf;
   auto on_add_decoded_data = [&json_buf](Buffer::Instance& buf, bool) { json_buf.move(buf); };
   ON_CALL(decoder_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke(on_add_decoded_data));
@@ -235,7 +256,7 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersOnlyRequestWithJsonOn) {
  */
 TEST_F(AwsLambdaFilterTest, DecodeDataWithTextualBodyWithJsonOn) {
   using source::extensions::filters::http::aws_lambda::Request;
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
 
   Buffer::OwnedImpl decoded_buf;
   constexpr absl::string_view expected_plain_text = "Foo bar bazz";
@@ -305,7 +326,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataWithTextualBodyWithJsonOn) {
  */
 TEST_F(AwsLambdaFilterTest, DecodeDataWithBinaryBodyWithJsonOn) {
   using source::extensions::filters::http::aws_lambda::Request;
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
 
   Buffer::OwnedImpl decoded_buf;
   const absl::string_view fake_binary_data = "this should get base64 encoded";
@@ -348,12 +369,12 @@ TEST_F(AwsLambdaFilterTest, DecodeDataWithBinaryBodyWithJsonOn) {
 }
 
 TEST_F(AwsLambdaFilterTest, EncodeHeadersEndStreamShouldSkip) {
-  setupFilter({Arn, true /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
   Http::TestResponseHeaderMapImpl headers;
   auto result = filter_->encodeHeaders(headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   result = filter_->encodeHeaders(headers, true /*end_stream*/);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 }
@@ -363,7 +384,7 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersEndStreamShouldSkip) {
  * encoding headers and skip the filter.
  */
 TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambdaErrorShouldSkipAndContinue) {
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   headers.addCopy(Http::LowerCaseString("x-Amz-Function-Error"), "unhandled");
@@ -375,7 +396,7 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambdaErrorShouldSkipAndContinue) {
  * If Lambda returns a 5xx error then we should skip encoding headers and skip the filter.
  */
 TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambda5xxShouldSkipAndContinue) {
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(500);
   auto result = filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -386,7 +407,7 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersWithLambda5xxShouldSkipAndContinue) {
  * encodeHeaders() in a happy path should stop iteration.
  */
 TEST_F(AwsLambdaFilterTest, EncodeHeadersStopsIteration) {
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
   auto result = filter_->encodeHeaders(headers, false /*end_stream*/);
@@ -398,7 +419,30 @@ TEST_F(AwsLambdaFilterTest, EncodeHeadersStopsIteration) {
  * This is true whether end_stream is true or false.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataInPassThroughMode) {
-  setupFilter({Arn, true /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, true /*passthrough*/});
+  Buffer::OwnedImpl buf;
+  filter_->resolveSettings();
+  auto result = filter_->encodeData(buf, false /*end_stream*/);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, result);
+
+  result = filter_->encodeData(buf, true /*end_stream*/);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, result);
+
+  setupFilter({Arn, InvocationMode::Asynchronous, true /*passthrough*/});
+  filter_->resolveSettings();
+  result = filter_->encodeData(buf, false /*end_stream*/);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, result);
+
+  result = filter_->encodeData(buf, true /*end_stream*/);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, result);
+}
+
+/**
+ * encodeData() data in asynchronous mode should simply return Continue.
+ * This is true whether end_stream is true or false.
+ */
+TEST_F(AwsLambdaFilterTest, EncodeDataInAsynchrnous) {
+  setupFilter({Arn, InvocationMode::Asynchronous, false /*passthrough*/});
   Buffer::OwnedImpl buf;
   filter_->resolveSettings();
   auto result = filter_->encodeData(buf, false /*end_stream*/);
@@ -412,7 +456,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataInPassThroughMode) {
  * encodeData() data in JSON mode should stop iteration if end_stream is false.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeStopIterationAndBuffer) {
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   Buffer::OwnedImpl buf;
   filter_->resolveSettings();
   auto result = filter_->encodeData(buf, false /*end_stream*/);
@@ -424,7 +468,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeStopIterationAndBuffer) {
  * headers while ignoring any HTTP/2 pseudo-headers.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   filter_->resolveSettings();
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
@@ -481,7 +525,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
  * base64-encoded.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeBase64EncodedBody) {
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   filter_->resolveSettings();
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
@@ -528,7 +572,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeBase64EncodedBody) {
  * Encode data in JSON mode _returning_ invalid JSON payload should result in a 500 error.
  */
 TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeInvalidJson) {
-  setupFilter({Arn, false /*passthrough*/});
+  setupFilter({Arn, InvocationMode::Synchronous, false /*passthrough*/});
   filter_->resolveSettings();
   Http::TestResponseHeaderMapImpl headers;
   headers.setStatus(200);
