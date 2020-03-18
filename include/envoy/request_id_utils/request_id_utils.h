@@ -45,6 +45,7 @@ public:
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
    * @param out reference to a variable where we store the result of the mod operation.
    * @param mod integer to mod the request ID by.
+   * @return true if request ID is valid and out is populated by the result.
    */
   virtual bool modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
                               uint64_t mod) PURE;
@@ -52,6 +53,7 @@ public:
   /**
    * Get the current tracing status of a request given its headers.
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
+   * @return trace status of the request based on the given headers.
    */
   virtual TraceStatus getTraceStatus(const Http::RequestHeaderMap& request_headers) PURE;
 
@@ -60,8 +62,7 @@ public:
    * @param request_headers supplies the incoming request headers for setting the trace status.
    * @param status the trace status that should be set for this request.
    */
-  virtual void setTraceStatus(Http::RequestHeaderMap& request_headers,
-                              const TraceStatus status) PURE;
+  virtual void setTraceStatus(Http::RequestHeaderMap& request_headers, TraceStatus status) PURE;
 };
 
 using UtilitiesSharedPtr = std::shared_ptr<Utilities>;

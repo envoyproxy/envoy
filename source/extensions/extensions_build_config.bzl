@@ -105,12 +105,6 @@ EXTENSIONS = {
     #
 
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
-
-    #
-    # Request ID utilities
-    #
-    
-    "envoy.request_id_utils.uuid":                      "//source/extensions/request_id_utils/uuid:config",
     
     #
     # Resource monitors

@@ -76,7 +76,7 @@ UUIDUtils::getTraceStatus(const Http::RequestHeaderMap& request_headers) {
 }
 
 void UUIDUtils::setTraceStatus(Http::RequestHeaderMap& request_headers,
-                               const Envoy::RequestIDUtils::TraceStatus status) {
+                               Envoy::RequestIDUtils::TraceStatus status) {
   if (request_headers.RequestId() == nullptr) {
     return;
   }

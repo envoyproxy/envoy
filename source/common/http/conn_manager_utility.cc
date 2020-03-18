@@ -215,15 +215,15 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.setEnvoyExternalAddress(final_remote_address->ip()->addressAsString());
   }
 
-  auto rid_utils = config.requestIDUtils();
   // Generate x-request-id for all edge requests, or if there is none.
-  if (config.generateRequestId() && rid_utils != nullptr) {
+  if (config.generateRequestId()) {
+    auto rid_utils = config.requestIDUtils();
     // Unconditionally set a request ID if we are allowed to override it from
     // the edge. Otherwise just ensure it is set.
     if (!config.preserveExternalRequestId() && edge_request) {
-      config.requestIDUtils()->setRequestID(request_headers);
+      rid_utils->setRequestID(request_headers);
     } else {
-      config.requestIDUtils()->ensureRequestID(request_headers);
+      rid_utils->ensureRequestID(request_headers);
     }
   }
 
@@ -243,7 +243,7 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
   auto rid_utils = config.requestIDUtils();
   uint64_t result;
   // Skip if request-id is corrupted, or non-existent
-  if (rid_utils == nullptr || !rid_utils->modRequestIDBy(request_headers, result, 10000)) {
+  if (!rid_utils->modRequestIDBy(request_headers, result, 10000)) {
     return;
   }
 
@@ -261,22 +261,20 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
   }
 
   // Do not apply tracing transformations if we are currently tracing.
-  if (RequestIDUtils::TraceStatus::NoTrace ==
-      config.requestIDUtils()->getTraceStatus(request_headers)) {
+  if (RequestIDUtils::TraceStatus::NoTrace == rid_utils->getTraceStatus(request_headers)) {
     if (request_headers.ClientTraceId() &&
         runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
-      config.requestIDUtils()->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Client);
+      rid_utils->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
-      config.requestIDUtils()->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Forced);
+      rid_utils->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Forced);
     } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
                                                  result)) {
-      config.requestIDUtils()->setTraceStatus(request_headers,
-                                              RequestIDUtils::TraceStatus::Sampled);
+      rid_utils->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Sampled);
     }
   }
 
   if (!runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
-    config.requestIDUtils()->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::NoTrace);
+    rid_utils->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::NoTrace);
   }
 }
 

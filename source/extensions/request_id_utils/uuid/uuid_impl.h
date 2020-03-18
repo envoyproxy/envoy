@@ -18,7 +18,7 @@ public:
   bool modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
   Envoy::RequestIDUtils::TraceStatus getTraceStatus(const Http::RequestHeaderMap& request_headers);
   void setTraceStatus(Http::RequestHeaderMap& request_headers,
-                      const Envoy::RequestIDUtils::TraceStatus status);
+                      Envoy::RequestIDUtils::TraceStatus status);
 
 private:
   // Reference to the random generator used to generate new request IDs

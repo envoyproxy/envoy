@@ -127,7 +127,7 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
   auto rid_utils = stream_info.getRequestIDUtils();
   uint64_t random_value;
-  if (use_independent_randomness_ || rid_utils == nullptr ||
+  if (use_independent_randomness_ ||
       !rid_utils->modRequestIDBy(
           request_headers, random_value,
           ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()))) {
