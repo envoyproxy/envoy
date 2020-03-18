@@ -1,6 +1,6 @@
 # This file only installs dependencies needed in additio to Azure pipelines hosted image.
 # The list of installed software can be found at:
-# https://github.com/Microsoft/azure-pipelines-image-generation/blob/master/images/win/Vs2019-Server2019-Readme.md
+# https://github.com/actions/virtual-environments/blob/master/images/win/Windows2019-Readme.md
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 function Unzip
