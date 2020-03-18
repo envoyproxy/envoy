@@ -11,11 +11,11 @@ class UUIDUtils : public Envoy::RequestIDUtils::Utilities {
 public:
   UUIDUtils(Envoy::Runtime::RandomGenerator& random) : random(random) {}
 
-  void setRequestID(Http::HeaderMap& request_headers);
-  void ensureRequestID(Http::HeaderMap& request_headers);
-  bool modRequestIDBy(const Http::HeaderMap& request_headers, uint64_t& out, uint64_t mod);
-  Envoy::RequestIDUtils::TraceStatus getTraceStatus(const Http::HeaderMap& request_headers);
-  void setTraceStatus(Http::HeaderMap& request_headers,
+  void setRequestID(Http::RequestHeaderMap& request_headers);
+  void ensureRequestID(Http::RequestHeaderMap& request_headers);
+  bool modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
+  Envoy::RequestIDUtils::TraceStatus getTraceStatus(const Http::RequestHeaderMap& request_headers);
+  void setTraceStatus(Http::RequestHeaderMap& request_headers,
                       const Envoy::RequestIDUtils::TraceStatus status);
 
 private:

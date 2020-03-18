@@ -99,7 +99,7 @@ public:
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
-  RequestIDUtils::UtilitiesSharedPtr requestIDUtils() override { return request_id_utils; }
+  RequestIDUtils::UtilitiesSharedPtr requestIDUtils() override { return request_id_utils_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -171,7 +171,7 @@ private:
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           filter_config);
 
-  RequestIDUtils::UtilitiesSharedPtr request_id_utils;
+  RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;

@@ -11,12 +11,21 @@ namespace RequestIDUtils {
 UtilitiesSharedPtr RequestIDUtilsFactory::fromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDUtils& config,
     Server::Configuration::FactoryContext& context) {
+  const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::RequestIDUtilsFactory>::getFactoryByType(
+          type);
+  if (factory == nullptr) {
+    throw EnvoyException(
+        fmt::format("Didn't find a registered implementation for type: '{}'", type));
+  }
 
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::RequestIDUtilsFactory>(config);
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      config, context.messageValidationVisitor(), factory);
-  return factory.createUtilitiesInstance(*message, context);
+  // FIXME(euroelessar): Use Config::Utility::translateAnyToFactoryConfig once
+  // https://github.com/envoyproxy/envoy/pull/10418 is merged.
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  Config::Utility::translateOpaqueConfig(config.typed_config(), ProtobufWkt::Struct(),
+                                         context.messageValidationVisitor(), *message);
+  return factory->createUtilitiesInstance(*message, context);
 }
 
 UtilitiesSharedPtr

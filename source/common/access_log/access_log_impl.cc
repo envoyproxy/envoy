@@ -122,7 +122,7 @@ RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& 
       percent_(config.percent_sampled()),
       use_independent_randomness_(config.use_independent_randomness()) {}
 
-bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&,
+bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
                              const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&) {
   auto rid_utils = stream_info.getRequestIDUtils();

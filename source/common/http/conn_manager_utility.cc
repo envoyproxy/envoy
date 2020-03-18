@@ -59,7 +59,7 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
-    Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info) {
+    const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (Utility::isUpgrade(request_headers)) {

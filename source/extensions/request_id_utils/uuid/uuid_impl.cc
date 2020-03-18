@@ -14,20 +14,20 @@ namespace Envoy {
 namespace Extensions {
 namespace RequestIDUtils {
 
-void UUIDUtils::setRequestID(Http::HeaderMap& request_headers) {
+void UUIDUtils::setRequestID(Http::RequestHeaderMap& request_headers) {
   // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
   std::string uuid = random.uuid();
   ASSERT(!uuid.empty());
   request_headers.setRequestId(uuid);
 }
 
-void UUIDUtils::ensureRequestID(Http::HeaderMap& request_headers) {
+void UUIDUtils::ensureRequestID(Http::RequestHeaderMap& request_headers) {
   if (!request_headers.RequestId()) {
     setRequestID(request_headers);
   }
 }
 
-bool UUIDUtils::modRequestIDBy(const Http::HeaderMap& request_headers, uint64_t& out,
+bool UUIDUtils::modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out,
                                uint64_t mod) {
   if (request_headers.RequestId() == nullptr) {
     return false;
@@ -47,7 +47,7 @@ bool UUIDUtils::modRequestIDBy(const Http::HeaderMap& request_headers, uint64_t&
 }
 
 Envoy::RequestIDUtils::TraceStatus
-UUIDUtils::getTraceStatus(const Http::HeaderMap& request_headers) {
+UUIDUtils::getTraceStatus(const Http::RequestHeaderMap& request_headers) {
   if (request_headers.RequestId() == nullptr) {
     return Envoy::RequestIDUtils::TraceStatus::NoTrace;
   }
@@ -68,7 +68,7 @@ UUIDUtils::getTraceStatus(const Http::HeaderMap& request_headers) {
   }
 }
 
-void UUIDUtils::setTraceStatus(Http::HeaderMap& request_headers,
+void UUIDUtils::setTraceStatus(Http::RequestHeaderMap& request_headers,
                                const Envoy::RequestIDUtils::TraceStatus status) {
   if (request_headers.RequestId() == nullptr) {
     return;

@@ -167,8 +167,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::HttpTracerManager& http_tracer_manager)
-    : request_id_utils(RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context)),
-      context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
+    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
@@ -228,9 +227,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   // If we are provided a different request_id_utils implementation to use try and create a new
   // instance of it.
-  if (!config.request_id_utils().name().empty()) {
-    request_id_utils =
+  if (config.request_id_utils().has_typed_config()) {
+    request_id_utils_ =
         Envoy::RequestIDUtils::RequestIDUtilsFactory::fromProto(config.request_id_utils(), context);
+  } else {
+    request_id_utils_ = RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context);
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
