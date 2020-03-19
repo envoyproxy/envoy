@@ -13,7 +13,6 @@
 // * HTTP 1.0 special cases
 // * Fuzz config settings
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/request_id_utils/request_id_utils.h"
 
 #include "common/common/empty_string.h"
 #include "common/http/conn_manager_impl.h"
@@ -22,6 +21,7 @@
 #include "common/http/exception.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/request_id_utils/request_id_utils_impl.h"
 #include "common/stats/symbol_table_creator.h"
 
 #include "test/common/http/conn_manager_impl_fuzz.pb.h"
@@ -34,6 +34,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -72,6 +73,7 @@ public:
     ON_CALL(scoped_route_config_provider_, lastUpdated())
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
+    request_id_utils_ = Envoy::RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context_);
   }
 
   void newStream() {
@@ -90,7 +92,7 @@ public:
   // Http::ConnectionManagerConfig
 
   // TODO(rossdylan): Replace this nullptr with the uuid impl or mock impl
-  RequestIDUtils::UtilitiesSharedPtr requestIDUtils() override { return nullptr; }
+  RequestIDUtils::UtilitiesSharedPtr requestIDUtils() override { return request_id_utils_; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {
@@ -153,6 +155,8 @@ public:
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
+  Envoy::Server::Configuration::MockFactoryContext context_;
+  RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
   MockStreamDecoderFilter* decoder_filter_{};
