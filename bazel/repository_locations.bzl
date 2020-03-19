@@ -54,13 +54,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],
     ),
     com_github_c_ares_c_ares = dict(
-        sha256 = "bbaab13d6ad399a278d476f533e4d88a7ec7d729507348bb9c2e3b207ba4c606",
-        strip_prefix = "c-ares-d7e070e7283f822b1d2787903cce3615536c5610",
-        # 2019-06-19
-        # 27 new commits from release-1.15.0. Upgrade for commit 7d3591ee8a1a63e7748e68e6d880bd1763a32885 "getaddrinfo enhancements" and follow up fixes.
-        # Use getaddrinfo to query DNS record and TTL.
-        # TODO(crazyxy): Update to release-1.16.0 when it is released.
-        urls = ["https://github.com/c-ares/c-ares/archive/d7e070e7283f822b1d2787903cce3615536c5610.tar.gz"],
+        sha256 = "b045ef78cda05edd4c677ab351f209315aab8fb041051031bdbe185aaf74baf3",
+        strip_prefix = "c-ares-cares-1_16_0",
+        urls = ["https://github.com/c-ares/c-ares/archive/cares-1_16_0.tar.gz"],
     ),
     com_github_circonus_labs_libcircllhist = dict(
         sha256 = "8165aa25e529d7d4b9ae849d3bf30371255a99d6db0421516abcff23214cdc2c",
@@ -265,9 +261,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227.tar.gz"],
     ),
     com_github_curl = dict(
-        sha256 = "1dd7604e418b0b9a9077f62f763f6684c1b092a7bc17e3f354b8ad5c964d7358",
-        strip_prefix = "curl-7.68.0",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_68_0/curl-7.68.0.tar.gz"],
+        sha256 = "01ae0c123dee45b01bbaef94c0bc00ed2aec89cb2ee0fd598e0d302a6b5e0a98",
+        strip_prefix = "curl-7.69.1",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_69_1/curl-7.69.1.tar.gz"],
     ),
     com_googlesource_chromium_v8 = dict(
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh

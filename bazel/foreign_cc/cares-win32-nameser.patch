@@ -1,12 +1,15 @@
---- CMakeLists.txt.orig	2020-02-19 14:42:47.978299400 -0500
-+++ CMakeLists.txt	2020-02-19 14:45:18.925903400 -0500
-@@ -652,6 +652,9 @@
- # Headers installation target
+  diff --git a/CMakeLists.txt b/CMakeLists.txt
+index fd123e1..9768394 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -693,6 +693,9 @@ ENDIF ()
+ # Headers and Man Pages installation target
  IF (CARES_INSTALL)
  	SET (CARES_HEADERS ares.h ares_version.h ares_dns.h "${PROJECT_BINARY_DIR}/ares_build.h" ares_rules.h)
 +	IF (WIN32)
-+		SET (CARES_HEADERS ${CARES_HEADERS} nameser.h)
++	    SET (CARES_HEADERS ${CARES_HEADERS} nameser.h)
 +	ENDIF()
- 	INSTALL (FILES ${CARES_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
- ENDIF ()
+ 	INSTALL (FILES ${CARES_HEADERS} COMPONENT Devel DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
  
+ 	# ManPages
+

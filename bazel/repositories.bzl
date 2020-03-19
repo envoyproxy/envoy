@@ -207,6 +207,7 @@ def _com_github_c_ares_c_ares():
     location = REPOSITORY_LOCATIONS["com_github_c_ares_c_ares"]
     http_archive(
         name = "com_github_c_ares_c_ares",
+        patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:cares-win32-nameser.patch"],
         build_file_content = BUILD_ALL_CONTENT,
         **location
@@ -595,6 +596,8 @@ def _com_github_curl():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
 """,
+        patches = ["@envoy//bazel/foreign_cc:curl-revert-cmake-minreqver.patch"],
+        patch_args = ["-p1"],
         **location
     )
     native.bind(
