@@ -109,7 +109,7 @@ public:
     /**
      * Stop listening according to implementation's own definition.
      */
-    virtual void stopListening() PURE;
+    virtual void shutdownListener() PURE;
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;

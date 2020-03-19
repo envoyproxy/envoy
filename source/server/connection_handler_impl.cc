@@ -57,14 +57,14 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
-      listener.second.listener_->stopListening();
+      listener.second.listener_->shutdownListener();
     }
   }
 }
 
 void ConnectionHandlerImpl::stopListeners() {
   for (auto& listener : listeners_) {
-    listener.second.listener_->stopListening();
+    listener.second.listener_->shutdownListener();
   }
 }
 

@@ -48,7 +48,7 @@ public:
   Network::Listener* listener() override { return udp_listener_.get(); }
   void pauseListening() override;
   void resumeListening() override;
-  void stopListening() override;
+  void shutdownListener() override;
 
 private:
   friend class ActiveQuicListenerPeer;

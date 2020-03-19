@@ -106,7 +106,7 @@ void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewCo
 
 void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
 
-void ActiveQuicListener::stopListening() {
+void ActiveQuicListener::shutdownListener() {
   // Same as pauseListening() because all we want is to stop accepting new
   // connections.
   quic_dispatcher_->StopAcceptingNewConnections();
