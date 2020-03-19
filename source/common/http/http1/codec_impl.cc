@@ -633,7 +633,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
   }
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
-  // transfer-encodings it does not understand.
+  // transfer-codings it does not understand.
   if (request_or_response_headers.TransferEncoding()) {
     const absl::string_view encoding =
         request_or_response_headers.TransferEncoding()->value().getStringView();
