@@ -5,9 +5,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgreSQLProxy {
 
-bool BufferHelper::endOfBuffer(Buffer::Instance& buffer) {
-  return buffer.length() == 0;
-}
+bool BufferHelper::endOfBuffer(Buffer::Instance& buffer) { return buffer.length() == 0; }
 
 int BufferHelper::readUint8(Buffer::Instance& buffer, uint8_t& val) {
   try {
@@ -46,7 +44,7 @@ int BufferHelper::readBytes(Buffer::Instance& buffer, size_t skip_bytes) {
   if (buffer.length() < skip_bytes) {
     return POSTGRESQL_FAILURE;
   }
-  //buffer.drain(skip_bytes);
+  // buffer.drain(skip_bytes);
   return POSTGRESQL_SUCCESS;
 }
 

@@ -1,11 +1,10 @@
 #pragma once
 
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/postgresql_proxy/postgresql_filter.h"
-
 #include "envoy/extensions/filters/network/postgresql_proxy/v3alpha/postgresql_proxy.pb.h"
 #include "envoy/extensions/filters/network/postgresql_proxy/v3alpha/postgresql_proxy.pb.validate.h"
 
+#include "extensions/filters/network/common/factory_base.h"
+#include "extensions/filters/network/postgresql_proxy/postgresql_filter.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {

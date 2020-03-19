@@ -10,7 +10,8 @@ namespace PostgreSQLProxy {
  */
 Network::FilterFactoryCb
 NetworkFilters::PostgreSQLProxy::PostgreSQLConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::postgresql_proxy::v3alpha::PostgreSQLProxy& proto_config,
+    const envoy::extensions::filters::network::postgresql_proxy::v3alpha::PostgreSQLProxy&
+        proto_config,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());
 
