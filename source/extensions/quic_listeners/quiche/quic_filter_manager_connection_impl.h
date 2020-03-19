@@ -87,7 +87,7 @@ public:
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
 
   // Network::ReadBufferSource
-  Network::StreamBuffer getReadBuffer() override { return {emptyBuffer(), false}; }
+  Network::StreamBuffer getReadBuffer() override { return {empty_buffer_, false}; }
   // Network::WriteBufferSource
   Network::StreamBuffer getWriteBuffer() override { NOT_REACHED_GCOVR_EXCL_LINE; }
 
@@ -117,8 +117,6 @@ private:
   // Called when aggregated buffered bytes across all the streams declines to low watermark.
   void onSendBufferLowWatermark();
 
-  static Buffer::Instance& emptyBuffer() { MUTABLE_CONSTRUCT_ON_FIRST_USE(Buffer::OwnedImpl); }
-
   // Currently ConnectionManagerImpl is the one and only filter. If more network
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
@@ -133,6 +131,7 @@ private:
   // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's
   // send buffer.
   EnvoyQuicSimulatedWatermarkBuffer write_buffer_watermark_simulation_;
+  Buffer::OwnedImpl empty_buffer_;
 };
 
 } // namespace Quic
