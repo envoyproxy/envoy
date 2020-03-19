@@ -43,7 +43,7 @@ public:
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                    RecvMsgOutput& output) override;
 
-  bool supportMmsg() const override;
+  bool supportsMmsg() const override;
 
 private:
   // Converts a SysCallSizeResult to IoCallUint64Result.

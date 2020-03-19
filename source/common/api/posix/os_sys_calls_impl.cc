@@ -3,7 +3,6 @@
 #include <unistd.h>
 
 #include <cerrno>
-#include <iostream>
 #include <string>
 
 #include "common/api/os_sys_calls_impl.h"
@@ -66,8 +65,7 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
 #endif
 }
 
-bool OsSysCallsImpl::supportMmsg() const {
-  std::cerr << "============ OsSysCallsImpl:supportMmsg\n";
+bool OsSysCallsImpl::supportsMmsg() const {
 #if ENVOY_MMSG_MORE
   return true;
 #else

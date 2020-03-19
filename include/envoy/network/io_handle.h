@@ -98,7 +98,7 @@ public:
     /*
      * @param num_packets_per_call is the max number of packets allowed per
      * recvmmsg call. For recvmsg call, any value larger than 0 is allowed, but
-     * only the first one will be used for return.
+     * only one packet will be returned.
      * @param dropped_packets points to a variable to store how many packets are
      * dropped so far. If nullptr, recvmsg() won't try to get this information
      * from transport header.
@@ -140,7 +140,10 @@ public:
   virtual Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                            RecvMsgOutput& output) PURE;
 
-  virtual bool supportMmsg() const PURE;
+  /**
+   * return true if the platform supports recvmmsg() and sendmmsg().
+   */
+  virtual bool supportsMmsg() const PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

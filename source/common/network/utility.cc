@@ -557,7 +557,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 UdpPacketProcessor& udp_packet_processor,
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped) {
-  if (handle.supportMmsg()) {
+  if (handle.supportsMmsg()) {
     const uint32_t num_packets_per_mmsg_call = 16u;
     const uint32_t num_slices_per_packet = 1u;
     absl::FixedArray<Buffer::InstancePtr> buffers(num_packets_per_mmsg_call);

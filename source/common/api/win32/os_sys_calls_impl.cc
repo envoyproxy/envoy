@@ -165,12 +165,9 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-bool OsSysCallsImpl::supportMmsg() const {
-#if ENVOY_MMSG_MORE
-  return true;
-#else
+bool OsSysCallsImpl::supportsMmsg() const {
+  // Windows doesn't suppport it.
   return false;
-#endif
 }
 
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {

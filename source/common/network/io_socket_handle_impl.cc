@@ -308,6 +308,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     hdr->msg_controllen = cbufs[i].size();
   }
 
+  // Set MSG_WAITFORONE so that recvmmsg will not waiting for
+  // |num_packets_permmsg_call| packets to arrive before returning when the
+  // socket is a blocking socket.
   const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().recvmmsg(
       fd_, mmsg_hdr.data(), num_packets_per_mmsg_call, MSG_TRUNC | MSG_WAITFORONE, nullptr);
 
@@ -363,9 +366,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   return sysCallResultToIoCallResult(result);
 }
 
-bool IoSocketHandleImpl::supportMmsg() const {
-  std::cerr << "========= IoSocketHandleImpl::supportMmsg\n";
-  return Api::OsSysCallsSingleton::get().supportMmsg();
+bool IoSocketHandleImpl::supportsMmsg() const {
+  return Api::OsSysCallsSingleton::get().supportsMmsg();
 }
 
 } // namespace Network

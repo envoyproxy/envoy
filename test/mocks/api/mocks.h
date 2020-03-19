@@ -87,7 +87,7 @@ public:
   MOCK_METHOD(SysCallIntResult, socketpair, (int domain, int type, int protocol, os_fd_t sv[2]));
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));
   MOCK_METHOD(SysCallSizeResult, write, (os_fd_t sockfd, const void* buffer, size_t length));
-  MOCK_METHOD(bool, supportMmsg, (), (const));
+  MOCK_METHOD(bool, supportsMmsg, (), (const));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;

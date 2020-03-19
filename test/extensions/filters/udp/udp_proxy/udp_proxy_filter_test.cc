@@ -66,7 +66,7 @@ public:
                               int send_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
 
-      EXPECT_CALL(*io_handle_, supportMmsg());
+      EXPECT_CALL(*io_handle_, supportsMmsg());
       // Return the datagram.
       EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
@@ -97,7 +97,7 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        EXPECT_CALL(*io_handle_, supportMmsg());
+        EXPECT_CALL(*io_handle_, supportsMmsg());
         EXPECT_CALL(*io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(
                 0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),

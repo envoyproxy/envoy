@@ -67,6 +67,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
     ipv6_addr->sin6_port = htons(54321);
     *reinterpret_cast<sockaddr_in6*>(msg->msg_name) = *ipv6_addr;
     msg->msg_namelen = sizeof(sockaddr_in6);
+    msg->msg_controllen = 0;
     return Api::SysCallSizeResult{5u, 0};
   }));
   wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output);
@@ -87,11 +88,13 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   wrapper_->readv(5, &slice, 1);
   wrapper_->writev(&slice, 1);
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
-  wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output);
-  wrapper_->recvmmsg(slices, /*self_port=*/12345, output2);
+  EXPECT_DEBUG_DEATH(wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output),
+                     "recvmmsg is called after close");
+  EXPECT_DEBUG_DEATH(wrapper_->recvmmsg(slices, /*self_port=*/12345, output2),
+                     "recvmmsg is called after close");
 
-  EXPECT_CALL(os_sys_calls_, supportMmsg());
-  wrapper_->supportMmsg();
+  EXPECT_CALL(os_sys_calls_, supportsMmsg());
+  wrapper_->supportsMmsg();
 }
 
 } // namespace Quic
