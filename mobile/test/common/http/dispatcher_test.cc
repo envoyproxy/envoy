@@ -759,6 +759,12 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
       }));
   start_stream_post_cb();
 
+  // Used to verify that when a reset is received, the Http::Dispatcher::DirectStream fires
+  // runResetCallbacks. The Http::ConnectionManager depends on the Http::Dispatcher::DirectStream
+  // firing this tight loop to let the Http::ConnectionManager clean up its stream state.
+  Http::MockStreamCallbacks callbacks;
+  response_encoder_->getStream().addCallbacks(callbacks);
+
   // Send request headers.
   Event::PostCb send_headers_post_cb;
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&send_headers_post_cb));
@@ -773,6 +779,10 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
   ASSERT_EQ(cc.on_headers_calls, 1);
 
   Event::PostCb stream_deletion_post_cb;
+  // Expect that when a reset is received, the Http::Dispatcher::DirectStream fires
+  // runResetCallbacks. The Http::ConnectionManager depends on the Http::Dispatcher::DirectStream
+  // firing this tight loop to let the Http::ConnectionManager clean up its stream state.
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
   EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&stream_deletion_post_cb));
   response_encoder_->getStream().resetStream(StreamResetReason::RemoteReset);
