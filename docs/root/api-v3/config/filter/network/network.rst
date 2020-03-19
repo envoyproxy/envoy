@@ -7,3 +7,4 @@ Network filters
 
   */empty/*
   ../../../extensions/filters/network/*/v3/*
+  ../../../extensions/filters/network/*/v3alpha/*
