@@ -186,7 +186,7 @@ private:
   Router::RouteConfigProviderManager& route_config_provider_manager_;
   Config::ConfigProviderManager& scoped_routes_config_provider_manager_;
   CodecType codec_type_;
-  const Http::Http2Settings http2_settings_;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const Http::Http1Settings http1_settings_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};

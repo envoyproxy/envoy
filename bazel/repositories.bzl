@@ -507,6 +507,11 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/time:time",
     )
 
+    native.bind(
+        name = "abseil_algorithm",
+        actual = "@com_google_absl//absl/algorithm:algorithm",
+    )
+
 def _com_google_protobuf():
     _repository_impl("rules_python")
     _repository_impl(

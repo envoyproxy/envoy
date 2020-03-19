@@ -720,10 +720,11 @@ public:
   virtual const Http::Http1Settings& http1Settings() const PURE;
 
   /**
-   * @return const Http::Http2Settings& for HTTP/2 connections created on behalf of this cluster.
-   *         @see Http::Http2Settings.
+   * @return const envoy::config::core::v3::Http2ProtocolOptions& for HTTP/2 connections
+   * created on behalf of this cluster.
+   *         @see envoy::config::core::v3::Http2ProtocolOptions.
    */
-  virtual const Http::Http2Settings& http2Settings() const PURE;
+  virtual const envoy::config::core::v3::Http2ProtocolOptions& http2Options() const PURE;
 
   /**
    * @param name std::string containing the well-known name of the extension for which protocol

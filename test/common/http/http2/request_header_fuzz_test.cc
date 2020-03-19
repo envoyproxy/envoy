@@ -17,7 +17,7 @@ namespace {
 void Replay(const Frame& frame, ServerCodecFrameInjector& codec) {
   // Create the server connection containing the nghttp2 session.
   TestServerConnectionImpl connection(
-      codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.settings_,
+      codec.server_connection_, codec.server_callbacks_, codec.stats_store_, codec.options_,
       Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT);
   codec.write(WellKnownFrames::clientConnectionPrefaceFrame(), connection);
   codec.write(WellKnownFrames::defaultSettingsFrame(), connection);

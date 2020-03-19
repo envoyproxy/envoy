@@ -18,6 +18,7 @@
 #include "common/common/fmt.h"
 #include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -1213,7 +1214,7 @@ name: passthrough-filter
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
-            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+            ::Envoy::Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       });
 
   initialize();
@@ -1351,7 +1352,7 @@ name: encode-headers-return-stop-all-filter
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
         hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
-            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+            ::Envoy::Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       });
 
   initialize();

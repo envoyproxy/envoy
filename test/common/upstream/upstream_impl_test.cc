@@ -295,7 +295,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
+  EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
   EXPECT_EQ(Http::Http1Settings::HeaderKeyFormat::ProperCase,
             cluster.info()->http1Settings().header_key_format_);
 
@@ -622,7 +622,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
+  EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
@@ -1037,6 +1037,57 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
+// Ensures that HTTP/2 user defined SETTINGS parameter validation is enforced on clusters.
+TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    dns_refresh_rate: 4s
+    dns_failure_refresh_rate:
+      base_interval: 7s
+      max_interval: 10s
+    lb_policy: round_robin
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 43
+        max_pending_requests: 57
+        max_requests: 50
+        max_retries: 10
+      - priority: HIGH
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+    max_requests_per_connection: 3
+    protocol_selection: USE_DOWNSTREAM_PROTOCOL
+    http2_protocol_options:
+      hpack_table_size: 2048
+      custom_settings_parameters: { identifier: 1, value: 1024 }
+    http_protocol_options:
+      header_key_format:
+        proper_case_words: {}
+    hosts:
+    - { socket_address: { address: localhost1, port_value: 11001 }}
+    - { socket_address: { address: localhost2, port_value: 11002 }}
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_);
+  EXPECT_THROW_WITH_REGEX(
+      StrictDnsClusterImpl(cluster_config, runtime_, dns_resolver_, factory_context,
+                           std::move(scope), false),
+      EnvoyException,
+      R"(the \{hpack_table_size\} HTTP/2 SETTINGS parameter\(s\) can not be configured through)"
+      " both");
+}
+
 TEST(HostImplTest, HostCluster) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
@@ -1305,7 +1356,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
-// Validates that setting an EDS health value through LoadAssignment is honored for static clusters.
+// Validates that setting an EDS health value through LoadAssignment is honored for static
+// clusters.
 TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   const std::string yaml = R"EOF(
     name: staticcluster
@@ -1601,8 +1653,8 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(0U, cluster.info()->maxRequestsPerConnection());
-  EXPECT_EQ(Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
-            cluster.info()->http2Settings().hpack_table_size_);
+  EXPECT_EQ(::Envoy::Http2::Utility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE,
+            cluster.info()->http2Options().hpack_table_size().value());
   EXPECT_EQ(LoadBalancerType::Random, cluster.info()->lbType());
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11001", "10.0.0.2:11002"}),
@@ -1869,8 +1921,8 @@ TEST(PrioritySet, Extend) {
   // Test batch host updates. Verify that we can move a host without triggering intermediate host
   // updates.
 
-  // We're going to do a noop host change, so add a callback to assert that we're not announcing any
-  // host changes.
+  // We're going to do a noop host change, so add a callback to assert that we're not announcing
+  // any host changes.
   priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) -> void {
     EXPECT_TRUE(added.empty() && removed.empty());
   });
@@ -2033,9 +2085,9 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
       no_such_filter: { option: value }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      makeCluster(yaml), EnvoyException,
-      "Didn't find a registered network or http filter implementation for name: 'no_such_filter'");
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered network or http filter implementation for "
+                            "name: 'no_such_filter'");
 }
 
 TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
@@ -2050,9 +2102,9 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
         "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      makeCluster(yaml), EnvoyException,
-      "Didn't find a registered network or http filter implementation for name: 'no_such_filter'");
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered network or http filter implementation for "
+                            "name: 'no_such_filter'");
 }
 
 TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
@@ -2184,6 +2236,34 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   EXPECT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
             cluster->info()->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.unit());
+}
+
+// Validates HTTP2 SETTINGS config.
+TEST_F(ClusterInfoImplTest, Http2ProtocolOptions) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options:
+      hpack_table_size: 2048
+      initial_stream_window_size: 65536
+      custom_settings_parameters:
+        - identifier: 0x10
+          value: 10
+        - identifier: 0x12
+          value: 12
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(cluster->info()->http2Options().hpack_table_size().value(), 2048);
+  EXPECT_EQ(cluster->info()->http2Options().initial_stream_window_size().value(), 65536);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].identifier().value(),
+            0x10);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].value().value(), 10);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].identifier().value(),
+            0x12);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].value().value(), 12);
 }
 
 class TestFilterConfigFactoryBase {

@@ -1466,7 +1466,9 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(),
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions()),
       maxRequestHeadersKb(), maxRequestHeadersCount());
 }
 

@@ -18,6 +18,7 @@
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
+#include "common/http/utility.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -423,27 +424,27 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                               const Http2Settings& http2_settings, const uint32_t max_headers_kb,
-                               const uint32_t max_headers_count)
+                               const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                               const uint32_t max_headers_kb, const uint32_t max_headers_count)
     : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))}, connection_(connection),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
-      per_stream_buffer_limit_(http2_settings.initial_stream_window_size_),
+      per_stream_buffer_limit_(http2_options.initial_stream_window_size().value()),
       stream_error_on_invalid_http_messaging_(
-          http2_settings.stream_error_on_invalid_http_messaging_),
-      flood_detected_(false), max_outbound_frames_(http2_settings.max_outbound_frames_),
+          http2_options.stream_error_on_invalid_http_messaging()),
+      flood_detected_(false), max_outbound_frames_(http2_options.max_outbound_frames().value()),
       frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundFrame(fragment);
       }),
-      max_outbound_control_frames_(http2_settings.max_outbound_control_frames_),
+      max_outbound_control_frames_(http2_options.max_outbound_control_frames().value()),
       control_frame_buffer_releasor_([this](const Buffer::OwnedBufferFragmentImpl* fragment) {
         releaseOutboundControlFrame(fragment);
       }),
       max_consecutive_inbound_frames_with_empty_payload_(
-          http2_settings.max_consecutive_inbound_frames_with_empty_payload_),
+          http2_options.max_consecutive_inbound_frames_with_empty_payload().value()),
       max_inbound_priority_frames_per_stream_(
-          http2_settings.max_inbound_priority_frames_per_stream_),
+          http2_options.max_inbound_priority_frames_per_stream().value()),
       max_inbound_window_update_frames_per_data_frame_sent_(
-          http2_settings.max_inbound_window_update_frames_per_data_frame_sent_),
+          http2_options.max_inbound_window_update_frames_per_data_frame_sent().value()),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false) {}
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
@@ -547,6 +548,10 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     raised_goaway_ = true;
     callbacks().onGoAway();
     return 0;
+  }
+
+  if (frame->hd.type == NGHTTP2_SETTINGS && frame->hd.flags == NGHTTP2_FLAG_NONE) {
+    onSettingsForTest(frame->settings);
   }
 
   StreamImpl* stream = getStream(frame->hd.stream_id);
@@ -900,52 +905,49 @@ void ConnectionImpl::sendPendingFrames() {
   }
 }
 
-void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disable_push) {
-  ASSERT(http2_settings.hpack_table_size_ <= Http2Settings::MAX_HPACK_TABLE_SIZE);
-  ASSERT(Http2Settings::MIN_MAX_CONCURRENT_STREAMS <= http2_settings.max_concurrent_streams_ &&
-         http2_settings.max_concurrent_streams_ <= Http2Settings::MAX_MAX_CONCURRENT_STREAMS);
-  ASSERT(
-      Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE <= http2_settings.initial_stream_window_size_ &&
-      http2_settings.initial_stream_window_size_ <= Http2Settings::MAX_INITIAL_STREAM_WINDOW_SIZE);
-  ASSERT(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE <=
-             http2_settings.initial_connection_window_size_ &&
-         http2_settings.initial_connection_window_size_ <=
-             Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE);
+void ConnectionImpl::sendSettings(
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options, bool disable_push) {
+  absl::InlinedVector<nghttp2_settings_entry, 10> settings;
+  auto insertParameter = [&settings](const nghttp2_settings_entry& entry) mutable -> bool {
+    const auto it = std::find_if(settings.cbegin(), settings.cend(),
+                                 [&entry](const nghttp2_settings_entry& existing) {
+                                   return entry.settings_id == existing.settings_id;
+                                 });
+    if (it != settings.end()) {
+      return false;
+    }
+    settings.push_back(entry);
+    return true;
+  };
 
-  std::vector<nghttp2_settings_entry> iv;
-
-  if (http2_settings.allow_connect_) {
-    iv.push_back({NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, 1});
-  }
-
-  if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
-    iv.push_back({NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_settings.hpack_table_size_});
-    ENVOY_CONN_LOG(debug, "setting HPACK table size to {}", connection_,
-                   http2_settings.hpack_table_size_);
-  }
-
-  if (http2_settings.max_concurrent_streams_ != NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS) {
-    iv.push_back({NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_});
-    ENVOY_CONN_LOG(debug, "setting max concurrent streams to {}", connection_,
-                   http2_settings.max_concurrent_streams_);
-  }
-
-  if (http2_settings.initial_stream_window_size_ != NGHTTP2_INITIAL_WINDOW_SIZE) {
-    iv.push_back(
-        {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_settings.initial_stream_window_size_});
-    ENVOY_CONN_LOG(debug, "setting stream-level initial window size to {}", connection_,
-                   http2_settings.initial_stream_window_size_);
-  }
-
+  // Universally disable receiving push promise frames as we don't currently support
+  // them. nghttp2 will fail the connection if the other side still sends them.
+  // TODO(mattklein123): Remove this when we correctly proxy push promise.
+  // NOTE: This is a special case with respect to custom parameter overrides in that server push is
+  // not supported and therefore not end user configurable.
   if (disable_push) {
-    // Universally disable receiving push promise frames as we don't currently support them. nghttp2
-    // will fail the connection if the other side still sends them.
-    // TODO(mattklein123): Remove this when we correctly proxy push promise.
-    iv.push_back({NGHTTP2_SETTINGS_ENABLE_PUSH, 0});
+    settings.push_back(
+        {static_cast<int32_t>(NGHTTP2_SETTINGS_ENABLE_PUSH), disable_push ? 0U : 1U});
   }
 
-  if (!iv.empty()) {
-    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());
+  for (const auto it : http2_options.custom_settings_parameters()) {
+    ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
+    const bool result =
+        insertParameter({static_cast<int32_t>(it.identifier().value()), it.value().value()});
+    ASSERT(result);
+    ENVOY_CONN_LOG(debug, "adding custom settings parameter with id {:#x} to {}", connection_,
+                   it.identifier().value(), it.value().value());
+  }
+
+  // Insert named parameters.
+  settings.insert(
+      settings.end(),
+      {{NGHTTP2_SETTINGS_HEADER_TABLE_SIZE, http2_options.hpack_table_size().value()},
+       {NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL, http2_options.allow_connect()},
+       {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_options.max_concurrent_streams().value()},
+       {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, http2_options.initial_stream_window_size().value()}});
+  if (!settings.empty()) {
+    int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &settings[0], settings.size());
     ASSERT(rc == 0);
   } else {
     // nghttp2_submit_settings need to be called at least once
@@ -953,12 +955,14 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
     ASSERT(rc == 0);
   }
 
+  const uint32_t initial_connection_window_size =
+      http2_options.initial_connection_window_size().value();
   // Increase connection window size up to our default size.
-  if (http2_settings.initial_connection_window_size_ != NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE) {
+  if (initial_connection_window_size != NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE) {
     ENVOY_CONN_LOG(debug, "updating connection-level initial window size to {}", connection_,
-                   http2_settings.initial_connection_window_size_);
+                   initial_connection_window_size);
     int rc = nghttp2_submit_window_update(session_, NGHTTP2_FLAG_NONE, 0,
-                                          http2_settings.initial_connection_window_size_ -
+                                          initial_connection_window_size -
                                               NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
     ASSERT(rc == 0);
   }
@@ -1071,60 +1075,64 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
-ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) {
+ConnectionImpl::Http2Options::Http2Options(
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options) {
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
-  // calculations. This saves a tremendous amount of memory in cases where there are a large number
-  // of kept alive HTTP/2 connections.
+  // calculations. This saves a tremendous amount of memory in cases where there are a large
+  // number of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
 
   // The max send header block length is configured to an arbitrarily high number so as to never
-  // trigger the check within nghttp2, as we check request headers length in codec_impl::saveHeader.
+  // trigger the check within nghttp2, as we check request headers length in
+  // codec_impl::saveHeader.
   nghttp2_option_set_max_send_header_block_length(options_, 0x2000000);
 
-  if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
-    nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);
+  if (http2_options.hpack_table_size().value() != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
+    nghttp2_option_set_max_deflate_dynamic_table_size(options_,
+                                                      http2_options.hpack_table_size().value());
   }
 
-  if (http2_settings.allow_metadata_) {
+  if (http2_options.allow_metadata()) {
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
   }
 
-  // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames. This
-  // new limit may cause the internal nghttp2 mitigation to trigger more often (as it requires just
-  // 9K of incoming bytes for smallest 9 byte SETTINGS frame), bypassing the same mitigation and its
-  // associated behavior in the envoy HTTP/2 codec. Since envoy does not rely on this mitigation,
-  // set back to the old 10K number to avoid any changes in the HTTP/2 codec behavior.
+  // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames.
+  // This new limit may cause the internal nghttp2 mitigation to trigger more often (as it
+  // requires just 9K of incoming bytes for smallest 9 byte SETTINGS frame), bypassing the same
+  // mitigation and its associated behavior in the envoy HTTP/2 codec. Since envoy does not rely
+  // on this mitigation, set back to the old 10K number to avoid any changes in the HTTP/2 codec
+  // behavior.
   nghttp2_option_set_max_outbound_ack(options_, 10000);
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
-ConnectionImpl::ClientHttp2Options::ClientHttp2Options(const Http2Settings& http2_settings)
-    : Http2Options(http2_settings) {
+ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options)
+    : Http2Options(http2_options) {
   // Temporarily disable initial max streams limit/protection, since we might want to create
   // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
   //
   // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
-  nghttp2_option_set_peer_max_concurrent_streams(options_,
-                                                 Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+  nghttp2_option_set_peer_max_concurrent_streams(
+      options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
 }
 
-ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
-                                           Http::ConnectionCallbacks& callbacks,
-                                           Stats::Scope& stats, const Http2Settings& http2_settings,
-                                           const uint32_t max_response_headers_kb,
-                                           const uint32_t max_response_headers_count)
-    : ConnectionImpl(connection, stats, http2_settings, max_response_headers_kb,
+ClientConnectionImpl::ClientConnectionImpl(
+    Network::Connection& connection, Http::ConnectionCallbacks& callbacks, Stats::Scope& stats,
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count)
+    : ConnectionImpl(connection, stats, http2_options, max_response_headers_kb,
                      max_response_headers_count),
       callbacks_(callbacks) {
-  ClientHttp2Options client_http2_options(http2_settings);
+  ClientHttp2Options client_http2_options(http2_options);
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
                               client_http2_options.options());
-  sendSettings(http2_settings, true);
-  allow_metadata_ = http2_settings.allow_metadata_;
+  sendSettings(http2_options, true);
+  allow_metadata_ = http2_options.allow_metadata();
 }
 
 RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
@@ -1162,19 +1170,18 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
   return saveHeader(frame, std::move(name), std::move(value));
 }
 
-ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
-                                           Http::ServerConnectionCallbacks& callbacks,
-                                           Stats::Scope& scope, const Http2Settings& http2_settings,
-                                           const uint32_t max_request_headers_kb,
-                                           const uint32_t max_request_headers_count)
-    : ConnectionImpl(connection, scope, http2_settings, max_request_headers_kb,
+ServerConnectionImpl::ServerConnectionImpl(
+    Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks,
+    Stats::Scope& scope, const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count)
+    : ConnectionImpl(connection, scope, http2_options, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks) {
-  Http2Options http2_options(http2_settings);
+  Http2Options h2_options(http2_options);
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options.options());
-  sendSettings(http2_settings, false);
-  allow_metadata_ = http2_settings.allow_metadata_;
+                              h2_options.options());
+  sendSettings(http2_options, false);
+  allow_metadata_ = http2_options.allow_metadata();
 }
 
 int ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {

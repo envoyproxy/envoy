@@ -234,11 +234,13 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
         shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
         max_request_headers_count);
   } else {
-    auto settings = Http::Http2Settings();
-    settings.allow_connect_ = true;
-    settings.allow_metadata_ = true;
+    envoy::config::core::v3::Http2ProtocolOptions http2_options =
+        ::Envoy::Http2::Utility::initializeAndValidateOptions(
+            envoy::config::core::v3::Http2ProtocolOptions());
+    http2_options.set_allow_connect(true);
+    http2_options.set_allow_metadata(true);
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, settings, max_request_headers_kb,
+        shared_connection_.connection(), *this, store, http2_options, max_request_headers_kb,
         max_request_headers_count);
     ASSERT(type == Type::HTTP2);
   }
