@@ -324,11 +324,8 @@ void UpstreamRequest::onPoolReady(Http::RequestEncoder& request_encoder,
 
   onUpstreamHostSelected(host);
 
-  ENVOY_LOG_MISC(info, "info.filterstate: {}", info.filterState()->hasDataWithName("foo"));
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState()->parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
-  ENVOY_LOG_MISC(info, "stream info upstream: {}",
-                 stream_info_.upstreamFilterState()->hasDataWithName("foo"));
   stream_info_.setUpstreamLocalAddress(request_encoder.getStream().connectionLocalAddress());
   parent_.callbacks_->streamInfo().setUpstreamLocalAddress(
       request_encoder.getStream().connectionLocalAddress());
