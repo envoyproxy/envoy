@@ -1298,7 +1298,7 @@ TEST_F(HttpHealthCheckerImplTest,
       envoy::config::core::v3::Locality(), health_check_config, 0,
       envoy::config::core::v3::UNKNOWN);
   const std::string path = "/healthcheck";
-  // setup health check config with a differnet host, to check that we still get hte host configured
+  // setup health check config with a different host, to check that we still get the host configured
   // on the endpoint.
   setupServiceValidationWithCustomHostValueHC("foo.com");
   // requires non-empty `service_name` in config.
