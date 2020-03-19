@@ -534,8 +534,8 @@ public:
 
   /**
    * @return Upstream Connection's ClusterInfo.
-   * This returns an optional to differentiate between unhealthy host(empty),
-   * misconfiguration(unset) and healthy host(set).
+   * This returns an optional to differentiate between unset(absl::nullopt),
+   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
    */
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 };
