@@ -174,7 +174,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
-      http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
+      http2_options_(Http2::Utility::initializeAndValidateOptions(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
@@ -462,7 +462,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         maxRequestHeadersCount());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
-        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
+        connection, callbacks, context_.scope(), http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
     // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
@@ -475,7 +475,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
+        connection, data, callbacks, context_.scope(), http1_settings_, http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount());
   }
 

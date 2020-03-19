@@ -331,22 +331,6 @@ void ConditionalInitializer::wait() {
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
 
-namespace Http {
-
-// Satisfy linker
-const uint32_t Http2Settings::DEFAULT_HPACK_TABLE_SIZE;
-const uint32_t Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS;
-const uint32_t Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
-const uint32_t Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
-const uint32_t Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE;
-const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_FRAMES;
-const uint32_t Http2Settings::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES;
-const uint32_t Http2Settings::DEFAULT_MAX_CONSECUTIVE_INBOUND_FRAMES_WITH_EMPTY_PAYLOAD;
-const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM;
-const uint32_t Http2Settings::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
-
-} // namespace Http
-
 namespace Api {
 
 class TestImplProvider {
