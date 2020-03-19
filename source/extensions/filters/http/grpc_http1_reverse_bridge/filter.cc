@@ -202,18 +202,12 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 }
 
 void Filter::buildGrpcFrameHeader(Buffer::Instance& buffer) {
-  // Compute the size of the payload and construct the length prefix.
-  //
   // We do this even if the upstream failed: If the response returned non-200,
   // we'll respond with a grpc-status with an error, so clients will know that the request
   // was unsuccessful. Since we're guaranteed at this point to have a valid response
   // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
   // response body.
-  const auto length = buffer.length();
-  std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
-  Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, length, frame);
-  Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
-  buffer.prepend(frame_buffer);
+  Grpc::Encoder().prependFrameHeader(Grpc::GRPC_FH_DEFAULT, buffer);
 }
 
 } // namespace GrpcHttp1ReverseBridge
