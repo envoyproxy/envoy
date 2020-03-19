@@ -16,7 +16,7 @@ class AwsLambdaFilterIntegrationTest : public testing::TestWithParam<Network::Ad
                                        public HttpIntegrationTest {
 public:
   AwsLambdaFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void SetUp() override { setUpstreamProtocol(FakeHttpConnection::Type::HTTP1); }
 
@@ -157,7 +157,8 @@ TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedHeaderOnlyRequest) {
   setupLambdaFilter(false /*passthrough*/);
   HttpIntegrationTest::initialize();
 
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "GET"},
                                                  {":path", "/resize?type=jpg"},
                                                  {":authority", "host"},
                                                  {"s3-location", "mybucket/images/123.jpg"}};
@@ -201,7 +202,8 @@ TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedPlainBody) {
   setupLambdaFilter(false /*passthrough*/);
   HttpIntegrationTest::initialize();
 
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "GET"},
                                                  {":path", "/resize?type=jpg"},
                                                  {":authority", "host"},
                                                  {"content-type", "text/plain"},
@@ -249,7 +251,8 @@ TEST_P(AwsLambdaFilterIntegrationTest, JsonWrappedBinaryBody) {
   setupLambdaFilter(false /*passthrough*/);
   HttpIntegrationTest::initialize();
 
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "GET"},
                                                  {":path", "/resize?type=jpg"},
                                                  {":authority", "host"},
                                                  {"content-type", "application/octet-stream"},

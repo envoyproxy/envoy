@@ -60,7 +60,7 @@ On the other end, the response of the Lambda function must conform to the follow
         "isBase64Encoded": true|false
     }
 
-- The ``statusCode`` field is used as the HTTP response code. If this key is missing, Envoy returns a ``200
+- The ``statusCode`` field is an integer used as the HTTP response code. If this key is missing, Envoy returns a ``200
   OK``.
 - The ``headers`` are used as the HTTP response headers.
 - The ``cookies`` are used as ``Set-Cookie`` response headers. Unlike the request headers, cookies are _not_ part of the
@@ -93,7 +93,7 @@ If you use the per-filter configuration, the target cluster _must_ have the foll
           egress_gateway: true
 
 
-Below are some examples the show how the filter can be used in different deployment scenarios.
+Below are some examples that show how the filter can be used in different deployment scenarios.
 
 Example configuration
 ---------------------

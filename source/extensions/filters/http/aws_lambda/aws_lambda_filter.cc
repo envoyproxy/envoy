@@ -216,7 +216,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   if (skip_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -226,16 +226,19 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   }
 
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  ASSERT(decoder_callbacks_->decodingBuffer());
+  if (!decoder_callbacks_->decodingBuffer()) {
+    decoder_callbacks_->addDecodedData(data, false);
+  }
+
   const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
 
   if (!payload_passthrough_) {
-    decoder_callbacks_->modifyDecodingBuffer([this](Buffer::Instance& data) {
+    decoder_callbacks_->modifyDecodingBuffer([this](Buffer::Instance& dec_buf) {
       Buffer::OwnedImpl json_buf;
-      jsonizeRequest(*request_headers_, &data, json_buf);
+      jsonizeRequest(*request_headers_, &dec_buf, json_buf);
       // effectively swap(data, json_buf)
-      data.drain(data.length());
-      data.move(json_buf);
+      dec_buf.drain(dec_buf.length());
+      dec_buf.move(json_buf);
     });
     request_headers_->setContentLength(decoding_buffer.length());
     request_headers_->setReferenceContentType(content_type_json);
@@ -247,7 +250,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterDataStatus Filter::encodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (skip_ || payload_passthrough_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -257,7 +260,9 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance&, bool end_stream) {
   }
 
   ENVOY_LOG(trace, "Tranforming JSON payload to HTTP response.");
-  ASSERT(encoder_callbacks_->encodingBuffer());
+  if (!encoder_callbacks_->encodingBuffer()) {
+    encoder_callbacks_->addEncodedData(data, false);
+  }
   const Buffer::Instance& encoding_buffer = *encoder_callbacks_->encodingBuffer();
   encoder_callbacks_->modifyEncodingBuffer([this](Buffer::Instance& enc_buf) {
     Buffer::OwnedImpl body;
