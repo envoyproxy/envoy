@@ -29,9 +29,7 @@ void checkMatcher(
     const RBAC::Matcher& matcher, bool expected,
     const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
     const Envoy::Http::RequestHeaderMap& headers = Envoy::Http::RequestHeaderMapImpl(),
-    const envoy::config::core::v3::Metadata& metadata = envoy::config::core::v3::Metadata()) {
-  NiceMock<StreamInfo::MockStreamInfo> info;
-  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    const StreamInfo::StreamInfo& info = NiceMock<StreamInfo::MockStreamInfo>()) {
   EXPECT_EQ(expected, matcher.matches(connection, headers, info));
 }
 
@@ -160,29 +158,48 @@ TEST(HeaderMatcher, HeaderMatcher) {
 
 TEST(IPMatcher, IPMatcher) {
   Envoy::Network::MockConnection conn;
-  Envoy::Network::Address::InstanceConstSharedPtr local =
+  Envoy::Http::RequestHeaderMapImpl headers;
+  Envoy::Network::Address::InstanceConstSharedPtr connectionLocal =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  Envoy::Network::Address::InstanceConstSharedPtr remote =
+  Envoy::Network::Address::InstanceConstSharedPtr connectionRemote =
       Envoy::Network::Utility::parseInternetAddress("4.5.6.7", 456, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(local));
-  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(remote));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(connectionLocal));
+  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(connectionRemote));
 
-  envoy::config::core::v3::CidrRange local_cidr;
-  local_cidr.set_address_prefix("1.2.3.0");
-  local_cidr.mutable_prefix_len()->set_value(24);
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Envoy::Network::Address::InstanceConstSharedPtr downstreamRemote =
+      Envoy::Network::Utility::parseInternetAddress("8.9.10.11", 456, false);
+  EXPECT_CALL(Const(info), downstreamRemoteAddress()).WillRepeatedly(ReturnRef(downstreamRemote));
 
-  envoy::config::core::v3::CidrRange remote_cidr;
-  remote_cidr.set_address_prefix("4.5.6.7");
-  remote_cidr.mutable_prefix_len()->set_value(32);
+  envoy::config::core::v3::CidrRange connection_local_cidr;
+  connection_local_cidr.set_address_prefix("1.2.3.0");
+  connection_local_cidr.mutable_prefix_len()->set_value(24);
 
-  checkMatcher(IPMatcher(local_cidr, true), true, conn);
-  checkMatcher(IPMatcher(remote_cidr, false), true, conn);
+  envoy::config::core::v3::CidrRange connection_remote_cidr;
+  connection_remote_cidr.set_address_prefix("4.5.6.7");
+  connection_remote_cidr.mutable_prefix_len()->set_value(32);
 
-  local_cidr.set_address_prefix("1.2.4.8");
-  remote_cidr.set_address_prefix("4.5.6.0");
+  envoy::config::core::v3::CidrRange downstream_remote_cidr;
+  downstream_remote_cidr.set_address_prefix("8.9.10.11");
+  downstream_remote_cidr.mutable_prefix_len()->set_value(32);
 
-  checkMatcher(IPMatcher(local_cidr, true), false, conn);
-  checkMatcher(IPMatcher(remote_cidr, false), false, conn);
+  checkMatcher(IPMatcher(connection_local_cidr, IPMatcher::Type::ConnectionLocal), true, conn,
+               headers, info);
+  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), true, conn,
+               headers, info);
+  checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), true, conn,
+               headers, info);
+
+  connection_local_cidr.set_address_prefix("1.2.4.8");
+  connection_remote_cidr.set_address_prefix("4.5.6.0");
+  downstream_remote_cidr.set_address_prefix("4.5.6.7");
+
+  checkMatcher(IPMatcher(connection_local_cidr, IPMatcher::Type::ConnectionLocal), false, conn,
+               headers, info);
+  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), false, conn,
+               headers, info);
+  checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), false, conn,
+               headers, info);
 }
 
 TEST(PortMatcher, PortMatcher) {
@@ -288,6 +305,7 @@ TEST(AuthenticatedMatcher, NoSSL) {
 TEST(MetadataMatcher, MetadataMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::RequestHeaderMapImpl header;
+  NiceMock<StreamInfo::MockStreamInfo> info;
 
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::config::core::v3::Metadata metadata;
@@ -295,15 +313,16 @@ TEST(MetadataMatcher, MetadataMatcher) {
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
   metadata.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", label));
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("rbac");
   matcher.add_path()->set_key("label");
 
   matcher.mutable_value()->mutable_string_match()->set_exact("test");
-  checkMatcher(MetadataMatcher(matcher), false, conn, header, metadata);
+  checkMatcher(MetadataMatcher(matcher), false, conn, header, info);
   matcher.mutable_value()->mutable_string_match()->set_exact("prod");
-  checkMatcher(MetadataMatcher(matcher), true, conn, header, metadata);
+  checkMatcher(MetadataMatcher(matcher), true, conn, header, info);
 }
 
 TEST(PolicyMatcher, PolicyMatcher) {

@@ -170,7 +170,7 @@ message Permission {
 }
 
 // Principal defines an identity or a group of identities for a downstream subject.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Principal {
   // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
   // each are applied with the associated behavior.
@@ -205,6 +205,11 @@ message Principal {
 
     // A CIDR block that describes the downstream IP.
     api.v2.core.CidrRange source_ip = 5;
+
+    // A CIDR block that describes the remote IP of downstream connection.
+    // This might be different from the source_IP as the remote IP could be
+    // inferred from a proxy proto, x-forwarded-for, etc.
+    api.v2.core.CidrRange remote_ip = 10;
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.

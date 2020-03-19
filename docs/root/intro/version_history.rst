@@ -57,6 +57,7 @@ Version history
 * network filters: added a :ref:`direct response filter <config_network_filters_direct_response>`.
 * rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
 * request_id_extension: add an ability to extend request ID handling at :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_id_extension>`.
+* rbac: added :ref:`remote_ip <envoy_api_field_config.rbac.v2.Principal.remote_ip>` for matching downstream remote IP address.
 * retry: added a retry predicate that :ref:`rejects hosts based on metadata. <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
 * router: added additional stats for :ref:`virtual clusters <config_http_filters_router_vcluster_stats>`.
 * router: added :ref:`auto_san_validation <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_san_validation>` to support overrriding SAN validation to transport socket for new upstream connections based on the downstream HTTP host/authority header.

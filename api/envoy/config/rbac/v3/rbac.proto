@@ -180,7 +180,7 @@ message Permission {
 }
 
 // Principal defines an identity or a group of identities for a downstream subject.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -223,6 +223,11 @@ message Principal {
 
     // A CIDR block that describes the downstream IP.
     core.v3.CidrRange source_ip = 5;
+
+    // A CIDR block that describes the remote IP of downstream connection.
+    // This might be different from the source_IP as the remote IP could be
+    // inferred from a proxy proto, x-forwarded-for, etc.
+    core.v3.CidrRange remote_ip = 10;
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
