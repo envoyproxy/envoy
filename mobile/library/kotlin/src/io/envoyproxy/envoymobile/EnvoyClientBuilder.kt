@@ -21,6 +21,8 @@ open class EnvoyClientBuilder(
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
   private var statsFlushSeconds = 60
+  private var appVersion = "unspecified"
+  private var appId = "unspecified"
 
   /**
    * Add a log level to use with Envoy.
@@ -97,6 +99,30 @@ open class EnvoyClientBuilder(
   }
 
   /**
+   * Add the App Version of the App using this Envoy Client.
+   *
+   * @param appVersion the version.
+   *
+   * @return this builder.
+   */
+  fun addAppVersion(appVersion: String): EnvoyClientBuilder {
+    this.appVersion = appVersion
+    return this
+  }
+
+  /**
+   * Add the App ID of the App using this Envoy Client.
+   *
+   * @param appId the ID.
+   *
+   * @return this builder.
+   */
+  fun addAppId(appId: String): EnvoyClientBuilder {
+    this.appId = appId
+    return this
+  }
+
+  /**
    * Builds a new instance of Envoy using the provided configurations.
    *
    * @return A new instance of Envoy.
@@ -107,7 +133,7 @@ open class EnvoyClientBuilder(
         return Envoy(engineType(), configuration.yaml, logLevel)
       }
       is Standard -> {
-        Envoy(engineType(), EnvoyConfiguration(statsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, statsFlushSeconds), logLevel)
+        Envoy(engineType(), EnvoyConfiguration(statsDomain, connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, statsFlushSeconds, appVersion, appId), logLevel)
       }
     }
   }

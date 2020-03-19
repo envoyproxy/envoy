@@ -72,4 +72,26 @@ class EnvoyBuilderTest {
     val envoy = clientBuilder.build()
     assertThat(envoy.envoyConfiguration!!.statsFlushSeconds).isEqualTo(1234)
   }
+
+  @Test
+  fun `specifying app version overrides default`() {
+    clientBuilder = EnvoyClientBuilder(Standard())
+    clientBuilder.addEngineType { engine }
+
+    clientBuilder.addAppVersion("v1.2.3")
+    clientBuilder.build()
+    val envoy = clientBuilder.build()
+    assertThat(envoy.envoyConfiguration!!.appVersion).isEqualTo("v1.2.3")
+  }
+
+  @Test
+  fun `specifying app id overrides default`() {
+    clientBuilder = EnvoyClientBuilder(Standard())
+    clientBuilder.addEngineType { engine }
+
+    clientBuilder.addAppId("com.mydomain.myapp")
+    clientBuilder.build()
+    val envoy = clientBuilder.build()
+    assertThat(envoy.envoyConfiguration!!.appId).isEqualTo("com.mydomain.myapp")
+  }
 }

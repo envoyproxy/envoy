@@ -136,6 +136,8 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsMax;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
+@property (nonatomic, strong) NSString *appVersion;
+@property (nonatomic, strong) NSString *appId;
 
 /**
  Create a new instance of the configuration.
@@ -145,7 +147,9 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
                   dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
        dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
         dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
-                  statsFlushSeconds:(UInt32)statsFlushSeconds;
+                  statsFlushSeconds:(UInt32)statsFlushSeconds
+                         appVersion:(NSString *)appVersion
+                              appId:(NSString *)appId;
 
 /**
  Resolves the provided configuration template using properties on this configuration.

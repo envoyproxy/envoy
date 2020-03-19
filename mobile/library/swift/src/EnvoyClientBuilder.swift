@@ -18,6 +18,8 @@ public final class EnvoyClientBuilder: NSObject {
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var statsFlushSeconds: UInt32 = 60
+  private var appVersion: String = "unspecified"
+  private var appId: String = "unspecified"
 
   // MARK: - Public
 
@@ -81,8 +83,8 @@ public final class EnvoyClientBuilder: NSObject {
 
   /// Add a rate at which to refresh DNS in case of DNS failure.
   ///
-  /// - parameter base: base rate in seconds.
-  /// - parameter max: max rate in seconds.
+  /// - parameter base: Base rate in seconds.
+  /// - parameter max: Max rate in seconds.
   ///
   /// - returns: This builder.
   @discardableResult
@@ -103,6 +105,28 @@ public final class EnvoyClientBuilder: NSObject {
     return self
   }
 
+  /// Add the App Version of the App using this Envoy Client.
+  ///
+  /// - parameter appVersion: The version.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addAppVersion(_ appVersion: String) -> EnvoyClientBuilder {
+    self.appVersion = appVersion
+    return self
+  }
+
+  /// Add the App ID of the App using this Envoy Client.
+  ///
+  /// - parameter appId: The ID.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addAppId(_ appId: String) -> EnvoyClientBuilder {
+    self.appId = appId
+    return self
+  }
+
   /// Builds a new instance of EnvoyClient using the provided configurations.
   ///
   /// - returns: A new instance of EnvoyClient.
@@ -118,7 +142,9 @@ public final class EnvoyClientBuilder: NSObject {
         dnsRefreshSeconds: self.dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
-        statsFlushSeconds: self.statsFlushSeconds)
+        statsFlushSeconds: self.statsFlushSeconds,
+        appVersion: self.appVersion,
+        appId: self.appId)
       return EnvoyClient(config: config, logLevel: self.logLevel, engine: engine)
     }
   }
