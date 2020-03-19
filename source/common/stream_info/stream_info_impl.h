@@ -32,7 +32,7 @@ struct StreamInfoImpl : public StreamInfo {
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::make_shared<FilterStateImpl>(
             FilterStateImpl::LazyCreateAncestor(parent_filter_state,
-                                                FilterState::LifeSpan::DownstreamConnection),
+                                                FilterState::LifeSpan::Connection),
             FilterState::LifeSpan::FilterChain)) {}
 
   SystemTime startTime() const override { return start_time_; }
@@ -216,8 +216,7 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const FilterStateSharedPtr& filterState() override { return filter_state_; }
-  const FilterState& filterState() const override { return *filter_state_; }
+  const FilterStateSharedPtr& filterState() const override { return filter_state_; }
 
   const FilterStateSharedPtr& upstreamFilterState() const override {
     return upstream_filter_state_;

@@ -448,7 +448,11 @@ private:
   TimeSource& timeSource() { return config_.timeSource(); }
   Http::Context& httpContext() { return config_.http_context_; }
 
+  // This makes it accessible to the RouterTest class.
+protected:
   FilterConfig& config_;
+
+private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};

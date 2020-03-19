@@ -914,7 +914,7 @@ FilterStateFormatter::FilterStateFormatter(const std::string& key,
 
 ProtobufTypes::MessagePtr
 FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
-  const StreamInfo::FilterState& filter_state = stream_info.filterState();
+  const StreamInfo::FilterState& filter_state = *stream_info.filterState();
   if (!filter_state.hasDataWithName(key_)) {
     return nullptr;
   }

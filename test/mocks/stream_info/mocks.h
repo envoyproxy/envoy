@@ -79,8 +79,7 @@ public:
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD(void, setDynamicMetadata,
               (const std::string&, const std::string&, const std::string&));
-  MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
-  MOCK_METHOD(const FilterState&, filterState, (), (const));
+  MOCK_METHOD(const FilterStateSharedPtr&, filterState, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
   MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
   MOCK_METHOD(void, setRequestedServerName, (const absl::string_view));

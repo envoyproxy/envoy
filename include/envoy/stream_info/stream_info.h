@@ -479,8 +479,7 @@ public:
    * filters (append only). Both object types can be consumed by multiple filters.
    * @return the filter state associated with this request.
    */
-  virtual const FilterStateSharedPtr& filterState() PURE;
-  virtual const FilterState& filterState() const PURE;
+  virtual const FilterStateSharedPtr& filterState() const PURE;
 
   /**
    * Filter State object to be shared between upstream and downstream filters.
