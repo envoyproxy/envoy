@@ -56,8 +56,9 @@ message Endpoint {
   HealthCheckConfig health_check_config = 2;
 
   // The hostname associated with this endpoint. This hostname is not used for routing or address
-  // resolution. If provided, it will be used in auto-host-rewrite routes and potentially health
-  // checks.
+  // resolution. If provided, it will be used in auto-host-rewrite routes and health checks, if
+  // configured. To use this field with health checks, set
+  // :ref:`use_hostname <envoy_api_field_endpoint.Endpoint.HealthCheckConfig.use_hostname>` to true.
   string hostname = 3;
 }
 
