@@ -483,7 +483,7 @@ message HttpConnectionManager {
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
 
-  // The configuration of the extension to use for request ID utilities. This includes operations such as
+  // The configuration of the request ID extension. This includes operations such as
   // generation, validation, and associated tracing operations.
   //
   // If not set, Envoy uses the default UUID-based behavior:
@@ -493,7 +493,7 @@ message HttpConnectionManager {
   // 2. Request ID is a universally unique identifier (UUID).
   //
   // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
-  RequestIDUtils request_id_utils = 36;
+  RequestIDExtension request_id_extension = 36;
 }
 
 message Rds {
@@ -674,10 +674,10 @@ message HttpFilter {
   }
 }
 
-message RequestIDUtils {
+message RequestIDExtension {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.network.http_connection_manager.v2.RequestIDUtils";
+      "envoy.config.filter.network.http_connection_manager.v2.RequestIDExtension";
 
-  // Request ID utility specific configuration.
+  // Request ID extension specific configuration.
   google.protobuf.Any typed_config = 1;
 }

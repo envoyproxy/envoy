@@ -21,10 +21,10 @@ public:
   /**
    * Read a RequestIDUtils definition from proto and create it.
    */
-  static UtilitiesSharedPtr
-  fromProto(const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDUtils&
-                config,
-            Server::Configuration::FactoryContext& context);
+  static UtilitiesSharedPtr fromProto(
+      const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
+          config,
+      Server::Configuration::FactoryContext& context);
 };
 
 } // namespace RequestIDUtils

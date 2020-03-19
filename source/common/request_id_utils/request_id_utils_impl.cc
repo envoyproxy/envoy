@@ -9,7 +9,8 @@ namespace Envoy {
 namespace RequestIDUtils {
 
 UtilitiesSharedPtr RequestIDUtilsFactory::fromProto(
-    const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDUtils& config,
+    const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
+        config,
     Server::Configuration::FactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   auto* factory =

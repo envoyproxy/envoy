@@ -227,9 +227,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   // If we are provided a different request_id_utils implementation to use try and create a new
   // instance of it, otherwise use default one.
-  if (config.request_id_utils().has_typed_config()) {
+  if (config.request_id_extension().has_typed_config()) {
     request_id_utils_ = Envoy::RequestIDUtils::RequestIDUtilsFactory::fromProto(
-        config.request_id_utils(), context_);
+        config.request_id_extension(), context_);
   } else {
     request_id_utils_ = RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context_);
   }
