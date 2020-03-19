@@ -1253,9 +1253,10 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_use_hostname(true);
-  auto test_host = std::make_shared<HostImpl>(cluster_->info_, host, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-                                    envoy::config::core::v3::Locality(), health_check_config, 0,
-                                    envoy::config::core::v3::UNKNOWN);
+  auto test_host = std::make_shared<HostImpl>(
+      cluster_->info_, host, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN);
   const std::string path = "/healthcheck";
   setupServiceValidationHC();
   // requires non-empty `service_name` in config.
@@ -1287,13 +1288,15 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHostThatOverridesConfigValue) {
+TEST_F(HttpHealthCheckerImplTest,
+       SuccessServiceCheckWithCustomHostValueOnTheHostThatOverridesConfigValue) {
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
   health_check_config.set_use_hostname(true);
-  auto test_host = std::make_shared<HostImpl>(cluster_->info_, host, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
-                                    envoy::config::core::v3::Locality(), health_check_config, 0,
-                                    envoy::config::core::v3::UNKNOWN);
+  auto test_host = std::make_shared<HostImpl>(
+      cluster_->info_, host, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0,
+      envoy::config::core::v3::UNKNOWN);
   const std::string path = "/healthcheck";
   // setup health check config with a differnet host, to check that we still get hte host configured
   // on the endpoint.

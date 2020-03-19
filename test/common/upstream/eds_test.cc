@@ -536,12 +536,11 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 // Validate that onConfigUpdate() updates the hostname.
 TEST_F(EdsTest, Hostname) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-   auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
-    auto* socket_address = endpoint->mutable_address()
-                               ->mutable_socket_address();
-    socket_address->set_address("1.2.3.4");
-    socket_address->set_port_value(1234);
-    endpoint->set_hostname("foo");
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  endpoint->set_hostname("foo");
   cluster_load_assignment.set_cluster_name("fare");
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);

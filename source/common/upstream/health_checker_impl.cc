@@ -41,7 +41,7 @@ const std::string& getHostname(const HostSharedPtr& host, const std::string& con
   return cluster->name();
 }
 
-const std::string& getHostname(const HostSharedPtr& host, 
+const std::string& getHostname(const HostSharedPtr& host,
                                const absl::optional<std::string>& config_hostname,
                                const ClusterInfoConstSharedPtr& cluster) {
   if (config_hostname.has_value()) {
@@ -208,7 +208,7 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_ty
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
-      hostname_(getHostname( host, parent_.host_value_, parent_.cluster_.info())),
+      hostname_(getHostname(host, parent_.host_value_, parent_.cluster_.info())),
       protocol_(codecClientTypeToProtocol(parent_.codec_client_type_)),
       local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 

@@ -1143,8 +1143,7 @@ TEST(HostImplTest, UseHostname) {
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
   config.set_use_hostname(true);
   HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
-                            envoy::config::core::v3::Locality().default_instance(), config,
-                            1);
+                            envoy::config::core::v3::Locality().default_instance(), config, 1);
   EXPECT_TRUE(descr.useHostnameForHealthChecks());
 }
 
@@ -1278,7 +1277,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNoneEmptyHostnameWithHealthChecks) {
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->useHostnameForHealthChecks());
+  EXPECT_TRUE(
+      cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->useHostnameForHealthChecks());
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
