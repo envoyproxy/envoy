@@ -2414,7 +2414,7 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationDisabledIfSetToZero) {
   conn_manager_->onData(fake_input, false); // kick off request
 }
 
-TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationVaildlyConfigured) {
+TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationValidlyConfigured) {
   max_stream_duration_ = std::chrono::milliseconds(10);
   setup(false, "");
 
