@@ -322,6 +322,15 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   }
 }
 
+namespace {
+void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
+  stream_info.onRequestComplete();
+  for (const auto& access_log : config.accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, stream_info);
+  }
+}
+} // namespace
+
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket) {
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
@@ -335,10 +344,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     ENVOY_LOG(debug, "closing connection: no matching filter chain found");
     stats_.no_filter_chain_match_.inc();
     stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    stream_info->onRequestComplete();
-    for (const auto& access_log : config_.accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, *stream_info);
-    }
+    emitLogs(config_, *stream_info);
     socket->close();
     return;
   }
@@ -449,10 +455,7 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
-  stream_info_->onRequestComplete();
-  for (const auto& access_log : config_.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, *stream_info_);
-  }
+  emitLogs(config_, *stream_info_);
 
   active_connections_.listener_.stats_.downstream_cx_active_.dec();
   active_connections_.listener_.stats_.downstream_cx_destroy_.inc();

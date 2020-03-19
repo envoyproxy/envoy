@@ -88,7 +88,6 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
 
   std::list<ActiveWriteFilterPtr>::iterator entry;
   if (!filter) {
-    connection_.streamInfo().addBytesSent(buffer_source.getWriteBuffer().buffer.length());
     entry = downstream_filters_.begin();
   } else {
     entry = std::next(filter->entry());
@@ -102,6 +101,8 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
     }
   }
 
+  // Report the final bytes written to the wire
+  connection_.streamInfo().addBytesSent(buffer_source.getWriteBuffer().buffer.length());
   return FilterStatus::Continue;
 }
 
