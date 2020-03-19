@@ -123,11 +123,13 @@ public:
     return 1;
   }
 
-  std::vector<Buffer::RawSlice> getRawSlices() const override {
-    return {{const_cast<char*>(start()), size_}};
+  void getRawSlices(Buffer::RawSliceVector& raw_slices) const override {
+    raw_slices.emplace_back(Buffer::RawSlice{const_cast<char*>(start()), size_});
   }
 
   uint64_t length() const override { return size_; }
+
+  uint64_t numSlicesComputedSlowly() const override { return 1; }
 
   void* linearize(uint32_t /*size*/) override {
     // Sketchy, but probably will work for test purposes.
@@ -385,7 +387,9 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     break;
   }
   case test::common::buffer::Action::kGetRawSlices: {
-    const uint64_t slices_needed = target_buffer.getRawSlices().size();
+    Buffer::RawSliceVector all_slices;
+    target_buffer.getRawSlices(all_slices);
+    const uint64_t slices_needed = all_slices.size();
     const uint64_t slices_tested =
         std::min(slices_needed, static_cast<uint64_t>(action.get_raw_slices()));
     if (slices_tested == 0) {

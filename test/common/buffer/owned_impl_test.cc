@@ -586,7 +586,7 @@ TEST_F(OwnedImplTest, AppendSliceForTest) {
   static constexpr const char* Inputs[] = {"one", "2", "", "four", ""};
   Buffer::OwnedImpl buffer;
   RawSlice slices[NumInputs];
-  EXPECT_EQ(0, buffer.getRawSlices().size());
+  EXPECT_EQ(0, buffer.numSlicesComputedSlowly());
   EXPECT_EQ(0, buffer.getAtMostNRawSlices(slices, NumInputs));
   for (const auto& input : Inputs) {
     buffer.appendSliceForTest(input);
@@ -604,8 +604,12 @@ TEST_F(OwnedImplTest, AppendSliceForTest) {
   expectSlice(slices[1], "2");
   expectSlice(slices[2], "four");
 
+  // numSlicesComputedSlowly returns the count of slices with nonzero length.
+  EXPECT_EQ(3, buffer.numSlicesComputedSlowly());
+
   // getRawSlices returns only the slices with nonzero length.
-  std::vector<RawSlice> slices_vector = buffer.getRawSlices();
+  RawSliceVector slices_vector;
+  buffer.getRawSlices(slices_vector);
   EXPECT_EQ(3, slices_vector.size());
 
   expectSlice(slices_vector[0], "one");
@@ -708,14 +712,14 @@ void TestBufferMove(uint64_t buffer1_length, uint64_t buffer2_length,
                     uint64_t expected_slice_count) {
   Buffer::OwnedImpl buffer1;
   buffer1.add(std::string(buffer1_length, 'a'));
-  EXPECT_EQ(1, buffer1.getRawSlices().size());
+  EXPECT_EQ(1, buffer1.numSlicesComputedSlowly());
 
   Buffer::OwnedImpl buffer2;
   buffer2.add(std::string(buffer2_length, 'b'));
-  EXPECT_EQ(1, buffer2.getRawSlices().size());
+  EXPECT_EQ(1, buffer2.numSlicesComputedSlowly());
 
   buffer1.move(buffer2);
-  EXPECT_EQ(expected_slice_count, buffer1.getRawSlices().size());
+  EXPECT_EQ(expected_slice_count, buffer1.numSlicesComputedSlowly());
   EXPECT_EQ(buffer1_length + buffer2_length, buffer1.length());
   // Make sure `buffer2` was drained.
   EXPECT_EQ(0, buffer2.length());

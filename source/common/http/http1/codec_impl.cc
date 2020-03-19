@@ -450,8 +450,10 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
     return false;
   }
 
+  Buffer::RawSliceVector slices;
+  data.getRawSlices(slices);
   ssize_t total_parsed = 0;
-  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+  for (const Buffer::RawSlice& slice : slices) {
     total_parsed += slice.len_;
     onBody(static_cast<const char*>(slice.mem_), slice.len_);
   }
@@ -472,7 +474,9 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
-    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+    Buffer::RawSliceVector slices;
+    data.getRawSlices(slices);
+    for (const Buffer::RawSlice& slice : slices) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {

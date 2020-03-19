@@ -196,7 +196,9 @@ std::string Base64::encode(const Buffer::Instance& buffer, uint64_t length) {
 
   uint64_t j = 0;
   uint8_t next_c = 0;
-  for (const Buffer::RawSlice& slice : buffer.getRawSlices()) {
+  Buffer::RawSliceVector slices;
+  buffer.getRawSlices(slices);
+  for (const Buffer::RawSlice& slice : slices) {
     const uint8_t* slice_mem = static_cast<const uint8_t*>(slice.mem_);
 
     for (uint64_t i = 0; i < slice.len_ && j < length; ++i, ++j) {

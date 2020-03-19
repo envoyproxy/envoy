@@ -14,6 +14,7 @@
 
 #include "common/common/byte_order.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -28,6 +29,8 @@ struct RawSlice {
 
   bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
 };
+
+using RawSliceVector = absl::InlinedVector<RawSlice, 16>;
 
 /**
  * A wrapper class to facilitate passing in externally owned data to a buffer via addBufferFragment.
@@ -133,15 +136,24 @@ public:
   virtual uint64_t getAtMostNRawSlices(RawSlice* out, uint64_t out_size) const PURE;
 
   /**
-   * Get the contents of the buffer as a vector of raw buffer slices.
-   * @return std::vector with RawSlice for every non-empty slice in the buffer.
+   * Fetch the raw buffer slices.
+   * @param raw_slices supplies the inline vector of RawSlice objects to fill.
    */
-  virtual std::vector<RawSlice> getRawSlices() const PURE;
+  virtual void getRawSlices(RawSliceVector& raw_slices) const PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).
    */
   virtual uint64_t length() const PURE;
+
+  /**
+   * Computes the number of non-empty slices in the buffer representation by iterating through the
+   * list of raw slices and counting the number of non-empty ones. This utility method exists for
+   * the purpose of UDP processing code which needs to make stronger checks on the number of slices
+   * used by the buffer representations, and some tests.
+   * @return the number of non-empty slices in the buffer representation, computed slowly.
+   */
+  virtual uint64_t numSlicesComputedSlowly() const PURE;
 
   /**
    * @return a pointer to the first byte of data that has been linearized out to size bytes.

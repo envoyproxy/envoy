@@ -25,7 +25,7 @@ QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
 QuicMemSliceImpl::QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
   ASSERT(firstSliceLength(buffer) == length);
   single_slice_buffer_.move(buffer, length);
-  ASSERT(single_slice_buffer_.getRawSlices().size() == 1);
+  ASSERT(single_slice_buffer_.numSlicesComputedSlowly() == 1);
 }
 
 const char* QuicMemSliceImpl::data() const {

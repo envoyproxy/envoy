@@ -44,7 +44,9 @@ void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {
   ASSERT(&data != this);
-  for (const RawSlice& slice : data.getRawSlices()) {
+  RawSliceVector raw_slices;
+  data.getRawSlices(raw_slices);
+  for (const RawSlice& slice : raw_slices) {
     add(slice.mem_, slice.len_);
   }
 }
@@ -185,8 +187,7 @@ uint64_t OwnedImpl::getAtMostNRawSlices(RawSlice* out, uint64_t out_size) const 
   return num_slices;
 }
 
-std::vector<RawSlice> OwnedImpl::getRawSlices() const {
-  std::vector<RawSlice> raw_slices;
+void OwnedImpl::getRawSlices(RawSliceVector& raw_slices) const {
   raw_slices.reserve(slices_.size());
   for (const auto& slice : slices_) {
     if (slice->dataSize() == 0) {
@@ -195,7 +196,6 @@ std::vector<RawSlice> OwnedImpl::getRawSlices() const {
 
     raw_slices.emplace_back(RawSlice{slice->data(), slice->dataSize()});
   }
-  return raw_slices;
 }
 
 uint64_t OwnedImpl::length() const {
@@ -210,6 +210,16 @@ uint64_t OwnedImpl::length() const {
 #endif
 
   return length_;
+}
+
+uint64_t OwnedImpl::numSlicesComputedSlowly() const {
+  uint64_t count = 0;
+  for (const auto& slice : slices_) {
+    if (slice->dataSize() != 0) {
+      ++count;
+    }
+  }
+  return count;
 }
 
 void* OwnedImpl::linearize(uint32_t size) {
@@ -500,7 +510,9 @@ OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, 
 std::string OwnedImpl::toString() const {
   std::string output;
   output.reserve(length());
-  for (const RawSlice& slice : getRawSlices()) {
+  RawSliceVector raw_slices;
+  getRawSlices(raw_slices);
+  for (const RawSlice& slice : raw_slices) {
     output.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

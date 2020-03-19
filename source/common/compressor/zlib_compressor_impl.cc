@@ -38,7 +38,9 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
 uint64_t ZlibCompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
-  for (const Buffer::RawSlice& input_slice : buffer.getRawSlices()) {
+  Buffer::RawSliceVector input_slices;
+  buffer.getRawSlices(input_slices);
+  for (const Buffer::RawSlice& input_slice : input_slices) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     // Z_NO_FLUSH tells the compressor to take the data in and compresses it as much as possible

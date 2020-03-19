@@ -37,7 +37,9 @@ uint64_t ZlibDecompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
-  for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
+  Buffer::RawSliceVector input_slices;
+  input_buffer.getRawSlices(input_slices);
+  for (const Buffer::RawSlice& input_slice : input_slices) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     while (inflateNext()) {

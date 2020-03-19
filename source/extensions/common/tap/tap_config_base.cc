@@ -28,7 +28,8 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v3::Body& output_body,
   ASSERT(buffer_start_offset + buffer_length_to_copy <= data.length());
   const uint32_t final_bytes_to_copy = std::min(max_buffered_bytes, buffer_length_to_copy);
 
-  std::vector<Buffer::RawSlice> slices = data.getRawSlices();
+  Buffer::RawSliceVector slices;
+  data.getRawSlices(slices);
   trimSlices(slices, buffer_start_offset, final_bytes_to_copy);
   for (const Buffer::RawSlice& slice : slices) {
     output_body.mutable_as_bytes()->append(static_cast<const char*>(slice.mem_), slice.len_);

@@ -45,7 +45,7 @@ public:
   // QuicMemSliceSpan
   quiche::QuicheStringPiece GetData(size_t index);
   QuicByteCount total_length() { return buffer_->length(); };
-  size_t NumSlices() { return buffer_->getRawSlices().size(); }
+  size_t NumSlices() { return buffer_->numSlicesComputedSlowly(); }
   template <typename ConsumeFunction> QuicByteCount ConsumeAll(ConsumeFunction consume);
   bool empty() const { return buffer_->length() == 0; }
 
@@ -56,7 +56,9 @@ private:
 template <typename ConsumeFunction>
 QuicByteCount QuicMemSliceSpanImpl::ConsumeAll(ConsumeFunction consume) {
   size_t saved_length = 0;
-  for (auto& slice : buffer_->getRawSlices()) {
+  Envoy::Buffer::RawSliceVector slices;
+  buffer_->getRawSlices(slices);
+  for (auto& slice : slices) {
     if (slice.len_ == 0) {
       continue;
     }

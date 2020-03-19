@@ -450,7 +450,9 @@ ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
 
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
-  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
+  Buffer::RawSliceVector slices;
+  data.getRawSlices(slices);
+  for (const Buffer::RawSlice& slice : slices) {
     dispatching_ = true;
     ssize_t rc =
         nghttp2_session_mem_recv(session_, static_cast<const uint8_t*>(slice.mem_), slice.len_);

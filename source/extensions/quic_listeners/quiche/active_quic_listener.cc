@@ -81,7 +81,7 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
       quic::QuicTime::Delta::FromMicroseconds(std::chrono::duration_cast<std::chrono::microseconds>(
                                                   data.receive_time_.time_since_epoch())
                                                   .count());
-  ASSERT(data.buffer_->getRawSlices().size() == 1);
+  ASSERT(data.buffer_->numSlicesComputedSlowly() == 1);
   Buffer::RawSlice slice;
   data.buffer_->getAtMostNRawSlices(&slice, 1);
   // TODO(danzh): pass in TTL and UDP header.
