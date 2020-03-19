@@ -407,7 +407,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   if (downstreamConnection()) {
     transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
-        downstreamConnection()->streamInfo().filterState());
+        *downstreamConnection()->streamInfo().filterState());
   }
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
