@@ -383,8 +383,8 @@ void ConnectionManagerUtility::mutateResponseHeaders(
   }
   response_headers.removeTransferEncoding();
 
-  if (request_headers != nullptr) {
-    rid_utils->maybePreserveRequestIDInResponse(response_headers, *request_headers);
+  if (request_headers != nullptr && request_headers->EnvoyForceTrace()) {
+    rid_utils->preserveRequestIDInResponse(response_headers, *request_headers);
   }
   response_headers.removeKeepAlive();
   response_headers.removeProxyConnection();

@@ -32,12 +32,12 @@ public:
   virtual void ensureRequestID(Http::RequestHeaderMap& request_headers) PURE;
 
   /**
-   * Maybe preserve request ID in response headers. Condition is implementation specific.
+   * Preserve request ID in response headers if any is set in the request headers.
    * @param response_headers supplies the downstream response headers for setting the request ID.
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
    */
-  virtual void maybePreserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
-                                                const Http::RequestHeaderMap& request_headers) PURE;
+  virtual void preserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
+                                           const Http::RequestHeaderMap& request_headers) PURE;
 
   /**
    * Perform a mod operation across the request id within a request and store the result in the

@@ -1,7 +1,5 @@
 #include "extensions/request_id_utils/uuid/config.h"
 
-#include "envoy/extensions/request_id_utils/uuid/v3/uuid.pb.h"
-
 #include "extensions/request_id_utils/uuid/uuid_impl.h"
 #include "extensions/request_id_utils/well_known_names.h"
 
@@ -18,16 +16,11 @@ UUIDUtilsFactory::createUtilitiesInstance(const Protobuf::Message&,
 std::string UUIDUtilsFactory::name() const { return RequestIDUtilNames::get().UUID; }
 
 ProtobufTypes::MessagePtr UUIDUtilsFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::request_id_utils::uuid::v3::UUIDConfig>();
+  return std::make_unique<ProtobufWkt::Empty>();
 }
 
 std::string UUIDUtilsFactory::category() const { return "request_id_utils"; }
 
-/**
- * Static registration for the UUID based request ID utilities
- *
- */
-REGISTER_FACTORY(UUIDUtilsFactory, Server::Configuration::RequestIDUtilsFactory);
 } // namespace UUID
 } // namespace RequestIDUtils
 } // namespace Extensions

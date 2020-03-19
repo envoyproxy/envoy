@@ -486,7 +486,13 @@ message HttpConnectionManager {
   // The configuration of the extension to use for request ID utilities. This includes operations such as
   // generation, validation, and associated tracing operations.
   //
-  // If not set, Envoy uses the :ref:`default UUID-based behavior <extension_envoy.request_id_utils.uuid>`.
+  // If not set, Envoy uses the default UUID-based behavior:
+  //
+  // 1. Request ID is propagated using *x-request-id* header.
+  //
+  // 2. Request ID is a universally unique identifier (UUID).
+  //
+  // 3. Tracing decision (sampled, forced, etc) is set in 14th byte of the UUID.
   RequestIDUtils request_id_utils = 36;
 }
 

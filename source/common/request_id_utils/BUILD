@@ -30,6 +30,5 @@ envoy_cc_library(
         "//source/extensions/request_id_utils/uuid:config",
         "//source/extensions/request_id_utils/uuid:uuid_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/request_id_utils/uuid/v3:pkg_cc_proto",
     ],
 )

@@ -16,8 +16,7 @@ public:
   /**
    * Return a newly created instance of the default RequestIDUtils implementation.
    */
-  static envoy::extensions::filters::network::http_connection_manager::v3::RequestIDUtils
-  defaultConfig();
+  static UtilitiesSharedPtr defaultInstance(Server::Configuration::FactoryContext& context);
 
   /**
    * Read a RequestIDUtils definition from proto and create it.

@@ -13,8 +13,8 @@ public:
 
   void setRequestID(Http::RequestHeaderMap& request_headers);
   void ensureRequestID(Http::RequestHeaderMap& request_headers);
-  void maybePreserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
-                                        const Http::RequestHeaderMap& request_headers);
+  void preserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
+                                   const Http::RequestHeaderMap& request_headers);
   bool modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
   Envoy::RequestIDUtils::TraceStatus getTraceStatus(const Http::RequestHeaderMap& request_headers);
   void setTraceStatus(Http::RequestHeaderMap& request_headers,
