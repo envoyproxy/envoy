@@ -49,7 +49,7 @@ message DnsCacheConfig {
   //
   // .. note:
   //
-  // The refersh rate is rounded to the closest millisecond, and must be at least 1ms.
+  // The refresh rate is rounded to the closest millisecond, and must be at least 1ms.
   google.protobuf.Duration dns_refresh_rate = 3
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
