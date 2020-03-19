@@ -174,7 +174,7 @@ TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
   }
 }
 )EOF");
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillRepeatedly(Return(false));
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, test"}}, false);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }
