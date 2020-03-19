@@ -498,7 +498,9 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
                                                       max_request_headers_count);
   }
   VERIFY_ASSERTION(connection->initialize());
-  VERIFY_ASSERTION(connection->readDisable(false));
+  if (read_disable_on_new_connection_) {
+    VERIFY_ASSERTION(connection->readDisable(false));
+  }
   return AssertionSuccess();
 }
 

@@ -42,11 +42,17 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  ClientSslTransportOptions& setSni(absl::string_view sni) {
+    sni_ = std::string(sni);
+    return *this;
+  }
+
   bool alpn_{};
   bool san_{};
   bool client_ecdsa_cert_{};
   std::vector<std::string> cipher_suites_{};
   std::string sigalgs_;
+  std::string sni_;
   envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
 };

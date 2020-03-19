@@ -137,6 +137,9 @@ public:
   // Add a network filter prior to existing filters.
   void addNetworkFilter(const std::string& filter_yaml);
 
+  // Add a listener filter prior to existing listener filters.
+  void addListenerFilter(const std::string& filter_yaml);
+
   // Sets the client codec to the specified type.
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                           HttpConnectionManager::CodecType type);

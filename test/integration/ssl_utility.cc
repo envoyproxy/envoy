@@ -64,6 +64,9 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   for (const std::string& cipher_suite : options.cipher_suites_) {
     common_context->mutable_tls_params()->add_cipher_suites(cipher_suite);
   }
+  if (!options.sni_.empty()) {
+    tls_context.set_sni(options.sni_);
+  }
 
   common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);
   common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
