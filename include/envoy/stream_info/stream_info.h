@@ -534,6 +534,8 @@ public:
 
   /**
    * @return Upstream Connection's ClusterInfo.
+   * This returns an optional to differentiate between unhealthy host(empty),
+   * misconfiguration(unset) and healthy host(set).
    */
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 };
