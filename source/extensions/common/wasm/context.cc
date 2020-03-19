@@ -94,7 +94,7 @@ WasmResult Context::getProperty(absl::string_view path, std::string* result) {
 }
 
 WasmResult Context::defineMetric(MetricType type, absl::string_view name, uint32_t* metric_id_ptr) {
-  auto stat_name = wasm()->stat_name_set_->add(name);
+  auto stat_name = wasm()->stat_name_set()->add(name);
   switch (type) {
   case MetricType::Counter: {
     auto id = wasm_->nextCounterMetricId();

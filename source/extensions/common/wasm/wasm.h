@@ -48,7 +48,6 @@ public:
   virtual ~Wasm();
 
   Stats::StatNameSetSharedPtr stat_name_set() const { return stat_name_set_; }
-
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
 
@@ -84,10 +83,6 @@ void createWasm(const VmConfig& vm_config, PluginSharedPtr plugin_config,
                 Runtime::RandomGenerator& random, Api::Api& api,
                 Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                 CreateWasmCallback&& cb);
-
-// Create a ThreadLocal VM from an existing VM (e.g. from createWasm() above).
-WasmHandleSharedPtr createThreadLocalWasm(WasmHandle& base_wasm_handle, PluginSharedPtr plugin,
-                                          Event::Dispatcher& dispatcher);
 
 void createWasmForTesting(const VmConfig& vm_config, PluginSharedPtr plugin,
                           Stats::ScopeSharedPtr scope, Upstream::ClusterManager& cluster_manager,

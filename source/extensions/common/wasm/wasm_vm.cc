@@ -21,11 +21,11 @@ WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& s
     throw WasmException("Failed to create WASM VM with unspecified runtime.");
   } else if (runtime == WasmRuntimeNames::get().Null) {
     auto wasm = proxy_wasm::createNullVm();
-    wasm->integration().reset(new EnvoyWasmVmIntegration(scope, "null"));
+    wasm->integration().reset(new EnvoyWasmVmIntegration(scope, runtime, "null"));
     return wasm;
   } else if (runtime == WasmRuntimeNames::get().V8) {
     auto wasm = proxy_wasm::createV8Vm();
-    wasm->integration().reset(new EnvoyWasmVmIntegration(scope, "v8"));
+    wasm->integration().reset(new EnvoyWasmVmIntegration(scope, runtime, "v8"));
     return wasm;
   } else {
     throw WasmException(fmt::format(

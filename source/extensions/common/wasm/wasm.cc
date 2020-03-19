@@ -70,13 +70,14 @@ Wasm::Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view
 Wasm::Wasm(WasmHandleSharedPtr& base_wasm_handle, Event::Dispatcher& dispatcher)
     : WasmBase(base_wasm_handle,
                [&base_wasm_handle]() {
-                 return createWasmVm(base_wasm_handle->wasm()->wasm_vm()->runtime(),
-                                     getWasm(base_wasm_handle)->scope_);
+                 return createWasmVm(
+                     getEnvoyWasmIntegration(*base_wasm_handle->wasm()->wasm_vm()).runtime(),
+                     getWasm(base_wasm_handle)->scope_);
                }),
       scope_(getWasm(base_wasm_handle)->scope_),
-      cluster_manager_(getWasm(base_wasm_handle)->cluster_manager_), dispatcher_(dispatcher),
+      cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()), wasm_stats_(getWasm(base_wasm_handle)->wasm_stats_),
-      stat_name_set_(getWasm(base_wasm_handle)->stat_name_set_) {
+      stat_name_set_(getWasm(base_wasm_handle)->stat_name_set()) {
   active_wasm_++;
   wasm_stats_.active_.set(active_wasm_);
   wasm_stats_.created_.inc();

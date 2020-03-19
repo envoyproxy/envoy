@@ -24,6 +24,12 @@ namespace Wasm {
 class TestContext : public Extensions::Common::Wasm::Context {
 public:
   TestContext(Extensions::Common::Wasm::Wasm* wasm) : Extensions::Common::Wasm::Context(wasm) {}
+  TestContext(Extensions::Common::Wasm::Wasm* wasm,
+              Extensions::Common::Wasm::PluginSharedPtr plugin)
+      : Extensions::Common::Wasm::Context(wasm, plugin) {}
+  TestContext(Extensions::Common::Wasm::Wasm* wasm, uint32_t root_context_id,
+              Extensions::Common::Wasm::PluginSharedPtr plugin)
+      : Extensions::Common::Wasm::Context(wasm, root_context_id, plugin) {}
   ~TestContext() override {}
   proxy_wasm::WasmResult log(uint64_t level, absl::string_view message) override {
     std::cerr << std::string(message) << "\n";
@@ -66,9 +72,11 @@ TEST_P(WasmCommonTest, Logging) {
       absl::StrCat("envoy.wasm.runtime.", GetParam()), vm_id, vm_configuration, vm_key, scope,
       cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
+  EXPECT_THROW_WITH_MESSAGE(wasm->error("foo"), Extensions::Common::Wasm::WasmException, "foo");
   auto wasm_weak = std::weak_ptr<Extensions::Common::Wasm::Wasm>(wasm);
-  auto wasm_handler = std::make_unique<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
+  auto wasm_handle = std::make_shared<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
   auto context = std::make_unique<TestContext>(wasm_weak.lock().get());
+  auto vm_context = std::make_unique<TestContext>(wasm_weak.lock().get(), plugin);
 
   EXPECT_CALL(*context, log_(spdlog::level::trace, Eq("test trace logging")));
   EXPECT_CALL(*context, log_(spdlog::level::debug, Eq("test debug logging")));
@@ -79,11 +87,14 @@ TEST_P(WasmCommonTest, Logging) {
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("on_delete logging")));
 
   EXPECT_TRUE(wasm_weak.lock()->initialize(code, false));
+  auto thread_local_wasm = std::make_shared<Wasm>(wasm_handle, *dispatcher);
+  thread_local_wasm.reset();
   wasm_weak.lock()->setContext(context.get());
   auto root_context = context.get();
   wasm_weak.lock()->startForTesting(std::move(context), plugin);
   wasm_weak.lock()->configure(root_context, plugin);
-  wasm_handler.reset();
+
+  wasm_handle.reset();
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   // This will fault on nullptr if wasm has been deleted.
   plugin->plugin_configuration_ = "done";

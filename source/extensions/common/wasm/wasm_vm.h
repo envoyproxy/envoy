@@ -39,9 +39,10 @@ struct VmStats {
 class EnvoyWasmVmIntegration : public proxy_wasm::WasmVmIntegration,
                                Logger::Loggable<Logger::Id::wasm> {
 public:
-  EnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime)
-      : scope_(scope), runtime_prefix_(absl::StrCat("wasm_vm.", runtime, ".")),
-        runtime_(std::string(runtime)),
+  EnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime,
+                         absl::string_view short_runtime)
+      : scope_(scope), runtime_(std::string(runtime)), short_runtime_(std::string(short_runtime)),
+        runtime_prefix_(absl::StrCat("wasm_vm.", short_runtime, ".")),
         stats_(VmStats{ALL_VM_STATS(POOL_COUNTER_PREFIX(*scope_, runtime_prefix_),
                                     POOL_GAUGE_PREFIX(*scope_, runtime_prefix_))}) {
     stats_.created_.inc();
@@ -53,17 +54,24 @@ public:
     ENVOY_LOG(debug, "~WasmVm {} {} remaining active", runtime_, stats_.active_.value());
   }
   proxy_wasm::WasmVmIntegration* clone() override {
-    return new EnvoyWasmVmIntegration(scope_, runtime_);
+    return new EnvoyWasmVmIntegration(scope_, runtime_, short_runtime_);
   }
   // void log(proxy_wasm::LogLevel level, absl::string_view message) override;
   void error(absl::string_view message) override;
 
+  const std::string& runtime() const { return runtime_; }
+
 protected:
   const Stats::ScopeSharedPtr scope_;
+  const std::string runtime_;
+  const std::string short_runtime_;
   const std::string runtime_prefix_;
-  const std::string runtime_; // The runtime e.g. "v8".
   VmStats stats_;
 }; // namespace Wasm
+
+inline const EnvoyWasmVmIntegration& getEnvoyWasmIntegration(proxy_wasm::WasmVm& wasm_vm) {
+  return *static_cast<const EnvoyWasmVmIntegration*>(wasm_vm.integration().get());
+}
 
 // Exceptions for issues with the WebAssembly code.
 class WasmException : public EnvoyException {
