@@ -73,8 +73,6 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
     if (config_->removeAcceptEncodingHeader()) {
       headers.removeAcceptEncoding();
     }
-  } else {
-    config_->stats().not_compressed_.inc();
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -116,7 +114,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
     config_->stats().compressed_.inc();
     // Finally instantiate the compressor.
     compressor_ = config_->makeCompressor();
-  } else if (!skip_compression_) {
+  } else {
     skip_compression_ = true;
     config_->stats().not_compressed_.inc();
   }
