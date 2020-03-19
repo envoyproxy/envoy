@@ -52,7 +52,7 @@ message InlineDnsTable {
   // Fully qualified domain names for which Envoy will respond to queries
   repeated DnsVirtualDomain virtual_domains = 2 [(validate.rules).repeated = {min_items: 1}];
 
-  // This field serves to help Envoy determine whether a name belongs
-  // to a known resource or whether the query should be forwarded externally
+  // This field serves to help Envoy determine whether it can authoritatively
+  // answer a query for a name belonging to a domain in this list
   repeated string known_domains = 3;
 }
