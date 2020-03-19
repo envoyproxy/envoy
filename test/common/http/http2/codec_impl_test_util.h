@@ -2,8 +2,8 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/http/utility.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
