@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.network.postgresql_proxy.v2alpha;
 
 import "udpa/annotations/status.proto";
+
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 

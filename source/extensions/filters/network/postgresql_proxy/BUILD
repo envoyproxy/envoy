@@ -18,24 +18,24 @@ api_proto_package()
 envoy_cc_library(
     name = "filter",
     srcs = [
+        "postgresql_decoder.cc",
         "postgresql_filter.cc",
         "postgresql_utils.cc",
-        "postgresql_decoder.cc"
     ],
     hdrs = [
-        "postgresql_filter.h",
-        "postgresql_utils.h",
         "postgresql_decoder.h",
-        "postgresql_session.h"
+        "postgresql_filter.h",
+        "postgresql_session.h",
+        "postgresql_utils.h",
     ],
     repository = "@envoy",
     deps = [
-        "@envoy//include/envoy/network:filter_interface",
-        "@envoy//include/envoy/server:filter_config_interface",
-        "@envoy//include/envoy/stats:stats_interface",
-        "@envoy//include/envoy/stats:stats_macros",
-        "@envoy//source/common/buffer:buffer_lib",
-        "@envoy//source/common/network:filter_lib",
+        "//include/envoy/network:filter_interface",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/network:filter_lib",
     ],
 )
 
