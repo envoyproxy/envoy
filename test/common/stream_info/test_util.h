@@ -4,7 +4,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
-#include "common/request_id_utils/request_id_utils_impl.h"
+#include "common/request_id_extension/request_id_extension_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
@@ -21,7 +21,7 @@ public:
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
     Runtime::RandomGeneratorImpl random;
-    request_id_utils_ = RequestIDUtils::RequestIDUtilsFactory::defaultInstance(random);
+    request_id_extension_ = RequestIDExtension::RequestIDExtensionFactory::defaultInstance(random);
 
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
@@ -211,11 +211,11 @@ public:
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setRequestIDUtils(RequestIDUtils::UtilitiesSharedPtr utils) override {
-    request_id_utils_ = utils;
+  void setRequestIDExtension(RequestIDExtension::UtilitiesSharedPtr utils) override {
+    request_id_extension_ = utils;
   }
-  RequestIDUtils::UtilitiesSharedPtr getRequestIDUtils() const override {
-    return request_id_utils_;
+  RequestIDExtension::UtilitiesSharedPtr getRequestIDExtension() const override {
+    return request_id_extension_;
   }
 
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
@@ -256,7 +256,7 @@ public:
   std::string upstream_transport_failure_reason_;
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
-  RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
+  RequestIDExtension::UtilitiesSharedPtr request_id_extension_;
 };
 
 } // namespace Envoy

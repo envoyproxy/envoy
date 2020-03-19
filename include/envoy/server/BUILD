@@ -245,11 +245,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "request_id_utils_config_interface",
-    hdrs = ["request_id_utils_config.h"],
+    name = "request_id_extension_config_interface",
+    hdrs = ["request_id_extension_config.h"],
     deps = [
         ":filter_config_interface",
-        "//include/envoy/request_id_utils:request_id_utils_interface",
+        "//include/envoy/request_id_extension:request_id_extension_interface",
         "//source/common/protobuf",
     ],
 )

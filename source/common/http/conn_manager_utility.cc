@@ -217,13 +217,13 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
   // Generate x-request-id for all edge requests, or if there is none.
   if (config.generateRequestId()) {
-    auto rid_utils = config.requestIDUtils();
+    auto rid_extension = config.requestIDExtension();
     // Unconditionally set a request ID if we are allowed to override it from
     // the edge. Otherwise just ensure it is set.
     if (!config.preserveExternalRequestId() && edge_request) {
-      rid_utils->setRequestID(request_headers);
+      rid_extension->setRequestID(request_headers);
     } else {
-      rid_utils->ensureRequestID(request_headers);
+      rid_extension->ensureRequestID(request_headers);
     }
   }
 
@@ -240,10 +240,10 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
     return;
   }
 
-  auto rid_utils = config.requestIDUtils();
+  auto rid_extension = config.requestIDExtension();
   uint64_t result;
   // Skip if request-id is corrupted, or non-existent
-  if (!rid_utils->modRequestIDBy(request_headers, result, 10000)) {
+  if (!rid_extension->modRequestIDBy(request_headers, result, 10000)) {
     return;
   }
 
@@ -261,20 +261,20 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(RequestHeaderMap& requ
   }
 
   // Do not apply tracing transformations if we are currently tracing.
-  if (RequestIDUtils::TraceStatus::NoTrace == rid_utils->getTraceStatus(request_headers)) {
+  if (RequestIDExtension::TraceStatus::NoTrace == rid_extension->getTraceStatus(request_headers)) {
     if (request_headers.ClientTraceId() &&
         runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
-      rid_utils->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Client);
+      rid_extension->setTraceStatus(request_headers, RequestIDExtension::TraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
-      rid_utils->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Forced);
+      rid_extension->setTraceStatus(request_headers, RequestIDExtension::TraceStatus::Forced);
     } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
                                                  result)) {
-      rid_utils->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Sampled);
+      rid_extension->setTraceStatus(request_headers, RequestIDExtension::TraceStatus::Sampled);
     }
   }
 
   if (!runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
-    rid_utils->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::NoTrace);
+    rid_extension->setTraceStatus(request_headers, RequestIDExtension::TraceStatus::NoTrace);
   }
 }
 
@@ -366,7 +366,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
 
 void ConnectionManagerUtility::mutateResponseHeaders(
     ResponseHeaderMap& response_headers, const RequestHeaderMap* request_headers,
-    const RequestIDUtils::UtilitiesSharedPtr& rid_utils, const std::string& via) {
+    const RequestIDExtension::UtilitiesSharedPtr& rid_extension, const std::string& via) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -384,7 +384,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(
   response_headers.removeTransferEncoding();
 
   if (request_headers != nullptr && request_headers->EnvoyForceTrace()) {
-    rid_utils->preserveRequestIDInResponse(response_headers, *request_headers);
+    rid_extension->preserveRequestIDInResponse(response_headers, *request_headers);
   }
   response_headers.removeKeepAlive();
   response_headers.removeProxyConnection();

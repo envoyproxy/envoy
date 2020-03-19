@@ -1,13 +1,13 @@
 #pragma once
 
-#include "envoy/request_id_utils/request_id_utils.h"
+#include "envoy/request_id_extension/request_id_extension.h"
 
 #include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
-namespace RequestIDUtils {
+namespace RequestIDExtension {
 
-class UUIDUtils : public Envoy::RequestIDUtils::Utilities {
+class UUIDUtils : public Envoy::RequestIDExtension::Utilities {
 public:
   UUIDUtils(Envoy::Runtime::RandomGenerator& random) : random(random) {}
 
@@ -16,9 +16,10 @@ public:
   void preserveRequestIDInResponse(Http::ResponseHeaderMap& response_headers,
                                    const Http::RequestHeaderMap& request_headers);
   bool modRequestIDBy(const Http::RequestHeaderMap& request_headers, uint64_t& out, uint64_t mod);
-  Envoy::RequestIDUtils::TraceStatus getTraceStatus(const Http::RequestHeaderMap& request_headers);
+  Envoy::RequestIDExtension::TraceStatus
+  getTraceStatus(const Http::RequestHeaderMap& request_headers);
   void setTraceStatus(Http::RequestHeaderMap& request_headers,
-                      Envoy::RequestIDUtils::TraceStatus status);
+                      Envoy::RequestIDExtension::TraceStatus status);
 
 private:
   // Reference to the random generator used to generate new request IDs
@@ -43,5 +44,5 @@ private:
   static const char NO_TRACE = '4';
 };
 
-} // namespace RequestIDUtils
+} // namespace RequestIDExtension
 } // namespace Envoy

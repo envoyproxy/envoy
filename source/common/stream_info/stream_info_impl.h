@@ -6,7 +6,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
-#include "envoy/request_id_utils/request_id_utils.h"
+#include "envoy/request_id_extension/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
@@ -247,11 +247,11 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setRequestIDUtils(RequestIDUtils::UtilitiesSharedPtr utils) override {
-    request_id_utils_ = utils;
+  void setRequestIDExtension(RequestIDExtension::UtilitiesSharedPtr utils) override {
+    request_id_extension_ = utils;
   }
-  RequestIDUtils::UtilitiesSharedPtr getRequestIDUtils() const override {
-    return request_id_utils_;
+  RequestIDExtension::UtilitiesSharedPtr getRequestIDExtension() const override {
+    return request_id_extension_;
   }
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
@@ -293,7 +293,7 @@ private:
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
-  RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
+  RequestIDExtension::UtilitiesSharedPtr request_id_extension_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
 };

@@ -21,7 +21,7 @@
 #include "common/http/exception.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/request_id_utils/request_id_utils_impl.h"
+#include "common/request_id_extension/request_id_extension_impl.h"
 #include "common/stats/symbol_table_creator.h"
 
 #include "test/common/http/conn_manager_impl_fuzz.pb.h"
@@ -73,7 +73,8 @@ public:
     ON_CALL(scoped_route_config_provider_, lastUpdated())
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
-    request_id_utils_ = Envoy::RequestIDUtils::RequestIDUtilsFactory::defaultInstance(random_);
+    request_id_extension_ =
+        Envoy::RequestIDExtension::RequestIDExtensionFactory::defaultInstance(random_);
   }
 
   void newStream() {
@@ -92,7 +93,9 @@ public:
   // Http::ConnectionManagerConfig
 
   // TODO(rossdylan): Replace this nullptr with the uuid impl or mock impl
-  RequestIDUtils::UtilitiesSharedPtr requestIDUtils() override { return request_id_utils_; }
+  RequestIDExtension::UtilitiesSharedPtr requestIDExtension() override {
+    return request_id_extension_;
+  }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {
@@ -156,7 +159,7 @@ public:
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
+  RequestIDExtension::UtilitiesSharedPtr request_id_extension_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
   MockStreamDecoderFilter* decoder_filter_{};

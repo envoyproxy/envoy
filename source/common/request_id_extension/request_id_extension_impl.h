@@ -1,25 +1,25 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/request_id_utils/request_id_utils.h"
-#include "envoy/server/request_id_utils_config.h"
+#include "envoy/request_id_extension/request_id_extension.h"
+#include "envoy/server/request_id_extension_config.h"
 
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
-namespace RequestIDUtils {
+namespace RequestIDExtension {
 /**
  * Request ID Utilities factory that reads the configuration from proto.
  */
-class RequestIDUtilsFactory {
+class RequestIDExtensionFactory {
 public:
   /**
-   * Return a newly created instance of the default RequestIDUtils implementation.
+   * Return a newly created instance of the default RequestIDExtension implementation.
    */
   static UtilitiesSharedPtr defaultInstance(Envoy::Runtime::RandomGenerator& random);
 
   /**
-   * Read a RequestIDUtils definition from proto and create it.
+   * Read a RequestIDExtension definition from proto and create it.
    */
   static UtilitiesSharedPtr fromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
@@ -27,5 +27,5 @@ public:
       Server::Configuration::FactoryContext& context);
 };
 
-} // namespace RequestIDUtils
+} // namespace RequestIDExtension
 } // namespace Envoy

@@ -9,8 +9,8 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "request_id_utils_interface",
-    hdrs = ["request_id_utils.h"],
+    name = "request_id_extension_interface",
+    hdrs = ["request_id_extension.h"],
     deps = [
         "//include/envoy/http:header_map_interface",
     ],

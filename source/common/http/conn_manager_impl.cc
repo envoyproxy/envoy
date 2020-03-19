@@ -554,7 +554,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
 
-  stream_info_.setRequestIDUtils(connection_manager.config_.requestIDUtils());
+  stream_info_.setRequestIDExtension(connection_manager.config_.requestIDExtension());
 
   if (connection_manager_.config_.isRoutable() &&
       connection_manager.config_.routeConfigProvider() != nullptr) {
@@ -1512,8 +1512,9 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(
-      headers, request_headers_.get(), connection_manager_.config_.requestIDUtils(), EMPTY_STRING);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
+                                                  connection_manager_.config_.requestIDExtension(),
+                                                  EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -1596,7 +1597,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeadersInternal(ResponseHeaderMa
     headers.setReferenceServer(connection_manager_.config_.serverName());
   }
   ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
-                                                  connection_manager_.config_.requestIDUtils(),
+                                                  connection_manager_.config_.requestIDExtension(),
                                                   connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the

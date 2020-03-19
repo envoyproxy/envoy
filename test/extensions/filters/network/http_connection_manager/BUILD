@@ -24,7 +24,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ratelimit:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
-        "//source/extensions/request_id_utils/uuid:config",
+        "//source/extensions/request_id_extension/uuid:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",

@@ -9,18 +9,18 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "request_id_utils_lib",
+    name = "request_id_extension_lib",
     srcs = [
-        "request_id_utils_impl.cc",
+        "request_id_extension_impl.cc",
         "uuid_impl.cc",
     ],
     hdrs = [
-        "request_id_utils_impl.h",
+        "request_id_extension_impl.h",
         "uuid_impl.h",
     ],
     deps = [
-        "//include/envoy/request_id_utils:request_id_utils_interface",
-        "//include/envoy/server:request_id_utils_config_interface",
+        "//include/envoy/request_id_extension:request_id_extension_interface",
+        "//include/envoy/server:request_id_extension_config_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",

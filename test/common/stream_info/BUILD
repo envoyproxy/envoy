@@ -43,10 +43,10 @@ envoy_cc_test_library(
     name = "test_util",
     hdrs = ["test_util.h"],
     deps = [
-        "//include/envoy/request_id_utils:request_id_utils_interface",
+        "//include/envoy/request_id_extension:request_id_extension_interface",
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
-        "//source/common/request_id_utils:request_id_utils_lib",
+        "//source/common/request_id_extension:request_id_extension_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stream_info:filter_state_lib",
         "//test/test_common:simulated_time_system_lib",

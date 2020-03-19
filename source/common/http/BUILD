@@ -152,7 +152,7 @@ envoy_cc_library(
         ":date_provider_lib",
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/request_id_utils:request_id_utils_interface",
+        "//include/envoy/request_id_extension:request_id_extension_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

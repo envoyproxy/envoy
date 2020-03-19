@@ -18,7 +18,7 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/request_id_utils:request_id_utils_interface",
+        "//include/envoy/request_id_extension:request_id_extension_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",

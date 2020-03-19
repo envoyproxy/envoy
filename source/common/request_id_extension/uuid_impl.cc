@@ -1,4 +1,4 @@
-#include "common/request_id_utils/uuid_impl.h"
+#include "common/request_id_extension/uuid_impl.h"
 
 #include <cstdint>
 #include <string>
@@ -11,7 +11,7 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace RequestIDUtils {
+namespace RequestIDExtension {
 
 void UUIDUtils::setRequestID(Http::RequestHeaderMap& request_headers) {
   // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
@@ -52,30 +52,30 @@ bool UUIDUtils::modRequestIDBy(const Http::RequestHeaderMap& request_headers, ui
   return true;
 }
 
-Envoy::RequestIDUtils::TraceStatus
+Envoy::RequestIDExtension::TraceStatus
 UUIDUtils::getTraceStatus(const Http::RequestHeaderMap& request_headers) {
   if (request_headers.RequestId() == nullptr) {
-    return Envoy::RequestIDUtils::TraceStatus::NoTrace;
+    return Envoy::RequestIDExtension::TraceStatus::NoTrace;
   }
   absl::string_view uuid = request_headers.RequestId()->value().getStringView();
   if (uuid.length() != Runtime::RandomGeneratorImpl::UUID_LENGTH) {
-    return Envoy::RequestIDUtils::TraceStatus::NoTrace;
+    return Envoy::RequestIDExtension::TraceStatus::NoTrace;
   }
 
   switch (uuid[TRACE_BYTE_POSITION]) {
   case TRACE_FORCED:
-    return Envoy::RequestIDUtils::TraceStatus::Forced;
+    return Envoy::RequestIDExtension::TraceStatus::Forced;
   case TRACE_SAMPLED:
-    return Envoy::RequestIDUtils::TraceStatus::Sampled;
+    return Envoy::RequestIDExtension::TraceStatus::Sampled;
   case TRACE_CLIENT:
-    return Envoy::RequestIDUtils::TraceStatus::Client;
+    return Envoy::RequestIDExtension::TraceStatus::Client;
   default:
-    return Envoy::RequestIDUtils::TraceStatus::NoTrace;
+    return Envoy::RequestIDExtension::TraceStatus::NoTrace;
   }
 }
 
 void UUIDUtils::setTraceStatus(Http::RequestHeaderMap& request_headers,
-                               Envoy::RequestIDUtils::TraceStatus status) {
+                               Envoy::RequestIDExtension::TraceStatus status) {
   if (request_headers.RequestId() == nullptr) {
     return;
   }
@@ -86,21 +86,21 @@ void UUIDUtils::setTraceStatus(Http::RequestHeaderMap& request_headers,
   std::string uuid(uuid_view);
 
   switch (status) {
-  case Envoy::RequestIDUtils::TraceStatus::Forced:
+  case Envoy::RequestIDExtension::TraceStatus::Forced:
     uuid[TRACE_BYTE_POSITION] = TRACE_FORCED;
     break;
-  case Envoy::RequestIDUtils::TraceStatus::Client:
+  case Envoy::RequestIDExtension::TraceStatus::Client:
     uuid[TRACE_BYTE_POSITION] = TRACE_CLIENT;
     break;
-  case Envoy::RequestIDUtils::TraceStatus::Sampled:
+  case Envoy::RequestIDExtension::TraceStatus::Sampled:
     uuid[TRACE_BYTE_POSITION] = TRACE_SAMPLED;
     break;
-  case Envoy::RequestIDUtils::TraceStatus::NoTrace:
+  case Envoy::RequestIDExtension::TraceStatus::NoTrace:
     uuid[TRACE_BYTE_POSITION] = NO_TRACE;
     break;
   }
   request_headers.setRequestId(uuid);
 }
 
-} // namespace RequestIDUtils
+} // namespace RequestIDExtension
 } // namespace Envoy

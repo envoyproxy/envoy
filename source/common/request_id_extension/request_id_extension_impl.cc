@@ -1,19 +1,19 @@
-#include "common/request_id_utils/request_id_utils_impl.h"
+#include "common/request_id_extension/request_id_extension_impl.h"
 
 #include "common/common/utility.h"
 #include "common/config/utility.h"
-#include "common/request_id_utils/uuid_impl.h"
+#include "common/request_id_extension/uuid_impl.h"
 
 namespace Envoy {
-namespace RequestIDUtils {
+namespace RequestIDExtension {
 
-UtilitiesSharedPtr RequestIDUtilsFactory::fromProto(
+UtilitiesSharedPtr RequestIDExtensionFactory::fromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension&
         config,
     Server::Configuration::FactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   auto* factory =
-      Registry::FactoryRegistry<Server::Configuration::RequestIDUtilsFactory>::getFactoryByType(
+      Registry::FactoryRegistry<Server::Configuration::RequestIDExtensionFactory>::getFactoryByType(
           type);
   if (factory == nullptr) {
     throw EnvoyException(
@@ -25,9 +25,10 @@ UtilitiesSharedPtr RequestIDUtilsFactory::fromProto(
   return factory->createUtilitiesInstance(*message, context);
 }
 
-UtilitiesSharedPtr RequestIDUtilsFactory::defaultInstance(Envoy::Runtime::RandomGenerator& random) {
+UtilitiesSharedPtr
+RequestIDExtensionFactory::defaultInstance(Envoy::Runtime::RandomGenerator& random) {
   return std::make_shared<UUIDUtils>(random);
 }
 
-} // namespace RequestIDUtils
+} // namespace RequestIDExtension
 } // namespace Envoy

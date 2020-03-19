@@ -7,7 +7,7 @@
 #include "envoy/http/header_map.h"
 
 namespace Envoy {
-namespace RequestIDUtils {
+namespace RequestIDExtension {
 
 enum class TraceStatus { NoTrace, Sampled, Client, Forced };
 
@@ -66,5 +66,6 @@ public:
 };
 
 using UtilitiesSharedPtr = std::shared_ptr<Utilities>;
-} // namespace RequestIDUtils
+
+} // namespace RequestIDExtension
 } // namespace Envoy
