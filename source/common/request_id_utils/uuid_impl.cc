@@ -1,4 +1,4 @@
-#include "extensions/request_id_utils/uuid/uuid_impl.h"
+#include "common/request_id_utils/uuid_impl.h"
 
 #include <cstdint>
 #include <string>
@@ -11,7 +11,6 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace RequestIDUtils {
 
 void UUIDUtils::setRequestID(Http::RequestHeaderMap& request_headers) {
@@ -102,6 +101,6 @@ void UUIDUtils::setTraceStatus(Http::RequestHeaderMap& request_headers,
   }
   request_headers.setRequestId(uuid);
 }
+
 } // namespace RequestIDUtils
-} // namespace Extensions
 } // namespace Envoy

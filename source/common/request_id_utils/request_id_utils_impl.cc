@@ -2,8 +2,7 @@
 
 #include "common/common/utility.h"
 #include "common/config/utility.h"
-
-#include "extensions/request_id_utils/uuid/config.h"
+#include "common/request_id_utils/uuid_impl.h"
 
 namespace Envoy {
 namespace RequestIDUtils {
@@ -26,10 +25,8 @@ UtilitiesSharedPtr RequestIDUtilsFactory::fromProto(
   return factory->createUtilitiesInstance(*message, context);
 }
 
-UtilitiesSharedPtr
-RequestIDUtilsFactory::defaultInstance(Server::Configuration::FactoryContext& context) {
-  return Envoy::Extensions::RequestIDUtils::UUID::UUIDUtilsFactory().createUtilitiesInstance(
-      ProtobufWkt::Empty(), context);
+UtilitiesSharedPtr RequestIDUtilsFactory::defaultInstance(Envoy::Runtime::RandomGenerator& random) {
+  return std::make_shared<UUIDUtils>(random);
 }
 
 } // namespace RequestIDUtils

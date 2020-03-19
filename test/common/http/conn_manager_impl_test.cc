@@ -26,10 +26,10 @@
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/request_id_utils/request_id_utils_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
-#include "extensions/request_id_utils/uuid/uuid_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -96,8 +96,7 @@ public:
                "", fake_stats_),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))},
-        request_id_utils_(RequestIDUtils::UtilitiesSharedPtr{
-            new Extensions::RequestIDUtils::UUIDUtils(random_)}) {
+        request_id_utils_(RequestIDUtils::RequestIDUtilsFactory::defaultInstance(random_)) {
 
     ON_CALL(route_config_provider_, lastUpdated())
         .WillByDefault(Return(test_time_.timeSystem().systemTime()));

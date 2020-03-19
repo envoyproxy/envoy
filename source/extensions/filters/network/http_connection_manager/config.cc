@@ -231,7 +231,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     request_id_utils_ = Envoy::RequestIDUtils::RequestIDUtilsFactory::fromProto(
         config.request_id_extension(), context_);
   } else {
-    request_id_utils_ = RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context_);
+    request_id_utils_ = RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context_.random());
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will

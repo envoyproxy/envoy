@@ -11,11 +11,10 @@
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/network/utility.h"
+#include "common/request_id_utils/request_id_utils_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/request_id_utils/uuid/uuid_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -49,22 +48,20 @@ TEST(HttpTracerUtilityTest, IsTracing) {
   Runtime::RandomGeneratorImpl random;
   std::string not_traceable_guid = random.uuid();
 
-  auto ridUtils = std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
-      Envoy::Extensions::RequestIDUtils::UUIDUtils(random));
-
-  ON_CALL(stream_info, getRequestIDUtils()).WillByDefault(Return(ridUtils));
+  auto rid_utils = RequestIDUtils::RequestIDUtilsFactory::defaultInstance(random);
+  ON_CALL(stream_info, getRequestIDUtils()).WillByDefault(Return(rid_utils));
 
   std::string forced_guid = random.uuid();
   Http::TestRequestHeaderMapImpl forced_header{{"x-request-id", forced_guid}};
-  ridUtils->setTraceStatus(forced_header, Envoy::RequestIDUtils::TraceStatus::Forced);
+  rid_utils->setTraceStatus(forced_header, Envoy::RequestIDUtils::TraceStatus::Forced);
 
   std::string sampled_guid = random.uuid();
   Http::TestRequestHeaderMapImpl sampled_header{{"x-request-id", sampled_guid}};
-  ridUtils->setTraceStatus(sampled_header, Envoy::RequestIDUtils::TraceStatus::Sampled);
+  rid_utils->setTraceStatus(sampled_header, Envoy::RequestIDUtils::TraceStatus::Sampled);
 
   std::string client_guid = random.uuid();
   Http::TestRequestHeaderMapImpl client_header{{"x-request-id", client_guid}};
-  ridUtils->setTraceStatus(client_header, Envoy::RequestIDUtils::TraceStatus::Client);
+  rid_utils->setTraceStatus(client_header, Envoy::RequestIDUtils::TraceStatus::Client);
 
   Http::TestRequestHeaderMapImpl not_traceable_header{{"x-request-id", not_traceable_guid}};
   Http::TestRequestHeaderMapImpl empty_header{};

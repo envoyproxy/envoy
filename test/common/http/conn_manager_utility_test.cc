@@ -9,10 +9,9 @@
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/request_id_utils/request_id_utils_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/runtime/uuid_util.h"
-
-#include "extensions/request_id_utils/uuid/uuid_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -119,9 +118,8 @@ public:
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
-    auto ridUtils = std::make_shared<Envoy::Extensions::RequestIDUtils::UUIDUtils>(
-        Envoy::Extensions::RequestIDUtils::UUIDUtils(random_));
-    ON_CALL(config_, requestIDUtils()).WillByDefault(Return(ridUtils));
+    auto rid_utils = RequestIDUtils::RequestIDUtilsFactory::defaultInstance(random_);
+    ON_CALL(config_, requestIDUtils()).WillByDefault(Return(rid_utils));
   }
 
   struct MutateRequestRet {

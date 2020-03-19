@@ -5,8 +5,8 @@
 #include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace RequestIDUtils {
+
 class UUIDUtils : public Envoy::RequestIDUtils::Utilities {
 public:
   UUIDUtils(Envoy::Runtime::RandomGenerator& random) : random(random) {}
@@ -44,5 +44,4 @@ private:
 };
 
 } // namespace RequestIDUtils
-} // namespace Extensions
 } // namespace Envoy

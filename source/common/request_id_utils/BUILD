@@ -10,8 +10,14 @@ envoy_package()
 
 envoy_cc_library(
     name = "request_id_utils_lib",
-    srcs = ["request_id_utils_impl.cc"],
-    hdrs = ["request_id_utils_impl.h"],
+    srcs = [
+        "request_id_utils_impl.cc",
+        "uuid_impl.cc",
+    ],
+    hdrs = [
+        "request_id_utils_impl.h",
+        "uuid_impl.h",
+    ],
     deps = [
         "//include/envoy/request_id_utils:request_id_utils_interface",
         "//include/envoy/server:request_id_utils_config_interface",
@@ -27,8 +33,6 @@ envoy_cc_library(
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/extensions/request_id_utils/uuid:config",
-        "//source/extensions/request_id_utils/uuid:uuid_lib",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

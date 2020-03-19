@@ -73,7 +73,7 @@ public:
     ON_CALL(scoped_route_config_provider_, lastUpdated())
         .WillByDefault(Return(time_system_.systemTime()));
     access_logs_.emplace_back(std::make_shared<NiceMock<AccessLog::MockInstance>>());
-    request_id_utils_ = Envoy::RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context_);
+    request_id_utils_ = Envoy::RequestIDUtils::RequestIDUtilsFactory::defaultInstance(random_);
   }
 
   void newStream() {
@@ -155,7 +155,7 @@ public:
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
-  Envoy::Server::Configuration::MockFactoryContext context_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
   RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};

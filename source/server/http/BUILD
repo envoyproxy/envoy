@@ -55,6 +55,7 @@ envoy_cc_library(
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:utility_lib",
         "//source/common/profiler:profiler_lib",
+        "//source/common/request_id_utils:request_id_utils_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_config_lib",
         "//source/common/stats:histogram_lib",
