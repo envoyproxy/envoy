@@ -6,6 +6,7 @@ import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/listener.proto";
 import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";

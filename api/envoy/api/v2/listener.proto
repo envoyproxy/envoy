@@ -4,6 +4,7 @@ package envoy.api.v2;
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/socket_option.proto";
 import "envoy/api/v2/listener/listener_components.proto";
 import "envoy/api/v2/listener/udp_listener_config.proto";
 import "envoy/config/listener/v2/api_listener.proto";

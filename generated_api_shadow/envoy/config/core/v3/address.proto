@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
-import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/socket_option.proto";
 
 import "google/protobuf/wrappers.proto";
 
