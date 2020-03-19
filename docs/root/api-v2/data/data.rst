@@ -6,6 +6,7 @@ Envoy data
   :maxdepth: 2
 
   accesslog/accesslog
-  core/core
   cluster/cluster
+  core/core
+  extensions/extensions
   tap/tap
