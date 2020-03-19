@@ -98,6 +98,11 @@ public:
   virtual HealthCheckHostMonitor& healthChecker() const PURE;
 
   /**
+   * @return should the hostname used as the host header for health checking.
+   */
+  virtual bool useHostnameForHealthChecks() const PURE;
+
+  /**
    * @return the hostname associated with the host if any.
    * Empty string "" indicates that hostname is not a DNS name.
    */

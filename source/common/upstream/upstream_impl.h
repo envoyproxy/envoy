@@ -120,6 +120,7 @@ public:
     }
   }
   HostStats& stats() const override { return stats_; }
+  bool useHostnameForHealthChecks() const override { return health_check_use_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
@@ -140,6 +141,7 @@ private:
 protected:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
+  bool health_check_use_hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
