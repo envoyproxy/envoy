@@ -37,6 +37,8 @@ public:
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
    * the corresponding abstraction to a ProtobufWkt::Struct.
+   * @param replacements A container that is used to hold the required replacements when this object
+   * is serialized.
    */
   virtual const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const PURE;
 
