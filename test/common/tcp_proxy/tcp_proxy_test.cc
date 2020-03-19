@@ -1927,7 +1927,21 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   filter_->onNewConnection();
 }
 
-TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ClusterNameSet)) {
+class TcpProxyNonDeprecatedConfigRoutingTest : public TcpProxyRoutingTest {
+public:
+  TcpProxyNonDeprecatedConfigRoutingTest() = default;
+
+  void setup() {
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    )EOF";
+
+    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+  }
+};
+
+TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
   setup();
 
   initializeFilter();
