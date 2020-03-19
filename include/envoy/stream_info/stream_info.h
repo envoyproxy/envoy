@@ -527,13 +527,13 @@ public:
   virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
 
   /**
-   * @param Upstream connection's ClusterInfo.
+   * @param Upstream Connection's ClusterInfo.
    */
   virtual void
   setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
 
   /**
-   * @return Upstream connection's ClusterInfo.
+   * @return Upstream Connection's ClusterInfo.
    */
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 };
