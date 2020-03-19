@@ -34,7 +34,6 @@ namespace {
 
 constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
-constexpr auto content_type_json = "application/json";
 
 void setLambdaHeaders(Http::RequestHeaderMap& headers, absl::string_view function_name) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
@@ -69,7 +68,8 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
   // If transfer-encoding is anything other than 'identity' (i.e. chunked, compress, deflate or
   // gzip) then we want to base64-encode the response body regardless of the content-type value.
   if (auto encoding_header = headers.TransferEncoding()) {
-    if (!absl::EqualsIgnoreCase(encoding_header->value().getStringView(), "identity")) {
+    if (!absl::EqualsIgnoreCase(encoding_header->value().getStringView(),
+                                Http::Headers::get().TransferEncodingValues.Identity)) {
       return false;
     }
   }
@@ -81,7 +81,7 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
 
   const Http::LowerCaseString content_type_value{
       std::string(headers.ContentType()->value().getStringView())};
-  if (content_type_value.get() == "application/json") {
+  if (content_type_value.get() == Http::Headers::get().ContentTypeValues.Json) {
     return true;
   }
 
@@ -139,8 +139,7 @@ std::string Filter::resolveSettings() {
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   auto cluster_info_ptr = decoder_callbacks_->clusterInfo();
-  ASSERT(cluster_info_ptr);
-  if (!isTargetClusterLambdaGateway(*cluster_info_ptr)) {
+  if (!cluster_info_ptr || !isTargetClusterLambdaGateway(*cluster_info_ptr)) {
     skip_ = true;
     ENVOY_LOG(trace, "Target cluster does not have the Lambda metadata. Moving on.");
     return Http::FilterHeadersStatus::Continue;
@@ -184,7 +183,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // reflect the actual incoming request headers instead of the overwritten ones.
   setLambdaHeaders(headers, arn_->functionName());
   headers.setContentLength(json_buf.length());
-  headers.setReferenceContentType(content_type_json);
+  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hash = Hex::encode(hashing_util.getSha256Digest(json_buf));
   sigv4_signer_->sign(headers, hash);
@@ -241,7 +240,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       dec_buf.move(json_buf);
     });
     request_headers_->setContentLength(decoding_buffer.length());
-    request_headers_->setReferenceContentType(content_type_json);
+    request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 
   setLambdaHeaders(*request_headers_, arn_->functionName());
@@ -342,7 +341,8 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
     // 3- There was no x-amz-function-error header
     // 4- The body contains invalid JSON
     headers.setStatus(static_cast<int>(Http::Code::InternalServerError));
-    ENVOY_LOG(error, "Failed to parse JSON response from AWS Lambda.\n{}", ex.what());
+    // TODO(marcomagdy): Replace the following log with a stat instead
+    ENVOY_LOG(debug, "Failed to parse JSON response from AWS Lambda.\n{}", ex.what());
     return;
   }
 
@@ -361,7 +361,7 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
   if (json_resp.status_code() != 0) {
     headers.setStatus(json_resp.status_code());
   }
-  headers.setReferenceContentType(content_type_json);
+  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   if (!json_resp.body().empty()) {
     if (json_resp.is_base64_encoded()) {
       body.add(Base64::decode(json_resp.body()));
