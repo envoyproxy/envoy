@@ -16,7 +16,8 @@ public:
       - name: direct_response
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.direct_response.v3.Config
-          response: aGVsbG8sIHdvcmxkIQo=
+          response:
+            inline_string: "hello, world!\n"
       )EOF";
   }
 

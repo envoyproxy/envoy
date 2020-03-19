@@ -834,21 +834,21 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(49));
+  EXPECT_CALL(random_, random()).WillOnce(Return(190));
   retry_timer_ = new Event::MockTimer(&dispatcher_);
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(24), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(15), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(149));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(74), _));
+  EXPECT_CALL(random_, random()).WillOnce(Return(190));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(40), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(349));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(174), _));
+  EXPECT_CALL(random_, random()).WillOnce(Return(190));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(90), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
@@ -879,19 +879,25 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffInterval) {
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(350));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(150), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(751));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(51), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(351), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(1499));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1200), _));
+  EXPECT_CALL(random_, random()).WillOnce(Return(2399));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(799), _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(2399));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1199), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
@@ -914,19 +920,25 @@ TEST_F(RouterRetryStateImplTest, CustomBackOffIntervalDefaultMax) {
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(350));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(50), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(150), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
   EXPECT_CALL(random_, random()).WillOnce(Return(751));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(51), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(351), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(1499));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(random_, random()).WillOnce(Return(2999));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(599), _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->invokeCallback();
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(2999));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(999), _));
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->invokeCallback();
@@ -1086,6 +1098,56 @@ TEST_F(RouterRetryStateImplTest, BudgetRuntimeSetOnly) {
   expectTimerCreateAndEnable();
   Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, ParseRetryOn) {
+  // RETRY_ON_5XX             0x1
+  // RETRY_ON_GATEWAY_ERROR   0x2
+  // RETRY_ON_CONNECT_FAILURE 0x4
+  std::string config = "5xx,gateway-error,connect-failure";
+  auto result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, 7);
+  EXPECT_TRUE(result.second);
+
+  config = "xxx,gateway-error,connect-failure";
+  result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, 6);
+  EXPECT_FALSE(result.second);
+
+  config = " 5xx,gateway-error ,  connect-failure   ";
+  result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, 7);
+  EXPECT_TRUE(result.second);
+
+  config = " 5 xx,gateway-error ,  connect-failure   ";
+  result = RetryStateImpl::parseRetryOn(config);
+  EXPECT_EQ(result.first, 6);
+  EXPECT_FALSE(result.second);
+}
+
+TEST_F(RouterRetryStateImplTest, ParseRetryGrpcOn) {
+  // RETRY_ON_GRPC_CANCELLED             0x20
+  // RETRY_ON_GRPC_DEADLINE_EXCEEDED     0x40
+  // RETRY_ON_GRPC_RESOURCE_EXHAUSTED    0x80
+  std::string config = "cancelled,deadline-exceeded,resource-exhausted";
+  auto result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 224);
+  EXPECT_TRUE(result.second);
+
+  config = "cancelled,deadline-exceeded,resource-exhaust";
+  result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 96);
+  EXPECT_FALSE(result.second);
+
+  config = "   cancelled,deadline-exceeded   ,   resource-exhausted   ";
+  result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 224);
+  EXPECT_TRUE(result.second);
+
+  config = "   cancelled,deadline-exceeded   ,   resource- exhausted   ";
+  result = RetryStateImpl::parseRetryGrpcOn(config);
+  EXPECT_EQ(result.first, 96);
+  EXPECT_FALSE(result.second);
 }
 
 } // namespace
