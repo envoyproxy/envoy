@@ -1064,6 +1064,14 @@ typed_config:
     EXPECT_EQ("Canceled\n", output_);
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
+  {
+    InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+    EXPECT_CALL(*file_, write(_));
+    response_headers_.addCopy(Http::Headers::get().GrpcStatus, "-1");
+    log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+    EXPECT_EQ("-1\n", output_);
+    response_headers_.remove(Http::Headers::get().GrpcStatus);
+  }
 }
 
 TEST_F(AccessLogImplTest, GrpcStatusFilterValues) {

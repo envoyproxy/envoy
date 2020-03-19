@@ -1334,32 +1334,32 @@ TEST(AccessLogFormatterTest, GrpcStatusFormatterTest) {
   }
   {
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("InvalidCode",
+    EXPECT_EQ("-1",
               formatter.format(request_header, response_header, response_trailer, stream_info));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-        ProtoEq(ValueUtil::stringValue("InvalidCode")));
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("InvalidCode",
+    EXPECT_EQ("42738",
               formatter.format(request_header, response_header, response_trailer, stream_info));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-        ProtoEq(ValueUtil::stringValue("InvalidCode")));
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_trailer.clear();
   }
   {
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("InvalidCode",
+    EXPECT_EQ("-1",
               formatter.format(request_header, response_header, response_trailer, stream_info));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-        ProtoEq(ValueUtil::stringValue("InvalidCode")));
+        ProtoEq(ValueUtil::stringValue("-1")));
     response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("InvalidCode",
+    EXPECT_EQ("42738",
               formatter.format(request_header, response_header, response_trailer, stream_info));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-        ProtoEq(ValueUtil::stringValue("InvalidCode")));
+        ProtoEq(ValueUtil::stringValue("42738")));
     response_header.clear();
   }
 }

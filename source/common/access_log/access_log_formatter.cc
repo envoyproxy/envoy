@@ -867,21 +867,30 @@ std::string GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
                                         const Http::ResponseHeaderMap& response_headers,
                                         const Http::ResponseTrailerMap& response_trailers,
                                         const StreamInfo::StreamInfo& info) const {
-  const auto grpc_status = Grpc::Common::getGrpcStatus(response_trailers, response_headers, info);
+  const auto grpc_status =
+      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
     return UnspecifiedValueString;
   }
-  return Grpc::Utility::grpcStatusToString(grpc_status.value());
+  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+    return std::to_string(grpc_status.value());
+  }
+  return grpc_status_message;
 }
 
 ProtobufWkt::Value GrpcStatusFormatter::formatValue(
     const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& info) const {
-  const auto grpc_status = Grpc::Common::getGrpcStatus(response_trailers, response_headers, info);
+  const auto grpc_status =
+      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
   if (!grpc_status.has_value()) {
     return unspecifiedValue();
   }
   const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
+  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
+    return ValueUtil::stringValue(std::to_string(grpc_status.value()));
+  }
   return ValueUtil::stringValue(grpc_status_message);
 }
 
