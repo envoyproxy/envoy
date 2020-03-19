@@ -3,6 +3,7 @@ Version history
 
 1.14.0 (Pending)
 ================
+* access log: added support for DOWNSTREAM_LOCAL_PORT :ref:`access log formatters <config_access_log_format>`.
 * access loggers: access logger extensions use the "envoy.access_loggers" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
