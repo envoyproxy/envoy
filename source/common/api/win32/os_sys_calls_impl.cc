@@ -166,7 +166,7 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
 }
 
 bool OsSysCallsImpl::supportsMmsg() const {
-  // Windows doesn't suppport it.
+  // Windows doesn't support it.
   return false;
 }
 

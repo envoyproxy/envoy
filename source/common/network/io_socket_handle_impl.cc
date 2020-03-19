@@ -1,10 +1,5 @@
 #include "common/network/io_socket_handle_impl.h"
 
-#include <sys/socket.h>
-
-#include <cerrno>
-#include <iostream>
-
 #include "envoy/buffer/buffer.h"
 
 #include "common/api/os_sys_calls_impl.h"
