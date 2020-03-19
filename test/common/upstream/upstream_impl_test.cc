@@ -1137,6 +1137,17 @@ TEST(HostImplTest, HealthPipeAddress) {
       EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
 }
 
+// Test that use_hostname flag from the health check config propagates.
+TEST(HostImplTest, UseHostname) {
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
+  config.set_use_hostname(true);
+  HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
+                            envoy::config::core::v3::Locality().default_instance(), config,
+                            1);
+  EXPECT_TRUE(descr.useHostnameForHealthChecks());
+}
+
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 TEST_F(StaticClusterImplTest, InitialHosts) {
@@ -1199,6 +1210,75 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
+  EXPECT_FALSE(cluster.info()->addedViaApi());
+}
+
+TEST_F(StaticClusterImplTest, LoadAssignmentNoneEmptyHostname) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            hostname: foo
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+            health_check_config:
+              port_value: 8000
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_FALSE(cluster.info()->addedViaApi());
+}
+TEST_F(StaticClusterImplTest, LoadAssignmentNoneEmptyHostnameWithHealthChecks) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            hostname: foo
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+            health_check_config:
+              port_value: 8000
+              use_hostname: true
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_TRUE(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->useHostnameForHealthChecks());
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
