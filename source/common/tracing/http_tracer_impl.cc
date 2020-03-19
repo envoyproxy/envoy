@@ -18,7 +18,6 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/runtime/uuid_util.h"
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_cat.h"

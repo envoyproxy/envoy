@@ -21,7 +21,6 @@ envoy_cc_test(
         "//source/common/http:message_lib",
         "//source/common/request_id_extension:request_id_extension_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/common/runtime:uuid_util_lib",
         "//source/common/tracing:http_tracer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",

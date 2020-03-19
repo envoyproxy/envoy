@@ -9,7 +9,7 @@ namespace RequestIDExtension {
 
 class UUIDUtils : public Envoy::RequestIDExtension::Utilities {
 public:
-  UUIDUtils(Envoy::Runtime::RandomGenerator& random) : random(random) {}
+  explicit UUIDUtils(Envoy::Runtime::RandomGenerator& random) : random(random) {}
 
   void setRequestID(Http::RequestHeaderMap& request_headers);
   void ensureRequestID(Http::RequestHeaderMap& request_headers);

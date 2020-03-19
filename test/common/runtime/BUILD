@@ -75,12 +75,3 @@ envoy_cc_test(
         "//source/common/runtime:runtime_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "uuid_util_test",
-    srcs = ["uuid_util_test.cc"],
-    deps = [
-        "//source/common/runtime:runtime_lib",
-        "//source/common/runtime:uuid_util_lib",
-    ],
-)

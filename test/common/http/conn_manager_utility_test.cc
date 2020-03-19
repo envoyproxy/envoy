@@ -11,7 +11,6 @@
 #include "common/network/utility.h"
 #include "common/request_id_extension/request_id_extension_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/runtime/uuid_util.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -118,8 +117,8 @@ public:
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
-    auto rid_extension = RequestIDExtension::RequestIDExtensionFactory::defaultInstance(random_);
-    ON_CALL(config_, requestIDExtension()).WillByDefault(Return(rid_extension));
+    request_id_extension_ = RequestIDExtension::RequestIDExtensionFactory::defaultInstance(random_);
+    ON_CALL(config_, requestIDExtension()).WillByDefault(Return(request_id_extension_));
   }
 
   struct MutateRequestRet {
@@ -146,6 +145,7 @@ public:
 
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  RequestIDExtension::UtilitiesSharedPtr request_id_extension_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;
@@ -1089,8 +1089,8 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::Sampled,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::Sampled,
+            request_id_extension_->getTraceStatus(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
@@ -1107,8 +1107,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::Sampled,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::Sampled,
+            request_id_extension_->getTraceStatus(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
@@ -1132,8 +1132,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithRouteOverride) {
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::NoTrace,
+            request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Sampling must not be done on client traced.
@@ -1152,8 +1152,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
       {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::Forced,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::Forced,
+            request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Sampling, global off.
@@ -1171,8 +1171,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::NoTrace,
+            request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Client, client enabled, global on.
@@ -1190,8 +1190,8 @@ TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::Client,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::Client,
+            request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Client, client disabled, global on.
@@ -1213,8 +1213,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenClientSamplingNotSetAndGlobalSet
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::NoTrace,
+            request_id_extension_->getTraceStatus(request_headers));
 }
 
 // Forced, global on.
@@ -1232,7 +1232,8 @@ TEST_F(ConnectionManagerUtilityTest, ForcedTracedWhenGlobalSet) {
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ(UuidTraceStatus::Forced, UuidUtils::isTraceableUuid(headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::Forced,
+            request_id_extension_->getTraceStatus(headers));
 }
 
 // Forced, global off.
@@ -1250,7 +1251,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ(UuidTraceStatus::NoTrace, UuidUtils::isTraceableUuid(headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::NoTrace,
+            request_id_extension_->getTraceStatus(headers));
 }
 
 // Forced, global on, broken uuid.
@@ -1259,8 +1261,8 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
                                                  {"x-request-id", "bb"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::NoTrace,
+            request_id_extension_->getTraceStatus(request_headers));
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
@@ -1270,8 +1272,8 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers,
                                                   config_.requestIDExtension(), "");
 
-  EXPECT_EQ(UuidTraceStatus::NoTrace,
-            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+  EXPECT_EQ(RequestIDExtension::TraceStatus::NoTrace,
+            request_id_extension_->getTraceStatus(request_headers));
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));

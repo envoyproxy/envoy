@@ -221,7 +221,6 @@ envoy_cc_library(
         "//source/common/http/http3:well_known_names",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
-        "//source/common/runtime:uuid_util_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",

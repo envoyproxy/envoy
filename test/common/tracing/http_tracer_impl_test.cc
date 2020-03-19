@@ -13,7 +13,6 @@
 #include "common/network/utility.h"
 #include "common/request_id_extension/request_id_extension_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
