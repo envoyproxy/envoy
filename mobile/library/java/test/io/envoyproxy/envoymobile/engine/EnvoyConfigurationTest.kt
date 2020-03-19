@@ -14,6 +14,8 @@ mock_template:
     max_interval: {{ dns_failure_refresh_rate_seconds_max }}s
   stats_flush_interval: {{ stats_flush_interval_seconds }}s
   os: {{ device_os }}
+  app_version: {{ app_version }}
+  app_id: {{ app_id }}
 """
 
 
@@ -21,7 +23,7 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `resolving with default configuration resolves with values`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567)
+    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp")
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(TEST_CONFIG)
     assertThat(resolvedTemplate).contains("stats_domain: stats.foo.com")
@@ -31,12 +33,14 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("max_interval: 456s")
     assertThat(resolvedTemplate).contains("stats_flush_interval: 567s")
     assertThat(resolvedTemplate).contains("os: Android")
+    assertThat(resolvedTemplate).contains("app_version: v1.2.3")
+    assertThat(resolvedTemplate).contains("app_id: com.mydomain.myapp")
   }
 
 
   @Test(expected = EnvoyConfiguration.ConfigurationException::class)
   fun `resolve templates with invalid templates will throw on build`() {
-    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567)
+    val envoyConfiguration = EnvoyConfiguration("stats.foo.com", 123, 234, 345, 456, 567, "v1.2.3", "com.mydomain.myapp")
 
     envoyConfiguration.resolveTemplate("{{ }}")
   }

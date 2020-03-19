@@ -8,6 +8,8 @@ public class EnvoyConfiguration {
   public final Integer dnsFailureRefreshSecondsBase;
   public final Integer dnsFailureRefreshSecondsMax;
   public final Integer statsFlushSeconds;
+  public final String appVersion;
+  public final String appId;
 
   /**
    * Create a new instance of the configuration.
@@ -19,16 +21,20 @@ public class EnvoyConfiguration {
    * @param dnsFailureRefreshSecondsBase base rate in seconds to refresh DNS on failure.
    * @param dnsFailureRefreshSecondsMax  max rate in seconds to refresh DNS on failure.
    * @param statsFlushSeconds            interval at which to flush Envoy stats.
+   * @param appVersion                   the App Version of the App using this Envoy Client.
+   * @param appId                        the App ID of the App using this Envoy Client.
    */
   public EnvoyConfiguration(String statsDomain, int connectTimeoutSeconds, int dnsRefreshSeconds,
                             int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
-                            int statsFlushSeconds) {
+                            int statsFlushSeconds, String appVersion, String appId) {
     this.statsDomain = statsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
     this.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
     this.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
     this.statsFlushSeconds = statsFlushSeconds;
+    this.appVersion = appVersion;
+    this.appId = appId;
   }
 
   /**
@@ -42,7 +48,7 @@ public class EnvoyConfiguration {
    */
   String resolveTemplate(String templateYAML) {
     String resolvedConfiguration =
-        templateYAML.replace("{{ stats_domain }}", String.format("%s", statsDomain))
+        templateYAML.replace("{{ stats_domain }}", statsDomain)
             .replace("{{ connect_timeout_seconds }}", String.format("%s", connectTimeoutSeconds))
             .replace("{{ dns_refresh_rate_seconds }}", String.format("%s", dnsRefreshSeconds))
             .replace("{{ dns_failure_refresh_rate_seconds_base }}",
@@ -50,7 +56,9 @@ public class EnvoyConfiguration {
             .replace("{{ dns_failure_refresh_rate_seconds_max }}",
                      String.format("%s", dnsFailureRefreshSecondsMax))
             .replace("{{ stats_flush_interval_seconds }}", String.format("%s", statsFlushSeconds))
-            .replace("{{ device_os }}", "Android");
+            .replace("{{ device_os }}", "Android")
+            .replace("{{ app_version }}", appVersion)
+            .replace("{{ app_id }}", appId);
 
     if (resolvedConfiguration.contains("{{")) {
       throw new ConfigurationException();

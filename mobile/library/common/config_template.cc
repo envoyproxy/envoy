@@ -171,5 +171,7 @@ watchdog:
   miss_timeout: 60s
 node:
   metadata:
+    app_id : {{ app_id }}
+    app_version : {{ app_version }}
     os: {{ device_os }}
 )";
