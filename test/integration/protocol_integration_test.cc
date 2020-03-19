@@ -995,21 +995,21 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, 1, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  // Expect rejection.
-  // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
-  // connections without it. Likely need to reconsider whether the waits/closes should be on
-  // client or upstream.
-  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  response->waitForReset();
-  ASSERT_TRUE(fake_upstream_connection_->close());
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("431", response->headers().Status()->value().getStringView());
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
