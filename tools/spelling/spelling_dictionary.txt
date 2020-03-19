@@ -221,6 +221,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+Postgre
 Prereq
 QUIC
 QoS
@@ -827,6 +828,7 @@ pos
 posix
 postfix
 postfixes
+postgresql
 pre
 preallocate
 preallocating

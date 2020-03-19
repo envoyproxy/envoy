@@ -18,20 +18,20 @@ namespace PostgreSQLProxy {
 /**
  * All PostgreSQL proxy stats. @see stats_macros.h
  */
-#define ALL_POSTGRESQL_PROXY_STATS(COUNTER)   \
-  COUNTER(frontend_commands)                  \
-  COUNTER(unrecognized)                       \
-  COUNTER(sessions)                           \
-  COUNTER(errors)                             \
-  COUNTER(statements)                         \
-  COUNTER(statements_insert)                  \
-  COUNTER(statements_delete)                  \
-  COUNTER(statements_update)                  \
-  COUNTER(statements_select)                  \
-  COUNTER(statements_other)                   \
-  COUNTER(transactions)                       \
-  COUNTER(transactions_commit)                \
-  COUNTER(transactions_rollback)              \
+#define ALL_POSTGRESQL_PROXY_STATS(COUNTER)                                                        \
+  COUNTER(frontend_commands)                                                                       \
+  COUNTER(unrecognized)                                                                            \
+  COUNTER(sessions)                                                                                \
+  COUNTER(errors)                                                                                  \
+  COUNTER(statements)                                                                              \
+  COUNTER(statements_insert)                                                                       \
+  COUNTER(statements_delete)                                                                       \
+  COUNTER(statements_update)                                                                       \
+  COUNTER(statements_select)                                                                       \
+  COUNTER(statements_other)                                                                        \
+  COUNTER(transactions)                                                                            \
+  COUNTER(transactions_commit)                                                                     \
+  COUNTER(transactions_rollback)                                                                   \
   COUNTER(warnings)
 
 /**
@@ -60,7 +60,9 @@ private:
 
 using PostgreSQLFilterConfigSharedPtr = std::shared_ptr<PostgreSQLFilterConfig>;
 
-class PostgreSQLFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
+class PostgreSQLFilter : public Network::Filter,
+                         DecoderCallbacks,
+                         Logger::Loggable<Logger::Id::filter> {
 public:
   PostgreSQLFilter(PostgreSQLFilterConfigSharedPtr config);
   ~PostgreSQLFilter() override = default;
@@ -92,10 +94,11 @@ public:
   void doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);
   void setDecoder(std::unique_ptr<Decoder> decoder) { decoder_ = std::move(decoder); }
-  Decoder* getDecoder() const {return decoder_.get(); }
+  Decoder* getDecoder() const { return decoder_.get(); }
 
   uint32_t getFrontendBufLength() const { return frontend_buffer_.length(); }
   uint32_t getBackendBufLength() const { return backend_buffer_.length(); }
+
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   PostgreSQLFilterConfigSharedPtr config_;

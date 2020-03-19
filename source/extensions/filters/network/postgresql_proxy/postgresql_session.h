@@ -10,21 +10,18 @@ namespace PostgreSQLProxy {
 
 class PostgreSQLSession : Logger::Loggable<Logger::Id::filter> {
 public:
-  enum class ProtocolDirection {
-    Frontend,
-    Backend,
-    Both
-  };
+  enum class ProtocolDirection { Frontend, Backend, Both };
 
-  enum class ProtocolType {
-    Simple,
-    Extended
-  };
+  enum class ProtocolType { Simple, Extended };
 
-  void setProtocolDirection(PostgreSQLSession::ProtocolDirection protocol_direction) { protocol_direction_ = protocol_direction; }
+  void setProtocolDirection(PostgreSQLSession::ProtocolDirection protocol_direction) {
+    protocol_direction_ = protocol_direction;
+  }
   PostgreSQLSession::ProtocolDirection getProtocolDirection() { return protocol_direction_; }
 
-  void setProtocolType(PostgreSQLSession::ProtocolType protocol_type) { protocol_type_ = protocol_type; }
+  void setProtocolType(PostgreSQLSession::ProtocolType protocol_type) {
+    protocol_type_ = protocol_type;
+  }
   PostgreSQLSession::ProtocolType getProtocolType() { return protocol_type_; }
 
   bool inTransaction() { return in_transaction_; };

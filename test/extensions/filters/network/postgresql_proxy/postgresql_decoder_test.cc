@@ -1,8 +1,8 @@
-#include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
-#include "extensions/filters/network/postgresql_proxy/postgresql_utils.h"
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include "extensions/filters/network/postgresql_proxy/postgresql_decoder.h"
+#include "extensions/filters/network/postgresql_proxy/postgresql_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,7 +10,7 @@ namespace NetworkFilters {
 namespace PostgreSQLProxy {
 
 class DecoderCallbacksMock : public DecoderCallbacks {
-	public:
+public:
   MOCK_METHOD(void, incFrontend, (), (override));
   MOCK_METHOD(void, incUnrecognized, (), (override));
   MOCK_METHOD(void, incErrors, (), (override));
@@ -50,7 +50,7 @@ TEST(PostgreSQLMessageTest, Basic) {
   ASSERT_THAT(action2.target<MessageImpl::MsgAction>(), action_list.get().front().target<MessageImpl::MsgAction>());
 }
 #endif
-// Define fixture class witrh decoder and mock callbacks.
+// Define fixture class with decoder and mock callbacks.
 class PostgreSQLProxyDecoderTest : public ::testing::TestWithParam<std::string> {
 public:
   PostgreSQLProxyDecoderTest() {
@@ -58,11 +58,12 @@ public:
     decoder_->initialize();
     decoder_->setInitial(false);
   }
+
 protected:
   ::testing::NiceMock<DecoderCallbacksMock> callbacks_;
   std::unique_ptr<DecoderImpl> decoder_;
 
-  // fields offen used
+  // fields often used
   Buffer::OwnedImpl data;
   uint32_t length_;
   char buf_[256];
@@ -70,8 +71,8 @@ protected:
 
 // Test processing the initial message from a client.
 // For historical reasons, the first message does not include
-// command (ats byte). It starts with length. The initial 
-// message contains the protocol version. After processing the 
+// command (first byte). It starts with length. The initial
+// message contains the protocol version. After processing the
 // initial message the server should start using message format
 // with command as 1st byte.
 TEST_F(PostgreSQLProxyDecoderTest, InitialMessage) {
@@ -139,7 +140,7 @@ TEST_F(PostgreSQLProxyDecoderTest, ReadingBufferLargeMessages) {
   // The buffer contains command (1 byte), length (4 bytes) and 94 bytes of message
   ASSERT_THAT(data.length(), 99);
 
-  // Add 2 missing bytes and feed again to decoder 
+  // Add 2 missing bytes and feed again to decoder
   data.add("AB");
   decoder_->onData(data, true);
   ASSERT_THAT(data.length(), 0);
@@ -174,35 +175,28 @@ TEST_F(PostgreSQLProxyDecoderTest, TwoMessagesInOneBuffer) {
   ASSERT_THAT(data.length(), 0);
 }
 
-TEST_F(PostgreSQLProxyDecoderTest, Unrecognized)
-{
+TEST_F(PostgreSQLProxyDecoderTest, Unrecognized) {
   // Create invalid message. The first byte is invalid "="
   // Message must be at least 5 bytes to be parsed.
-  EXPECT_CALL(callbacks_, incUnrecognized())
-		.Times(1);
-	data.add("=");
+  EXPECT_CALL(callbacks_, incUnrecognized()).Times(1);
+  data.add("=");
   length_ = htonl(50);
   data.add(&length_, sizeof(length_));
   data.add(buf_, 46);
-	decoder_->onData(data, true);
+  decoder_->onData(data, true);
 }
 
 TEST_P(PostgreSQLProxyDecoderTest, FrontEnd) {
-	EXPECT_CALL(callbacks_, incFrontend())
-		.Times(1);
-	data.add(GetParam());
+  EXPECT_CALL(callbacks_, incFrontend()).Times(1);
+  data.add(GetParam());
   length_ = htonl(50);
   data.add(&length_, sizeof(length_));
   data.add(buf_, 46);
-	decoder_->onData(data, true);
+  decoder_->onData(data, true);
 }
 
-
-INSTANTIATE_TEST_CASE_P(
-  FrontEndMessagesTests,
-  PostgreSQLProxyDecoderTest,
-  ::testing::Values("P", "Q", "B")
-  );
+INSTANTIATE_TEST_CASE_P(FrontEndMessagesTests, PostgreSQLProxyDecoderTest,
+                        ::testing::Values("P", "Q", "B"));
 
 // Test Backend messages
 TEST_F(PostgreSQLProxyDecoderTest, Backend) {
@@ -328,18 +322,17 @@ TEST_F(PostgreSQLProxyDecoderTest, Backend) {
 }
 
 // Test checks deep inspection of the R message
-// During login/authentiation phase client and server exchange
+// During login/authentication phase client and server exchange
 // multiple R messages. Only payload with length is 8 and
 // payload with uint32 number equal to 0 indicates
 // successful authentication.
 TEST_F(PostgreSQLProxyDecoderTest, AuthenticationMsg) {
   std::string payload;
 
-  // Create authentication message which does not 
-  // mean that authentication was OK. The number of 
-  // sessions must not be increased. 
-  EXPECT_CALL(callbacks_, incSessions())
-    .Times(0);
+  // Create authentication message which does not
+  // mean that authentication was OK. The number of
+  // sessions must not be increased.
+  EXPECT_CALL(callbacks_, incSessions()).Times(0);
   payload = "blah blah";
   data.add("R");
   length_ = htonl(4 + payload.length());
@@ -363,4 +356,4 @@ TEST_F(PostgreSQLProxyDecoderTest, AuthenticationMsg) {
 } // namespace PostgreSQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
-} // namespace Envoy {
+} // namespace Envoy
