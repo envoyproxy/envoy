@@ -159,7 +159,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
     callbacks.onSuccess(
         request_, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                       new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-    return &request_;
+    return nullptr;
   });
 
   std::string async_data = "non-empty";
@@ -201,7 +201,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
     callbacks.onSuccess(
         request_, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                       new Http::TestResponseHeaderMapImpl{{":status", "200"}}})});
-    return &request_;
+    return nullptr;
   });
 
   std::string async_data = "non-empty";
@@ -247,7 +247,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
     response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
     callbacks.onSuccess(request_, std::move(response));
-    return &request_;
+    return nullptr;
   });
 
   std::string async_data = "non-empty";
@@ -292,7 +292,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccess) {
     response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
     callbacks.onSuccess(request_, std::move(response));
-    return &request_;
+    return nullptr;
   });
 
   std::string async_data = "non-empty";
@@ -331,7 +331,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
     callbacks.onSuccess(
         request_, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                       new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-    return &request_;
+    return nullptr;
   });
 
   std::string async_data = "non-empty";
@@ -374,7 +374,7 @@ TEST_F(AsyncDataSourceTest, DatasourceReleasedBeforeFetchingData) {
       response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
       callbacks.onSuccess(request_, std::move(response));
-      return &request_;
+      return nullptr;
     });
 
     remote_data_provider_ = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
@@ -421,7 +421,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
             request_,
             Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                 new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-        return &request_;
+        return nullptr;
       },
       num_retries);
 
@@ -449,7 +449,7 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
                     response->body() = std::make_unique<Buffer::OwnedImpl>(body);
 
                     callbacks.onSuccess(request_, std::move(response));
-                    return &request_;
+                    return nullptr;
                   }));
         }
 

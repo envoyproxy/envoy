@@ -109,7 +109,7 @@ public:
             [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
                 const Envoy::Http::AsyncClient::RequestOptions) -> Http::AsyncClient::Request* {
               message_ptr = std::move(message);
-              return &async_request_;
+              return nullptr;
             }));
 
     const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});

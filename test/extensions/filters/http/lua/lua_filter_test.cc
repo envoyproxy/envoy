@@ -1284,6 +1284,8 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             cb.onFailure(request, Http::AsyncClient::FailureReason::Reset);
+            // Intentionally return nullptr (instead of request handle) to trigger a particular
+            // code path.
             return nullptr;
           }));
 

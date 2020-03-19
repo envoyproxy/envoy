@@ -266,6 +266,8 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
           [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
             callbacks.onFailure(request_, Envoy::Http::AsyncClient::FailureReason::Reset);
+            // Intentionally return nullptr (instead of request handle) to trigger a particular
+            // code path.
             return nullptr;
           }));
 

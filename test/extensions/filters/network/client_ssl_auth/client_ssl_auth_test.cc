@@ -258,6 +258,8 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
                 request_,
                 Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                     new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+            // Intentionally return nullptr (instead of request handle) to trigger a particular
+            // code path.
             return nullptr;
           }));
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
