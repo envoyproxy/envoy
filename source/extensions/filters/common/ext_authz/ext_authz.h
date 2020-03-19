@@ -91,7 +91,7 @@ public:
    *        NOTE: The callback may happen within the calling stack.
    * @param request is the proto message with the attributes of the specific payload.
    * @param parent_span source for generating an egress child span as part of the trace.
-   * @param stream_info supplies the client's request stream info.
+   * @param stream_info supplies the client's stream info.
    */
   virtual void check(RequestCallbacks& callback,
                      const envoy::service::auth::v3::CheckRequest& request,
