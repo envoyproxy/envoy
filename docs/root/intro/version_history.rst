@@ -21,6 +21,7 @@ Version history
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * grpc-stats: add options to limit which messages stats are created for.
 * config: added stat :ref:`update_time <config_cluster_manager_cds>`.
+* compressor: generic :ref:`compressor <config_http_filters_compressor>` filter exposed to users.
 * datasource: added retry policy for remote async data source.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
 * dns: added support for :ref:`dns_failure_refresh_rate <envoy_api_field_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig.dns_failure_refresh_rate>` for the :ref:`dns cache <envoy_api_msg_config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig>` to set the DNS refresh rate during failures.

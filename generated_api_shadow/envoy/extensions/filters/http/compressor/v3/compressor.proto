@@ -4,10 +4,13 @@ package envoy.extensions.filters.http.compressor.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.compressor.v3";
 option java_outer_classname = "CompressorProto";
@@ -15,8 +18,10 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 // [#protodoc-title: Compressor]
+// Compressor :ref:`configuration overview <config_http_filters_compressor>`.
+// [#extension: envoy.filters.http.compressor]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Compressor {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.compressor.v2.Compressor";
@@ -46,4 +51,28 @@ message Compressor {
   // Runtime flag that controls whether the filter is enabled or not. If set to false, the
   // filter will operate as a pass-through filter. If not specified, defaults to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
+
+  // A compressor library to use for compression. By default
+  // :ref:`envoy.filters.http.compressor.gzip<envoy_api_msg_extensions.filters.http.compressor.gzip.v3.Gzip>`
+  // is used.
+  //
+  // This field is ignored when used in the context of the deprecated "envoy.filters.http.gzip"
+  // filter.
+  CompressorLibrary compressor_library = 6;
+}
+
+message CompressorLibrary {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.compressor.v2.CompressorLibrary";
+
+  // The name of the compressor library to instantiate for the filter.
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Compressor library specific configuration. See the supported libraries for further
+  // documentation.
+  oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
+    google.protobuf.Any typed_config = 3;
+  }
 }

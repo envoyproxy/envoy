@@ -9,3 +9,4 @@ HTTP filters
   */v2/*
   */v2alpha/*
   */v2alpha1/*
+  compressor/*/v2/*

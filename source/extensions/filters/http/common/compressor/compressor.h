@@ -55,12 +55,14 @@ struct CompressorStats {
   ALL_COMPRESSOR_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+// TODO(rojkov): merge this class with Compressor::CompressorFilterConfig when the filter
+// `envoy.filters.http.gzip` is fully deprecated and dropped.
 class CompressorFilterConfig {
 public:
   CompressorFilterConfig() = delete;
   virtual ~CompressorFilterConfig() = default;
 
-  virtual std::unique_ptr<Compressor::Compressor> makeCompressor() PURE;
+  virtual std::unique_ptr<Envoy::Compressor::Compressor> makeCompressor() PURE;
 
   bool enabled() const { return enabled_.enabled(); }
   const CompressorStats& stats() { return stats_; }
@@ -69,7 +71,6 @@ public:
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
   uint32_t minimumLength() const { return content_length_; }
   const std::string contentEncoding() const { return content_encoding_; };
-  const std::map<std::string, uint32_t> registeredCompressors() const;
 
 protected:
   CompressorFilterConfig(
@@ -148,7 +149,7 @@ private:
   bool shouldCompress(const EncodingDecision& decision) const;
 
   bool skip_compression_;
-  std::unique_ptr<Compressor::Compressor> compressor_;
+  std::unique_ptr<Envoy::Compressor::Compressor> compressor_;
   const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
 };
