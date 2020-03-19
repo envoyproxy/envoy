@@ -2414,7 +2414,7 @@ TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationDisabledIfSetToZero) {
   conn_manager_->onData(fake_input, false); // kick off request
 }
 
-TEST_F(HttpConnectionManagerImplTest, StreamDeletionConfigiredValidly) {
+TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationVaildlyConfigured) {
   max_stream_duration_ = std::chrono::milliseconds(10);
   setup(false, "");
 
@@ -2429,7 +2429,7 @@ TEST_F(HttpConnectionManagerImplTest, StreamDeletionConfigiredValidly) {
   conn_manager_->onData(fake_input, false); // kick off request
 }
 
-TEST_F(HttpConnectionManagerImplTest, StreamAliveDurationExpired) {
+TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackResetStream) {
   max_stream_duration_ = std::chrono::milliseconds(10);
   setup(false, "");
   Event::MockTimer* duration_timer = setUpTimer();
@@ -2449,7 +2449,7 @@ TEST_F(HttpConnectionManagerImplTest, StreamAliveDurationExpired) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_rx_reset_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, NotInvokeDeferredStreamDeletion) {
+TEST_F(HttpConnectionManagerImplTest, MaxStreamDurationCallbackNotCalledIfResetStreamValidly) {
   max_stream_duration_ = std::chrono::milliseconds(5000);
   setup(false, "");
   Event::MockTimer* duration_timer = setUpTimer();
