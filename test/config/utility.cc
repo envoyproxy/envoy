@@ -391,6 +391,27 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
+void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
+                                            absl::string_view cluster_name) {
+  RELEASE_ASSERT(!finalized_, "");
+  ProtobufWkt::Struct cluster_metadata;
+  TestUtility::loadFromYaml(std::string(metadata_yaml), cluster_metadata);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < static_resources->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+    if (cluster->name() != cluster_name) {
+      continue;
+    }
+    for (const auto& kvp : cluster_metadata.fields()) {
+      ASSERT_TRUE(kvp.second.kind_case() == ProtobufWkt::Value::KindCase::kStructValue);
+      cluster->mutable_metadata()->mutable_filter_metadata()->insert(
+          {kvp.first, kvp.second.struct_value()});
+    }
+    break;
+  }
+}
+
 void ConfigHelper::applyConfigModifiers() {
   for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
