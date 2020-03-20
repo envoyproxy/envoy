@@ -225,7 +225,8 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
       connect_timeout: 0.25s
       lb_policy: ROUND_ROBIN
       common_lb_config:
-        use_hostname: true
+        consistent_hashing_lb_config:
+          use_hostname_for_hashing: true
       hosts:
       - socket_address:
           address: 10.0.0.1
@@ -243,7 +244,8 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
             std::move(outlier_event_logger_), false, validation_visitor_, *api_);
       },
       EnvoyException,
-      "Cannot use hostname loadbalancing for cluster of type: 'envoy.clusters.test_static'");
+      "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
+      "'envoy.clusters.test_static'");
 }
 
 } // namespace

@@ -262,9 +262,13 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
   config_.value().mutable_minimum_ring_size()->set_value(12);
 
   common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
-  common_config_.set_use_hostname(true);
+  auto chc = envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig();
+  chc.set_use_hostname_for_hashing(true);
+  common_config_.set_allocated_consistent_hashing_lb_config(&chc);
 
   init();
+  common_config_.release_consistent_hashing_lb_config();
+
   EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
   EXPECT_EQ("ring_hash_lb.min_hashes_per_host", lb_->stats().min_hashes_per_host_.name());
   EXPECT_EQ("ring_hash_lb.max_hashes_per_host", lb_->stats().max_hashes_per_host_.name());
