@@ -8,5 +8,5 @@ Envoy data
   accesslog/accesslog
   cluster/cluster
   core/core
-  extensions/extensions
+  dns/dns
   tap/tap

@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.udp.dns_filter.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/data/extensions/filter/udp/dns_filter/v2alpha/inline_dns_table.proto";
+import "envoy/data/dns/v2alpha/dns_table.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -14,7 +14,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.udp.dns_filter.v2alpha"
 option java_outer_classname = "DnsFilterProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filter.udp.dns_filter.v3";
+    "envoy.extensions.filter.udp.dns_filter.v3alpha";
 option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: DNS Filter]
@@ -29,7 +29,7 @@ message DnsFilterConfig {
   message ServerContextConfig {
     oneof config_source {
       // Load the configuration specified from the control plane
-      data.extensions.filter.udp.dns_filter.v2alpha.InlineDnsTable inline_dns_table = 1;
+      data.dns.v2alpha.DnsTable inline_dns_table = 1;
 
       // Seed the filter configuration from an external path
       api.v2.core.DataSource external_dns_table = 2;

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.data.extensions.filter.udp.dns_filter.v2alpha;
+package envoy.data.dns.v2alpha;
 
 import "google/protobuf/duration.proto";
 
@@ -8,8 +8,8 @@ import "udpa/annotations/status.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.data.extensions.filter.udp.dns_filter.v2alpha";
-option java_outer_classname = "InlineDnsTableProto";
+option java_package = "io.envoyproxy.envoy.data.dns.v2alpha";
+option java_outer_classname = "DnsTableProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).work_in_progress = true;
 
@@ -18,9 +18,11 @@ option (udpa.annotations.file_status).work_in_progress = true;
 
 // This message contains the configuration for the DNS Filter if populated
 // from the control plane
-message InlineDnsTable {
+message DnsTable {
   // This message contains a list of IP addresses returned for a query for a known name
   message AddressList {
+    // This field contains a well formed IP address that is returned
+    // in the answer for a name query
     repeated string address = 1;
   }
 
