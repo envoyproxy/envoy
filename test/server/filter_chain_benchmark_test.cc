@@ -67,6 +67,10 @@ public:
     return remote_address_;
   }
 
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return remote_address_;
+  }
+
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }

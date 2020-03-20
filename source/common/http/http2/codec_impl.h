@@ -79,8 +79,8 @@ public:
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                 const Http2Settings& http2_settings, const uint32_t max_headers_kb,
-                 const uint32_t max_headers_count);
+                 const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                 const uint32_t max_headers_kb, const uint32_t max_headers_count);
 
   ~ConnectionImpl() override;
 
@@ -123,7 +123,7 @@ protected:
    */
   class Http2Options {
   public:
-    Http2Options(const Http2Settings& http2_settings);
+    Http2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
@@ -134,7 +134,7 @@ protected:
 
   class ClientHttp2Options : public Http2Options {
   public:
-    ClientHttp2Options(const Http2Settings& http2_settings);
+    ClientHttp2Options(const envoy::config::core::v3::Http2ProtocolOptions& http2_options);
   };
 
   /**
@@ -154,7 +154,7 @@ protected:
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
-    void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
+    void encodeHeadersBase(const std::vector<nghttp2_nv>& final_headers, bool end_stream);
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
@@ -206,7 +206,7 @@ protected:
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
-    virtual void decodeHeaders() PURE;
+    virtual void decodeHeaders(bool allow_waiting_for_informational_headers) PURE;
     virtual void decodeTrailers() PURE;
 
     // Get MetadataEncoder for this stream.
@@ -215,8 +215,6 @@ protected:
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
     void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
-
-    virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
 
     bool buffers_overrun() const { return read_disable_count_ > 0; }
 
@@ -259,12 +257,8 @@ protected:
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
-    void transformUpgradeFromH1toH2(HeaderMap& headers) override {
-      upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
-      Http::Utility::transformUpgradeRequestFromH1toH2(headers);
-    }
     StreamDecoder& decoder() override { return response_decoder_; }
-    void decodeHeaders() override;
+    void decodeHeaders(bool allow_waiting_for_informational_headers) override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
@@ -286,9 +280,7 @@ protected:
     }
 
     // RequestEncoder
-    void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override {
-      encodeHeadersBase(headers, end_stream);
-    }
+    void encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
     void encodeTrailers(const RequestTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
@@ -311,11 +303,8 @@ protected:
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
-    void transformUpgradeFromH1toH2(HeaderMap& headers) override {
-      Http::Utility::transformUpgradeResponseFromH1toH2(headers);
-    }
     StreamDecoder& decoder() override { return *request_decoder_; }
-    void decodeHeaders() override;
+    void decodeHeaders(bool allow_waiting_for_informational_headers) override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
@@ -330,11 +319,7 @@ protected:
 
     // ResponseEncoder
     void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
-    void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override {
-      // The contract is that client codecs must ensure that :status is present.
-      ASSERT(headers.Status() != nullptr);
-      encodeHeadersBase(headers, end_stream);
-    }
+    void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
@@ -349,7 +334,11 @@ protected:
   StreamImpl* getStream(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
   void sendPendingFrames();
-  void sendSettings(const Http2Settings& http2_settings, bool disable_push);
+  void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                    bool disable_push);
+  // Callback triggered when the peer's SETTINGS frame is received.
+  // NOTE: This is only used for tests.
+  virtual void onSettingsForTest(const nghttp2_settings&) {}
 
   static Http2Callbacks http2_callbacks_;
 
@@ -463,7 +452,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats, const Http2Settings& http2_settings,
+                       Stats::Scope& stats,
+                       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count);
 
@@ -496,7 +486,8 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Scope& scope, const Http2Settings& http2_settings,
+                       Stats::Scope& scope,
+                       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_request_headers_kb,
                        const uint32_t max_request_headers_count);
 

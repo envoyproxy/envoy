@@ -65,6 +65,7 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
   MOCK_METHOD(bool, isRoutable, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
@@ -89,6 +90,7 @@ public:
   MOCK_METHOD(const Network::Address::Instance&, localAddress, ());
   MOCK_METHOD(const absl::optional<std::string>&, userAgent, ());
   MOCK_METHOD(const Http::TracingConnectionManagerConfig*, tracingConfig, ());
+  MOCK_METHOD(Tracing::HttpTracerSharedPtr, tracer, ());
   MOCK_METHOD(ConnectionManagerListenerStats&, listenerStats, ());
   MOCK_METHOD(bool, proxy100Continue, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));

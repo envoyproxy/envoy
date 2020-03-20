@@ -26,6 +26,7 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -658,7 +659,8 @@ private:
     void resetIdleTimer();
     // Per-stream request timeout callback
     void onRequestTimeout();
-
+    // Per-stream alive duration reached.
+    void onStreamMaxDurationReached();
     bool hasCachedRoute() { return cached_route_.has_value() && cached_route_.value(); }
 
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
@@ -701,6 +703,8 @@ private:
     Event::TimerPtr stream_idle_timer_;
     // Per-stream request timeout.
     Event::TimerPtr request_timer_;
+    // Per-stream alive duration.
+    Event::TimerPtr max_stream_duration_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     StreamInfo::StreamInfoImpl stream_info_;
@@ -743,7 +747,7 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
-  Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
+  Tracing::HttpTracer& tracer() { return *config_.tracer(); }
   void handleCodecException(const char* error);
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::ResponseFlag> response_flag);

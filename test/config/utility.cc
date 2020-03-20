@@ -16,6 +16,7 @@
 
 #include "common/common/assert.h"
 #include "common/config/resources.h"
+#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
@@ -582,8 +583,8 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
                                        v3::HttpConnectionManager::HTTP2) {
-      const uint32_t size =
-          std::max(downstream_buffer_limit, Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      const uint32_t size = std::max(downstream_buffer_limit,
+                                     Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
       auto* options = hcm_config.mutable_http2_protocol_options();
       options->mutable_initial_stream_window_size()->set_value(size);
       storeHttpConnectionManager(hcm_config);
@@ -607,6 +608,16 @@ void ConfigHelper::setDownstreamMaxConnectionDuration(std::chrono::milliseconds 
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
         hcm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
+      });
+}
+
+void ConfigHelper::setDownstreamMaxStreamDuration(std::chrono::milliseconds timeout) {
+  addConfigModifier(
+      [timeout](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_stream_duration()->MergeFrom(
             ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
       });
 }

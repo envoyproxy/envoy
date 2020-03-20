@@ -43,6 +43,20 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
+
+static Http::ResponseMessagePtr makeSuccessResponse() {
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+
+  msg->trailers(
+      Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}}});
+  std::unique_ptr<Protobuf::Message> collector_response =
+      lightstep::Transporter::MakeCollectorResponse();
+  EXPECT_NE(collector_response, nullptr);
+  msg->body() = Grpc::Common::serializeToGrpcFrame(*collector_response);
+  return msg;
+}
+
 namespace {
 
 class LightStepDriverTest : public testing::Test {
@@ -62,18 +76,28 @@ public:
 
     if (init_timer) {
       timer_ = new NiceMock<Event::MockTimer>(&tls_.dispatcher_);
-      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _));
+      EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _)).Times(AtLeast(1));
     }
 
     driver_ = std::make_unique<LightStepDriver>(lightstep_config, cm_, stats_, tls_, runtime_,
                                                 std::move(opts), propagation_mode, grpc_context_);
   }
 
-  void setupValidDriver(Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
+  void setupValidDriver(int min_flush_spans = LightStepDriver::DefaultMinFlushSpans,
+                        Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                             Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
     EXPECT_CALL(cm_, get(Eq("fake_cluster"))).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
         .WillByDefault(Return(Upstream::ClusterInfo::Features::HTTP2));
+
+    EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.flush_interval_ms", _))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(1000));
+
+    EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
+                                               LightStepDriver::DefaultMinFlushSpans))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(min_flush_spans));
 
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
@@ -164,10 +188,10 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
 }
 
 TEST_F(LightStepDriverTest, FlushSeveralSpans) {
-  setupValidDriver();
+  setupValidDriver(2);
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-  Http::AsyncClient::Callbacks* callback;
+  Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_,
@@ -186,10 +210,6 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
             return &request;
           }));
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
-                                             LightStepDriver::DefaultMinFlushSpans))
-      .Times(AtLeast(1))
-      .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
@@ -205,17 +225,11 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
                                                     start_time_, {Tracing::Reason::Sampling, true});
   second_span->finishSpan();
 
-  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  Tracing::SpanPtr third_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                   start_time_, {Tracing::Reason::Sampling, true});
+  third_span->finishSpan();
 
-  msg->trailers(
-      Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}}});
-  std::unique_ptr<Protobuf::Message> collector_response =
-      lightstep::Transporter::MakeCollectorResponse();
-  EXPECT_NE(collector_response, nullptr);
-  msg->body() = Grpc::Common::serializeToGrpcFrame(*collector_response);
-
-  callback->onSuccess(std::move(msg));
+  callback->onSuccess(makeSuccessResponse());
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.success")
@@ -228,10 +242,10 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
 }
 
 TEST_F(LightStepDriverTest, FlushOneFailure) {
-  setupValidDriver();
+  setupValidDriver(1);
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-  Http::AsyncClient::Callbacks* callback;
+  Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_,
@@ -250,9 +264,6 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
             return &request;
           }));
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
-                                             LightStepDriver::DefaultMinFlushSpans))
-      .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
@@ -260,6 +271,11 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
                                                    start_time_, {Tracing::Reason::Sampling, true});
 
   first_span->finishSpan();
+
+  Tracing::SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                    start_time_, {Tracing::Reason::Sampling, true});
+
+  second_span->finishSpan();
 
   callback->onFailure(Http::AsyncClient::FailureReason::Reset);
 
@@ -269,14 +285,14 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.total")
                     .value());
-  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_dropped").value());
 }
 
-TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
-  setupValidDriver();
+TEST_F(LightStepDriverTest, FlushWithActiveReport) {
+  setupValidDriver(1);
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-  Http::AsyncClient::Callbacks* callback;
+  Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_,
@@ -295,45 +311,92 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
             return &request;
           }));
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
-                                             LightStepDriver::DefaultMinFlushSpans))
-      .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                                   start_time_, {Tracing::Reason::Sampling, true});
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  driver_->flush();
 
-  first_span->finishSpan();
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  driver_->flush();
 
-  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_dropped").value());
 
-  msg->trailers(
-      Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}}});
-  msg->body() = std::make_unique<Buffer::OwnedImpl>("invalidresponse");
+  EXPECT_CALL(request, cancel());
 
-  callback->onSuccess(std::move(msg));
+  driver_.reset();
+}
 
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("grpc.lightstep.collector.CollectorService.Report.failure")
-                    .value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("grpc.lightstep.collector.CollectorService.Report.total")
-                    .value());
-  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
+TEST_F(LightStepDriverTest, OnFullWithActiveReport) {
+  setupValidDriver(1);
+
+  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::AsyncClient::Callbacks* callback = nullptr;
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  EXPECT_CALL(cm_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            EXPECT_EQ("/lightstep.collector.CollectorService/Report",
+                      message->headers().Path()->value().getStringView());
+            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
+            EXPECT_EQ("application/grpc",
+                      message->headers().ContentType()->value().getStringView());
+
+            return &request;
+          }));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
+
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  driver_->flush();
+
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_dropped").value());
+
+  EXPECT_CALL(request, cancel());
+
+  driver_.reset();
 }
 
 TEST_F(LightStepDriverTest, FlushSpansTimer) {
   setupValidDriver();
 
+  Http::MockAsyncClientRequest request(&cm_.async_client_);
+  Http::AsyncClient::Callbacks* callback = nullptr;
+
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
   EXPECT_CALL(cm_.async_client_,
-              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)));
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& /*message*/, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
-                                             LightStepDriver::DefaultMinFlushSpans))
-      .WillOnce(Return(LightStepDriver::DefaultMinFlushSpans));
+            return &request;
+          }));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
@@ -348,62 +411,17 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
 
   timer_->invokeCallback();
 
+  callback->onSuccess(makeSuccessResponse());
+
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
 }
 
-TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
-  setupValidDriver();
-
-  Http::MockAsyncClientRequest request(&cm_.async_client_);
-  Http::AsyncClient::Callbacks* callback;
-  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
-
-  EXPECT_CALL(cm_.async_client_,
-              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
-
-            EXPECT_EQ("/lightstep.collector.CollectorService/Report",
-                      message->headers().Path()->value().getStringView());
-            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
-            EXPECT_EQ("application/grpc",
-                      message->headers().ContentType()->value().getStringView());
-
-            return &request;
-          }));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
-                                             LightStepDriver::DefaultMinFlushSpans))
-      .WillOnce(Return(1));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
-      .WillOnce(Return(5000U));
-
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
-                                             start_time_, {Tracing::Reason::Sampling, true});
-  span->finishSpan();
-
-  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
-      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-
-  // No trailers, gRPC is considered failed.
-  callback->onSuccess(std::move(msg));
-
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("grpc.lightstep.collector.CollectorService.Report.failure")
-                    .value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("grpc.lightstep.collector.CollectorService.Report.total")
-                    .value());
-  EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());
-}
-
 TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
-  setupValidDriver();
+  setupValidDriver(1);
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
-  Http::AsyncClient::Callbacks* callback;
+  Http::AsyncClient::Callbacks* callback = nullptr;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_,
@@ -415,15 +433,17 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
 
             return &request;
           }));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
-                                             LightStepDriver::DefaultMinFlushSpans))
-      .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
+
+  driver_
+      ->startSpan(config_, request_headers_, operation_name_, start_time_,
+                  {Tracing::Reason::Sampling, true})
+      ->finishSpan();
 
   EXPECT_CALL(request, cancel());
 
@@ -434,7 +454,7 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
   for (Common::Ot::OpenTracingDriver::PropagationMode propagation_mode :
        {Common::Ot::OpenTracingDriver::PropagationMode::SingleHeader,
         Common::Ot::OpenTracingDriver::PropagationMode::TracerNative}) {
-    setupValidDriver(propagation_mode);
+    setupValidDriver(LightStepDriver::DefaultMinFlushSpans, propagation_mode);
 
     // Supply bogus context, that will be simply ignored.
     const std::string invalid_context = "notvalidcontext";

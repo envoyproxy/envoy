@@ -68,10 +68,18 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:api_type_oracle_lib",
         "//source/common/config:version_converter_lib",
+        "//source/common/protobuf:visitor_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "visitor_lib",
+    srcs = ["visitor.cc"],
+    hdrs = ["visitor.h"],
+    deps = [":protobuf"],
 )
 
 envoy_cc_library(

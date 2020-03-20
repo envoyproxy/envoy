@@ -48,7 +48,8 @@ message CustomTag {
         "envoy.type.tracing.v2.CustomTag.Header";
 
     // Header name to obtain the value to populate the tag value.
-    string name = 1 [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME}];
+    string name = 1
+        [(validate.rules).string = {min_bytes: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // When the header does not exist,
     // the tag value will be populated with this default value if specified,

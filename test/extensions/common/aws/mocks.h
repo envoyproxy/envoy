@@ -25,6 +25,7 @@ public:
 
   MOCK_METHOD(void, sign, (Http::RequestMessage&, bool));
   MOCK_METHOD(void, sign, (Http::RequestHeaderMap&));
+  MOCK_METHOD(void, sign, (Http::RequestHeaderMap&, const std::string&));
 };
 
 class MockMetadataFetcher {
