@@ -65,7 +65,7 @@ static_resources:
         port_value: 0
     filter_chains:
     - filters:
-      - name: envoy.filters.network.http_connection_manager
+      - name: http
         typed_config:
           "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: config_test
@@ -341,7 +341,7 @@ public:
     auto* resource = response.add_resources();
     resource->set_name("cannot-resolve-alias");
     resource->set_version(version);
-    for (const auto alias : aliases) {
+    for (const auto& alias : aliases) {
       resource->add_aliases(alias);
     }
     response.set_nonce("noncense");

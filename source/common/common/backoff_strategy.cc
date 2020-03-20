@@ -4,22 +4,25 @@ namespace Envoy {
 
 JitteredBackOffStrategy::JitteredBackOffStrategy(uint64_t base_interval, uint64_t max_interval,
                                                  Runtime::RandomGenerator& random)
-    : base_interval_(base_interval), max_interval_(max_interval), random_(random) {
+    : base_interval_(base_interval), max_interval_(max_interval), next_interval_(base_interval),
+      random_(random) {
   ASSERT(base_interval_ > 0);
   ASSERT(base_interval_ <= max_interval_);
 }
 
 uint64_t JitteredBackOffStrategy::nextBackOffMs() {
-  const uint64_t multiplier = (1 << current_retry_) - 1;
-  const uint64_t base_backoff = multiplier * base_interval_;
-  if (base_backoff <= max_interval_) {
-    current_retry_++;
+  const uint64_t backoff = next_interval_;
+  ASSERT(backoff > 0);
+  // Set next_interval_ to max_interval_ if doubling the interval would exceed the max or overflow.
+  if (next_interval_ < max_interval_ / 2) {
+    next_interval_ *= 2;
+  } else {
+    next_interval_ = max_interval_;
   }
-  ASSERT(base_backoff > 0);
-  return std::min(random_.random() % base_backoff, max_interval_);
+  return std::min(random_.random() % backoff, max_interval_);
 }
 
-void JitteredBackOffStrategy::reset() { current_retry_ = 1; }
+void JitteredBackOffStrategy::reset() { next_interval_ = base_interval_; }
 
 FixedBackOffStrategy::FixedBackOffStrategy(uint64_t interval_ms) : interval_ms_(interval_ms) {
   ASSERT(interval_ms_ > 0);

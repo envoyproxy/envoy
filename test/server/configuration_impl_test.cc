@@ -58,12 +58,12 @@ class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()),
-        cluster_manager_factory_(server_.admin(), server_.runtime(), server_.stats(),
-                                 server_.threadLocal(), server_.random(), server_.dnsResolver(),
-                                 server_.sslContextManager(), server_.dispatcher(),
-                                 server_.localInfo(), server_.secretManager(),
-                                 server_.messageValidationContext(), *api_, server_.httpContext(),
-                                 server_.accessLogManager(), server_.singletonManager()) {}
+        cluster_manager_factory_(
+            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
+            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
+            server_.dispatcher(), server_.localInfo(), server_.secretManager(),
+            server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
+            server_.accessLogManager(), server_.singletonManager()) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -195,7 +195,8 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
+  EXPECT_THAT(envoy::config::trace::v3::Tracing{},
+              ProtoEq(server_.httpContext().defaultTracingConfig()));
 }
 
 TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfiguration) {
@@ -234,7 +235,8 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpNullTracer*>(&config.httpTracer()));
+  EXPECT_THAT(envoy::config::trace::v3::Tracing{},
+              ProtoEq(server_.httpContext().defaultTracingConfig()));
 }
 
 TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {

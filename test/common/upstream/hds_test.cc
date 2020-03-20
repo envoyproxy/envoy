@@ -285,12 +285,12 @@ TEST_F(HdsTest, TestStreamConnectionFailure) {
       .WillOnce(Return(nullptr))
       .WillOnce(Return(&async_stream_));
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(1000005)).WillRepeatedly(Return(1234567));
+  EXPECT_CALL(random_, random()).WillOnce(Return(1000005)).WillRepeatedly(Return(654321));
   EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(5), _));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1567), _));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(2567), _));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(4567), _));
-  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(25567), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(321), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(2321), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(6321), _));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(14321), _));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
 
   // Test connection failure and retry

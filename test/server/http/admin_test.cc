@@ -1249,6 +1249,16 @@ TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   EXPECT_TRUE(absl::StartsWith(response.toString(), "usage:"));
 }
 
+TEST_P(AdminInstanceTest, ReopenLogs) {
+  Http::ResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+
+  EXPECT_CALL(server_, accessLogManager()).WillRepeatedly(ReturnRef(access_log_manager_));
+  EXPECT_CALL(access_log_manager_, reopen());
+  EXPECT_EQ(Http::Code::OK, postCallback("/reopen_logs", header_map, response));
+}
+
 TEST_P(AdminInstanceTest, TracingStatsDisabled) {
   const std::string& name = admin_.tracingStats().service_forced_.name();
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -1632,13 +1642,15 @@ protected:
 
   void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
     Stats::StatNameManagedStorage storage(name, *symbol_table_);
-    counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
+    Stats::StatName stat_name = storage.statName();
+    counters_.push_back(alloc_.makeCounter(stat_name, stat_name, cluster_tags));
   }
 
   void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
     Stats::StatNameManagedStorage storage(name, *symbol_table_);
-    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags,
-                                       Stats::Gauge::ImportMode::Accumulate));
+    Stats::StatName stat_name = storage.statName();
+    gauges_.push_back(
+        alloc_.makeGauge(stat_name, stat_name, cluster_tags, Stats::Gauge::ImportMode::Accumulate));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
@@ -1654,6 +1666,9 @@ protected:
 
   void clearStorage() {
     pool_.clear();
+    counters_.clear();
+    gauges_.clear();
+    histograms_.clear();
     EXPECT_EQ(0, symbol_table_->numSymbols());
   }
 

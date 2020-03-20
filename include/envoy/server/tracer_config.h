@@ -2,7 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/server/instance.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/protobuf/protobuf.h"
@@ -10,6 +10,27 @@
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
+/**
+ * Context passed to HTTP tracers to access server resources.
+ */
+class TracerFactoryContext {
+public:
+  virtual ~TracerFactoryContext() = default;
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for tracer configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+};
+
+using TracerFactoryContextPtr = std::unique_ptr<TracerFactoryContext>;
 
 /**
  * Implemented by each Tracer and registered via Registry::registerFactory() or the convenience
@@ -25,10 +46,10 @@ public:
    * general error or a Json::Exception if the json configuration is erroneous. The returned
    * pointer should always be valid.
    * @param config supplies the proto configuration for the HttpTracer
-   * @param server supplies the server instance
+   * @param context supplies the factory context
    */
   virtual Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message& config,
-                                                  Instance& server) PURE;
+                                                  TracerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tracers"; }
 };

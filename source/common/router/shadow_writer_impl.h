@@ -21,7 +21,7 @@ public:
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-              std::chrono::milliseconds timeout) override;
+              const Http::AsyncClient::RequestOptions& options) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::ResponseMessagePtr&&) override {}

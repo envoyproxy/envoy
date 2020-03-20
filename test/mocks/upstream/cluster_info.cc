@@ -7,6 +7,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
+#include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -36,7 +37,9 @@ MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
 MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 
 MockClusterInfo::MockClusterInfo()
-    : stats_(ClusterInfoImpl::generateStats(stats_store_)),
+    : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions())),
+      stats_(ClusterInfoImpl::generateStats(stats_store_)),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       timeout_budget_stats_(absl::make_optional<ClusterTimeoutBudgetStats>(
@@ -51,7 +54,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, eds_service_name()).WillByDefault(ReturnPointee(&eds_service_name_));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
-  ON_CALL(*this, http2Settings()).WillByDefault(ReturnRef(http2_settings_));
+  ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
   ON_CALL(*this, maxResponseHeadersCount())
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
