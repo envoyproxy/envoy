@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.filter.network.postgresql_proxy.v2alpha;
 
+import "udpa/annotations/status.proto";
+
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -10,6 +12,7 @@ option java_outer_classname = "PostgresqlProxyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.postgresql_proxy.v3alpha";
+option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: PostgreSQL proxy]
 // PostgreSQL Proxy :ref:`configuration overview
