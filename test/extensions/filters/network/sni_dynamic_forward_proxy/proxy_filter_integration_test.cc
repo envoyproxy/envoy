@@ -35,7 +35,7 @@ public:
   void setup(uint64_t max_hosts = 1024) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
 
-    config_helper_.addListenerFilter("name: envoy.listener.tls_inspector");
+    config_helper_.addListenerFilter("name: envoy.filters.listener.tls_inspector");
 
     config_helper_.addConfigModifier([this, max_hosts](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
