@@ -300,8 +300,6 @@ TEST_F(StatMergerDynamicTest, DynamicsWithRealSymbolTable) {
   EXPECT_EQ(3, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
   EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,,world"));
   EXPECT_EQ(1, dynamicEncodeDecodeTest("D:hello,,,world"));
-  EXPECT_EQ(1, dynamicEncodeDecodeTest("D:,22337..368."));
-  EXPECT_EQ(16, dynamicEncodeDecodeTest(".D:\271.D:-a\377\377\377.dsdf.D:j .a.D:9.a.sd0.D:.D:nuis-a.foj pa.D:9.a.sd\204.a.D:\377\377sdsdf.D:j .a.D:9.a.sd0.D:.D:nuis-a.foj pa.D:9.a.sd0.21.748364\312.D:.\363\240\200.D:nuis-a.D:,22337..368.47\363\240.\241.5709j."));
 }
 
 TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
@@ -329,9 +327,6 @@ TEST_F(StatMergerDynamicTest, DynamicsWithFakeSymbolTable) {
   EXPECT_EQ(0, dynamicEncodeDecodeTest("hello..D:world"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello..D:world"));
   EXPECT_EQ(0, dynamicEncodeDecodeTest("D:hello.D:.D:world"));
-  EXPECT_EQ(0, dynamicEncodeDecodeTest("D:,22337..368."));
-
-  EXPECT_EQ(0, dynamicEncodeDecodeTest(".D:\271.D:-a\377\377\377.dsdf.D:j .a.D:9.a.sd0.D:.D:nuis-a.foj pa.D:9.a.sd\204.a.D:\377\377sdsdf.D:j .a.D:9.a.sd0.D:.D:nuis-a.foj pa.D:9.a.sd0.21.748364\312.D:.\363\240\200.D:nuis-a.D:,22337..368.47\363\240.\241.5709j."));
 
   // TODO(#10008): these tests fail because fake/real symbol tables
   // deal with empty components differently.
