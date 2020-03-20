@@ -40,7 +40,7 @@ public:
   }
 
   void setup(Http::RequestHeaderMap& request_headers) {
-    // FIXME setup with vcluster instead of nullptr
+    // FIX ME setup with virtual cluster instead of nullptr for testing stats.
     state_ = RetryStateImpl::create(policy_, request_headers, cluster_, nullptr, runtime_, random_,
                                     dispatcher_, Upstream::ResourcePriority::Default);
   }
