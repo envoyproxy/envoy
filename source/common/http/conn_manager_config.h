@@ -59,6 +59,7 @@ namespace Http {
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_tx_reset)                                                                  \
+  COUNTER(downstream_rq_max_duration_reached)                                                      \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
   COUNTER(rs_too_large)                                                                            \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
@@ -281,6 +282,11 @@ public:
    *         timeout. See http_connection_manager.proto for a detailed description of this timeout.
    */
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
+   * @return maximum duration time to keep alive stream
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
 
   /**
    * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
