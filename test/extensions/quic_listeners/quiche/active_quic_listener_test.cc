@@ -95,10 +95,8 @@ protected:
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
 
-    if (runtime_enabled && false) {
-      EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true))
-          .WillRepeatedly(Return(runtime_enabled));
-    }
+    EXPECT_CALL(runtime_.snapshot_, getBoolean("quic.enabled", true))
+        .WillRepeatedly(Return(runtime_enabled));
 
     testing::Sequence seq;
     for (int i = 0; i < connection_count; ++i) {
