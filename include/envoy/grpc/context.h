@@ -41,7 +41,7 @@ public:
    * @param grpc_status supplies the gRPC status.
    */
   virtual void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                          const RequestNames& request_names,
+                          const absl::optional<RequestNames>& request_names,
                           const Http::HeaderEntry* grpc_status) PURE;
 
   /**
@@ -52,7 +52,7 @@ public:
    * @param success supplies whether the call succeeded.
    */
   virtual void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                          const RequestNames& request_names, bool success) PURE;
+                          const absl::optional<RequestNames>& request_names, bool success) PURE;
 
   /**
    * Charge a success/failure stat to a cluster/service/method.
@@ -60,8 +60,8 @@ public:
    * @param request_names supplies the request names.
    * @param success supplies whether the call succeeded.
    */
-  virtual void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
-                          bool success) PURE;
+  virtual void chargeStat(const Upstream::ClusterInfo& cluster,
+                          const absl::optional<RequestNames>& request_names, bool success) PURE;
 
   /**
    * Charge a request message stat to a cluster/service/method.
@@ -70,7 +70,8 @@ public:
    * @param amount supplies the number of the request messages.
    */
   virtual void chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
-                                        const RequestNames& request_names, uint64_t amount) PURE;
+                                        const absl::optional<RequestNames>& request_names,
+                                        uint64_t amount) PURE;
 
   /**
    * Charge a response message stat to a cluster/service/method.
@@ -79,7 +80,8 @@ public:
    * @param amount supplies the number of the response messages.
    */
   virtual void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
-                                         const RequestNames& request_names, uint64_t amount) PURE;
+                                         const absl::optional<RequestNames>& request_names,
+                                         uint64_t amount) PURE;
 
   /**
    * @return a struct containing StatNames for gRPC stat tokens.

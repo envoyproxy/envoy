@@ -26,22 +26,24 @@ public:
 
   // Context
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const RequestNames& request_names, const Http::HeaderEntry* grpc_status) override;
+                  const absl::optional<RequestNames>& request_names,
+                  const Http::HeaderEntry* grpc_status) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const RequestNames& request_names, bool success) override;
-  void chargeStat(const Upstream::ClusterInfo& cluster, const RequestNames& request_names,
-                  bool success) override;
+                  const absl::optional<RequestNames>& request_names, bool success) override;
+  void chargeStat(const Upstream::ClusterInfo& cluster,
+                  const absl::optional<RequestNames>& request_names, bool success) override;
   void chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
-                                const RequestNames& request_names, uint64_t amount) override;
+                                const absl::optional<RequestNames>& request_names,
+                                uint64_t amount) override;
   void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
-                                 const RequestNames& request_names, uint64_t amount) override;
+                                 const absl::optional<RequestNames>& request_names,
+                                 uint64_t amount) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.
    * @param path supplies the :path header.
-   * @param service supplies the output pointer of the gRPC service.
-   * @param method supplies the output pointer of the gRPC method.
-   * @return bool true if both gRPC serve and method have been resolved successfully.
+   * @return if both gRPC serve and method have been resolved successfully returns
+   *   a populated RequestNames, otherwise returns an empty optional.
    */
   absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path) override;
 
@@ -60,6 +62,13 @@ private:
   // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/7008 for
   // a lock-free approach to creating dynamic stat-names based on requests.
   Stats::StatName makeDynamicStatName(absl::string_view name);
+
+  // Gets the stat prefix and underlying storage, depending on whether request_names is empty
+  // or not.
+  // Prefix will be "<protocol>" if request_names is empty, or
+  // "<protocol>.<service>.<method>" if it is not empty.
+  std::pair<Stats::StatName, Stats::SymbolTable::StoragePtr>
+  getPrefix(Protocol protocol, const absl::optional<RequestNames>& request_names);
 
   Stats::SymbolTable& symbol_table_;
   mutable Thread::MutexBasicLockable mutex_;
