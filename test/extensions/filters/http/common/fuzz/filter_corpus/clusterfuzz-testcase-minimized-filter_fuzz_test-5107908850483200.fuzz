@@ -1,0 +1,9 @@
+config {
+  name: "envoy.filters.http.header_to_metadata"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config"
+    value: "\n\036\n\001=\012\014\n\002Ae\022\001]\032\001{(\001\032\t\n\001]\022\001]\032\001{ \001\n&\n\001=\032\037\n\027envoy.filters.http.rbac\022\001]\032\001{ \001\n\020\n\001=\032\t\n\001]\022\001]\032\001{ \001"
+  }
+}
+data {
+}
