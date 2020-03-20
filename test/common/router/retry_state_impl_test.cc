@@ -40,7 +40,8 @@ public:
   }
 
   void setup(Http::RequestHeaderMap& request_headers) {
-    state_ = RetryStateImpl::create(policy_, request_headers, cluster_, runtime_, random_,
+    // FIXME setup with vcluster instead of nullptr
+    state_ = RetryStateImpl::create(policy_, request_headers, cluster_, nullptr, runtime_, random_,
                                     dispatcher_, Upstream::ResourcePriority::Default);
   }
 
