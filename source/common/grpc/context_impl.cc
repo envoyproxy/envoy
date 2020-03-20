@@ -39,8 +39,8 @@ std::pair<Stats::StatName, Stats::SymbolTable::StoragePtr>
 ContextImpl::getPrefix(Protocol protocol, const absl::optional<RequestStatNames>& request_names) {
   const Stats::StatName protocolName = protocolStatName(protocol);
   if (request_names) {
-    Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
-        {protocolStatName(protocol), request_names->service_, request_names->method_});
+    Stats::SymbolTable::StoragePtr prefix_storage =
+        symbol_table_.join({protocolName, request_names->service_, request_names->method_});
     Stats::StatName prefix = Stats::StatName(prefix_storage.get());
     return {prefix, std::move(prefix_storage)};
   } else {
