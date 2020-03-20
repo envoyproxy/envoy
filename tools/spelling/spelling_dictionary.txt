@@ -729,6 +729,7 @@ misconfigured
 mixin
 mkdir
 mmap
+mmsg
 mongo
 moveable
 msec
