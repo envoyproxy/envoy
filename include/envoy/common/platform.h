@@ -33,6 +33,7 @@
 
 #include <io.h>
 #include <stdint.h>
+#include <time.h>
 
 #define htole16(x) (x)
 #define htole32(x) (x)
