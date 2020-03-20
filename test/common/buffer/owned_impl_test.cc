@@ -585,18 +585,22 @@ TEST_F(OwnedImplTest, AppendSliceForTest) {
   static constexpr size_t NumInputs = 3;
   static constexpr const char* Inputs[] = {"one", "2", "", "four", ""};
   Buffer::OwnedImpl buffer;
-  RawSlice slices[NumInputs];
-  EXPECT_EQ(0, buffer.numSlicesComputedSlowly());
-  EXPECT_EQ(0, buffer.getAtMostNRawSlices(slices, NumInputs));
+  EXPECT_EQ(0, buffer.getRawSlices().size());
+  EXPECT_EQ(0, buffer.getRawSlices(NumInputs).size());
   for (const auto& input : Inputs) {
     buffer.appendSliceForTest(input);
   }
-  // getAtMostNRawSlices will only return the 3 slices with nonzero length.
-  EXPECT_EQ(3, buffer.getAtMostNRawSlices(slices, NumInputs));
+  // getRawSlices(max_slices) will only return the 3 slices with nonzero length.
+  RawSliceVector slices = buffer.getRawSlices(/*max_slices=*/NumInputs);
+  EXPECT_EQ(3, slices.size());
+
+  // Verify edge case where max_slices is -1 and +1 the actual non-empty slice count.
+  EXPECT_EQ(2, buffer.getRawSlices(/*max_slices=*/NumInputs - 1).size());
+  EXPECT_EQ(3, buffer.getRawSlices(/*max_slices=*/NumInputs + 1).size());
 
   auto expectSlice = [](const RawSlice& slice, const char* expected) {
     size_t length = strlen(expected);
-    EXPECT_EQ(length, slice.len_);
+    EXPECT_EQ(length, slice.len_) << expected;
     EXPECT_EQ(0, memcmp(slice.mem_, expected, length));
   };
 
@@ -604,22 +608,13 @@ TEST_F(OwnedImplTest, AppendSliceForTest) {
   expectSlice(slices[1], "2");
   expectSlice(slices[2], "four");
 
-  // numSlicesComputedSlowly returns the count of slices with nonzero length.
-  EXPECT_EQ(3, buffer.numSlicesComputedSlowly());
-
   // getRawSlices returns only the slices with nonzero length.
-  RawSliceVector slices_vector;
-  buffer.getRawSlices(slices_vector);
+  RawSliceVector slices_vector = buffer.getRawSlices();
   EXPECT_EQ(3, slices_vector.size());
 
   expectSlice(slices_vector[0], "one");
   expectSlice(slices_vector[1], "2");
   expectSlice(slices_vector[2], "four");
-
-  // The number of slices returned by getAtMostNRawSlices is limited by out_size
-  // and the actual number of slices with nonzero length.
-  EXPECT_EQ(1, buffer.getAtMostNRawSlices(slices, 1));
-  EXPECT_EQ(3, buffer.getAtMostNRawSlices(slices, 100));
 }
 
 // Regression test for oss-fuzz issue
@@ -712,14 +707,14 @@ void TestBufferMove(uint64_t buffer1_length, uint64_t buffer2_length,
                     uint64_t expected_slice_count) {
   Buffer::OwnedImpl buffer1;
   buffer1.add(std::string(buffer1_length, 'a'));
-  EXPECT_EQ(1, buffer1.numSlicesComputedSlowly());
+  EXPECT_EQ(1, buffer1.getRawSlices().size());
 
   Buffer::OwnedImpl buffer2;
   buffer2.add(std::string(buffer2_length, 'b'));
-  EXPECT_EQ(1, buffer2.numSlicesComputedSlowly());
+  EXPECT_EQ(1, buffer2.getRawSlices().size());
 
   buffer1.move(buffer2);
-  EXPECT_EQ(expected_slice_count, buffer1.numSlicesComputedSlowly());
+  EXPECT_EQ(expected_slice_count, buffer1.getRawSlices().size());
   EXPECT_EQ(buffer1_length + buffer2_length, buffer1.length());
   // Make sure `buffer2` was drained.
   EXPECT_EQ(0, buffer2.length());

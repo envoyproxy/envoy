@@ -17,9 +17,7 @@ std::vector<uint8_t> UtilityImpl::getSha256Digest(const Buffer::Instance& buffer
   bssl::ScopedEVP_MD_CTX ctx;
   auto rc = EVP_DigestInit(ctx.get(), EVP_sha256());
   RELEASE_ASSERT(rc == 1, "Failed to init digest context");
-  Buffer::RawSliceVector slices;
-  buffer.getRawSlices(slices);
-  for (const auto& slice : slices) {
+  for (const auto& slice : buffer.getRawSlices()) {
     rc = EVP_DigestUpdate(ctx.get(), slice.mem_, slice.len_);
     RELEASE_ASSERT(rc == 1, "Failed to update digest");
   }

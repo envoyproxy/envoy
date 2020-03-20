@@ -11,9 +11,8 @@
 namespace quic {
 
 quiche::QuicheStringPiece QuicMemSliceSpanImpl::GetData(size_t index) {
-  absl::FixedArray<Envoy::Buffer::RawSlice> slices(index + 1);
-  uint64_t num_slices = buffer_->getAtMostNRawSlices(slices.begin(), index + 1);
-  ASSERT(num_slices > index);
+  Envoy::Buffer::RawSliceVector slices = buffer_->getRawSlices(/*max_slices=*/index + 1);
+  ASSERT(slices.size() > index);
   return {reinterpret_cast<char*>(slices[index].mem_), slices[index].len_};
 }
 

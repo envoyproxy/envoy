@@ -66,8 +66,7 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
   if (!buffer_instance) {
     return {};
   }
-  Buffer::RawSliceVector raw_slices;
-  buffer_instance->getRawSlices(raw_slices);
+  Buffer::RawSliceVector raw_slices = buffer_instance->getRawSlices();
   if (raw_slices.empty()) {
     return {};
   }

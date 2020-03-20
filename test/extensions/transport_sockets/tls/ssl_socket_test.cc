@@ -4409,9 +4409,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
   EXPECT_CALL(*read_filter_, onData(_, _))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
         EXPECT_GE(expected_chunk_size, data.length());
-        Buffer::RawSliceVector slices;
-        data.getRawSlices(slices);
-        EXPECT_EQ(1, slices.size());
+        EXPECT_EQ(1, data.getRawSlices().size());
         filter_seen += data.length();
         data.drain(data.length());
         if (filter_seen == (write_size * num_writes)) {

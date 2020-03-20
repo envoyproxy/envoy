@@ -67,9 +67,7 @@ public:
    */
   void onData(Buffer::Instance& data) override {
     // Pass slices to `doParse`.
-    Buffer::RawSliceVector slices;
-    data.getRawSlices(slices);
-    for (const Buffer::RawSlice& slice : slices) {
+    for (const Buffer::RawSlice& slice : data.getRawSlices()) {
       doParse(slice);
     }
   }

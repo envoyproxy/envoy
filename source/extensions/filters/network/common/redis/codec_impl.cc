@@ -330,9 +330,7 @@ RespValue::CompositeArray::CompositeArrayConstIterator::empty() {
 }
 
 void DecoderImpl::decode(Buffer::Instance& data) {
-  Buffer::RawSliceVector slices;
-  data.getRawSlices(slices);
-  for (const Buffer::RawSlice& slice : slices) {
+  for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     parseSlice(slice);
   }
 

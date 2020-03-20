@@ -264,11 +264,11 @@ TEST_F(WatermarkBufferTest, MoveWatermarks) {
   EXPECT_EQ(0, buffer_.length());
 }
 
-TEST_F(WatermarkBufferTest, GetAtMostNRawSlices) {
+TEST_F(WatermarkBufferTest, GetRawSlices) {
   buffer_.add(TEN_BYTES, 10);
 
-  RawSlice slices[2];
-  ASSERT_EQ(1, buffer_.getAtMostNRawSlices(&slices[0], 2));
+  RawSliceVector slices = buffer_.getRawSlices(/*max_slices=*/2);
+  ASSERT_EQ(1, slices.size());
   EXPECT_EQ(10, slices[0].len_);
   EXPECT_EQ(0, memcmp(slices[0].mem_, &TEN_BYTES[0], 10));
 

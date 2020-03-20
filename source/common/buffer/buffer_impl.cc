@@ -44,9 +44,7 @@ void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {
   ASSERT(&data != this);
-  RawSliceVector raw_slices;
-  data.getRawSlices(raw_slices);
-  for (const RawSlice& slice : raw_slices) {
+  for (const RawSlice& slice : data.getRawSlices()) {
     add(slice.mem_, slice.len_);
   }
 }
@@ -168,34 +166,26 @@ void OwnedImpl::drain(uint64_t size) {
   }
 }
 
-uint64_t OwnedImpl::getAtMostNRawSlices(RawSlice* out, uint64_t out_size) const {
-  uint64_t num_slices = 0;
+RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) const {
+  uint64_t max_out = slices_.size();
+  if (max_slices.has_value()) {
+    max_out = std::min(max_out, max_slices.value());
+  }
+
+  RawSliceVector raw_slices;
+  raw_slices.reserve(max_out);
   for (const auto& slice : slices_) {
-    if (num_slices >= out_size) {
+    if (raw_slices.size() >= max_out) {
       break;
     }
 
     if (slice->dataSize() == 0) {
       continue;
     }
-    if (num_slices < out_size) {
-      out[num_slices].mem_ = slice->data();
-      out[num_slices].len_ = slice->dataSize();
-    }
-    num_slices++;
-  }
-  return num_slices;
-}
-
-void OwnedImpl::getRawSlices(RawSliceVector& raw_slices) const {
-  raw_slices.reserve(slices_.size());
-  for (const auto& slice : slices_) {
-    if (slice->dataSize() == 0) {
-      continue;
-    }
 
     raw_slices.emplace_back(RawSlice{slice->data(), slice->dataSize()});
   }
+  return raw_slices;
 }
 
 uint64_t OwnedImpl::length() const {
@@ -210,16 +200,6 @@ uint64_t OwnedImpl::length() const {
 #endif
 
   return length_;
-}
-
-uint64_t OwnedImpl::numSlicesComputedSlowly() const {
-  uint64_t count = 0;
-  for (const auto& slice : slices_) {
-    if (slice->dataSize() != 0) {
-      ++count;
-    }
-  }
-  return count;
 }
 
 void* OwnedImpl::linearize(uint32_t size) {
@@ -490,9 +470,8 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
 
 Api::IoCallUint64Result OwnedImpl::write(Network::IoHandle& io_handle) {
   constexpr uint64_t MaxSlices = 16;
-  RawSlice slices[MaxSlices];
-  const uint64_t num_slices = getAtMostNRawSlices(slices, MaxSlices);
-  Api::IoCallUint64Result result = io_handle.writev(slices, num_slices);
+  RawSliceVector slices = getRawSlices(MaxSlices);
+  Api::IoCallUint64Result result = io_handle.writev(slices.begin(), slices.size());
   if (result.ok() && result.rc_ > 0) {
     drain(static_cast<uint64_t>(result.rc_));
   }
@@ -510,9 +489,7 @@ OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, 
 std::string OwnedImpl::toString() const {
   std::string output;
   output.reserve(length());
-  RawSliceVector raw_slices;
-  getRawSlices(raw_slices);
-  for (const RawSlice& slice : raw_slices) {
+  for (const RawSlice& slice : getRawSlices()) {
     output.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

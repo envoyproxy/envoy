@@ -259,9 +259,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
     original_text.append(sample);
   }
 
-  Buffer::RawSliceVector slices;
-  buffer.getRawSlices(slices);
-  const uint64_t num_slices = slices.size();
+  const uint64_t num_slices = buffer.getRawSlices().size();
   EXPECT_EQ(num_slices, 20);
 
   Envoy::Compressor::ZlibCompressorImpl compressor;

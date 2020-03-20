@@ -14,8 +14,7 @@ namespace {
 class ZlibCompressorImplTest : public testing::Test {
 protected:
   void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
-    Buffer::RawSliceVector compressed_slices;
-    output_buffer.getRawSlices(compressed_slices);
+    Buffer::RawSliceVector compressed_slices = output_buffer.getRawSlices();
     const uint64_t num_comp_slices = compressed_slices.size();
 
     const std::string header_hex_str = Hex::encode(
@@ -35,8 +34,7 @@ protected:
 
   void expectValidFinishedBuffer(const Buffer::OwnedImpl& output_buffer,
                                  const uint32_t input_size) {
-    Buffer::RawSliceVector compressed_slices;
-    output_buffer.getRawSlices(compressed_slices);
+    Buffer::RawSliceVector compressed_slices = output_buffer.getRawSlices();
     const uint64_t num_comp_slices = compressed_slices.size();
 
     const std::string header_hex_str = Hex::encode(

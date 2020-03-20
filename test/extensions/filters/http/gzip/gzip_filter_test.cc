@@ -93,8 +93,7 @@ protected:
   }
 
   void expectValidFinishedBuffer(const uint32_t content_length) {
-    Buffer::RawSliceVector compressed_slices;
-    data_.getRawSlices(compressed_slices);
+    Buffer::RawSliceVector compressed_slices = data_.getRawSlices();
     const uint64_t num_comp_slices = compressed_slices.size();
 
     const std::string header_hex_str = Hex::encode(

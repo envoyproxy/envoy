@@ -97,10 +97,8 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
   // Check whether the two buffers contain the same content. It is valid for the content
   // to be arranged differently in the buffers. For example, lhs could have one slice
   // containing 10 bytes while rhs has ten slices containing one byte each.
-  Buffer::RawSliceVector lhs_slices;
-  lhs.getRawSlices(lhs_slices);
-  Buffer::RawSliceVector rhs_slices;
-  rhs.getRawSlices(rhs_slices);
+  Buffer::RawSliceVector lhs_slices = lhs.getRawSlices();
+  Buffer::RawSliceVector rhs_slices = rhs.getRawSlices();
 
   size_t rhs_slice = 0;
   size_t rhs_offset = 0;

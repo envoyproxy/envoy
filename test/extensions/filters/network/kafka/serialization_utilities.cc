@@ -13,9 +13,8 @@ void assertStringViewIncrement(const absl::string_view incremented,
 }
 
 const char* getRawData(const Buffer::OwnedImpl& buffer) {
-  absl::FixedArray<Buffer::RawSlice> slices(1);
-  uint64_t num_slices = buffer.getAtMostNRawSlices(slices.begin(), 1);
-  ASSERT(num_slices == 1);
+  Buffer::RawSliceVector slices = buffer.getRawSlices(1);
+  ASSERT(slices.size() == 1);
   return reinterpret_cast<const char*>((slices[0]).mem_);
 }
 
