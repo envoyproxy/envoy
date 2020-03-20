@@ -1130,6 +1130,48 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   }
 }
 
+void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_type) {
+  initialize();
+
+  uint32_t http_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(http_port);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "HEAD"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(0);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
+  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_);
+  EXPECT_TRUE(admin_response->complete());
+  EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
+  EXPECT_EQ("OK\n", admin_response->body());
+
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Wait for the response to be read by the codec client.
+  response->waitForEndStream();
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+
+  // Validate that the listeners have been stopped.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+
+  // Validate that port is closed and can be bound by other sockets.
+  EXPECT_NO_THROW(Network::TcpListenSocket(
+      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
+                                           http_port),
+      nullptr, true));
+}
+
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {
   if (version_ == Network::Address::IpVersion::v4) {
     return "listener.127.0.0.1_0." + stat_name;
