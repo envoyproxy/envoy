@@ -16,7 +16,6 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -28,7 +27,6 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnRef;
 using testing::WithArgs;
 
@@ -46,8 +44,7 @@ public:
           "envoy_grpc": { "cluster_name": "ext_authz_server" }
       },
       "failure_mode_allow": true,
-      "stat_prefix": "name",
-      "include_peer_certificate": true
+      "stat_prefix": "name"
     }
     )EOF";
 
@@ -58,7 +55,6 @@ public:
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
-    ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
 
     // NOP currently.
     filter_->onAboveWriteBufferHighWatermark();
@@ -86,7 +82,6 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
-  std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
 };
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
@@ -109,23 +104,12 @@ TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
 TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   InSequence s;
 
-  ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_));
-  ON_CALL(*ssl_, uriSanPeerCertificate()).WillByDefault(Return(std::vector<std::string>{"source"}));
-  ON_CALL(*ssl_, uriSanLocalCertificate())
-      .WillByDefault(Return(std::vector<std::string>{"destination"}));
-
-  const std::string cert_data = "cert-data";
-  ON_CALL(*ssl_, urlEncodedPemEncodedPeerCertificate()).WillByDefault(ReturnRef(cert_data));
-
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  envoy::service::auth::v3::CheckRequest check_request;
-  EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(WithArgs<0, 1>(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest& check_param) -> void {
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
-            check_request = check_param;
           })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -143,11 +127,6 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
       stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
 
   EXPECT_CALL(filter_callbacks_, continueReading());
-
-  // Since include_peer_certificate is true, we expect to have certificate data in the check
-  // request.
-  EXPECT_EQ(cert_data, check_request.attributes().source().certificate());
-
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
