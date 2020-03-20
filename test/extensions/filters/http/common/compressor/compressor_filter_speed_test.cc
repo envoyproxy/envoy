@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "common/compressor/zlib_compressor_impl.h"
+
 #include "extensions/filters/http/common/compressor/compressor.h"
 
 #include "test/mocks/http/mocks.h"
@@ -8,7 +9,6 @@
 #include "test/mocks/stats/mocks.h"
 
 #include "benchmark/benchmark.h"
-
 #include "gmock/gmock.h"
 
 using testing::Return;
