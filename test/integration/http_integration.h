@@ -220,6 +220,8 @@ protected:
   // makes sure they were dropped.
   void testTrailers(uint64_t request_size, uint64_t response_size, bool request_trailers_present,
                     bool response_trailers_present);
+  // Test /drain_listener from admin portal.
+  void testAdminDrain(Http::CodecClient::Type admin_request_type);
 
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   // Prefix listener stat with IP:port, including IP version dependent loopback address.

@@ -120,7 +120,9 @@ private:
 
     // ActiveListenerImplBase
     Network::Listener* listener() override { return listener_.get(); }
-    void destroy() override { listener_.reset(); }
+    void pauseListening() override { listener_->disable(); }
+    void resumeListening() override { listener_->enable(); }
+    void shutdownListener() override { listener_.reset(); }
 
     // Network::BalancedConnectionHandler
     uint64_t numConnections() const override { return num_listener_connections_; }
@@ -287,7 +289,9 @@ public:
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
-  void destroy() override { udp_listener_.reset(); }
+  void pauseListening() override { udp_listener_->disable(); }
+  void resumeListening() override { udp_listener_->enable(); }
+  void shutdownListener() override { udp_listener_.reset(); }
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;

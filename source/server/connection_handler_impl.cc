@@ -39,7 +39,7 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
         config.udpListenerFactory()->createActiveUdpListener(*this, dispatcher_, config);
   }
   if (disable_listeners_) {
-    details.listener_->listener()->disable();
+    details.listener_->pauseListening();
   }
   listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
 }
@@ -57,28 +57,28 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
-      listener.second.listener_->destroy();
+      listener.second.listener_->shutdownListener();
     }
   }
 }
 
 void ConnectionHandlerImpl::stopListeners() {
   for (auto& listener : listeners_) {
-    listener.second.listener_->destroy();
+    listener.second.listener_->shutdownListener();
   }
 }
 
 void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& listener : listeners_) {
-    listener.second.listener_->listener()->disable();
+    listener.second.listener_->pauseListening();
   }
 }
 
 void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& listener : listeners_) {
-    listener.second.listener_->listener()->enable();
+    listener.second.listener_->resumeListening();
   }
 }
 
