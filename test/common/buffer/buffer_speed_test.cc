@@ -8,9 +8,9 @@ namespace Envoy {
 
 static constexpr uint64_t MaxBufferLength = 1024 * 1024;
 
-// No-op release callback for use in BufferFragmentImpl instances.
-static const std::function<void(const void*, size_t, const Buffer::BufferFragmentImpl*)>
-    DoNotReleaseFragment = nullptr;
+// The fragment needs to be heap allocated in order to survive past the processing done in the inner
+// loop in the benchmarks below. Do not attempt to release the actual contents of the buffer.
+void DeleteFragment(const void*, size_t, const Buffer::BufferFragmentImpl* self) { delete self; }
 
 // Test the creation of an empty OwnedImpl.
 static void BufferCreateEmpty(benchmark::State& state) {
@@ -113,8 +113,9 @@ static void BufferPrependBuffer(benchmark::State& state) {
     // buffer every time without the overhead of a copy, we use an BufferFragment that references
     // (and never deletes) an external string.
     Buffer::OwnedImpl to_add;
-    Buffer::BufferFragmentImpl fragment(input.data(), input.size(), DoNotReleaseFragment);
-    to_add.addBufferFragment(fragment);
+    auto fragment =
+        std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+    to_add.addBufferFragment(*fragment.release());
 
     buffer.prepend(to_add);
     if (buffer.length() >= MaxBufferLength) {
@@ -247,11 +248,12 @@ BENCHMARK(BufferReserveCommitPartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536)
 static void BufferLinearizeSimple(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
-  Buffer::BufferFragmentImpl fragment(input.data(), input.size(), DoNotReleaseFragment);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     buffer.drain(buffer.length());
-    buffer.addBufferFragment(fragment);
+    auto fragment =
+        std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+    buffer.addBufferFragment(*fragment.release());
     benchmark::DoNotOptimize(buffer.linearize(state.range(0)));
   }
 }
@@ -263,12 +265,13 @@ static void BufferLinearizeGeneral(benchmark::State& state) {
   static constexpr uint64_t SliceSize = 1024;
   const std::string data(SliceSize, 'a');
   const absl::string_view input(data);
-  Buffer::BufferFragmentImpl fragment(input.data(), input.size(), DoNotReleaseFragment);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
     buffer.drain(buffer.length());
     do {
-      buffer.addBufferFragment(fragment);
+      auto fragment =
+          std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), DeleteFragment);
+      buffer.addBufferFragment(*fragment.release());
     } while (buffer.length() < static_cast<uint64_t>(state.range(0)));
     benchmark::DoNotOptimize(buffer.linearize(state.range(0)));
   }
@@ -366,13 +369,3 @@ BENCHMARK(BufferStartsWithMatch)
     ->Args({65536, 4096});
 
 } // namespace Envoy
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  benchmark::Initialize(&argc, argv);
-
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}
