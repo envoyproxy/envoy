@@ -7,6 +7,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/socket_option.proto";
 import "envoy/api/v2/listener/listener_components.proto";
 import "envoy/api/v2/listener/udp_listener_config.proto";
+import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/config/listener/v2/api_listener.proto";
 
 import "google/api/annotations.proto";
@@ -24,7 +25,7 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message Listener {
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
@@ -237,4 +238,8 @@ message Listener {
   // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
   // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
   bool reuse_port = 21;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by this listener.
+  repeated config.filter.accesslog.v2.AccessLog access_log = 22;
 }
