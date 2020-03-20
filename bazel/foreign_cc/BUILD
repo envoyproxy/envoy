@@ -84,7 +84,6 @@ envoy_cmake_external(
         "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     defines = ["CARES_STATICLIB"],
-    generate_crosstool_file = True,
     lib_source = "@com_github_c_ares_c_ares//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["cares.lib"],
@@ -155,7 +154,6 @@ envoy_cmake_external(
         # More details https://github.com/lyft/envoy-mobile/issues/116
         "_GNU_SOURCE": "on",
     },
-    generate_crosstool_file = True,
     lib_source = "@com_github_libevent_libevent//:all",
     static_libraries = select({
         # macOS organization of libevent is different from Windows/Linux.
@@ -190,7 +188,6 @@ envoy_cmake_external(
     cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
     debug_cache_entries = {"ENABLE_DEBUG": "on"},
     defines = ["NGHTTP2_STATICLIB"],
-    generate_crosstool_file = True,
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["nghttp2_static.lib"],
@@ -206,7 +203,6 @@ envoy_cmake_external(
         "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     lib_source = "@com_github_jbeder_yaml_cpp//:all",
-    generate_crosstool_file = True,
     static_libraries = select({
         "//bazel:windows_x86_64": ["libyaml-cpp.lib"],
         "//conditions:default": ["libyaml-cpp.a"],
@@ -219,7 +215,6 @@ envoy_cmake_external(
         "BUILD_SHARED_LIBS": "off",
         "CMAKE_CXX_COMPILER_FORCED": "on",
     },
-    generate_crosstool_file = True,
     lib_source = "@net_zlib//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["zlibstatic.lib"],
