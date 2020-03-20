@@ -407,6 +407,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
+  getStreamInfo().setUpstreamClusterInfo(cluster);
 
   // Check this here because the TCP conn pool will queue our request waiting for a connection that
   // will never be released.
