@@ -71,7 +71,7 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
                              const absl::optional<RequestStatNames>& request_names, bool success) {
   auto prefix_and_storage = getPrefix(protocol, request_names);
-  Stats::StatName& prefix = prefix_and_storage.first;
+  Stats::StatName prefix = prefix_and_storage.first;
 
   const Stats::SymbolTable::StoragePtr status =
       symbol_table_.join({prefix, successStatName(success)});
@@ -90,7 +90,7 @@ void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
                                            const absl::optional<RequestStatNames>& request_names,
                                            uint64_t amount) {
   auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
-  Stats::StatName& prefix = prefix_and_storage.first;
+  Stats::StatName prefix = prefix_and_storage.first;
 
   const Stats::SymbolTable::StoragePtr request_message_count =
       symbol_table_.join({prefix, request_message_count_});
@@ -104,7 +104,7 @@ void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster
                                             const absl::optional<RequestStatNames>& request_names,
                                             uint64_t amount) {
   auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
-  Stats::StatName& prefix = prefix_and_storage.first;
+  Stats::StatName prefix = prefix_and_storage.first;
 
   const Stats::SymbolTable::StoragePtr response_message_count =
       symbol_table_.join({prefix, response_message_count_});
