@@ -1927,6 +1927,45 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   filter_->onNewConnection();
 }
 
+class TcpProxyNonDeprecatedConfigRoutingTest : public TcpProxyRoutingTest {
+public:
+  TcpProxyNonDeprecatedConfigRoutingTest() = default;
+
+  void setup() {
+    const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    )EOF";
+
+    config_.reset(new Config(constructConfigFromYaml(yaml, factory_context_)));
+  }
+};
+
+TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
+  setup();
+
+  initializeFilter();
+
+  // Port 9999 is within the specified destination port range.
+  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+
+  // Expect filter to try to open a connection to specified cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(nullptr));
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
+  EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
+      .WillOnce(
+          Invoke([&cluster_info](const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) {
+            cluster_info = upstream_cluster_info;
+          }));
+  EXPECT_CALL(connection_.stream_info_, upstreamClusterInfo())
+      .WillOnce(ReturnPointee(&cluster_info));
+
+  filter_->onNewConnection();
+
+  EXPECT_EQ(connection_.stream_info_.upstreamClusterInfo().value()->name(), "fake_cluster");
+}
+
 class TcpProxyHashingTest : public testing::Test {
 public:
   TcpProxyHashingTest() = default;

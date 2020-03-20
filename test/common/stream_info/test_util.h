@@ -209,6 +209,14 @@ public:
 
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
+  void setUpstreamClusterInfo(
+      const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) override {
+    upstream_cluster_info_ = upstream_cluster_info;
+  }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const override {
+    return upstream_cluster_info_;
+  }
+
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -245,6 +253,7 @@ public:
   std::string upstream_transport_failure_reason_;
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
 };
 
 } // namespace Envoy
