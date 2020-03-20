@@ -15,4 +15,4 @@ repos:
   rev: v1.16.0
   hooks:
     - id: codespell
-      args: [-L uint]
+      args: [-L=uint, -L=keyserver]
