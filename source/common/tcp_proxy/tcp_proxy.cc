@@ -229,8 +229,6 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
 }
 
 Filter::~Filter() {
-  getStreamInfo().onRequestComplete();
-
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
@@ -253,11 +251,6 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().enableHalfClose(true);
-  getStreamInfo().setDownstreamLocalAddress(read_callbacks_->connection().localAddress());
-  getStreamInfo().setDownstreamRemoteAddress(read_callbacks_->connection().remoteAddress());
-  getStreamInfo().setDownstreamDirectRemoteAddress(
-      read_callbacks_->connection().directRemoteAddress());
-  getStreamInfo().setDownstreamSslConnection(read_callbacks_->connection().ssl());
 
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
@@ -550,7 +543,6 @@ void Filter::onConnectTimeout() {
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
-  getStreamInfo().addBytesReceived(data.length());
   if (upstream_) {
     upstream_->encodeData(data, end_stream);
   }
@@ -589,7 +581,6 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
-  getStreamInfo().addBytesSent(data.length());
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?

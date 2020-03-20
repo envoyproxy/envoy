@@ -4,12 +4,17 @@ Access logging
 ==============
 
 The :ref:`HTTP connection manager <arch_overview_http_conn_man>` and
-:ref:`tcp proxy <arch_overview_tcp_proxy>` supports extensible access logging with the following
+:ref:`tcp proxy <arch_overview_tcp_proxy>` support extensible access logging with the following
 features:
 
-* Any number of access logs per connection manager or tcp proxy.
+* Any number of access logs per a connection stream.
 * Customizable access log filters that allow different types of requests and responses to be written
   to different access logs.
+
+Downstream connection access logging can be enabled using :ref:`listener access
+logs<envoy_api_field_Listener.access_log>`. The listener access logs complement
+HTTP request access logging and can be enabled separately and independently from
+filter access logs.
 
 .. _arch_overview_access_log_filters:
 

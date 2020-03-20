@@ -91,6 +91,9 @@ public:
       return envoy::config::core::v3::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
+    const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+      return empty_access_logs_;
+    }
 
     ConnectionHandlerTest& parent_;
     std::shared_ptr<Network::MockListenSocket> socket_;
@@ -103,6 +106,7 @@ public:
     const bool continue_on_listener_filters_timeout_;
     std::unique_ptr<Network::ActiveUdpListenerFactory> udp_listener_factory_;
     Network::ConnectionBalancerPtr connection_balancer_;
+    const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   };
 
   using TestListenerPtr = std::unique_ptr<TestListener>;

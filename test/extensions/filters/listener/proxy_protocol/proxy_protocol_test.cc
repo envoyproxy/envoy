@@ -89,6 +89,9 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return empty_access_logs_;
+  }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -186,6 +189,7 @@ public:
   std::string name_;
   Api::OsSysCallsImpl os_sys_calls_actual_;
   const Network::FilterChainSharedPtr filter_chain_;
+  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
 };
 
 // Parameterize the listener socket address version.
@@ -1034,6 +1038,9 @@ public:
     return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    return empty_access_logs_;
+  }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -1099,6 +1106,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
 };
 
 // Parameterize the listener socket address version.
