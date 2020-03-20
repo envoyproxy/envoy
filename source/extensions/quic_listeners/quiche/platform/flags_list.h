@@ -199,7 +199,7 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_proxy_write_packed_strings, false,
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_record_frontend_service_vip_mapping, false,
             "If true, for L1 GFE, as requests come in, record frontend service to VIP mapping "
-            "which is used to announce VIP in SHLO for proxied sessions. ")
+            "which is used to announce VIP in SHLO for proxied sessions.")
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_reject_all_traffic, false, "")
 
