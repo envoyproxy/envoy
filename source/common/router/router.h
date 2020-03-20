@@ -45,7 +45,6 @@ namespace Router {
   COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_direct_response)                                                                      \
-  COUNTER(rq_flood_on_upstream_abort)                                                              \
   COUNTER(rq_total)                                                                                \
   COUNTER(rq_reset_after_downstream_response_started)                                              \
   COUNTER(rq_retry_skipped_request_not_complete)

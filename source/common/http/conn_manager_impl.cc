@@ -1462,24 +1462,30 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   if (!state_.created_filter_chain_) {
     createFilterChain();
   }
-  stream_info_.setResponseCodeDetails(details);
-  Utility::sendLocalReply(
-      is_grpc_request,
-      [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-        if (modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        response_headers_ = std::move(headers);
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeHeaders(nullptr, *response_headers_, end_stream);
-      },
-      [this](Buffer::Instance& data, bool end_stream) -> void {
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
-      },
-      state_.destroyed_, code, body, grpc_status, is_head_request);
+  try {
+    stream_info_.setResponseCodeDetails(details);
+    Utility::sendLocalReply(
+        is_grpc_request,
+        [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+          if (modify_headers != nullptr) {
+            modify_headers(*headers);
+          }
+          response_headers_ = std::move(headers);
+          // TODO: Start encoding from the last decoder filter that saw the
+          // request instead.
+          encodeHeaders(nullptr, *response_headers_, end_stream);
+        },
+        [this](Buffer::Instance& data, bool end_stream) -> void {
+          // TODO: Start encoding from the last decoder filter that saw the
+          // request instead.
+          encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
+        },
+        state_.destroyed_, code, body, grpc_status, is_head_request);
+  } catch (const Http::FrameFloodException& e) {
+    //    config_.stats_.rq_flood_on_upstream_abort_.inc();
+    // Downstream connection is flooded with HTTP replies, just reset the stream.
+    connection_manager_.doEndStream(*this);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(

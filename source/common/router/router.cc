@@ -21,7 +21,6 @@
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
-#include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -966,21 +965,15 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
-    try {
-      callbacks_->sendLocalReply(
-          code, body,
-          [dropped, this](Http::ResponseHeaderMap& headers) {
-            if (dropped && !config_.suppress_envoy_headers_) {
-              headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
-            }
-            modify_headers_(headers);
-          },
-          absl::nullopt, details);
-    } catch (const Http::FrameFloodException& e) {
-      config_.stats_.rq_flood_on_upstream_abort_.inc();
-      // Downstream connection is flooded with HTTP replies, just reset the stream.
-      callbacks_->resetStream();
-    }
+    callbacks_->sendLocalReply(
+        code, body,
+        [dropped, this](Http::ResponseHeaderMap& headers) {
+          if (dropped && !config_.suppress_envoy_headers_) {
+            headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
+          }
+          modify_headers_(headers);
+        },
+        absl::nullopt, details);
   }
 }
 

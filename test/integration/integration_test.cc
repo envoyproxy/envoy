@@ -1244,7 +1244,6 @@ TEST_P(IntegrationTest, TestFloodUpstreamErrors) {
 
   // Verify the connection was closed due to flood protection.
   EXPECT_EQ(1, test_server_->counter("http1.response_flood")->value());
-  EXPECT_EQ(1, test_server_->counter("http.config_test.rq_flood_on_upstream_abort")->value());
 }
 
 // Make sure flood protection doesn't kick in with many requests sent serially.
