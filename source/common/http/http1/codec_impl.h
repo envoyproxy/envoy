@@ -192,7 +192,7 @@ public:
   bool enableTrailers() const { return enable_trailers_; }
 
   // Http::Connection
-  void dispatch(Buffer::Instance& data) override;
+  absl::Status dispatch(Buffer::Instance& data) override;
   void goAway() override {} // Called during connection manager drain flow
   Protocol protocol() override { return protocol_; }
   void shutdownNotice() override {} // Called during connection manager drain flow
@@ -234,14 +234,14 @@ private:
   /**
    * Called in order to complete an in progress header decode.
    */
-  void completeLastHeader();
+  int completeLastHeader();
 
   /**
    * Dispatch a memory span.
    * @param slice supplies the start address.
    * @len supplies the length of the span.
    */
-  size_t dispatchSlice(const char* slice, size_t len);
+  ssize_t dispatchSlice(const char* slice, size_t len);
 
   /**
    * Called when a request/response is beginning. A base routine happens first then a virtual
@@ -262,7 +262,7 @@ private:
    * @param data supplies the start address.
    * @param length supplies the length.
    */
-  void onHeaderField(const char* data, size_t length);
+  int onHeaderField(const char* data, size_t length);
 
   /**
    * Called when header value data is received.
@@ -290,7 +290,7 @@ private:
   /**
    * Called when the request/response is complete.
    */
-  void onMessageCompleteBase();
+  int onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
 
   /**
@@ -317,6 +317,8 @@ private:
 
   static http_parser_settings settings_;
 
+  bool dispatching_ : 1;
+  absl::Status codec_exception_;
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;

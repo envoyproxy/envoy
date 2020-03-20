@@ -30,6 +30,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
+    external_deps = ["abseil_status"],
     deps = [
         ":header_map_interface",
         ":metadata_interface",

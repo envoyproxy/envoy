@@ -122,7 +122,12 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 void CodecClient::onData(Buffer::Instance& data) {
   bool protocol_error = false;
   try {
-    codec_->dispatch(data);
+    auto status = codec_->dispatch(data);
+    if (!status.ok()) {
+      ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, status.message());
+      close();
+      protocol_error = true;
+    }
   } catch (CodecProtocolException& e) {
     ENVOY_CONN_LOG(debug, "protocol error: {}", *connection_, e.what());
     close();

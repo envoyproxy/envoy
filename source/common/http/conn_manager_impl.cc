@@ -279,7 +279,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   return **streams_.begin();
 }
 
-void ConnectionManagerImpl::handleCodecException(const char* error) {
+void ConnectionManagerImpl::handleCodecException(absl::string_view error) {
   ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), error);
 
   // HTTP/1.1 codec has already sent a 400 response if possible. HTTP/2 codec has already sent
@@ -320,7 +320,12 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     redispatch = false;
 
     try {
-      codec_->dispatch(data);
+      auto status = codec_->dispatch(data);
+      if (!status.ok()) {
+        stats_.named_.downstream_cx_protocol_error_.inc();
+        handleCodecException(status.message());
+        return Network::FilterStatus::StopIteration;
+      }
     } catch (const FrameFloodException& e) {
       // TODO(mattklein123): This is an emergency substitute for the lack of connection level
       // logging in the HCM. In a public follow up change we will add full support for connection

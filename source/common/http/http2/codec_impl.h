@@ -86,7 +86,7 @@ public:
 
   // Http::Connection
   // NOTE: the `dispatch` method is also overridden in the ServerConnectionImpl class
-  void dispatch(Buffer::Instance& data) override;
+  absl::Status dispatch(Buffer::Instance& data) override;
   void goAway() override;
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
@@ -507,7 +507,7 @@ private:
   // ClientConnectionImpl::checkOutboundQueueLimits method). The dispatch method on the
   // ServerConnectionImpl objects is called only when processing data from the downstream client in
   // the ConnectionManagerImpl::onData method.
-  void dispatch(Buffer::Instance& data) override;
+  absl::Status dispatch(Buffer::Instance& data) override;
 
   ServerConnectionCallbacks& callbacks_;
 
