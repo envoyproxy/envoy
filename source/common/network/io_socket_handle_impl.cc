@@ -304,7 +304,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   }
 
   // Set MSG_WAITFORONE so that recvmmsg will not waiting for
-  // |num_packets_permmsg_call| packets to arrive before returning when the
+  // |num_packets_per_mmsg_call| packets to arrive before returning when the
   // socket is a blocking socket.
   const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().recvmmsg(
       fd_, mmsg_hdr.data(), num_packets_per_mmsg_call, MSG_TRUNC | MSG_WAITFORONE, nullptr);
