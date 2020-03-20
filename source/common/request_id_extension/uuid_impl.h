@@ -9,7 +9,7 @@ namespace RequestIDExtension {
 
 class UUIDUtils : public Envoy::RequestIDExtension::Utilities {
 public:
-  explicit UUIDUtils(Envoy::Runtime::RandomGenerator& random) : random(random) {}
+  explicit UUIDUtils(Envoy::Runtime::RandomGenerator& random) : random_(random) {}
 
   void setRequestID(Http::RequestHeaderMap& request_headers);
   void ensureRequestID(Http::RequestHeaderMap& request_headers);
@@ -23,7 +23,7 @@ public:
 
 private:
   // Reference to the random generator used to generate new request IDs
-  Envoy::Runtime::RandomGenerator& random;
+  Envoy::Runtime::RandomGenerator& random_;
 
   // Byte on this position has predefined value of 4 for UUID4.
   static const int TRACE_BYTE_POSITION = 14;

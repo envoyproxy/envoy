@@ -26,6 +26,8 @@ public:
    */
   virtual RequestIDExtension::UtilitiesSharedPtr
   createUtilitiesInstance(const Protobuf::Message& config, FactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.request_id_extension"; }
 };
 
 } // namespace Configuration

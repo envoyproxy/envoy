@@ -15,7 +15,7 @@ namespace RequestIDExtension {
 
 void UUIDUtils::setRequestID(Http::RequestHeaderMap& request_headers) {
   // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
-  std::string uuid = random.uuid();
+  std::string uuid = random_.uuid();
   ASSERT(!uuid.empty());
   request_headers.setRequestId(uuid);
 }
