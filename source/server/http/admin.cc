@@ -1344,6 +1344,13 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::Response
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
+                                        Buffer::Instance& response, AdminStream&) {
+  server_.accessLogManager().reopen();
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 void AdminFilter::onComplete() {
@@ -1449,6 +1456,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
+          {"/reopen_logs", "reopen access logs", MAKE_ADMIN_HANDLER(handlerReopenLogs), false,
+           true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {}
@@ -1457,7 +1466,9 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), Http::Http1Settings(), Http::Http2Settings(),
+      connection, data, callbacks, server_.stats(), Http::Http1Settings(),
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions()),
       maxRequestHeadersKb(), maxRequestHeadersCount());
 }
 

@@ -49,7 +49,7 @@ private:
 
 class HistogramImplHelper : public MetricImpl<Histogram> {
 public:
-  HistogramImplHelper(StatName name, const std::string& tag_extracted_name,
+  HistogramImplHelper(StatName name, StatName tag_extracted_name,
                       const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table)
       : MetricImpl<Histogram>(name, tag_extracted_name, stat_name_tags, symbol_table) {}
   HistogramImplHelper(SymbolTable& symbol_table) : MetricImpl<Histogram>(symbol_table) {}
@@ -68,7 +68,7 @@ private:
  */
 class HistogramImpl : public HistogramImplHelper {
 public:
-  HistogramImpl(StatName name, Unit unit, Store& parent, const std::string& tag_extracted_name,
+  HistogramImpl(StatName name, Unit unit, Store& parent, StatName tag_extracted_name,
                 const StatNameTagVector& stat_name_tags)
       : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, parent.symbolTable()),
         unit_(unit), parent_(parent) {}

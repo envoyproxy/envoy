@@ -35,3 +35,17 @@ envoy_cc_test(
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "http_tracer_manager_impl_test",
+    srcs = [
+        "http_tracer_manager_impl_test.cc",
+    ],
+    deps = [
+        "//source/common/tracing:http_tracer_config_lib",
+        "//source/common/tracing:http_tracer_lib",
+        "//source/common/tracing:http_tracer_manager_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:registry_lib",
+    ],
+)

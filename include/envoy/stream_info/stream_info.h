@@ -25,6 +25,11 @@ namespace Router {
 class RouteEntry;
 } // namespace Router
 
+namespace Upstream {
+class ClusterInfo;
+using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
+} // namespace Upstream
+
 namespace StreamInfo {
 
 enum ResponseFlag {
@@ -520,6 +525,19 @@ public:
    * @return request headers.
    */
   virtual const Http::RequestHeaderMap* getRequestHeaders() const PURE;
+
+  /**
+   * @param Upstream Connection's ClusterInfo.
+   */
+  virtual void
+  setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
+
+  /**
+   * @return Upstream Connection's ClusterInfo.
+   * This returns an optional to differentiate between unset(absl::nullopt),
+   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
+   */
+  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 };
 
 } // namespace StreamInfo

@@ -27,7 +27,7 @@ message FaultDelay {
   }
 
   // Fault delays are controlled via an HTTP header (if applicable). See the
-  // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // :ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderDelay {
   }
@@ -65,7 +65,7 @@ message FaultRateLimit {
   }
 
   // Rate limits are controlled via an HTTP header (if applicable). See the
-  // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // :ref:`HTTP fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderLimit {
   }

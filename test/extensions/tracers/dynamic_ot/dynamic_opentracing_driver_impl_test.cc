@@ -46,7 +46,7 @@ public:
   NiceMock<Tracing::MockConfig> config_;
 };
 
-TEST_F(DynamicOpenTracingDriverTest, formatErrorMessage) {
+TEST_F(DynamicOpenTracingDriverTest, FormatErrorMessage) {
   const std::error_code error_code = std::make_error_code(std::errc::permission_denied);
   EXPECT_EQ(error_code.message(), DynamicOpenTracingDriver::formatErrorMessage(error_code, ""));
   EXPECT_EQ(error_code.message() + ": abc",

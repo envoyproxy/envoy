@@ -206,8 +206,8 @@ IntegrationCodecClientPtr
 HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
-  cluster->http2_settings_.allow_connect_ = true;
-  cluster->http2_settings_.allow_metadata_ = true;
+  cluster->http2_options_.set_allow_connect(true);
+  cluster->http2_options_.set_allow_metadata(true);
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
@@ -667,6 +667,7 @@ void HttpIntegrationTest::testRetry() {
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
+  host.set_include_attempt_count_in_response(true);
   config_helper_.addVirtualHost(host);
 
   initialize();
@@ -708,6 +709,9 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
+  EXPECT_EQ(
+      2,
+      atoi(std::string(response->headers().EnvoyAttemptCount()->value().getStringView()).c_str()));
 }
 
 void HttpIntegrationTest::testGrpcRetry() {
@@ -1022,18 +1026,21 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
             max_request_headers_count_);
       });
 
-  Http::TestRequestHeaderMapImpl big_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto big_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(
+      {{Http::Headers::get().Method, "GET"},
+       {Http::Headers::get().Path, "/test/long/url"},
+       {Http::Headers::get().Scheme, "http"},
+       {Http::Headers::get().Host, "host"}});
 
   for (int i = 0; i < 20000; i++) {
-    big_headers.addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
+    big_headers->addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
   }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response =
-      sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0, 0, time);
+      sendRequestAndWaitForResponse(*big_headers, 0, default_response_headers_, 0, 0, time);
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());

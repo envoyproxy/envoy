@@ -53,5 +53,7 @@ message SubjectAlternateName {
     string dns = 1;
 
     string uri = 2;
+
+    string ip_address = 3;
   }
 }
