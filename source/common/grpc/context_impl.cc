@@ -36,7 +36,7 @@ Stats::StatName ContextImpl::makeDynamicStatName(absl::string_view name) {
 
 // Gets the stat prefix and underlying storage, depending on whether request_names is empty
 std::pair<Stats::StatName, Stats::SymbolTable::StoragePtr>
-ContextImpl::getPrefix(Protocol protocol, const absl::optional<RequestNames>& request_names) {
+ContextImpl::getPrefix(Protocol protocol, const absl::optional<RequestStatNames>& request_names) {
   const Stats::StatName protocolName = protocolStatName(protocol);
   if (request_names) {
     Stats::SymbolTable::StoragePtr prefix_storage = symbol_table_.join(
@@ -49,7 +49,7 @@ ContextImpl::getPrefix(Protocol protocol, const absl::optional<RequestNames>& re
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                             const absl::optional<RequestNames>& request_names,
+                             const absl::optional<RequestStatNames>& request_names,
                              const Http::HeaderEntry* grpc_status) {
   if (!grpc_status) {
     return;
@@ -69,7 +69,7 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                             const absl::optional<RequestNames>& request_names, bool success) {
+                             const absl::optional<RequestStatNames>& request_names, bool success) {
   auto prefix_and_storage = getPrefix(protocol, request_names);
   Stats::StatName& prefix = prefix_and_storage.first;
 
@@ -82,12 +82,12 @@ void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster, Protocol prot
 }
 
 void ContextImpl::chargeStat(const Upstream::ClusterInfo& cluster,
-                             const absl::optional<RequestNames>& request_names, bool success) {
+                             const absl::optional<RequestStatNames>& request_names, bool success) {
   chargeStat(cluster, Protocol::Grpc, request_names, success);
 }
 
 void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
-                                           const absl::optional<RequestNames>& request_names,
+                                           const absl::optional<RequestStatNames>& request_names,
                                            uint64_t amount) {
   auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
   Stats::StatName& prefix = prefix_and_storage.first;
@@ -101,7 +101,7 @@ void ContextImpl::chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
 }
 
 void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
-                                            const absl::optional<RequestNames>& request_names,
+                                            const absl::optional<RequestStatNames>& request_names,
                                             uint64_t amount) {
   auto prefix_and_storage = getPrefix(Protocol::Grpc, request_names);
   Stats::StatName& prefix = prefix_and_storage.first;
@@ -114,7 +114,7 @@ void ContextImpl::chargeResponseMessageStat(const Upstream::ClusterInfo& cluster
       .add(amount);
 }
 
-absl::optional<ContextImpl::RequestNames>
+absl::optional<ContextImpl::RequestStatNames>
 ContextImpl::resolveServiceAndMethod(const Http::HeaderEntry* path) {
   absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
   if (!request_names) {
@@ -123,7 +123,7 @@ ContextImpl::resolveServiceAndMethod(const Http::HeaderEntry* path) {
 
   const Stats::StatName service = makeDynamicStatName(request_names->service_);
   const Stats::StatName method = makeDynamicStatName(request_names->method_);
-  return RequestNames{service, method};
+  return RequestStatNames{service, method};
 }
 
 } // namespace Grpc

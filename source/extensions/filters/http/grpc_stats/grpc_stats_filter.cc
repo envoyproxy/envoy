@@ -34,15 +34,16 @@ public:
     for (const auto& service : method_list.services()) {
       Stats::StatName stat_name_service = stat_name_pool_.add(service.name());
 
-      StringMap<Grpc::Context::RequestNames>& method_map = map_[service.name()];
+      StringMap<Grpc::Context::RequestStatNames>& method_map = map_[service.name()];
       for (const auto& method_name : service.method_names()) {
         Stats::StatName stat_name_method = stat_name_pool_.add(method_name);
-        method_map[method_name] = Grpc::Context::RequestNames{stat_name_service, stat_name_method};
+        method_map[method_name] =
+            Grpc::Context::RequestStatNames{stat_name_service, stat_name_method};
       }
     }
   }
 
-  absl::optional<Grpc::Context::RequestNames>
+  absl::optional<Grpc::Context::RequestStatNames>
   lookup(const Grpc::Common::RequestNames& request_names) const {
     auto service_it = map_.find(request_names.service_);
     if (service_it != map_.end()) {
@@ -58,7 +59,7 @@ public:
   }
 
 private:
-  StringMap<StringMap<Grpc::Context::RequestNames>> map_;
+  StringMap<StringMap<Grpc::Context::RequestStatNames>> map_;
   Stats::StatNamePool stat_name_pool_;
 };
 
@@ -102,7 +103,7 @@ public:
       cluster_ = decoder_callbacks_->clusterInfo();
       if (cluster_) {
         if (config_->stats_for_all_methods_) {
-          // Get dynamically-allocated Context::RequestNames from the context.
+          // Get dynamically-allocated Context::RequestStatNames from the context.
           request_names_ = config_->context_.resolveServiceAndMethod(headers.Path());
           do_stat_tracking_ = request_names_.has_value();
         } else {
@@ -113,7 +114,7 @@ public:
           // this configuration.
           //
           // Resolve the service and method to a string_view, then get
-          // the Context::RequestNames out of the pre-allocated list that
+          // the Context::RequestStatNames out of the pre-allocated list that
           // can be produced with the whitelist being present.
           absl::optional<Grpc::Common::RequestNames> request_names =
               Grpc::Common::resolveServiceAndMethod(headers.Path());
@@ -207,7 +208,7 @@ private:
   Grpc::FrameInspector request_counter_;
   Grpc::FrameInspector response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  absl::optional<Grpc::Context::RequestNames> request_names_;
+  absl::optional<Grpc::Context::RequestStatNames> request_names_;
 }; // namespace
 
 } // namespace

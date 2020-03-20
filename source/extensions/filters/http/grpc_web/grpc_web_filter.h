@@ -69,7 +69,7 @@ private:
   bool is_text_response_{};
   Buffer::OwnedImpl decoding_buffer_;
   Grpc::Decoder decoder_;
-  absl::optional<Grpc::Context::RequestNames> request_names_;
+  absl::optional<Grpc::Context::RequestStatNames> request_names_;
   bool is_grpc_web_request_{};
   Grpc::Context& context_;
 };

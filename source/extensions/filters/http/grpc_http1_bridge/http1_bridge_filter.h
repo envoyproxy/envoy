@@ -58,7 +58,7 @@ private:
   Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  absl::optional<Grpc::Context::RequestNames> request_names_;
+  absl::optional<Grpc::Context::RequestStatNames> request_names_;
   Grpc::Context& context_;
 };
 

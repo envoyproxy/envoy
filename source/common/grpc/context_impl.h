@@ -15,7 +15,7 @@
 namespace Envoy {
 namespace Grpc {
 
-struct Context::RequestNames {
+struct Context::RequestStatNames {
   Stats::StatName service_; // supplies the service name.
   Stats::StatName method_;  // supplies the method name.
 };
@@ -26,26 +26,26 @@ public:
 
   // Context
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const absl::optional<RequestNames>& request_names,
+                  const absl::optional<RequestStatNames>& request_names,
                   const Http::HeaderEntry* grpc_status) override;
   void chargeStat(const Upstream::ClusterInfo& cluster, Protocol protocol,
-                  const absl::optional<RequestNames>& request_names, bool success) override;
+                  const absl::optional<RequestStatNames>& request_names, bool success) override;
   void chargeStat(const Upstream::ClusterInfo& cluster,
-                  const absl::optional<RequestNames>& request_names, bool success) override;
+                  const absl::optional<RequestStatNames>& request_names, bool success) override;
   void chargeRequestMessageStat(const Upstream::ClusterInfo& cluster,
-                                const absl::optional<RequestNames>& request_names,
+                                const absl::optional<RequestStatNames>& request_names,
                                 uint64_t amount) override;
   void chargeResponseMessageStat(const Upstream::ClusterInfo& cluster,
-                                 const absl::optional<RequestNames>& request_names,
+                                 const absl::optional<RequestStatNames>& request_names,
                                  uint64_t amount) override;
 
   /**
    * Resolve the gRPC service and method from the HTTP2 :path header.
    * @param path supplies the :path header.
    * @return if both gRPC serve and method have been resolved successfully returns
-   *   a populated RequestNames, otherwise returns an empty optional.
+   *   a populated RequestStatNames, otherwise returns an empty optional.
    */
-  absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path) override;
+  absl::optional<RequestStatNames> resolveServiceAndMethod(const Http::HeaderEntry* path) override;
 
   Stats::StatName successStatName(bool success) const { return success ? success_ : failure_; }
   Stats::StatName protocolStatName(Protocol protocol) const {
@@ -68,7 +68,7 @@ private:
   // Prefix will be "<protocol>" if request_names is empty, or
   // "<protocol>.<service>.<method>" if it is not empty.
   std::pair<Stats::StatName, Stats::SymbolTable::StoragePtr>
-  getPrefix(Protocol protocol, const absl::optional<RequestNames>& request_names);
+  getPrefix(Protocol protocol, const absl::optional<RequestStatNames>& request_names);
 
   Stats::SymbolTable& symbol_table_;
   mutable Thread::MutexBasicLockable mutex_;
