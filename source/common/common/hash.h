@@ -123,6 +123,7 @@ using SharedStringSet =
     absl::flat_hash_set<SharedString, HeterogeneousStringHash, HeterogeneousStringEqual>;
 
 template <class Value>
-using StringMap = absl::flat_hash_map<std::string, Value>;
+using StringMap =
+    absl::flat_hash_map<std::string, Value, HeterogeneousStringHash, HeterogeneousStringEqual>;
 
 } // namespace Envoy
