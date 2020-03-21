@@ -633,7 +633,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
   NiceMock<MockRequestDecoder> decoder;
   Buffer::OwnedImpl local_buffer;
   // Read a request and send a response, without draining the response from the
-  // connection buffer. The first three should not cause problems.
+  // connection buffer. The first two should not cause problems.
   for (int i = 0; i < 2; ++i) {
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
