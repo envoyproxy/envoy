@@ -2,6 +2,8 @@
 
 #include "envoy/network/filter.h"
 
+#include "absl/strings/str_format.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -155,9 +157,16 @@ std::unique_ptr<TwoPhaseMatcher> createFromMessage(
       kDestinationPortRange: {
     return std::make_unique<DstPortMatcher>();
   }
+  // Invalid message.
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::RULE_NOT_SET: {
-    return nullptr;
+    throw EnvoyException(
+        absl::StrFormat("invalid listener filter chain matcher: %s", match_config.DebugString()));
   }
+  // Below could happen if the control plane provides deprecated api or newer api. Should be
+  // considered as corrupted config.
+  default:
+    throw EnvoyException(absl::StrFormat("unsupported listener filter chain matcher: %s",
+                                         match_config.DebugString()));
   }
 }
 } // namespace

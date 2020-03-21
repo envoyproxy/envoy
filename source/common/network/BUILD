@@ -350,6 +350,9 @@ envoy_cc_library(
         "filter_matcher.cc",
     ],
     hdrs = ["filter_matcher.h"],
+    external_deps = [
+        "abseil_str_format",
+    ],
     deps = [
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
