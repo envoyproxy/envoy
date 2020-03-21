@@ -206,8 +206,8 @@ IntegrationCodecClientPtr
 HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
-  cluster->http2_settings_.allow_connect_ = true;
-  cluster->http2_settings_.allow_metadata_ = true;
+  cluster->http2_options_.set_allow_connect(true);
+  cluster->http2_options_.set_allow_metadata(true);
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
@@ -667,6 +667,7 @@ void HttpIntegrationTest::testRetry() {
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
   auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
+  host.set_include_attempt_count_in_response(true);
   config_helper_.addVirtualHost(host);
 
   initialize();
@@ -708,6 +709,9 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
+  EXPECT_EQ(
+      2,
+      atoi(std::string(response->headers().EnvoyAttemptCount()->value().getStringView()).c_str()));
 }
 
 void HttpIntegrationTest::testGrpcRetry() {
@@ -1124,6 +1128,48 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   } else {
     EXPECT_EQ(response->trailers(), nullptr);
   }
+}
+
+void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_type) {
+  initialize();
+
+  uint32_t http_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(http_port);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "HEAD"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(0);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
+  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_);
+  EXPECT_TRUE(admin_response->complete());
+  EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
+  EXPECT_EQ("OK\n", admin_response->body());
+
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Wait for the response to be read by the codec client.
+  response->waitForEndStream();
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+
+  // Validate that the listeners have been stopped.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+
+  // Validate that port is closed and can be bound by other sockets.
+  EXPECT_NO_THROW(Network::TcpListenSocket(
+      Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
+                                           http_port),
+      nullptr, true));
 }
 
 std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name) {

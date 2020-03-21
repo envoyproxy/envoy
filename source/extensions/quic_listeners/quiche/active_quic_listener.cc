@@ -69,6 +69,7 @@ ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
 void ActiveQuicListener::onListenerShutdown() {
   ENVOY_LOG(info, "Quic listener {} shutdown.", config_.name());
   quic_dispatcher_->Shutdown();
+  udp_listener_.reset();
 }
 
 void ActiveQuicListener::onData(Network::UdpRecvData& data) {
@@ -99,6 +100,16 @@ void ActiveQuicListener::onReadReady() {
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
   quic_dispatcher_->OnCanWrite();
+}
+
+void ActiveQuicListener::pauseListening() { quic_dispatcher_->StopAcceptingNewConnections(); }
+
+void ActiveQuicListener::resumeListening() { quic_dispatcher_->StartAcceptingNewConnections(); }
+
+void ActiveQuicListener::shutdownListener() {
+  // Same as pauseListening() because all we want is to stop accepting new
+  // connections.
+  quic_dispatcher_->StopAcceptingNewConnections();
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(

@@ -1249,6 +1249,16 @@ TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   EXPECT_TRUE(absl::StartsWith(response.toString(), "usage:"));
 }
 
+TEST_P(AdminInstanceTest, ReopenLogs) {
+  Http::ResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+
+  EXPECT_CALL(server_, accessLogManager()).WillRepeatedly(ReturnRef(access_log_manager_));
+  EXPECT_CALL(access_log_manager_, reopen());
+  EXPECT_EQ(Http::Code::OK, postCallback("/reopen_logs", header_map, response));
+}
+
 TEST_P(AdminInstanceTest, TracingStatsDisabled) {
   const std::string& name = admin_.tracingStats().service_forced_.name();
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {

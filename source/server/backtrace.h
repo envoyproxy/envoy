@@ -39,6 +39,22 @@ public:
   BackwardsTrace() = default;
 
   /**
+   * Directs the output of logTrace() to directly stderr rather than the
+   * logging infrastructure.
+   *
+   * This is intended for coverage tests, where we enable trace logs, but send
+   * them to /dev/null to avoid accumulating too much data in CI.
+   *
+   * @param log_to_stderr Whether to log to stderr or the logging system.
+   */
+  static void setLogToStderr(bool log_to_stderr);
+
+  /**
+   * @return whether the system directing backtraces directly to stderr.
+   */
+  static bool logToStderr() { return log_to_stderr_; }
+
+  /**
    * Capture a stack trace.
    *
    * The trace will begin with the call to capture().
@@ -67,6 +83,11 @@ public:
    * Log the stack trace.
    */
   void logTrace() {
+    if (log_to_stderr_) {
+      printTrace(std::cerr);
+      return;
+    }
+
     ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
     ENVOY_LOG(critical, "Envoy version: {}", VersionInfo::version());
 
@@ -94,6 +115,8 @@ public:
   }
 
 private:
+  static bool log_to_stderr_;
+
   /**
    * Visit the previously captured stack trace.
    *
