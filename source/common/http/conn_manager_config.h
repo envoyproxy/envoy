@@ -5,10 +5,12 @@
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/date_provider.h"
 #include "common/network/utility.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -57,6 +59,7 @@ namespace Http {
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
   COUNTER(downstream_rq_tx_reset)                                                                  \
+  COUNTER(downstream_rq_max_duration_reached)                                                      \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
   COUNTER(rs_too_large)                                                                            \
   GAUGE(downstream_cx_active, Accumulate)                                                          \
@@ -79,8 +82,16 @@ struct ConnectionManagerNamedStats {
 };
 
 struct ConnectionManagerStats {
+  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, const std::string& prefix,
+                         Stats::Scope& scope)
+      : named_(std::move(named_stats)), prefix_(prefix),
+        prefix_stat_name_storage_(prefix, scope.symbolTable()), scope_(scope) {}
+
+  Stats::StatName prefixStatName() const { return prefix_stat_name_storage_.statName(); }
+
   ConnectionManagerNamedStats named_;
   std::string prefix_;
+  Stats::StatNameManagedStorage prefix_stat_name_storage_;
   Stats::Scope& scope_;
 };
 
@@ -273,6 +284,11 @@ public:
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 
   /**
+   * @return maximum duration time to keep alive stream
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+
+  /**
    * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
    *         config for each request flow. Pointer ownership is _not_ transferred to the caller of
    *         this function. This will return nullptr when scoped routing is enabled.
@@ -360,6 +376,11 @@ public:
    *         the same user agent will be written to the x-envoy-downstream-service-cluster header.
    */
   virtual const absl::optional<std::string>& userAgent() PURE;
+
+  /**
+   *  @return HttpTracerSharedPtr HttpTracer to use.
+   */
+  virtual Tracing::HttpTracerSharedPtr tracer() PURE;
 
   /**
    * @return tracing config.

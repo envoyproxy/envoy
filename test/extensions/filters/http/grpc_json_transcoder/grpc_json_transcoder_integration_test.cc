@@ -81,9 +81,15 @@ protected:
       ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
+      std::string dump;
+      for (char ch : upstream_request_->body().toString()) {
+        dump += std::to_string(int(ch));
+        dump += " ";
+      }
+
       Grpc::Decoder grpc_decoder;
       std::vector<Grpc::Frame> frames;
-      EXPECT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames));
+      EXPECT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames)) << dump;
       EXPECT_EQ(grpc_request_messages.size(), frames.size());
 
       for (size_t i = 0; i < grpc_request_messages.size(); ++i) {
@@ -93,8 +99,7 @@ protected:
         }
         RequestType expected_message;
         EXPECT_TRUE(TextFormat::ParseFromString(grpc_request_messages[i], &expected_message));
-
-        EXPECT_TRUE(MessageDifferencer::Equivalent(expected_message, actual_message));
+        EXPECT_THAT(actual_message, ProtoEq(expected_message));
       }
 
       Http::TestResponseHeaderMapImpl response_headers;
@@ -316,6 +321,22 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/index"}, {":authority", "host"}},
       "", {""}, {R"(content_type: "text/html" data: "<h1>Hello!</h1>" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "text/html"},
+                                      {"content-length", "15"},
+                                      {"grpc-status", "0"}},
+      R"(<h1>Hello!</h1>)");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryEchoHttpBody) {
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::EchoBodyRequest, google::api::HttpBody>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/echoBody?arg=oops"},
+                                     {":authority", "host"},
+                                     {"content-type", "text/plain"}},
+      "Hello!", {R"(arg: "oops" nested { content { content_type: "text/plain" data: "Hello!" } })"},
+      {R"(content_type: "text/html" data: "<h1>Hello!</h1>" )"}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "200"},
                                       {"content-type", "text/html"},
                                       {"content-length", "15"},

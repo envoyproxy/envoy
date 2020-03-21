@@ -16,6 +16,8 @@ public:
   const std::string ClientSslAuth = "envoy.filters.network.client_ssl_auth";
   // Echo filter
   const std::string Echo = "envoy.filters.network.echo";
+  // Direct response filter
+  const std::string DirectResponse = "envoy.filters.network.direct_response";
   // Dubbo proxy filter
   const std::string DubboProxy = "envoy.filters.network.dubbo_proxy";
   // HTTP connection manager filter

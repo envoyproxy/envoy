@@ -80,11 +80,10 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
-  return {
+  return ConnectionManagerStats(
       {ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix),
                                POOL_HISTOGRAM_PREFIX(scope, prefix))},
-      prefix,
-      scope};
+      prefix, scope);
 }
 
 ConnectionManagerTracingStats ConnectionManagerImpl::generateTracingStats(const std::string& prefix,
@@ -108,8 +107,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
-      drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
-      runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
+      drain_close_(drain_close), user_agent_(http_context.userAgentContext()),
+      random_generator_(random_generator), http_context_(http_context), runtime_(runtime),
+      local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
       overload_stop_accepting_requests_ref_(
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
@@ -230,6 +230,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  if (stream.max_stream_duration_timer_) {
+    stream.max_stream_duration_timer_->disableTimer();
+    stream.max_stream_duration_timer_ = nullptr;
+  }
   if (stream.stream_idle_timer_ != nullptr) {
     stream.stream_idle_timer_->disableTimer();
     stream.stream_idle_timer_ = nullptr;
@@ -578,7 +582,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   stream_info_.setDownstreamLocalAddress(
       connection_manager_.read_callbacks_->connection().localAddress());
   stream_info_.setDownstreamDirectRemoteAddress(
-      connection_manager_.read_callbacks_->connection().remoteAddress());
+      connection_manager_.read_callbacks_->connection().directRemoteAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
@@ -600,6 +604,15 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onRequestTimeout(); });
     request_timer_->enableTimer(request_timeout_ms_, this);
+  }
+
+  const auto max_stream_duration = connection_manager_.config_.maxStreamDuration();
+  if (max_stream_duration.has_value() && max_stream_duration.value().count()) {
+    max_stream_duration_timer_ =
+        connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
+                                            this);
   }
 
   stream_info_.setRequestedServerName(
@@ -671,6 +684,12 @@ void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   sendLocalReply(request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
                  Http::Code::RequestTimeout, "request timeout", nullptr, state_.is_head_request_,
                  absl::nullopt, StreamInfo::ResponseCodeDetails::get().RequestOverallTimeout);
+}
+
+void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
+  ENVOY_STREAM_LOG(debug, "Stream max duration time reached", *this);
+  connection_manager_.stats_.named_.downstream_rq_max_duration_reached_.inc();
+  connection_manager_.doEndStream(*this);
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
@@ -792,8 +811,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     request_headers_->removeExpect();
   }
 
-  connection_manager_.user_agent_.initializeFromHeaders(
-      *request_headers_, connection_manager_.stats_.prefix_, connection_manager_.stats_.scope_);
+  connection_manager_.user_agent_.initializeFromHeaders(*request_headers_,
+                                                        connection_manager_.stats_.prefixStatName(),
+                                                        connection_manager_.stats_.scope_);
 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
@@ -1405,6 +1425,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
 
+  stream_info_.setUpstreamClusterInfo(cached_cluster_info_.value());
   refreshCachedTracingCustomTags();
 }
 
