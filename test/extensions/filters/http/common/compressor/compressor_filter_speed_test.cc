@@ -215,7 +215,6 @@ static void Compress(benchmark::State& state) {
   }
 }
 BENCHMARK(Compress)->DenseRange(0, 8, 1);
-;
 
 } // namespace Compressors
 } // namespace Common
