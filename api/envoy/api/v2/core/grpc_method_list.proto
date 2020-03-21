@@ -10,7 +10,7 @@ option java_outer_classname = "GrpcMethodListProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 
-// A list of gRPC methods which can be used as a whitelist, for example.
+// A list of gRPC methods which can be used as an allowlist, for example.
 message GrpcMethodList {
   message Service {
     // The name of the gRPC service.

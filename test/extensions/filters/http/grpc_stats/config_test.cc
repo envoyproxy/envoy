@@ -35,9 +35,9 @@ protected:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  void addWhitelistEntry() {
-    auto* whitelist = config_.mutable_individual_method_stats_whitelist();
-    auto* services = whitelist->mutable_services();
+  void addAllowlistEntry() {
+    auto* allowlist = config_.mutable_individual_method_stats_allowlist();
+    auto* services = allowlist->mutable_services();
     auto* service = services->Add();
     service->set_name("BadCompanions");
     *service->mutable_method_names()->Add() = "GetBadCompanions";
@@ -63,7 +63,7 @@ protected:
 };
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
-  config_.set_stats_for_all_methods(true);
+  config_.mutable_stats_for_all_methods()->set_value(true);
   initialize();
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
@@ -91,7 +91,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
-  config_.set_stats_for_all_methods(true);
+  config_.mutable_stats_for_all_methods()->set_value(true);
   initialize();
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
@@ -111,7 +111,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
 }
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
-  config_.set_stats_for_all_methods(true);
+  config_.mutable_stats_for_all_methods()->set_value(true);
   initialize();
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc+proto"},
@@ -130,9 +130,9 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName(HttpFilterNames::get().GrpcStats));
 }
 
-// Test that a whitelist match results in method-named stats.
-TEST_F(GrpcStatsFilterConfigTest, StatsWhitelistMatch) {
-  addWhitelistEntry();
+// Test that an allowlist match results in method-named stats.
+TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMatch) {
+  addAllowlistEntry();
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
@@ -150,9 +150,9 @@ TEST_F(GrpcStatsFilterConfigTest, StatsWhitelistMatch) {
                      .value());
 }
 
-// Test that a whitelist method mismatch results in going to the generic stat.
-TEST_F(GrpcStatsFilterConfigTest, StatsWhitelistMismatchMethod) {
-  addWhitelistEntry();
+// Test that an allowlist method mismatch results in going to the generic stat.
+TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMismatchMethod) {
+  addAllowlistEntry();
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
@@ -172,9 +172,9 @@ TEST_F(GrpcStatsFilterConfigTest, StatsWhitelistMismatchMethod) {
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()->statsScope().counter("grpc.total").value());
 }
 
-// Test that a whitelist service mismatch results in going to the generic stat.
-TEST_F(GrpcStatsFilterConfigTest, StatsWhitelistMismatchService) {
-  addWhitelistEntry();
+// Test that an allowlist service mismatch results in going to the generic stat.
+TEST_F(GrpcStatsFilterConfigTest, StatsAllowlistMismatchService) {
+  addAllowlistEntry();
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
@@ -196,7 +196,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsWhitelistMismatchService) {
 
 // Test that any method results in going to the generic stat, when stats_for_all_methods == false.
 TEST_F(GrpcStatsFilterConfigTest, DisableStatsForAllMethods) {
-  config_.set_stats_for_all_methods(false);
+  config_.mutable_stats_for_all_methods()->set_value(false);
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},

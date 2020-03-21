@@ -10,7 +10,7 @@ option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "GrpcMethodListProto";
 option java_multiple_files = true;
 
-// A list of gRPC methods which can be used as a whitelist, for example.
+// A list of gRPC methods which can be used as an allowlist, for example.
 message GrpcMethodList {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcMethodList";
 

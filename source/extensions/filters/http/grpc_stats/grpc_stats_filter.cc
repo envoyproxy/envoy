@@ -67,29 +67,28 @@ struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
          Server::Configuration::FactoryContext& context)
       : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
-        whitelist_(context.scope().symbolTable()) {
+        allowlist_(context.scope().symbolTable()) {
 
     switch (proto_config.per_method_stat_specifier_case()) {
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
         PER_METHOD_STAT_SPECIFIER_NOT_SET:
-      stats_for_all_methods_ = !Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.grpc_stats_filter_disable_stats_for_all_methods_by_default");
-      break;
-
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::kStatsForAllMethods:
-      stats_for_all_methods_ = proto_config.stats_for_all_methods();
+      stats_for_all_methods_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto_config, stats_for_all_methods,
+          !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_stats_filter_disable_"
+                                          "stats_for_all_methods_by_default"));
       break;
 
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
-        kIndividualMethodStatsWhitelist:
-      whitelist_.populate(proto_config.individual_method_stats_whitelist());
+        kIndividualMethodStatsAllowlist:
+      allowlist_.populate(proto_config.individual_method_stats_allowlist());
       break;
     }
   }
   Grpc::Context& context_;
   bool emit_filter_state_;
   bool stats_for_all_methods_{false};
-  GrpcServiceMethodToRequestNamesMap whitelist_;
+  GrpcServiceMethodToRequestNamesMap allowlist_;
 };
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
@@ -108,28 +107,28 @@ public:
           do_stat_tracking_ = request_names_.has_value();
         } else {
           // This case handles both proto_config.stats_for_all_methods() == false,
-          // and proto_config.has_individual_method_stats_whitelist(). This works
+          // and proto_config.has_individual_method_stats_allowlist(). This works
           // because proto_config.stats_for_all_methods() == false results in
-          // an empty whitelist, which exactly matches the behavior specified for
+          // an empty allowlist, which exactly matches the behavior specified for
           // this configuration.
           //
           // Resolve the service and method to a string_view, then get
           // the Context::RequestStatNames out of the pre-allocated list that
-          // can be produced with the whitelist being present.
+          // can be produced with the allowlist being present.
           absl::optional<Grpc::Common::RequestNames> request_names =
               Grpc::Common::resolveServiceAndMethod(headers.Path());
 
           if (request_names) {
             // Do stat tracking as long as this looks like a grpc service/method,
-            // even if it isn't in the whitelist. Things not in the whitelist
+            // even if it isn't in the allowlist. Things not in the allowlist
             // are counted with a stat with no service/method in the name.
             do_stat_tracking_ = true;
 
-            // If the entry is not found in the whitelist, this will return
+            // If the entry is not found in the allowlist, this will return
             // an empty optional; each of the `charge` functions on the context
             // will interpret an empty optional for this value to mean that the
             // service.method prefix on the stat should be omitted.
-            request_names_ = config_->whitelist_.lookup(*request_names);
+            request_names_ = config_->allowlist_.lookup(*request_names);
           }
         }
       }
