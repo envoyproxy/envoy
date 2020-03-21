@@ -633,7 +633,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
   NiceMock<MockRequestDecoder> decoder;
   Buffer::OwnedImpl local_buffer;
   // Read a request and send a response, without draining the response from the
-  // connection buffer. The first two should not cause problems.
+  // connection buffer. The first three should not cause problems.
   for (int i = 0; i < 2; ++i) {
     Http::ResponseEncoder* response_encoder = nullptr;
     EXPECT_CALL(callbacks_, newStream(_, _))
@@ -669,10 +669,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
         }));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
-    codec_->dispatch(buffer);
-
-    TestResponseHeaderMapImpl headers{{":status", "200"}};
-    EXPECT_THROW_WITH_MESSAGE(response_encoder->encodeHeaders(headers, true), FrameFloodException,
+    EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), FrameFloodException,
                               "Too many responses queued.");
     EXPECT_EQ(1, store_.counter("http1.response_flood").value());
   }
