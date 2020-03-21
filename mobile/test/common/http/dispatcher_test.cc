@@ -42,7 +42,7 @@ ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
 
 class DispatcherTest : public testing::Test {
 public:
-  DispatcherTest() { http_dispatcher_.ready(event_dispatcher_, api_listener_); }
+  void ready() { http_dispatcher_.ready(event_dispatcher_, api_listener_); }
 
   typedef struct {
     uint32_t on_headers_calls;
@@ -62,6 +62,8 @@ public:
 };
 
 TEST_F(DispatcherTest, SetDestinationCluster) {
+  ready();
+
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response headers.
   envoy_http_callbacks bridge_callbacks;
@@ -173,6 +175,8 @@ TEST_F(DispatcherTest, SetDestinationCluster) {
 }
 
 TEST_F(DispatcherTest, SetDestinationClusterUpstreamProtocol) {
+  ready();
+
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response headers.
   envoy_http_callbacks bridge_callbacks;
@@ -304,7 +308,73 @@ TEST_F(DispatcherTest, SetDestinationClusterUpstreamProtocol) {
   ASSERT_EQ(cc.on_complete_calls, 1);
 }
 
+TEST_F(DispatcherTest, Queueing) {
+  envoy_stream_t stream = 1;
+  // Setup bridge_callbacks to handle the response headers.
+  envoy_http_callbacks bridge_callbacks;
+  callbacks_called cc = {0, 0, 0, 0, 0};
+  bridge_callbacks.context = &cc;
+  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
+                                   void* context) -> void {
+    ASSERT_TRUE(end_stream);
+    ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_headers_calls++;
+  };
+  bridge_callbacks.on_complete = [](void* context) -> void {
+    callbacks_called* cc = static_cast<callbacks_called*>(context);
+    cc->on_complete_calls++;
+  };
+
+  // Build a set of request headers.
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  envoy_headers c_headers = Utility::toBridgeHeaders(headers);
+
+  // These two stream operations will get queued up in the Http::Dispatcher's queue awaiting for the
+  // call to ready. Create a stream.
+  EXPECT_EQ(http_dispatcher_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+  // Send request headers.
+  http_dispatcher_.sendHeaders(stream, c_headers, true);
+
+  // After ready is called the queue will be flushed and two events will be posted to the
+  // event_dispatcher.
+  Event::PostCb start_stream_post_cb;
+  Event::PostCb send_headers_post_cb;
+  EXPECT_CALL(event_dispatcher_, post(_))
+      .WillOnce(SaveArg<0>(&start_stream_post_cb))
+      .WillOnce(SaveArg<0>(&send_headers_post_cb));
+  ready();
+  // Grab the response encoder in order to dispatch responses on the stream.
+  // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
+  // API.
+  EXPECT_CALL(api_listener_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        return request_decoder_;
+      }));
+  start_stream_post_cb();
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  send_headers_post_cb();
+
+  // Encode response headers.
+  Event::PostCb stream_deletion_post_cb;
+  EXPECT_CALL(event_dispatcher_, isThreadSafe()).Times(1).WillRepeatedly(Return(true));
+  EXPECT_CALL(event_dispatcher_, post(_)).WillOnce(SaveArg<0>(&stream_deletion_post_cb));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, true);
+  ASSERT_EQ(cc.on_headers_calls, 1);
+  stream_deletion_post_cb();
+
+  // Ensure that the callbacks on the bridge_callbacks were called.
+  ASSERT_EQ(cc.on_complete_calls, 1);
+}
+
 TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
+  ready();
+
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response headers.
   envoy_http_callbacks bridge_callbacks;
@@ -365,6 +435,8 @@ TEST_F(DispatcherTest, BasicStreamHeadersOnly) {
 }
 
 TEST_F(DispatcherTest, BasicStream) {
+  ready();
+
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response.
   envoy_http_callbacks bridge_callbacks;
@@ -448,6 +520,8 @@ TEST_F(DispatcherTest, BasicStream) {
 }
 
 TEST_F(DispatcherTest, MultipleDataStream) {
+  ready();
+
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response.
   envoy_http_callbacks bridge_callbacks;
@@ -545,6 +619,8 @@ TEST_F(DispatcherTest, MultipleDataStream) {
 }
 
 TEST_F(DispatcherTest, MultipleStreams) {
+  ready();
+
   envoy_stream_t stream1 = 1;
   envoy_stream_t stream2 = 2;
   // Start stream1.
@@ -664,6 +740,8 @@ TEST_F(DispatcherTest, MultipleStreams) {
 }
 
 TEST_F(DispatcherTest, ResetStreamLocal) {
+  ready();
+
   envoy_stream_t stream = 1;
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0};
@@ -713,6 +791,8 @@ TEST_F(DispatcherTest, ResetStreamLocal) {
 }
 
 TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
+  ready();
+
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response headers.
   envoy_http_callbacks bridge_callbacks;
@@ -793,6 +873,8 @@ TEST_F(DispatcherTest, RemoteResetAfterStreamStart) {
 }
 
 TEST_F(DispatcherTest, StreamResetAfterOnComplete) {
+  ready();
+
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response headers.
   envoy_http_callbacks bridge_callbacks;
@@ -856,6 +938,8 @@ TEST_F(DispatcherTest, StreamResetAfterOnComplete) {
 }
 
 TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRaceLocalWins) {
+  ready();
+
   envoy_stream_t stream = 1;
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0};
@@ -945,6 +1029,8 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRaceLocalWins) {
 }
 
 TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWinsDeletesStream) {
+  ready();
+
   envoy_stream_t stream = 1;
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0};
@@ -1033,6 +1119,8 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWinsDeletesStream) {
 }
 
 TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWins) {
+  ready();
+
   envoy_stream_t stream = 1;
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0};
@@ -1123,6 +1211,8 @@ TEST_F(DispatcherTest, ResetStreamLocalHeadersRemoteRemoteWins) {
 }
 
 TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRaceLocalWins) {
+  ready();
+
   envoy_stream_t stream = 1;
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0};
@@ -1209,6 +1299,8 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRaceLocalWins) {
 }
 
 TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWinsDeletesStream) {
+  ready();
+
   envoy_stream_t stream = 1;
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0};
@@ -1294,6 +1386,8 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWinsDeletesStream) {
 }
 
 TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWins) {
+  ready();
+
   envoy_stream_t stream = 1;
   envoy_http_callbacks bridge_callbacks;
   callbacks_called cc = {0, 0, 0, 0, 0};
@@ -1379,6 +1473,8 @@ TEST_F(DispatcherTest, ResetStreamLocalResetRemoteRemoteWins) {
 }
 
 TEST_F(DispatcherTest, ResetWhenRemoteClosesBeforeLocal) {
+  ready();
+
   envoy_stream_t stream = 1;
   // Setup bridge_callbacks to handle the response headers.
   envoy_http_callbacks bridge_callbacks;
