@@ -39,10 +39,10 @@ public:
     return compressor;
   }
 
-  Envoy::Compressor::ZlibCompressorImpl::CompressionLevel level_;
-  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy strategy_;
-  int64_t window_bits_;
-  uint64_t memory_level_;
+  const Envoy::Compressor::ZlibCompressorImpl::CompressionLevel level_;
+  const Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy strategy_;
+  const int64_t window_bits_;
+  const uint64_t memory_level_;
 };
 
 static void compressWith(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel level,
@@ -78,6 +78,7 @@ static void compressWith(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel
   EXPECT_EQ(1U, stats.counter("test.gzip.compressed").value());
 }
 
+// SPELLCHECKER(off)
 /*
 Running ./bazel-bin/test/extensions/filters/http/common/compressor/compressor_filter_speed_test
 Run on (8 X 2300 MHz CPU s)
@@ -164,6 +165,7 @@ Compress/8_mean     34943497 ns     34883150 ns            5
 Compress/8_median   34895321 ns     34830350 ns            5
 Compress/8_stddev     267204 ns       235565 ns            5
 */
+// SPELLCHECKER(on)
 
 static std::vector<
     std::tuple<Envoy::Compressor::ZlibCompressorImpl::CompressionLevel,
