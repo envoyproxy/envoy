@@ -22,6 +22,8 @@ EdsClusterImpl::EdsClusterImpl(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
+      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          cluster.eds_cluster_config().eds_config().resource_api_version()),
       local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
@@ -36,8 +38,7 @@ EdsClusterImpl::EdsClusterImpl(
   } else {
     initialize_phase_ = InitializePhase::Secondary;
   }
-  const auto resource_name =
-      getResourceName(cluster.eds_cluster_config().eds_config().resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this);

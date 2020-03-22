@@ -27,6 +27,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":http_integration_lib",
+        "//include/envoy/config:subscription_interface",
         "//source/common/common:version_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",

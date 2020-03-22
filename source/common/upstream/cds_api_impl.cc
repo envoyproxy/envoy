@@ -6,6 +6,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -13,7 +14,6 @@
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -30,9 +30,11 @@ CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_co
 
 CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
+    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
+          cds_config.resource_api_version()),
+      cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
-  const auto resource_name = getResourceName(cds_config.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
       cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this);
 }
@@ -66,9 +68,16 @@ void CdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
-    maybe_eds_resume = std::make_unique<Cleanup>(
-        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+    const auto target_resources =
+        Config::getAllVersionResourceNames<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+    for (const auto& resource_name : target_resources) {
+      cm_.adsMux()->pause("type.googleapis.com/" + resource_name);
+    }
+    maybe_eds_resume = std::make_unique<Cleanup>([this, target_resources] {
+      for (const auto& resource_name : target_resources) {
+        cm_.adsMux()->resume("type.googleapis.com/" + resource_name);
+      }
+    });
   }
 
   ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),

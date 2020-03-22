@@ -27,7 +27,6 @@
 #include "common/common/callback_impl.h"
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"
-#include "common/config/resources.h"
 #include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
 #include "common/init/watcher_impl.h"

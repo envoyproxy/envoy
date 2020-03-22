@@ -15,7 +15,6 @@
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
-#include "common/config/resources.h"
 #include "common/config/version_converter.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
@@ -99,13 +98,15 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
+      Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
+          rds_config_source.resource_api_version()),
       factory_context_(factory_context), name_(name), scope_key_builder_(scope_key_builder),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
-  const auto resource_name = getResourceName(rds_config_source_.resource_api_version());
+  const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
@@ -240,8 +241,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     // In the case if factory_context_.init_manager() is uninitialized, RDS is already paused
     // either by Server init or LDS init.
     if (factory_context_.clusterManager().adsMux()) {
-      factory_context_.clusterManager().adsMux()->pause(
-          Envoy::Config::TypeUrl::get().RouteConfiguration);
+      factory_context_.clusterManager().adsMux()->pause(getResourceName());
     }
     resume_rds = std::make_unique<Cleanup>([this, &noop_init_manager, version_info] {
       // For new RDS subscriptions created after listener warming up, we don't wait for them to
@@ -255,8 +255,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       // Note in the case of partial acceptance, accepted RDS subscriptions should be started
       // despite of any error.
       if (factory_context_.clusterManager().adsMux()) {
-        factory_context_.clusterManager().adsMux()->resume(
-            Envoy::Config::TypeUrl::get().RouteConfiguration);
+        factory_context_.clusterManager().adsMux()->resume(getResourceName());
       }
     });
   }

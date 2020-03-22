@@ -22,7 +22,6 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/new_grpc_mux_impl.h"
-#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -146,13 +145,25 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      if (cm_.adsMux() == nullptr ||
-          cm_.adsMux()->paused(Config::TypeUrl::get().ClusterLoadAssignment)) {
+      const auto target_resources =
+          Config::getAllVersionResourceNames<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+      bool cluster_load_assignment_paused = false;
+      for (const auto& resource_name : target_resources) {
+        cluster_load_assignment_paused =
+            cluster_load_assignment_paused ||
+            cm_.adsMux()->paused("type.googleapis.com/" + resource_name);
+      }
+      if (cm_.adsMux() == nullptr || cluster_load_assignment_paused) {
         initializeSecondaryClusters();
       } else {
-        cm_.adsMux()->pause(Config::TypeUrl::get().ClusterLoadAssignment);
-        Cleanup eds_resume(
-            [this] { cm_.adsMux()->resume(Config::TypeUrl::get().ClusterLoadAssignment); });
+        for (const auto& resource_name : target_resources) {
+          cm_.adsMux()->pause("type.googleapis.com/" + resource_name);
+        }
+        Cleanup eds_resume([this, target_resources] {
+          for (const auto& resource_name : target_resources) {
+            cm_.adsMux()->resume("type.googleapis.com/" + resource_name);
+          }
+        });
         initializeSecondaryClusters();
       }
     }
@@ -745,10 +756,16 @@ void ClusterManagerImpl::updateClusterCounts() {
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
+    const auto target_resources =
+        Config::getAllVersionResourceNames<envoy::config::cluster::v3::Cluster>();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      ads_mux_->pause(Config::TypeUrl::get().Cluster);
+      for (const auto& resource_name : target_resources) {
+        ads_mux_->pause("type.googleapis.com/" + resource_name);
+      }
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      ads_mux_->resume(Config::TypeUrl::get().Cluster);
+      for (const auto& resource_name : target_resources) {
+        ads_mux_->resume("type.googleapis.com/" + resource_name);
+      }
     }
   }
   cm_stats_.active_clusters_.set(active_clusters_.size());
