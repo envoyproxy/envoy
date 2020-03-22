@@ -111,8 +111,9 @@ class RdsRouteConfigProviderImpl;
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
  * RDS config providers.
  */
-class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
-                                   Logger::Loggable<Logger::Id::router> {
+class RdsRouteConfigSubscription
+    : Envoy::Config::SubscriptionBase<envoy::config::route::v3::RouteConfiguration>,
+      Logger::Loggable<Logger::Id::router> {
 public:
   ~RdsRouteConfigSubscription() override;
 
@@ -151,7 +152,6 @@ private:
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
-  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
 
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   const std::string route_config_name_;

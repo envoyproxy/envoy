@@ -255,6 +255,8 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   read_callbacks_->connection().enableHalfClose(true);
   getStreamInfo().setDownstreamLocalAddress(read_callbacks_->connection().localAddress());
   getStreamInfo().setDownstreamRemoteAddress(read_callbacks_->connection().remoteAddress());
+  getStreamInfo().setDownstreamDirectRemoteAddress(
+      read_callbacks_->connection().directRemoteAddress());
   getStreamInfo().setDownstreamSslConnection(read_callbacks_->connection().ssl());
 
   // Need to disable reads so that we don't write to an upstream that might fail
