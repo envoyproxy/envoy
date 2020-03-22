@@ -88,8 +88,8 @@ public:
     return logical_host_->outlierDetector();
   }
   HostStats& stats() const override { return logical_host_->stats(); }
-  bool useHostnameForHealthChecks() const override {
-    return logical_host_->useHostnameForHealthChecks();
+  const std::string& hostnameForHealthChecks() const override {
+    return logical_host_->hostnameForHealthChecks();
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }

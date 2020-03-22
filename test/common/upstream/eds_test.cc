@@ -555,13 +555,13 @@ TEST_F(EdsTest, UseHostnameForHealthChecks) {
   auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
   socket_address->set_address("1.2.3.4");
   socket_address->set_port_value(1234);
-  endpoint->mutable_health_check_config()->set_use_hostname(true);
+  endpoint->mutable_health_check_config()->set_hostname("foo");
   cluster_load_assignment.set_cluster_name("fare");
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 1);
-  EXPECT_TRUE(hosts[0]->useHostnameForHealthChecks());
+  EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "foo");
 }
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later

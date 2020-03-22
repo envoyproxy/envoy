@@ -98,9 +98,9 @@ public:
   virtual HealthCheckHostMonitor& healthChecker() const PURE;
 
   /**
-   * @return should the hostname used as the host header for health checking.
+   * @return The hostname used as the host header for health checking.
    */
-  virtual bool useHostnameForHealthChecks() const PURE;
+  virtual const std::string& hostnameForHealthChecks() const PURE;
 
   /**
    * @return the hostname associated with the host if any.

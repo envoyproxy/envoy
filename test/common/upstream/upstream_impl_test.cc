@@ -1137,14 +1137,14 @@ TEST(HostImplTest, HealthPipeAddress) {
       EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
 }
 
-// Test that use_hostname flag from the health check config propagates.
-TEST(HostImplTest, UseHostname) {
+// Test that hostname flag from the health check config propagates.
+TEST(HostImplTest, HealthcheckHostname) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
-  config.set_use_hostname(true);
+  config.set_hostname("foo");
   HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
                             envoy::config::core::v3::Locality().default_instance(), config, 1);
-  EXPECT_TRUE(descr.useHostnameForHealthChecks());
+  EXPECT_EQ("foo", descr.hostnameForHealthChecks());
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -1262,7 +1262,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNoneEmptyHostnameWithHealthChecks) {
                 port_value: 443
             health_check_config:
               port_value: 8000
-              use_hostname: true
+              hostname: "foo2"
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
@@ -1277,8 +1277,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNoneEmptyHostnameWithHealthChecks) {
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_TRUE(
-      cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->useHostnameForHealthChecks());
+  EXPECT_EQ("foo2",
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostnameForHealthChecks());
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 

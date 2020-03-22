@@ -30,9 +30,12 @@ message Endpoint {
     // to have different health check address port.
     uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
 
-    // If this is set to true, and the hostname is not empty, then the hostname in this endpoint
-    // will be used as the host header when doing health checks.
-    bool use_hostname = 2;
+    // By default, the host header for L7 health checks is controlled by cluster level configuration
+    // (see: :ref:`host <envoy_api_field_core.HealthCheck.HttpHealthCheck.host>` and
+    // :ref:`authority <envoy_api_field_core.HealthCheck.GrpcHealthCheck.authority>`). Setting this
+    // to a non-empty value allows overriding the cluster level configuration for a specific
+    // endpoint.
+    string hostname = 2;
   }
 
   // The upstream host address.
@@ -56,9 +59,9 @@ message Endpoint {
   HealthCheckConfig health_check_config = 2;
 
   // The hostname associated with this endpoint. This hostname is not used for routing or address
-  // resolution. If provided, it will be used in auto-host-rewrite routes and health checks, if
-  // configured. To use this field with health checks, set
-  // :ref:`use_hostname <envoy_api_field_endpoint.Endpoint.HealthCheckConfig.use_hostname>` to true.
+  // resolution. If provided, it will be associated with the endpoint, and can be used for features
+  // that require a hostname, like
+  // :ref:`auto_host_rewrite <envoy_api_field_route.RouteAction.auto_host_rewrite>`.
   string hostname = 3;
 }
 

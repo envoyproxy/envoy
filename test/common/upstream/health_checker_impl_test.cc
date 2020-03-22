@@ -1252,9 +1252,9 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceRegexPatternCheck) {
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHost) {
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
-  health_check_config.set_use_hostname(true);
+  health_check_config.set_hostname(host);
   auto test_host = std::make_shared<HostImpl>(
-      cluster_->info_, host, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0,
       envoy::config::core::v3::UNKNOWN);
   const std::string path = "/healthcheck";
@@ -1292,9 +1292,9 @@ TEST_F(HttpHealthCheckerImplTest,
        SuccessServiceCheckWithCustomHostValueOnTheHostThatOverridesConfigValue) {
   const std::string host = "www.envoyproxy.io";
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
-  health_check_config.set_use_hostname(true);
+  health_check_config.set_hostname(host);
   auto test_host = std::make_shared<HostImpl>(
-      cluster_->info_, host, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
       envoy::config::core::v3::Locality(), health_check_config, 0,
       envoy::config::core::v3::UNKNOWN);
   const std::string path = "/healthcheck";
@@ -3821,10 +3821,10 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostname) {
   setupServiceNameHC(absl::nullopt);
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
-  health_check_config.set_use_hostname(true);
+  health_check_config.set_hostname(expected_host);
   auto test_host = std::make_shared<HostImpl>(
-      cluster_->info_, expected_host, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr,
-      1, envoy::config::core::v3::Locality(), health_check_config, 0,
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0,
       envoy::config::core::v3::UNKNOWN);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   runHealthCheck(expected_host);
@@ -3836,10 +3836,10 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithHostnameOverridesConfig) {
   setupServiceNameHC("foo.com");
 
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
-  health_check_config.set_use_hostname(true);
+  health_check_config.set_hostname(expected_host);
   auto test_host = std::make_shared<HostImpl>(
-      cluster_->info_, expected_host, Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr,
-      1, envoy::config::core::v3::Locality(), health_check_config, 0,
+      cluster_->info_, "", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0,
       envoy::config::core::v3::UNKNOWN);
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
   runHealthCheck(expected_host);
