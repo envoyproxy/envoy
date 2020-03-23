@@ -19,55 +19,65 @@ namespace GrpcStats {
 
 namespace {
 
-// A map from gRPC service/method name to symbolized stat names
-// for the service/method.
+// A map from gRPC service/method name to symbolized stat names for the service/method.
 //
-// The expected usage pattern is that the map is populated once,
-// and can then be queried lock-free as long as it isn't being
-// modified.
+// The expected usage pattern is that the map is populated once, and can then be queried lock-free
+// as long as it isn't being modified.
 class GrpcServiceMethodToRequestNamesMap {
 public:
-  GrpcServiceMethodToRequestNamesMap(Stats::SymbolTable& symbol_table)
-      : stat_name_pool_(symbol_table) {}
-
-  void populate(const envoy::config::core::v3::GrpcMethodList& method_list) {
-    for (const auto& service : method_list.services()) {
-      Stats::StatName stat_name_service = stat_name_pool_.add(service.name());
-
-      StringMap<Grpc::Context::RequestStatNames>& method_map = map_[service.name()];
-      for (const auto& method_name : service.method_names()) {
-        Stats::StatName stat_name_method = stat_name_pool_.add(method_name);
-        method_map[method_name] =
-            Grpc::Context::RequestStatNames{stat_name_service, stat_name_method};
-      }
-    }
-  }
+public:
+  // Construct a map populated with the services/methods in method_list.
+  GrpcServiceMethodToRequestNamesMap(Stats::SymbolTable& symbol_table,
+                                     const envoy::config::core::v3::GrpcMethodList& method_list)
+      : stat_name_pool_(symbol_table), map_(populate(method_list)) {}
 
   absl::optional<Grpc::Context::RequestStatNames>
   lookup(const Grpc::Common::RequestNames& request_names) const {
-    auto service_it = map_.find(request_names.service_);
-    if (service_it != map_.end()) {
-      const auto& method_map = service_it->second;
-
-      auto method_it = method_map.find(request_names.method_);
-      if (method_it != method_map.end()) {
-        return method_it->second;
-      }
+    auto it = map_.find(ViewKey(request_names.service_, request_names.method_));
+    if (it != map_.end()) {
+      return it->second;
     }
 
     return {};
   }
 
 private:
-  StringMap<StringMap<Grpc::Context::RequestStatNames>> map_;
+  using OwningKey = std::tuple<std::string, std::string>;
+  using ViewKey = std::tuple<absl::string_view, absl::string_view>;
+  struct MapHash : absl::Hash<OwningKey>, absl::Hash<ViewKey> {
+    using is_transparent = void;
+  };
+
+  struct MapEq {
+    using is_transparent = void;
+    bool operator()(const OwningKey& left, const OwningKey& right) const { return left == right; }
+    bool operator()(const OwningKey& left, const ViewKey& right) const { return left == right; }
+  };
+  using MapType = absl::flat_hash_map<OwningKey, Grpc::Context::RequestStatNames, MapHash, MapEq>;
+
+  // Helper for generating a populated MapType so that `map_` can be const.
+  MapType populate(const envoy::config::core::v3::GrpcMethodList& method_list) {
+    MapType map;
+    for (const auto& service : method_list.services()) {
+      Stats::StatName stat_name_service = stat_name_pool_.add(service.name());
+
+      for (const auto& method_name : service.method_names()) {
+        Stats::StatName stat_name_method = stat_name_pool_.add(method_name);
+        map[OwningKey(service.name(), method_name)] =
+            Grpc::Context::RequestStatNames{stat_name_service, stat_name_method};
+      }
+    }
+    return map;
+  }
+
   Stats::StatNamePool stat_name_pool_;
+  const MapType map_;
 };
 
 struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
          Server::Configuration::FactoryContext& context)
-      : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
-        allowlist_(context.scope().symbolTable()) {
+      : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()) {
 
     switch (proto_config.per_method_stat_specifier_case()) {
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
@@ -81,14 +91,15 @@ struct Config {
 
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
         kIndividualMethodStatsAllowlist:
-      allowlist_.populate(proto_config.individual_method_stats_allowlist());
+      allowlist_.emplace(context.scope().symbolTable(),
+                         proto_config.individual_method_stats_allowlist());
       break;
     }
   }
   Grpc::Context& context_;
   bool emit_filter_state_;
   bool stats_for_all_methods_{false};
-  GrpcServiceMethodToRequestNamesMap allowlist_;
+  absl::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
 };
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
@@ -128,7 +139,9 @@ public:
             // an empty optional; each of the `charge` functions on the context
             // will interpret an empty optional for this value to mean that the
             // service.method prefix on the stat should be omitted.
-            request_names_ = config_->allowlist_.lookup(*request_names);
+            if (config_->allowlist_) {
+              request_names_ = config_->allowlist_->lookup(*request_names);
+            }
           }
         }
       }
