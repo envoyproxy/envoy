@@ -507,7 +507,7 @@ ssize_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   // Avoid overwriting the codec_exception_ we set in the callbacks.
   if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED &&
       codec_exception_.ok()) {
-    // TODO: We should set codec_exception_ to the http_erro_name here.
+    // TODO: We should set codec_exception_ here.
     sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError);
     throw CodecProtocolException("http/1.1 protocol error: " +
                                  std::string(http_errno_name(HTTP_PARSER_ERRNO(&parser_))));
