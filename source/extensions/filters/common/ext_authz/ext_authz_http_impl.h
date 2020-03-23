@@ -155,8 +155,9 @@ public:
              Tracing::Span&) override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::ResponseMessagePtr&& message) override;
-  void onFailure(Http::AsyncClient::FailureReason reason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& message) override;
+  void onFailure(const Http::AsyncClient::Request&,
+                 Http::AsyncClient::FailureReason reason) override;
 
 private:
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
