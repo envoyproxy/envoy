@@ -142,28 +142,31 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
+      const auto target_type_urls =
+          Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      const auto target_resources =
-          Config::getAllVersionResourceNames<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-      bool cluster_load_assignment_paused = false;
-      for (const auto& resource_name : target_resources) {
-        cluster_load_assignment_paused =
-            cluster_load_assignment_paused ||
-            cm_.adsMux()->paused("type.googleapis.com/" + resource_name);
-      }
-      if (cm_.adsMux() == nullptr || cluster_load_assignment_paused) {
+      if (cm_.adsMux() == nullptr) {
         initializeSecondaryClusters();
+        return;
       } else {
-        for (const auto& resource_name : target_resources) {
-          cm_.adsMux()->pause("type.googleapis.com/" + resource_name);
+        bool cluster_load_assignment_paused = false;
+        for (const auto& type_url : target_type_urls) {
+          cluster_load_assignment_paused =
+              cluster_load_assignment_paused || cm_.adsMux()->paused(type_url);
         }
-        Cleanup eds_resume([this, target_resources] {
-          for (const auto& resource_name : target_resources) {
-            cm_.adsMux()->resume("type.googleapis.com/" + resource_name);
+        if (!cluster_load_assignment_paused) {
+          for (const auto& type_url : target_type_urls) {
+            cm_.adsMux()->pause(type_url);
           }
-        });
+          Cleanup eds_resume([this, target_type_urls] {
+            for (const auto& type_url : target_type_urls) {
+              cm_.adsMux()->resume(type_url);
+            }
+          });
+        }
         initializeSecondaryClusters();
       }
     }
@@ -756,15 +759,15 @@ void ClusterManagerImpl::updateClusterCounts() {
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
   if (ads_mux_) {
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
-    const auto target_resources =
-        Config::getAllVersionResourceNames<envoy::config::cluster::v3::Cluster>();
+    const auto target_type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::cluster::v3::Cluster>();
     if (previous_warming == 0 && !warming_clusters_.empty()) {
-      for (const auto& resource_name : target_resources) {
-        ads_mux_->pause("type.googleapis.com/" + resource_name);
+      for (const auto& type_url : target_type_urls) {
+        ads_mux_->pause(type_url);
       }
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
-      for (const auto& resource_name : target_resources) {
-        ads_mux_->resume("type.googleapis.com/" + resource_name);
+      for (const auto& type_url : target_type_urls) {
+        ads_mux_->resume(type_url);
       }
     }
   }

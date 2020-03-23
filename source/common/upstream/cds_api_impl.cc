@@ -68,14 +68,14 @@ void CdsApiImpl::onConfigUpdate(
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
   if (cm_.adsMux()) {
-    const auto target_resources =
-        Config::getAllVersionResourceNames<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-    for (const auto& resource_name : target_resources) {
-      cm_.adsMux()->pause("type.googleapis.com/" + resource_name);
+    const auto target_type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+    for (const auto& type_url : target_type_urls) {
+      cm_.adsMux()->pause(type_url);
     }
-    maybe_eds_resume = std::make_unique<Cleanup>([this, target_resources] {
-      for (const auto& resource_name : target_resources) {
-        cm_.adsMux()->resume("type.googleapis.com/" + resource_name);
+    maybe_eds_resume = std::make_unique<Cleanup>([this, target_type_urls] {
+      for (const auto& type_url : target_type_urls) {
+        cm_.adsMux()->resume(type_url);
       }
     });
   }

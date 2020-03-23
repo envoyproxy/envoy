@@ -518,15 +518,15 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     if (instance.isShutdown()) {
       return;
     }
-    const auto target_resources =
-        Config::getAllVersionResourceNames<envoy::config::route::v3::RouteConfiguration>();
+    const auto target_type_urls =
+        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
 
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     if (cm.adsMux()) {
-      for (const auto& resource_name : target_resources) {
-        cm.adsMux()->pause("type.googleapis.com/" + resource_name);
+      for (const auto& type_url : target_type_urls) {
+        cm.adsMux()->pause(type_url);
       }
     }
 
@@ -536,8 +536,8 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
     if (cm.adsMux()) {
-      for (const auto& resource_name : target_resources) {
-        cm.adsMux()->resume("type.googleapis.com/" + resource_name);
+      for (const auto& type_url : target_type_urls) {
+        cm.adsMux()->resume(type_url);
       }
     }
   });
