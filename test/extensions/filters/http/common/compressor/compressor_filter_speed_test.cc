@@ -166,17 +166,6 @@ static std::vector<CompressionParams> compression_params = {
     {Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Best,
      Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard, 15, 9}};
 
-static void CompressFull(benchmark::State& state) {
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  const auto idx = state.range(0);
-  const auto& params = compression_params[idx];
-
-  for (auto _ : state) {
-    compressWith(params, decoder_callbacks);
-  }
-}
-BENCHMARK(CompressFull)->DenseRange(0, 8, 1);
-
 static void CompressChunks8192(benchmark::State& state) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   const auto idx = state.range(0);
@@ -209,6 +198,17 @@ static void CompressChunks1024(benchmark::State& state) {
   }
 }
 BENCHMARK(CompressChunks1024)->DenseRange(0, 8, 1);
+
+static void CompressFull(benchmark::State& state) {
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  const auto idx = state.range(0);
+  const auto& params = compression_params[idx];
+
+  for (auto _ : state) {
+    compressWith(params, decoder_callbacks);
+  }
+}
+BENCHMARK(CompressFull)->DenseRange(0, 8, 1);
 
 } // namespace Compressors
 } // namespace Common
