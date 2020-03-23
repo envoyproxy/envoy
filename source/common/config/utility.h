@@ -242,7 +242,6 @@ public:
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
-   * @param extension_name name of extension corresponding to config.
    * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
    * provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
@@ -266,6 +265,30 @@ public:
     translateOpaqueConfig(enclosing_message.typed_config(),
                           enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
                           *config);
+    return config;
+  }
+
+  /**
+   * Translate the typed any field into a proto message provided by the implementation factory.
+   * @param typed_config typed configuration.
+   * @param validation_visitor message validation visitor instance.
+   * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
+   * proto to be filled with the translated configuration.
+   */
+  template <class Factory>
+  static ProtobufTypes::MessagePtr
+  translateAnyToFactoryConfig(const ProtobufWkt::Any& typed_config,
+                              ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr, "");
+
+    // Check that the config type is not google.protobuf.Empty
+    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+
+    translateOpaqueConfig(typed_config, ProtobufWkt::Struct(), validation_visitor, *config);
     return config;
   }
 
@@ -324,20 +347,23 @@ public:
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
    * @param name the name of the filter.
-   * @param name the type of filter.
+   * @param filter_type the type of filter.
+   * @param filter_chain_type the type of filter chain.
    * @param is_terminal_filter true if the filter is designed to be terminal.
    * @param last_filter_in_current_config true if the filter is last in the configuration.
    * @throws EnvoyException if there is a mismatch between design and configuration.
    */
-  static void validateTerminalFilters(const std::string& name, const char* filter_type,
-                                      bool is_terminal_filter, bool last_filter_in_current_config) {
+  static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
+                                      const char* filter_chain_type, bool is_terminal_filter,
+                                      bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
-      throw EnvoyException(
-          fmt::format("Error: {} must be the terminal {} filter.", name, filter_type));
+      throw EnvoyException(fmt::format("Error: terminal filter named {} of type {} must be the "
+                                       "last filter in a {} filter chain.",
+                                       name, filter_type, filter_chain_type));
     } else if (!is_terminal_filter && last_filter_in_current_config) {
-      throw EnvoyException(
-          fmt::format("Error: non-terminal filter {} is the last filter in a {} filter chain.",
-                      name, filter_type));
+      throw EnvoyException(fmt::format(
+          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
+          name, filter_type, filter_chain_type));
     }
   }
 

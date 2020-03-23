@@ -3,14 +3,22 @@ Version history
 
 1.14.0 (Pending)
 ================
+* access log: added support for DOWNSTREAM_LOCAL_PORT :ref:`access log formatters <config_access_log_format>`.
 * access loggers: access logger extensions use the "envoy.access_loggers" name space. A mapping
   of extension names is available in the :ref:`deprecated <deprecated>` documentation.
+* access log: fix %DOWSTREAM_DIRECT_REMOTE_ADDRESS% when used with PROXY protocol listener filter
+* access log: introduce :ref:`connection-level access loggers<envoy_api_field_Listener.access_log>`.
 * adaptive concurrency: fixed bug that allowed concurrency limits to drop below the configured
   minimum.
-* aws_request_signing: a few fixes so that it works with S3.
 * admin: added support for displaying ip address subject alternate names in :ref:`certs<operations_admin_interface_certs>` end point.
+* admin: added :http:post:`/reopen_logs` endpoint to control log rotation.
+* aws_lambda: added :ref:`AWS Lambda filter <config_http_filters_aws_lambda>` that converts HTTP requests to Lambda
+  invokes. This effectively makes Envoy act as an egress gateway to AWS Lambda.
+* aws_request_signing: a few fixes so that it works with S3.
 * buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
 * config: use type URL to select an extension whenever the config type URL (or its previous versions) uniquely identify a typed extension, see :ref:`extension configuration <config_overview_extension_configuration>`.
+* grpc-json: added support for building HTTP request into
+  `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * config: added stat :ref:`update_time <config_cluster_manager_cds>`.
 * datasource: added retry policy for remote async data source.
 * dns: the STRICT_DNS cluster now only resolves to 0 hosts if DNS resolution successfully returns 0 hosts.
@@ -24,6 +32,7 @@ Version history
 * http: fixing a bug in HTTP/1.0 responses where Connection: keep-alive was not appended for connections which were kept alive.
 * http: fixed a bug that could send extra METADATA frames and underflow memory when encoding METADATA frames on a connection that was dispatching data.
 * http: connection header sanitizing has been modified to always sanitize if there is no upgrade, including when an h2c upgrade attempt has been removed.
+* http: added :ref:`max_stream_duration <envoy_api_field_core.HttpProtocolOptions.max_stream_duration>` to specify the duration of existing streams. See :ref:`connection and stream timeouts <faq_configuration_timeouts>`.
 * listener filters: listener filter extensions use the "envoy.filters.listener" name space. A
   mapping of extension names is available in the :ref:`deprecated <deprecated>` documentation.
 * listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
@@ -41,7 +50,10 @@ Version history
 * router: added support for :ref:`regex_rewrite
   <envoy_api_field_route.RouteAction.regex_rewrite>` for path rewriting using regular expressions and capture groups.
 * router: don't ignore :ref:`per_try_timeout <envoy_api_field_route.RetryPolicy.per_try_timeout>` when the :ref:`global route timeout <envoy_api_field_route.RouteAction.timeout>` is disabled.
+* router: added ability to set attempt count in downstream response, see :ref:`virtual host's include response
+  attempt count config <envoy_api_field_route.VirtualHost.include_attempt_count_in_response>`.
 * router: strip whitespace for :ref:`retry_on <envoy_api_field_route.RetryPolicy.retry_on>`, :ref:`grpc-retry-on header <config_http_filters_router_x-envoy-retry-grpc-on>` and :ref:`retry-on header <config_http_filters_router_x-envoy-retry-on>`.
+* router: added support for DOWNSTREAM_LOCAL_PORT :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * runtime: enabling the runtime feature "envoy.deprecated_features.allow_deprecated_extension_names"
   disables the use of deprecated extension names.
 * runtime: integer values may now be parsed as booleans.
@@ -62,6 +74,14 @@ Version history
   restart Envoy. The behavior will not switch until the connection pools are recreated. The new
   circuit breaker behavior is described :ref:`here <arch_overview_circuit_break>`.
 * upstream: changed load distribution algorithm when all priorities enter :ref:`panic mode<arch_overview_load_balancing_panic_threshold>`.
+
+1.13.1 (March 3, 2020)
+======================
+* buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
+* http: added HTTP/1.1 flood protection. Can be temporarily disabled using the runtime feature `envoy.reloadable_features.http1_flood_protection`.
+* listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
+* rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
+* sds: fixed the SDS vulnerability that TLS validation context (e.g., subject alt name or hash) cannot be effectively validated in some cases.
 
 1.13.0 (January 20, 2020)
 =========================
@@ -125,6 +145,14 @@ Version history
 * tracing: added initial support for AWS X-Ray (local sampling rules only) :ref:`X-Ray Tracing <envoy_api_msg_config.trace.v2alpha.XRayConfig>`.
 * tracing: added tags for gRPC request path, authority, content-type and timeout.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
+
+1.12.3 (March 3, 2020)
+======================
+* buffer: force copy when appending small slices to OwnedImpl buffer to avoid fragmentation.
+* http: added HTTP/1.1 flood protection. Can be temporarily disabled using the runtime feature `envoy.reloadable_features.http1_flood_protection`.
+* listeners: fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` could have been bypassed by a client using only TLS 1.3.
+* rbac: added :ref:`url_path <envoy_api_field_config.rbac.v2.Permission.url_path>` for matching URL path without the query and fragment string.
+* sds: fixed the SDS vulnerability that TLS validation context (e.g., subject alt name or hash) cannot be effectively validated in some cases.
 
 1.12.2 (December 10, 2019)
 ==========================
