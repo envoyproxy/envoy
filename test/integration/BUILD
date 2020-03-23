@@ -2,6 +2,8 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
@@ -284,6 +286,23 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "http_benchmark",
+    srcs = ["http_benchmark.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/exe:process_wide_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "http_benchmark_test",
+    benchmark_binary = "http_benchmark",
 )
 
 envoy_cc_test(
