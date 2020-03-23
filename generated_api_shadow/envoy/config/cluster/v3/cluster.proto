@@ -425,8 +425,7 @@ message Cluster {
           "envoy.api.v2.Cluster.CommonLbConfig.ConsistentHashingLbConfig";
 
       // If set to `true`, the cluster will use hostname instead of the resolved
-      // address as the key to consistently hash to an upstream host. Only valid for StrictDNS and LogicalDNS
-      // clusters with hostnames which resolve to a single IP address.
+      // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
       bool use_hostname_for_hashing = 1;
     }
 
