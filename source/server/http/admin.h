@@ -36,6 +36,7 @@
 #include "common/router/scoped_config_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "server/http/admin_filter.h"
 #include "server/http/config_tracker_impl.h"
 
 #include "absl/strings/string_view.h"

@@ -55,7 +55,6 @@
 #include "common/stats/histogram_impl.h"
 #include "common/upstream/host_utility.h"
 
-#include "server/http/admin_filter.h"
 #include "server/http/utils.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
