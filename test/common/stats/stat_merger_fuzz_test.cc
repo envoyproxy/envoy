@@ -25,9 +25,13 @@ void testDynamicEncoding(absl::string_view data, SymbolTable& symbol_table) {
   std::string unit_test_encoding;
 
   for (uint32_t index = 0; index < data.size();) {
-    // Select component lengths between 0 and 7 bytes inclusive, and ensure it
-    // doesn't overrun our buffer. It's OK to get very small or empty segments.
-    uint32_t num_bytes = data[index] & 0x7;
+    // Select component lengths between 1 and 8 bytes inclusive, and ensure it
+    // doesn't overrun our buffer.
+    //
+    // TODO(#10008): We should remove the "1 +" below, so we can get empty
+    // segments, which trigger some inconsistent handling as described in that
+    // bug.
+    uint32_t num_bytes = 1 + data[index] & 0x7;
     num_bytes = std::min(static_cast<uint32_t>(data.size() - 1),
                          num_bytes); // restrict number up to the size of data
 

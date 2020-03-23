@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
+import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/socket_option.proto";
@@ -24,7 +25,7 @@ option java_multiple_files = true;
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -232,4 +233,8 @@ message Listener {
   // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
   // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
   bool reuse_port = 21;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by this listener.
+  repeated accesslog.v3.AccessLog access_log = 22;
 }

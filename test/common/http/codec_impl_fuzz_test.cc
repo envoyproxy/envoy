@@ -132,6 +132,11 @@ public:
     ON_CALL(response_.stream_callbacks_, onResetStream(_, _))
         .WillByDefault(InvokeWithoutArgs([this] {
           ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
+          // Reset the client stream when we know the server stream has been reset. This ensures
+          // that the internal book keeping resetStream() below is consistent with the state of the
+          // client codec state, which is necessary to prevent multiple simultaneous streams for the
+          // HTTP/1 codec.
+          request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
           resetStream();
         }));
     ON_CALL(request_.request_decoder_, decodeHeaders_(_, true))

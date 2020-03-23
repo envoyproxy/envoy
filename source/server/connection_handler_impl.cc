@@ -39,7 +39,7 @@ void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
         config.udpListenerFactory()->createActiveUdpListener(*this, dispatcher_, config);
   }
   if (disable_listeners_) {
-    details.listener_->listener()->disable();
+    details.listener_->pauseListening();
   }
   listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
 }
@@ -57,28 +57,28 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
-      listener.second.listener_->destroy();
+      listener.second.listener_->shutdownListener();
     }
   }
 }
 
 void ConnectionHandlerImpl::stopListeners() {
   for (auto& listener : listeners_) {
-    listener.second.listener_->destroy();
+    listener.second.listener_->shutdownListener();
   }
 }
 
 void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& listener : listeners_) {
-    listener.second.listener_->listener()->disable();
+    listener.second.listener_->pauseListening();
   }
 }
 
 void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& listener : listeners_) {
-    listener.second.listener_->listener()->enable();
+    listener.second.listener_->resumeListening();
   }
 }
 
@@ -322,23 +322,41 @@ void ConnectionHandlerImpl::ActiveTcpListener::onAcceptWorker(
   }
 }
 
+namespace {
+void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info) {
+  stream_info.onRequestComplete();
+  for (const auto& access_log : config.accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, stream_info);
+  }
+}
+} // namespace
+
 void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     Network::ConnectionSocketPtr&& socket) {
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(parent_.dispatcher_.timeSource());
+  stream_info->setDownstreamLocalAddress(socket->localAddress());
+  stream_info->setDownstreamRemoteAddress(socket->remoteAddress());
+  stream_info->setDownstreamDirectRemoteAddress(socket->directRemoteAddress());
+
   // Find matching filter chain.
   const auto filter_chain = config_.filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
     ENVOY_LOG(debug, "closing connection: no matching filter chain found");
     stats_.no_filter_chain_match_.inc();
+    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    emitLogs(config_, *stream_info);
     socket->close();
     return;
   }
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
-  ActiveTcpConnectionPtr active_connection(new ActiveTcpConnection(
-      active_connections,
-      parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket)),
-      parent_.dispatcher_.timeSource()));
+  ActiveTcpConnectionPtr active_connection(
+      new ActiveTcpConnection(active_connections,
+                              parent_.dispatcher_.createServerConnection(
+                                  std::move(socket), std::move(transport_socket), *stream_info),
+                              parent_.dispatcher_.timeSource(), config_, std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_.perConnectionBufferLimitBytes());
 
   const bool empty_filter_chain = !config_.filterChainFactory().createNetworkFilterChain(
@@ -414,10 +432,13 @@ ConnectionHandlerImpl::ActiveConnections::~ActiveConnections() {
 
 ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
     ActiveConnections& active_connections, Network::ConnectionPtr&& new_connection,
-    TimeSource& time_source)
-    : active_connections_(active_connections), connection_(std::move(new_connection)),
+    TimeSource& time_source, Network::ListenerConfig& config,
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
+    : stream_info_(std::move(stream_info)), active_connections_(active_connections),
+      connection_(std::move(new_connection)),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
-          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
+          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)),
+      config_(config) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
@@ -434,6 +455,8 @@ ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
+  emitLogs(config_, *stream_info_);
+
   active_connections_.listener_.stats_.downstream_cx_active_.dec();
   active_connections_.listener_.stats_.downstream_cx_destroy_.inc();
   active_connections_.listener_.per_worker_stats_.downstream_cx_active_.dec();
