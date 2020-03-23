@@ -28,13 +28,14 @@ RestApiFetcher::~RestApiFetcher() {
 
 void RestApiFetcher::initialize() { refresh(); }
 
-void RestApiFetcher::onSuccess(Http::ResponseMessagePtr&& response) {
+void RestApiFetcher::onSuccess(const Http::AsyncClient::Request& request,
+                               Http::ResponseMessagePtr&& response) {
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
   if (response_code == enumToInt(Http::Code::NotModified)) {
     requestComplete();
     return;
   } else if (response_code != enumToInt(Http::Code::OK)) {
-    onFailure(Http::AsyncClient::FailureReason::Reset);
+    onFailure(request, Http::AsyncClient::FailureReason::Reset);
     return;
   }
 
@@ -47,7 +48,8 @@ void RestApiFetcher::onSuccess(Http::ResponseMessagePtr&& response) {
   requestComplete();
 }
 
-void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
+void RestApiFetcher::onFailure(const Http::AsyncClient::Request&,
+                               Http::AsyncClient::FailureReason reason) {
   // Currently Http::AsyncClient::FailureReason only has one value: "Reset".
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
   onFetchFailure(Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);

@@ -223,7 +223,7 @@ protected:
     Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
         Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", status}}}));
     msg->body() = std::make_unique<Buffer::OwnedImpl>(body);
-    popPendingCallback()->onSuccess(std::move(msg));
+    popPendingCallback()->onSuccess(request_, std::move(msg));
   }
 
   void completeCreateRequest() {
@@ -265,7 +265,9 @@ TEST_F(SquashFilterTest, DecodeHeaderContinuesOnClientFail) {
       .WillOnce(Invoke(
           [&](Envoy::Http::RequestMessagePtr&, Envoy::Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions&) -> Envoy::Http::AsyncClient::Request* {
-            callbacks.onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
+            callbacks.onFailure(request_, Envoy::Http::AsyncClient::FailureReason::Reset);
+            // Intentionally return nullptr (instead of request handle) to trigger a particular
+            // code path.
             return nullptr;
           }));
 
@@ -286,7 +288,7 @@ TEST_F(SquashFilterTest, DecodeContinuesOnCreateAttachmentFail) {
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(*attachmentTimeout_timer_, disableTimer());
-  popPendingCallback()->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
+  popPendingCallback()->onFailure(request_, Envoy::Http::AsyncClient::FailureReason::Reset);
 
   Envoy::Buffer::OwnedImpl data("nothing here");
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
@@ -365,7 +367,7 @@ TEST_F(SquashFilterTest, CheckRetryPollingAttachmentOnFailure) {
 
   auto retry_timer = new NiceMock<Envoy::Event::MockTimer>(&filter_callbacks_.dispatcher_);
   EXPECT_CALL(*retry_timer, enableTimer(config_->attachmentPollPeriod(), _));
-  popPendingCallback()->onFailure(Envoy::Http::AsyncClient::FailureReason::Reset);
+  popPendingCallback()->onFailure(request_, Envoy::Http::AsyncClient::FailureReason::Reset);
 
   // Expect the second get attachment request
   expectAsyncClientSend();

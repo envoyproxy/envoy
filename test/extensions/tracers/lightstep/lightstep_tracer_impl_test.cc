@@ -229,7 +229,7 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
                                                    start_time_, {Tracing::Reason::Sampling, true});
   third_span->finishSpan();
 
-  callback->onSuccess(makeSuccessResponse());
+  callback->onSuccess(request, makeSuccessResponse());
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.success")
@@ -277,7 +277,7 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 
   second_span->finishSpan();
 
-  callback->onFailure(Http::AsyncClient::FailureReason::Reset);
+  callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("grpc.lightstep.collector.CollectorService.Report.failure")
@@ -411,7 +411,7 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
 
   timer_->invokeCallback();
 
-  callback->onSuccess(makeSuccessResponse());
+  callback->onSuccess(request, makeSuccessResponse());
 
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.timer_flushed").value());
   EXPECT_EQ(1U, stats_.counter("tracing.lightstep.spans_sent").value());

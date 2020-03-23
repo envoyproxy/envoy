@@ -62,8 +62,9 @@ private:
   void requestComplete();
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::ResponseMessagePtr&& response) override;
-  void onFailure(Http::AsyncClient::FailureReason reason) override;
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
+  void onFailure(const Http::AsyncClient::Request&,
+                 Http::AsyncClient::FailureReason reason) override;
 
   Runtime::RandomGenerator& random_;
   const std::chrono::milliseconds refresh_interval_;

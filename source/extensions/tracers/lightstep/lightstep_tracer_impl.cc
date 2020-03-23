@@ -68,14 +68,15 @@ LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   }
 }
 
-void LightStepDriver::LightStepTransporter::onSuccess(Http::ResponseMessagePtr&& /*response*/) {
+void LightStepDriver::LightStepTransporter::onSuccess(const Http::AsyncClient::Request&,
+                                                      Http::ResponseMessagePtr&& /*response*/) {
   driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_names_, true);
   active_callback_->OnSuccess(*active_report_);
   reset();
 }
 
 void LightStepDriver::LightStepTransporter::onFailure(
-    Http::AsyncClient::FailureReason /*failure_reason*/) {
+    const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason /*failure_reason*/) {
   driver_.grpc_context_.chargeStat(*driver_.cluster(), driver_.request_names_, false);
   active_callback_->OnFailure(*active_report_);
   reset();

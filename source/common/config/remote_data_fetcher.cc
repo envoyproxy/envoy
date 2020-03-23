@@ -39,7 +39,8 @@ void RemoteDataFetcher::fetch() {
                            DurationUtil::durationToMilliseconds(uri_.timeout()))));
 }
 
-void RemoteDataFetcher::onSuccess(Http::ResponseMessagePtr&& response) {
+void RemoteDataFetcher::onSuccess(const Http::AsyncClient::Request&,
+                                  Http::ResponseMessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "fetch remote data [uri = {}]: success", uri_.uri());
@@ -66,7 +67,8 @@ void RemoteDataFetcher::onSuccess(Http::ResponseMessagePtr&& response) {
   request_ = nullptr;
 }
 
-void RemoteDataFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
+void RemoteDataFetcher::onFailure(const Http::AsyncClient::Request&,
+                                  Http::AsyncClient::FailureReason reason) {
   ENVOY_LOG(debug, "fetch remote data [uri = {}]: network error {}", uri_.uri(), enumToInt(reason));
   request_ = nullptr;
   callback_.onFailure(FailureReason::Network);

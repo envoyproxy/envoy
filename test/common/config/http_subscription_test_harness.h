@@ -151,7 +151,7 @@ public:
     }
     EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
     EXPECT_CALL(*timer_, enableTimer(_, _));
-    http_callbacks_->onSuccess(std::move(message));
+    http_callbacks_->onSuccess(http_request_, std::move(message));
     if (accept) {
       version_ = version;
     }
