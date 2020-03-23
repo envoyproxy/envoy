@@ -192,6 +192,7 @@ ActiveMessage::ActiveMessage(ConnectionManager& parent)
   parent_.stats().request_active_.inc();
   stream_info_.setDownstreamLocalAddress(parent_.connection().localAddress());
   stream_info_.setDownstreamRemoteAddress(parent_.connection().remoteAddress());
+  stream_info_.setDownstreamDirectRemoteAddress(parent_.connection().directRemoteAddress());
 }
 
 ActiveMessage::~ActiveMessage() {

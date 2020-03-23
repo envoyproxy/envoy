@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/subscription.h"
 #include "envoy/init/manager.h"
 #include "envoy/runtime/runtime.h"
@@ -199,7 +200,8 @@ private:
 
 class LoaderImpl;
 
-struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger::Id::runtime> {
+struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>,
+                          Logger::Loggable<Logger::Id::runtime> {
   RtdsSubscription(LoaderImpl& parent,
                    const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -220,7 +222,6 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
-  static std::string loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version);
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;

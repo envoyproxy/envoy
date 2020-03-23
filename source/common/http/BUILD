@@ -36,6 +36,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "async_client_utility_lib",
+    srcs = ["async_client_utility.cc"],
+    hdrs = ["async_client_utility.h"],
+    deps = [
+        "//include/envoy/http:async_client_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "codec_client_lib",
     srcs = ["codec_client.cc"],
     hdrs = ["codec_client.h"],
@@ -328,6 +337,7 @@ envoy_cc_library(
     external_deps = [
         "abseil_optional",
         "http_parser",
+        "nghttp2",
     ],
     deps = [
         ":exception_lib",

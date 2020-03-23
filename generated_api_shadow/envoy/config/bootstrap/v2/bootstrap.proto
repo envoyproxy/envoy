@@ -7,6 +7,7 @@ import "envoy/api/v2/cluster.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";
+import "envoy/api/v2/core/socket_option.proto";
 import "envoy/api/v2/listener.proto";
 import "envoy/config/metrics/v2/stats.proto";
 import "envoy/config/overload/v2alpha/overload.proto";

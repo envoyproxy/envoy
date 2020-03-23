@@ -123,6 +123,9 @@ public:
   // Set the max connection duration for downstream connections through the HttpConnectionManager.
   void setDownstreamMaxConnectionDuration(std::chrono::milliseconds max_connection_duration);
 
+  // Set the max stream duration for downstream connections through the HttpConnectionManager.
+  void setDownstreamMaxStreamDuration(std::chrono::milliseconds max_stream_duration);
+
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
@@ -179,6 +182,10 @@ public:
 
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
+
+  // Add filter_metadata to a cluster with the given name
+  void addClusterFilterMetadata(absl::string_view metadata_yaml,
+                                absl::string_view cluster_name = "cluster_0");
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.

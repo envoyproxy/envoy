@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
+import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/backoff.proto";
 import "envoy/api/v2/core/http_uri.proto";
 import "envoy/type/percent.proto";
@@ -14,6 +15,8 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
+
+import public "envoy/api/v2/core/socket_option.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "BaseProto";
@@ -123,7 +126,7 @@ message Extension {
 // Identifies a specific Envoy instance. The node identifier is presented to the
 // management server, which may use this identifier to distinguish per Envoy
 // configuration for serving.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message Node {
   // An opaque node identifier for the Envoy node. This also provides the local
   // service node name. It should be set if any of the following features are
@@ -182,6 +185,12 @@ message Node {
   // See :ref:`the list of features <client_features>` that xDS client may
   // support.
   repeated string client_features = 10;
+
+  // Known listening ports on the node as a generic hint to the management server
+  // for filtering :ref:`listeners <config_listeners>` to be returned. For example,
+  // if there is a listener bound to port 80, the list can optionally contain the
+  // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
+  repeated Address listening_addresses = 11;
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
@@ -333,46 +342,6 @@ message TransportSocket {
 
     google.protobuf.Any typed_config = 3;
   }
-}
-
-// Generic socket option message. This would be used to set socket options that
-// might not exist in upstream kernels or precompiled Envoy binaries.
-// [#next-free-field: 7]
-message SocketOption {
-  enum SocketState {
-    // Socket options are applied after socket creation but before binding the socket to a port
-    STATE_PREBIND = 0;
-
-    // Socket options are applied after binding the socket to a port but before calling listen()
-    STATE_BOUND = 1;
-
-    // Socket options are applied after calling listen()
-    STATE_LISTENING = 2;
-  }
-
-  // An optional name to give this socket option for debugging, etc.
-  // Uniqueness is not required and no special meaning is assumed.
-  string description = 1;
-
-  // Corresponding to the level value passed to setsockopt, such as IPPROTO_TCP
-  int64 level = 2;
-
-  // The numeric name as passed to setsockopt
-  int64 name = 3;
-
-  oneof value {
-    option (validate.required) = true;
-
-    // Because many sockopts take an int value.
-    int64 int_value = 4;
-
-    // Otherwise it's a byte buffer.
-    bytes buf_value = 5;
-  }
-
-  // The state in which the option will be applied. When used in BindConfig
-  // STATE_PREBIND is currently the only valid value.
-  SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
