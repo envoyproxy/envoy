@@ -643,13 +643,8 @@ def _com_googlesource_quiche():
     )
 
 def _com_googlesource_googleurl():
-    location = REPOSITORY_LOCATIONS["com_googlesource_googleurl"]
-    genrule_repository(
+    _repository_impl(
         name = "com_googlesource_googleurl",
-        urls = location["urls"],
-        sha256 = location["sha256"],
-        genrule_cmd_file = "@envoy//bazel/external:googleurl.genrule_cmd",
-        build_file = "@envoy//bazel/external:googleurl.BUILD",
     )
     native.bind(
         name = "googleurl",
