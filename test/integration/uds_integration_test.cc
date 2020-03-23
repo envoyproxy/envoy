@@ -111,7 +111,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
 
 TEST_P(UdsListenerIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = createConnectionFn();
-  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterHeaderOnlyRequestAndResponse) {

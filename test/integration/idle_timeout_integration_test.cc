@@ -282,7 +282,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
 // Successful request/response when per-stream idle timeout is configured.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
   enable_per_stream_idle_timeout_ = true;
-  testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
+  testRouterRequestAndResponseWithBody(1024, 1024, false);
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponse) {
@@ -292,7 +292,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponse) {
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponseWithBody) {
   enable_request_timeout_ = true;
-  testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
+  testRouterRequestAndResponseWithBody(1024, 1024, false);
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
