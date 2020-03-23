@@ -545,7 +545,7 @@ public:
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
         admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
-        admin_filter_(admin_) {
+        admin_filter_(admin_.createCallbackFunction()) {
     admin_.startHttpListener("/dev/null", address_out_path_,
                              Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
                              listener_scope_.createScope("listener.admin."));

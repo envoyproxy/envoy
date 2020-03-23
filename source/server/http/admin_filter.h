@@ -1,12 +1,17 @@
 #pragma once
 
+#include <functional>
 #include <list>
 
 #include "envoy/http/filter.h"
+#include "envoy/server/admin.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "common/http/codes.h"
+#include "common/http/header_map_impl.h"
 
-#include "server/http/admin.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,7 +23,10 @@ class AdminFilter : public Http::StreamDecoderFilter,
                     public AdminStream,
                     Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminFilter(AdminImpl& parent);
+  AdminFilter(std::function<Http::Code(absl::string_view path_and_query,
+                                       Http::ResponseHeaderMap& response_headers,
+                                       Buffer::OwnedImpl& response, AdminFilter& filter)>
+                  admin_server_run_callback_func);
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -40,12 +48,17 @@ public:
   const Http::RequestHeaderMap& getRequestHeaders() const override;
 
 private:
+  typedef std::function<Http::Code(absl::string_view path_and_query,
+                                   Http::ResponseHeaderMap& response_headers,
+                                   Buffer::OwnedImpl& response, AdminFilter& filter)>
+      AdminServerCallbackFunction;
+
   /**
    * Called when an admin request has been completely received.
    */
   void onComplete();
+  AdminServerCallbackFunction admin_server_callback_func_;
 
-  AdminImpl& parent_;
   // Handlers relying on the reference should use addOnDestroyCallback()
   // to add a callback that will notify them when the reference is no
   // longer valid.

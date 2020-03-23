@@ -1,4 +1,3 @@
-#include "server/http/admin.h"
 #include "server/http/admin_filter.h"
 
 #include "test/mocks/server/mocks.h"
@@ -16,29 +15,36 @@ namespace Server {
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminFilterTest()
-      : admin_(TestEnvironment::temporaryPath("envoy.prof"), server_),
-        filter_(admin_), request_headers_{{":path", "/"}} {
+      : admin_server_callback_func_(createAdminServerCallback()),
+        filter_(admin_server_callback_func_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
+  typedef std::function<Http::Code(absl::string_view path_and_query,
+                                   Http::ResponseHeaderMap& response_headers,
+                                   Buffer::OwnedImpl& response, AdminFilter& filter)>
+      AdminServerCallbackFunction;
+
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
-  AdminImpl admin_;
+  AdminServerCallbackFunction admin_server_callback_func_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
-};
 
-// Check default implementations the admin class picks up.
-TEST_P(AdminFilterTest, MiscFunctions) {
-  EXPECT_EQ(false, admin_.preserveExternalRequestId());
-  Http::MockFilterChainFactoryCallbacks mock_filter_chain_factory_callbacks;
-  EXPECT_EQ(false,
-            admin_.createUpgradeFilterChain("", nullptr, mock_filter_chain_factory_callbacks));
-  EXPECT_TRUE(nullptr != admin_.scopedRouteConfigProvider());
-  EXPECT_EQ(Http::ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
-            admin_.serverHeaderTransformation());
-}
+  AdminServerCallbackFunction createAdminServerCallback() {
+    return [](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
+              Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
+      // silence compiler warnings for unused params
+      (void)path_and_query;
+      (void)response_headers;
+      (void)filter;
+
+      response.add("OK\n");
+      return Http::Code::OK;
+    };
+  }
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminFilterTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

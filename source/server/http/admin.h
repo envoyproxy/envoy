@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <list>
 #include <string>
 #include <unordered_map>
@@ -156,6 +157,17 @@ public:
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
   Server::Instance& server() { return server_; }
+
+  typedef std::function<Http::Code(absl::string_view path_and_query,
+                                   Http::ResponseHeaderMap& response_headers,
+                                   Buffer::OwnedImpl& response, AdminFilter& filter)>
+      CallbackFunction;
+  CallbackFunction createCallbackFunction() {
+    return [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
+                  Buffer::OwnedImpl& response, AdminFilter& filter) -> Http::Code {
+      return runCallback(path_and_query, response_headers, response, filter);
+    };
+  }
 
 private:
   /**

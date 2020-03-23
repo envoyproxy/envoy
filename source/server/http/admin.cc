@@ -1388,12 +1388,14 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
 }
 
 void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new AdminFilter(*this)});
+  callbacks.addStreamDecoderFilter(
+      Http::StreamDecoderFilterSharedPtr{new AdminFilter(createCallbackFunction())});
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
+
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -1542,7 +1544,8 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
-  AdminFilter filter(*this);
+  AdminFilter filter(createCallbackFunction());
+
   Http::RequestHeaderMapImpl request_headers;
   request_headers.setMethod(method);
   filter.decodeHeaders(request_headers, false);

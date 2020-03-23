@@ -40,7 +40,7 @@ envoy_cc_test(
     name = "admin_filter_test",
     srcs = ["admin_filter_test.cc"],
     deps = [
-        "//source/server/http:admin_lib",
+        "//source/server/http:admin_filter_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
     ],

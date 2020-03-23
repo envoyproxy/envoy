@@ -1,16 +1,12 @@
 #include "server/http/admin_filter.h"
 
-#include "envoy/http/filter.h"
-
-#include "common/buffer/buffer_impl.h"
-
-#include "server/http/admin.h"
 #include "server/http/utils.h"
 
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
+AdminFilter::AdminFilter(AdminServerCallbackFunction admin_server_callback_func)
+    : admin_server_callback_func_(admin_server_callback_func) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
@@ -70,7 +66,7 @@ void AdminFilter::onComplete() {
   Buffer::OwnedImpl response;
   Http::ResponseHeaderMapPtr header_map{new Http::ResponseHeaderMapImpl};
   RELEASE_ASSERT(request_headers_, "");
-  Http::Code code = parent_.runCallback(path, *header_map, response, *this);
+  Http::Code code = admin_server_callback_func_(path, *header_map, response, *this);
   Utility::populateFallbackResponseHeaders(code, *header_map);
   callbacks_->encodeHeaders(std::move(header_map),
                             end_stream_on_complete_ && response.length() == 0);
