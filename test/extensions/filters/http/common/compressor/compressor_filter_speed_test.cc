@@ -186,6 +186,16 @@ static void CompressChunks8192(benchmark::State& state) {
 }
 BENCHMARK(CompressChunks8192)->DenseRange(0, 8, 1);
 
+static void CompressChunks4096(benchmark::State& state) {
+  const auto idx = state.range(0);
+  const auto& params = compression_params[idx];
+
+  for (auto _ : state) {
+    compressWith(params, 122880, 30);
+  }
+}
+BENCHMARK(CompressChunks4096)->DenseRange(0, 8, 1);
+
 static void CompressChunks1024(benchmark::State& state) {
   const auto idx = state.range(0);
   const auto& params = compression_params[idx];
