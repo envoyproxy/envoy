@@ -1,10 +1,10 @@
 #include <string>
 
-#include "common/runtime/runtime_impl.h"
 #include "common/request_id_extension/uuid_impl.h"
+#include "common/runtime/runtime_impl.h"
 
-#include "test/test_common/utility.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 

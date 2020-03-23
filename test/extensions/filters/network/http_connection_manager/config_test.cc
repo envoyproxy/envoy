@@ -1,8 +1,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
-#include "envoy/type/v3/percent.pb.h"
 #include "envoy/server/request_id_extension_config.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/date_provider_impl.h"
@@ -10,14 +10,14 @@
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
+#include "test/extensions/filters/network/http_connection_manager/config.pb.h"
+#include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
-#include "test/extensions/filters/network/http_connection_manager/config.pb.h"
-#include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
