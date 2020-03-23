@@ -116,14 +116,14 @@ Benchmark                  Time             CPU   Iterations
 ------------------------------------------------------------
 ....
 
-Compress/2          25198150 ns     25057345 ns           29
-Compress/2          24647784 ns     24569862 ns           29
-Compress/2          24051937 ns     24041379 ns           29
-Compress/2          24163591 ns     24124310 ns           29
-Compress/2          24264160 ns     24227103 ns           29
-Compress/2_mean     24465124 ns     24404000 ns            5
-Compress/2_median   24264160 ns     24227103 ns            5
-Compress/2_stddev     467098 ns       416948 ns            5
+CompressFull/2                18887569 ns     18783730 ns           37
+CompressFull/2                19108998 ns     19004000 ns           37
+CompressFull/2                18984786 ns     18897703 ns           37
+CompressFull/2                18617854 ns     18543027 ns           37
+CompressFull/2                18555731 ns     18485811 ns           37
+CompressFull/2_mean           18830988 ns     18742854 ns            5
+CompressFull/2_median         18887569 ns     18783730 ns            5
+CompressFull/2_stddev           237348 ns       223522 ns            5
 
 ....
 */
