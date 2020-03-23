@@ -1,0 +1,7 @@
+config {
+  name: "envoy.filters.http.dynamic_forward_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig"
+    value: "\n\t\n\002Ae\032\003\020\200N"
+  }
+}
