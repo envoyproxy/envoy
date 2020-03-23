@@ -301,34 +301,6 @@ TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
                             "http/1.1 protocol error: unsupported transfer encoding");
 }
 
-TEST_F(Http1ServerConnectionImplTest, UnsupportedChainedEncoding) {
-  initialize();
-
-  InSequence sequence;
-
-  MockRequestDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: "
-                           "deflate, chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: unsupported transfer encoding");
-}
-
-TEST_F(Http1ServerConnectionImplTest, InvalidEmbeddedChainedEncoding) {
-  initialize();
-
-  InSequence sequence;
-
-  MockRequestDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: "
-                           "identity, invalid, chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: unsupported transfer encoding");
-}
-
 TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
   initialize();
 
