@@ -74,18 +74,18 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(const std::string& addr_port
   return instance;
 }
 
-const std::string getLoopbackAddressUrlString(const Address::IpVersion version, uint8_t host_id) {
+const std::string getLoopbackAddressUrlString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return absl::StrCat("[", getLoopbackAddressString(version, host_id), "]");
+    return std::string("[::1]");
   }
-  return getLoopbackAddressString(version, host_id);
+  return std::string("127.0.0.1");
 }
 
-const std::string getLoopbackAddressString(const Address::IpVersion version, uint8_t host_id) {
+const std::string getLoopbackAddressString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v6) {
-    return absl::StrCat("::", host_id);
+    return std::string("::1");
   }
-  return absl::StrCat("127.0.0.", host_id);
+  return std::string("127.0.0.1");
 }
 
 const std::string getAnyAddressUrlString(const Address::IpVersion version) {

@@ -118,11 +118,9 @@ MockWorkerFactory::MockWorkerFactory() = default;
 MockWorkerFactory::~MockWorkerFactory() = default;
 
 MockWorker::MockWorker() {
-  ON_CALL(*this, addListener(_, _, _))
+  ON_CALL(*this, addListener(_, _))
       .WillByDefault(
-          Invoke([this](absl::optional<uint64_t> overridden_listener,
-                        Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
-            UNREFERENCED_PARAMETER(overridden_listener);
+          Invoke([this](Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
             config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
@@ -141,13 +139,6 @@ MockWorker::MockWorker() {
           completion();
         }
       }));
-
-  ON_CALL(*this, removeFilterChains(_, _))
-      .WillByDefault(Invoke(
-          [this](const Network::DrainingFilterChains&, std::function<void()> completion) -> void {
-            EXPECT_EQ(nullptr, remove_filter_chains_completion_);
-            remove_filter_chains_completion_ = completion;
-          }));
 }
 MockWorker::~MockWorker() = default;
 

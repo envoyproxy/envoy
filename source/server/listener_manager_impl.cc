@@ -231,11 +231,6 @@ DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
-DrainingFilterChains::DrainingFilterChains(ListenerImplPtr&& draining_listener,
-                                           uint64_t workers_pending_removal)
-    : draining_listener_(std::move(draining_listener)),
-      workers_pending_removal_(workers_pending_removal) {}
-
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory,
@@ -389,33 +384,9 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
-  ListenerImplPtr new_listener{};
-
-  // Support in place update only when no tradition update is occurring.
-  if (existing_active_listener != active_listeners_.end() &&
-      existing_warming_listener == warming_listeners_.end()) {
-    auto update_decision =
-        (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_);
-    switch (update_decision) {
-    // TODO(lambdai): Optimize when ongoing update is equivalent to the new config
-    /*case UpdateDecision::UpdateInFlight*/
-    case UpdateDecision::Update:
-      ENVOY_LOG(debug, "use smart update path for listener name={} hash={}", name, hash);
-      new_listener =
-          (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
-      break;
-    case UpdateDecision::NotSupported:
-      // Fallback to traditional listener update. This is rare.
-      new_listener =
-          std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
-                                         workers_started_, hash, server_.options().concurrency());
-      break;
-    }
-  } else {
-    new_listener =
-        std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
-                                       workers_started_, hash, server_.options().concurrency());
-  }
+  ListenerImplPtr new_listener(new ListenerImpl(config, version_info, *this, name, added_via_api,
+                                                workers_started_, hash,
+                                                server_.options().concurrency()));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
@@ -627,38 +598,22 @@ std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl
   return ret;
 }
 
-void ListenerManagerImpl::addListenerToWorker(Worker& worker,
-                                              absl::optional<uint64_t> overridden_listener,
-                                              ListenerImpl& listener,
+void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& listener,
                                               ListenerCompletionCallback completion_callback) {
-  if (overridden_listener.has_value()) {
-    ENVOY_LOG(debug, "replacing existing listener {}", overridden_listener.value());
-    worker.addListener(overridden_listener, listener, [this, &listener](bool success) -> void {
-      server_.dispatcher().post([this, success, &listener]() -> void {
-        // TODO: I don't have a concrete case to generate the failure.
-        UNREFERENCED_PARAMETER(success);
-        UNREFERENCED_PARAMETER(listener);
-        stats_.listener_create_success_.inc();
-      });
-    });
-    return;
-  }
-  worker.addListener(
-      overridden_listener, listener, [this, &listener, completion_callback](bool success) -> void {
+  worker.addListener(listener, [this, &listener, completion_callback](bool success) -> void {
         // The add listener completion runs on the worker thread. Post back to the main thread to
         // avoid locking.
         server_.dispatcher().post([this, success, &listener, completion_callback]() -> void {
-          // It is theoretically possible for a listener to get added on 1 worker but not the
-          // others. The below check with onListenerCreateFailure() is there to ensure we execute
-          // the removal/logging/stats at most once on failure. Note also that drain/removal can
-          // race with addition. It's guaranteed that workers process remove after add so this
-          // should be fine.
+        // It is theoretically possible for a listener to get added on 1 worker but not the others.
+        // The below check with onListenerCreateFailure() is there to ensure we execute the
+        // removal/logging/stats at most once on failure. Note also that drain/removal can race
+        // with addition. It's guaranteed that workers process remove after add so this should be
+        // fine.
           if (!success && !listener.onListenerCreateFailure()) {
-            // TODO(mattklein123): In addition to a critical log and a stat, we should consider
-            // adding
+            // TODO(mattklein123): In addition to a critical log and a stat, we should consider adding
             //                     a startup option here to cause the server to exit. I think we
             //                     probably want this at Lyft but I will do it in a follow up.
-            ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
+            ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker", 
                       listener.name(), listener.listenSocketFactory().localAddress()->asString());
             stats_.listener_create_failure_.inc();
             removeListener(listener.name());
@@ -677,8 +632,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, /* overrided listener */ absl::nullopt, listener,
-                        /* callback */ nullptr);
+    addListenerToWorker(*worker, listener, /* callback */ nullptr);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -699,112 +653,12 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-// TODO(lambdai): unify warmup
-void ListenerManagerImpl::onIntelligentListenerWarmed(ListenerImpl& listener) {
-  auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
-  auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
-  ASSERT(existing_warming_listener != warming_listeners_.end());
-  ASSERT(*existing_warming_listener != nullptr);
-
-  (*existing_warming_listener)
-      ->debugLog("intelligent listener warm complete. updating active listener");
-  if (existing_active_listener != active_listeners_.end()) {
-    ASSERT(*existing_active_listener != nullptr);
-    // The warmed listener should be added first so that the worker will accept new connections
-    // when it stops listening on the old listener.
-    for (const auto& worker : workers_) {
-      addListenerToWorker(*worker, (*existing_active_listener)->listenerTag(), listener, nullptr);
-    }
-    // Finish active_listeners_ transformation before calling `drainListener` as it depends on their
-    // state.
-    auto previous_listener = std::move(*existing_active_listener);
-    *existing_active_listener = std::move(*existing_warming_listener);
-    drainFilterChains(std::move(previous_listener), **existing_active_listener);
-  } else {
-    for (const auto& worker : workers_) {
-      addListenerToWorker(*worker, absl::nullopt, listener, nullptr);
-    }
-    active_listeners_.emplace_back(std::move(*existing_warming_listener));
-  }
-
-  warming_listeners_.erase(existing_warming_listener);
-  updateWarmingActiveGauges();
-}
-
-void ListenerManagerImpl::drainFilterChains(ListenerImplPtr&& listener,
-                                            ListenerImpl& new_listener) {
-
-  // First add the listener to the draining list.
-  std::list<DrainingFilterChains>::iterator draining_group = draining_filter_groups_.emplace(
-      draining_filter_groups_.begin(), std::move(listener), workers_.size());
-  draining_group->draining_listener_->diffFilterChain(
-      new_listener, [&draining_group](FilterChainImpl& filter_chain) mutable {
-        filter_chain.setDrainClose();
-        draining_group->draining_filter_chains_.push_back(&filter_chain);
-      });
-  int filter_chain_size = draining_group->draining_filter_chains_.size();
-
-  // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
-  // restart. Same below inside the lambda.
-  // TODO(lambdai): Currently the number of DrainFilterChains objects are tracked:
-  // len(filter_chains). What we really need is accumulate(filter_chains, fc: len(fc))
-  stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
-
-  draining_group->draining_listener_->debugLog(
-      absl::StrCat("draining ", filter_chain_size, " filter chains in listener ",
-                   draining_group->draining_listener_->name()));
-
-  // In the intelligent path where filter chains are drained but listener is survived, the
-  // connection is not impacted: the draining filter chains are not tracked by warmed up filter
-  // chain manager.
-  // Moved
-  // for (auto& filter_chain : filter_chains) {
-  //    draining_group->draining_filter_chains_ = std::move(filter_chains);
-  //   // FilterChain drain close is not bind with the listener
-  //   // TODO(lambdai): drainListener() must set drainClose for each filter chain
-  //   // TODO(lambdai): bring the tick based drain close back.
-  //   filter_chain.setDrainClose();
-  // }
-
-  // Start the drain sequence which completes when the listener's drain manager has completed
-  // draining at whatever the server configured drain times are.
-  // TODO(lambdai): only partial functionality is adopted. Consider split functionality?
-  // 1. Filter chain doesn't query the listener's drain close decision
-  // 2. the completion callback is used to execute the resouce clean up.
-  draining_group->startDrainSequence(
-      server_.options().drainTime(), server_.dispatcher(), [this, draining_group]() -> void {
-        draining_group->draining_listener_->debugLog(
-            absl::StrCat("removing draining filter chains from listener ",
-                         draining_group->draining_listener_->name()));
-        for (const auto& worker : workers_) {
-          // Once the drain time has completed via the drain manager's timer, we tell the workers
-          // to remove the filter chains.
-          // TODO(lambdai): Fix race condition and duplicate the efforts in drainListener.
-          worker->removeFilterChains(*draining_group, [this, draining_group]() -> void {
-            // The remove listener completion is called on the worker thread. We post back to
-            // the main thread to avoid locking. This makes sure that we don't destroy the
-            // listener while filters might still be using its context (stats, etc.).
-            server_.dispatcher().post([this, draining_group]() -> void {
-              if (--draining_group->workers_pending_removal_ == 0) {
-                draining_group->draining_listener_->debugLog(
-                    absl::StrCat("draining filter chains from listener ",
-                                 draining_group->draining_listener_->name(), " complete"));
-                draining_filter_groups_.erase(draining_group);
-                stats_.total_filter_chains_draining_.set(draining_filter_groups_.size());
-              }
-            });
-          });
-        }
-      });
-
-  updateWarmingActiveGauges();
-}
-
 uint64_t ListenerManagerImpl::numConnections() const {
   uint64_t num_connections = 0;
   for (const auto& worker : workers_) {
     num_connections += worker->numConnections();
   }
+
   return num_connections;
 }
 
@@ -861,7 +715,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     ENVOY_LOG(debug, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
-      addListenerToWorker(*worker, absl::nullopt, *listener, [this, listeners_pending_init]() {
+      addListenerToWorker(*worker, *listener, [this, listeners_pending_init]() {
         if (--(*listeners_pending_init) == 0) {
           stats_.workers_started_.set(1);
         }

@@ -24,20 +24,6 @@
 namespace Envoy {
 namespace Server {
 
-class ListenerMessageUtil {
-public:
-  // TODO(lambdai): This need to allign with the amendment in ListenerImpl::ListenerImpl where
-  // implicit listener filter chains are added.
-  static envoy::config::listener::v3::Listener
-  normalize(const envoy::config::listener::v3::Listener& config);
-
-  /**
-   * @return true if listener update from lhs to rhs could go through fast path.
-   */
-  static bool equivalent(const envoy::config::listener::v3::Listener& lhs,
-                         const envoy::config::listener::v3::Listener& rhs);
-};
-
 class ListenerManagerImpl;
 
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
@@ -85,15 +71,6 @@ private:
   const bool reuse_port_;
   Network::SocketSharedPtr socket_;
   absl::once_flag steal_once_;
-};
-
-// The decision on how to execute the listener config update.
-enum class UpdateDecision {
-  // Using fast path to update listener, less connections will be drained and closed.
-  Update,
-  // Using traditional listener update, where all the connections bind to the previous config will
-  // be drained and closed.
-  NotSupported
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
@@ -241,36 +218,7 @@ public:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash, uint32_t concurrency);
-  // TODO(lambdai): remove unnessary
-  ListenerImpl(const ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
-               const std::string& version_info, ListenerManagerImpl& parent,
-               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               uint32_t concurrency);
   ~ListenerImpl() override;
-
-  // ListenerFactoryContext may be shared by generations of listeners
-  std::shared_ptr<Configuration::ListenerFactoryContext> getListenerFactoryContext();
-
-  /**
-   * Determine if in place filter chain update could be executed at this moment.
-   */
-  UpdateDecision supportUpdateFilterChain(const envoy::config::listener::v3::Listener& config,
-                                          bool worker_started);
-  /**
-   * Execute in place filter chain update. The filter chain update is less expensive than full
-   * listener update.
-   */
-  std::unique_ptr<ListenerImpl>
-  newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
-                             bool workers_started, uint64_t hash);
-
-  /**
-   * Run the callback on each filter chain exists in this listener but not in another listener.
-   */
-  void diffFilterChain(const ListenerImpl& listener,
-                       std::function<void(FilterChainImpl&)> callback);
-
-  Init::Manager& initManager();
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -328,6 +276,7 @@ public:
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
   }
+  Init::Manager& initManager();
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
@@ -379,7 +328,7 @@ private:
   Init::TargetImpl listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
-  Init::ManagerImpl dynamic_init_manager_;
+  std::unique_ptr<Init::Manager> dynamic_init_manager_;
 
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;

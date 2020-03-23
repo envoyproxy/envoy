@@ -24,16 +24,12 @@ public:
   using AddListenerCompletion = std::function<void(bool success)>;
 
   /**
-   * Add a listener to the worker and replace the previous listener if any. If the previous listener
-   * doesn't exist, the behavior should be equivalent to add a new listener.
-   * @param overridden_listener The previous listener tag to be replaced. nullopt if it's a new
-   * listener.
+   * Add a listener to the worker.
    * @param listener supplies the listener to add.
    * @param completion supplies the completion to call when the listener has been added (or not) on
    *                   the worker.
    */
-  virtual void addListener(absl::optional<uint64_t> overridden_listener,
-                           Network::ListenerConfig& listener,
+  virtual void addListener(Network::ListenerConfig& listener,
                            AddListenerCompletion completion) PURE;
 
   /**
@@ -68,15 +64,6 @@ public:
    */
   virtual void removeListener(Network::ListenerConfig& listener,
                               std::function<void()> completion) PURE;
-  /**
-   * Remove the stale filter chains of the given listener but leave the listener running.
-   * @param draining_filter_chains supplies the filter chains and the listener id to be removed.
-   * @param completion supplies the completion to be called when the listener removed all the
-   * untracked connections. This completion is called on the worker thread. No locking is performed
-   * by the worker.
-   */
-  virtual void removeFilterChains(const Network::DrainingFilterChains& draining_filter_chains,
-                                  std::function<void()> completion) PURE;
 
   /**
    * Stop a listener from accepting new connections. This is used for server draining.

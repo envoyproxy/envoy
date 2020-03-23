@@ -34,15 +34,14 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
       [this](OverloadActionState state) { stopAcceptingConnectionsCb(state); });
 }
 
-void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                             Network::ListenerConfig& listener, AddListenerCompletion completion) {
+void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompletion completion) {
   // All listener additions happen via post. However, we must deal with the case where the listener
   // can not be created on the worker. There is a race condition where 2 processes can successfully
   // bind to an address, but then fail to listen() with EADDRINUSE. During initial startup, we want
   // to surface this.
-  dispatcher_->post([this, overridden_listener, &listener, completion]() -> void {
+  dispatcher_->post([this, &listener, completion]() -> void {
     try {
-      handler_->addListener(overridden_listener, listener);
+      handler_->addListener(listener);
       hooks_.onWorkerListenerAdded();
       completion(true);
     } catch (const Network::CreateListenerException& e) {
@@ -67,14 +66,6 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
     handler_->removeListeners(listener_tag);
     completion();
     hooks_.onWorkerListenerRemoved();
-  });
-}
-
-void WorkerImpl::removeFilterChains(const Network::DrainingFilterChains& draining_filter_chains,
-                                    std::function<void()> completion) {
-  ASSERT(thread_);
-  dispatcher_->post([this, &draining_filter_chains, completion = std::move(completion)]() -> void {
-    handler_->removeFilterChains(draining_filter_chains, completion);
   });
 }
 

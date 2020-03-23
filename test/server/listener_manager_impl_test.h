@@ -131,28 +131,6 @@ protected:
     return raw_listener;
   }
 
-  ListenerHandle* expectListenerOverridden(bool need_init) {
-    auto raw_listener = new ListenerHandle(/*need_local_drain_manager=*/false);
-    // TODO(lambdai): precisely decalre drain manager
-    // EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
-    //    .WillOnce(Return(raw_listener->drain_manager_));
-    EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [raw_listener, need_init](
-                const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
-                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
-                -> std::vector<Network::FilterFactoryCb> {
-              std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &filter_chain_factory_context;
-              if (need_init) {
-                filter_chain_factory_context.initManager().add(notifier->target_);
-              }
-              return {[notifier](Network::FilterManager&) -> void {}};
-            }));
-
-    return raw_listener;
-  }
-
   const Network::FilterChain*
   findFilterChain(uint16_t destination_port, const std::string& destination_address,
                   const std::string& server_name, const std::string& transport_protocol,
@@ -220,7 +198,7 @@ protected:
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t warming,
-                  uint64_t active, uint64_t draining, uint64_t draining_filter_chains) {
+                  uint64_t active, uint64_t draining) {
     EXPECT_EQ(added, server_.stats_store_.counter("listener_manager.listener_added").value());
     EXPECT_EQ(modified, server_.stats_store_.counter("listener_manager.listener_modified").value());
     EXPECT_EQ(removed, server_.stats_store_.counter("listener_manager.listener_removed").value());
@@ -236,10 +214,6 @@ protected:
                             .gauge("listener_manager.total_listeners_draining",
                                    Stats::Gauge::ImportMode::NeverImport)
                             .value());
-    EXPECT_EQ(draining_filter_chains, server_.stats_store_
-                                          .gauge("listener_manager.total_filter_chains_draining",
-                                                 Stats::Gauge::ImportMode::NeverImport)
-                                          .value());
   }
 
   void checkConfigDump(const std::string& expected_dump_yaml) {
