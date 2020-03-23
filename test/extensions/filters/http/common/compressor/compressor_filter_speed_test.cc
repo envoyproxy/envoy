@@ -49,9 +49,25 @@ using CompressionParams =
     std::tuple<Envoy::Compressor::ZlibCompressorImpl::CompressionLevel,
                Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy, int64_t, uint64_t>;
 
-static void compressWith(CompressionParams params, NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks,
-                         uint64_t payload_size = 122880,
-                         uint64_t chunks = 1) {
+static std::vector<Buffer::OwnedImpl> generateChunks(const uint64_t chunk_count,
+                                                     const uint64_t chunk_size) {
+  std::vector<Buffer::OwnedImpl> vec;
+  vec.reserve(chunk_count);
+
+  Buffer::OwnedImpl data;
+  TestUtility::feedBufferWithRandomCharacters(data, chunk_size);
+
+  for (uint64_t i = 0; i < chunk_count; ++i) {
+    Buffer::OwnedImpl chunk;
+    chunk.add(data);
+    vec.push_back(std::move(chunk));
+  }
+
+  return vec;
+}
+
+static void compressWith(std::vector<Buffer::OwnedImpl> chunks, CompressionParams params,
+                         NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks) {
   Stats::IsolatedStoreImpl stats;
   testing::NiceMock<Runtime::MockLoader> runtime;
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
@@ -78,25 +94,24 @@ static void compressWith(CompressionParams params, NiceMock<Http::MockStreamDeco
       {"content-type", "application/json;charset=utf-8"}};
   filter->encodeHeaders(response_headers, false);
 
-  EXPECT_EQ(0, 122880 % chunks);
-  const auto chunk_size = payload_size / chunks;
-  Buffer::OwnedImpl total_compressed_data;
-  for (auto i = 0u; i < chunks; ++i) {
-    Buffer::OwnedImpl data;
-    TestUtility::feedBufferWithRandomCharacters(data, chunk_size);
+  uint64_t idx = 0;
+  uint64_t total_uncompressed_bytes = 0;
+  uint64_t total_compressed_bytes = 0;
+  for (auto& data : chunks) {
+    total_uncompressed_bytes += data.length();
 
-    if (i == (chunks - 1)) {
+    if (idx == (chunks.size() - 1)) {
       filter->encodeData(data, true);
     } else {
       filter->encodeData(data, false);
     }
 
-    total_compressed_data.add(data);
+    total_compressed_bytes += data.length();
+    ++idx;
   }
 
-  EXPECT_EQ(payload_size, stats.counter("test.gzip.total_uncompressed_bytes").value());
-  EXPECT_EQ(total_compressed_data.length(),
-            stats.counter("test.gzip.total_compressed_bytes").value());
+  EXPECT_EQ(total_uncompressed_bytes, stats.counter("test.gzip.total_uncompressed_bytes").value());
+  EXPECT_EQ(total_compressed_bytes, stats.counter("test.gzip.total_compressed_bytes").value());
   EXPECT_EQ(1U, stats.counter("test.gzip.compressed").value());
 }
 
@@ -116,15 +131,14 @@ Benchmark                  Time             CPU   Iterations
 ------------------------------------------------------------
 ....
 
-CompressChunks8192/2          14881254 ns     14861000 ns           46
-CompressChunks8192/2          14956146 ns     14907478 ns           46
-CompressChunks8192/2          15446768 ns     15396283 ns           46
-CompressChunks8192/2          15363712 ns     15323761 ns           46
-CompressChunks8192/2          15265096 ns     15213652 ns           46
-CompressChunks8192/2_mean     15182595 ns     15140435 ns            5
-CompressChunks8192/2_median   15265096 ns     15213652 ns            5
-CompressChunks8192/2_stddev     250740 ns       243300 ns            5
-
+CompressChunks8192/2           2971499 ns      2967258 ns          248
+CompressChunks8192/2           3015538 ns      3008694 ns          248
+CompressChunks8192/2           2919954 ns      2907698 ns          248
+CompressChunks8192/2           2838894 ns      2831851 ns          248
+CompressChunks8192/2           2867619 ns      2865883 ns          248
+CompressChunks8192/2_mean      2922701 ns      2916277 ns            5
+CompressChunks8192/2_median    2919954 ns      2907698 ns            5
+CompressChunks8192/2_stddev      72569 ns        72251 ns            5
 ....
 */
 // SPELLCHECKER(on)
@@ -172,7 +186,8 @@ static void CompressChunks8192(benchmark::State& state) {
   const auto& params = compression_params[idx];
 
   for (auto _ : state) {
-    compressWith(params, decoder_callbacks, 122880, 15);
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(15, 8192);
+    compressWith(std::move(chunks), params, decoder_callbacks);
   }
 }
 BENCHMARK(CompressChunks8192)->DenseRange(0, 8, 1);
@@ -183,7 +198,8 @@ static void CompressChunks4096(benchmark::State& state) {
   const auto& params = compression_params[idx];
 
   for (auto _ : state) {
-    compressWith(params, decoder_callbacks, 122880, 30);
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(30, 4096);
+    compressWith(std::move(chunks), params, decoder_callbacks);
   }
 }
 BENCHMARK(CompressChunks4096)->DenseRange(0, 8, 1);
@@ -194,7 +210,8 @@ static void CompressChunks1024(benchmark::State& state) {
   const auto& params = compression_params[idx];
 
   for (auto _ : state) {
-    compressWith(params, decoder_callbacks, 122880, 120);
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(120, 1024);
+    compressWith(std::move(chunks), params, decoder_callbacks);
   }
 }
 BENCHMARK(CompressChunks1024)->DenseRange(0, 8, 1);
@@ -205,7 +222,8 @@ static void CompressFull(benchmark::State& state) {
   const auto& params = compression_params[idx];
 
   for (auto _ : state) {
-    compressWith(params, decoder_callbacks);
+    std::vector<Buffer::OwnedImpl> chunks = generateChunks(1, 122880);
+    compressWith(std::move(chunks), params, decoder_callbacks);
   }
 }
 BENCHMARK(CompressFull)->DenseRange(0, 8, 1);
