@@ -524,6 +524,24 @@ IntegrationTestServerPtr BaseIntegrationTest::createIntegrationTestServer(
                                        defer_listener_finalization_);
 }
 
+void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
+  listener_access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
+}
+
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename) {
+  // Wait a max of 1s for logs to flush to disk.
+  for (int i = 0; i < 1000; ++i) {
+    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    if (contents.length() > 0) {
+      return contents;
+    }
+    absl::SleepFor(absl::Milliseconds(1));
+  }
+  RELEASE_ASSERT(0, "Timed out waiting for access log");
+  return "";
+}
+
 void BaseIntegrationTest::createXdsUpstream() {
   if (create_xds_upstream_ == false) {
     return;

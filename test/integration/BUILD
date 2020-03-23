@@ -158,6 +158,8 @@ envoy_cc_test(
         ":filter_manager_integration_proto_cc_proto",
         ":http_integration_lib",
         ":integration_lib",
+        "//source/extensions/filters/listener/original_dst:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/tcp_proxy:config",

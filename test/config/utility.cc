@@ -733,6 +733,24 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   return true;
 }
 
+bool ConfigHelper::setListenerAccessLog(const std::string& filename, absl::string_view format) {
+  RELEASE_ASSERT(!finalized_, "");
+  if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
+    return false;
+  }
+  envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+  if (!format.empty()) {
+    access_log_config.set_format(std::string(format));
+  }
+  access_log_config.set_path(filename);
+  bootstrap_.mutable_static_resources()
+      ->mutable_listeners(0)
+      ->add_access_log()
+      ->mutable_typed_config()
+      ->PackFrom(access_log_config);
+  return true;
+}
+
 void ConfigHelper::initializeTls(
     const ServerSslOptions& options,
     envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {

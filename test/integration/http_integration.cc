@@ -256,19 +256,6 @@ HttpIntegrationTest::~HttpIntegrationTest() {
   fake_upstreams_.clear();
 }
 
-std::string HttpIntegrationTest::waitForAccessLog(const std::string& filename) {
-  // Wait a max of 1s for logs to flush to disk.
-  for (int i = 0; i < 1000; ++i) {
-    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
-    if (contents.length() > 0) {
-      return contents;
-    }
-    absl::SleepFor(absl::Milliseconds(1));
-  }
-  RELEASE_ASSERT(0, "Timed out waiting for access log");
-  return "";
-}
-
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));

@@ -100,9 +100,6 @@ public:
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   ~HttpIntegrationTest() override;
 
-  // Waits for the first access log entry.
-  std::string waitForAccessLog(const std::string& filename);
-
 protected:
   void useAccessLog(absl::string_view format = "");
 
