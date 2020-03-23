@@ -15,6 +15,8 @@ envoy_cc_library(
     external_deps = [
         "nghttp2",
         "abseil_optional",
+        "abseil_inlined_vector",
+        "abseil_algorithm",
     ],
     deps = [
         ":metadata_decoder_lib",

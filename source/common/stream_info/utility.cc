@@ -157,5 +157,14 @@ Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address
   }
 }
 
+const std::string
+Utility::formatDownstreamAddressJustPort(const Network::Address::Instance& address) {
+  std::string port;
+  if (address.type() == Network::Address::Type::Ip) {
+    port = std::to_string(address.ip()->port());
+  }
+  return port;
+}
+
 } // namespace StreamInfo
 } // namespace Envoy
