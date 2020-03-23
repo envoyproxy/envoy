@@ -180,7 +180,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   if (!completed_ && fallback_if_failed_) {
     fallback_if_failed_ = false;
     getAddrInfo(AF_INET);
-    // Note: Nothing can follow this call to getHostByName due to deletion of this
+    // Note: Nothing can follow this call to getAddrInfo due to deletion of this
     // object upon synchronous resolution.
     return;
   }
@@ -231,7 +231,7 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
-  // failed initial call to getHostByName followed by a synchronous IPv4
+  // failed initial call to getAddrInfo followed by a synchronous IPv4
   // resolution.
 
   // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for why this is done.
