@@ -974,6 +974,52 @@ TEST_F(HttpFilterTestParam, DisabledOnRoute) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
+// Test that filter can be disabled with route config.
+TEST_F(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
+  FilterConfigPerRoute auth_per_route(settings);
+
+  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+      .WillByDefault(Return(&auth_per_route));
+
+  auto test_disable = [&](bool disabled) {
+    initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 1
+    allow_partial_message: false
+  )EOF");
+
+    // Set the filter disabled setting.
+    settings.set_disabled(disabled);
+    // Initialize the route's per filter config.
+    auth_per_route = FilterConfigPerRoute(settings);
+  };
+
+  test_disable(false);
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  // When filter is not disabled, setDecoderBufferLimit is called.
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
+  EXPECT_CALL(connection_, remoteAddress()).Times(0);
+  EXPECT_CALL(connection_, localAddress()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  // To test that disabling the filter works.
+  test_disable(true);
+  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+  // Make sure that setDecoderBufferLimit is skipped.
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+}
+
 // Test that the request continues when the filter_callbacks has no route.
 TEST_F(HttpFilterTestParam, NoRoute) {
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
