@@ -95,9 +95,7 @@ AccessLogFileImpl::~AccessLogFileImpl() {
 }
 
 void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
-  uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-  buffer.getRawSlices(slices.begin(), num_slices);
+  Buffer::RawSliceVector slices = buffer.getRawSlices();
 
   // We must do the actual writes to disk under lock, so that we don't intermix chunks from
   // different AccessLogFileImpl pointing to the same underlying file. This can happen either via

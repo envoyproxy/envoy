@@ -93,9 +93,8 @@ protected:
   }
 
   void expectValidFinishedBuffer(const uint32_t content_length) {
-    uint64_t num_comp_slices = data_.getRawSlices(nullptr, 0);
-    absl::FixedArray<Buffer::RawSlice> compressed_slices(num_comp_slices);
-    data_.getRawSlices(compressed_slices.begin(), num_comp_slices);
+    Buffer::RawSliceVector compressed_slices = data_.getRawSlices();
+    const uint64_t num_comp_slices = compressed_slices.size();
 
     const std::string header_hex_str = Hex::encode(
         reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
@@ -176,7 +175,9 @@ TEST_F(GzipFilterTest, RuntimeDisabled) {
   }
 }
 )EOF");
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
+      .Times(2)
+      .WillRepeatedly(Return(false));
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
   doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
 }

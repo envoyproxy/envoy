@@ -46,7 +46,12 @@ message DnsCacheConfig {
   //
   //  The returned DNS TTL is not currently used to alter the refresh rate. This feature will be
   //  added in a future change.
-  google.protobuf.Duration dns_refresh_rate = 3 [(validate.rules).duration = {gt {}}];
+  //
+  // .. note:
+  //
+  // The refresh rate is rounded to the closest millisecond, and must be at least 1ms.
+  google.protobuf.Duration dns_refresh_rate = 3
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // The TTL for hosts that are unused. Hosts that have not been used in the configured time
   // interval will be purged. If not specified defaults to 5m.

@@ -152,6 +152,9 @@ public:
   // /dev/null.
   bool setAccessLog(const std::string& filename, absl::string_view format = "");
 
+  // Set the listener access log for the first listener to a given file.
+  bool setListenerAccessLog(const std::string& filename, absl::string_view format = "");
+
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);
 
@@ -182,6 +185,10 @@ public:
 
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
+
+  // Add filter_metadata to a cluster with the given name
+  void addClusterFilterMetadata(absl::string_view metadata_yaml,
+                                absl::string_view cluster_name = "cluster_0");
 
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
