@@ -30,7 +30,7 @@ TOOLS=$(dirname $(dirname $(realpath $0)))
 export PYTHONPATH="$TOOLS"
 ./tools/proto_format/proto_sync.py "--mode=$1" ${PROTO_TARGETS}
 
-bazel build ${BAZEL_BUILD_OPTIONS} //tools/type_whisperer:api_build_file 
+bazel build ${BAZEL_BUILD_OPTIONS} //tools/type_whisperer:api_build_file
 cp -f bazel-bin/tools/type_whisperer/BUILD.api_build_file api/BUILD
 
 cp -f  ./api/bazel/*.bzl ./api/bazel/BUILD ./generated_api_shadow/bazel
