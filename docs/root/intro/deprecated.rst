@@ -92,6 +92,11 @@ Deprecated items below are listed in chronological order.
   been deprecated in favor of `compressor`.
 * The statistics counter `header_gzip` in :ref:`HTTP Gzip filter <config_http_filters_gzip>`
   has been deprecated in favor of `header_compressor_used`.
+* The grpc_stats filter behavior of by default creating a new stat for every message type seen is deprecated.
+  The default will switch to only creating a fixed set of stats. The previous behavior can be enabled by enabling
+  :ref:`stats_for_all_methods <envoy_api_field_config.filter.http.grpc_stats.v2alpha.FilterConfig.stats_for_all_methods>`,
+  and the previous default can be enabled until the end of the deprecation period by enabling runtime feature
+  `envoy.reloadable_features.grpc_stats_filter_disable_stats_for_all_methods_by_default`.
 
 1.13.0 (January 20, 2020)
 =========================
