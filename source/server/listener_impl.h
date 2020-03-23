@@ -77,7 +77,7 @@ private:
 //                     initializing all listeners after workers are started.
 
 /**
- * The immutable factory context during the intelligent listener update. The continous intelligent
+ * The immutable factory context during the intelligent listener update. The continuous intelligent
  * listeners share the same ListenerFactoryContextBaseImpl. With ListenerFactoryContextBase, the
  * number of listener config at runtime is restricted to 1, despite the active filter chains could
  * spread among multiple listener configs.

@@ -350,8 +350,7 @@ public:
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, incNumConnections, ());
   MOCK_METHOD(void, decNumConnections, ());
-  MOCK_METHOD(void, addListener,
-              (ListenerConfig& config));
+  MOCK_METHOD(void, addListener, (ListenerConfig & config));
   MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
   MOCK_METHOD(void, removeFilterChains,
               (const DrainingFilterChains& draining_filter_chains,

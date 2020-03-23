@@ -224,7 +224,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                           }),
       listener_init_target_(fmt::format("Listener-init-target {}", name),
                             [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
-      dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(fmt::format("Listener-local-init-manager {} {}", name, hash))),
+      dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
+          fmt::format("Listener-local-init-manager {} {}", name, hash))),
       // local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(

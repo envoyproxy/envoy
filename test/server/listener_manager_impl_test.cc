@@ -3274,23 +3274,23 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
       config: {}            
   )EOF",
                                                        Network::Address::IpVersion::v4);
-      Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
-      // Extract listener_factory_context without breaking encapulation.                                           
-      ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([&listener_factory_context](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
-                          filters,
-                      Configuration::ListenerFactoryContext& context)
-                       -> std::vector<Network::ListenerFilterFactoryCb> {
-listener_factory_context = &context;
-              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
-                                                                                    context);
-            }));                                                     
+  Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
+  // Extract listener_factory_context without breaking encapulation.
+  ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+      .WillByDefault(
+          Invoke([&listener_factory_context](
+                     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                         filters,
+                     Configuration::ListenerFactoryContext& context)
+                     -> std::vector<Network::ListenerFilterFactoryCb> {
+            listener_factory_context = &context;
+            return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
+          }));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   ASSERT_NE(nullptr, listener_factory_context);
-  EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(&listener_factory_context->listenerMetadata(), "com.bar.foo", "baz")
-                .string_value());
+  EXPECT_EQ("test_value", Config::Metadata::metadataValue(
+                              &listener_factory_context->listenerMetadata(), "com.bar.foo", "baz")
+                              .string_value());
   EXPECT_EQ(envoy::config::core::v3::INBOUND, listener_factory_context->direction());
 }
 
